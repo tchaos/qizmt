@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gensort", "gensort\gensort.vcproj", "{A4480C83-0B57-45B2-9536-BA889A0AE18C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "valsort", "valsort\valsort.vcproj", "{DF4F3D89-99A9-44C3-A9D9-2349B9C0ACA6}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 3
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://tfs:8080/
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = gensort\\gensort.vcproj
+		SccProjectName1 = gensort
+		SccLocalPath1 = gensort
+		SccProjectUniqueName2 = valsort\\valsort.vcproj
+		SccProjectName2 = valsort
+		SccLocalPath2 = valsort
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A4480C83-0B57-45B2-9536-BA889A0AE18C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A4480C83-0B57-45B2-9536-BA889A0AE18C}.Debug|Win32.Build.0 = Debug|Win32
+		{A4480C83-0B57-45B2-9536-BA889A0AE18C}.Release|Win32.ActiveCfg = Release|Win32
+		{A4480C83-0B57-45B2-9536-BA889A0AE18C}.Release|Win32.Build.0 = Release|Win32
+		{DF4F3D89-99A9-44C3-A9D9-2349B9C0ACA6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{DF4F3D89-99A9-44C3-A9D9-2349B9C0ACA6}.Debug|Win32.Build.0 = Debug|Win32
+		{DF4F3D89-99A9-44C3-A9D9-2349B9C0ACA6}.Release|Win32.ActiveCfg = Release|Win32
+		{DF4F3D89-99A9-44C3-A9D9-2349B9C0ACA6}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

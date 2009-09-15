@@ -1,0 +1,51 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="uninstall_query_analyzer" Custodian="" Email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO_Multi>
+          <DFSReader></DFSReader>
+          <DFSWriter></DFSWriter>
+          <Mode>ALL MACHINES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          { 
+		
+
+                string tempdir = IOUtils.GetTempDirectory();
+                string destdir = "";
+                {
+                    int del = tempdir.LastIndexOf(@"\");               
+                    if (del > -1)
+                    {
+                        destdir = tempdir.Insert(del + 1, "RDBMS_");
+                    }
+                }
+                
+                if(destdir.Length == 0)
+                {
+                     throw new Exception("Error: uninstall_query_analyzer.xml cannot locate destdir.");
+                }
+
+		//uninstall data provider and protocol
+{
+int del = destdir.IndexOf(@"\", 2);
+string destdir_local = destdir.Substring(del + 1).Replace('$', ':');
+
+                DSpace_Log(Shell("cscript.exe " + destdir_local + @"\RDBMS_UninstallDataProvider.js"));
+}
+                
+                if (System.IO.Directory.Exists(destdir))
+                {
+                    System.IO.Directory.Delete(destdir, true);
+                }                
+                
+           }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

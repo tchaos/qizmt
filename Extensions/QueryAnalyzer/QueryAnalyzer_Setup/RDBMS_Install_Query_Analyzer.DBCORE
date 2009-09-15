@@ -1,0 +1,166 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_Install_Query_Analyzer.DBCORE" Custodian="" Email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO_Multi>
+          <DFSReader></DFSReader>
+          <DFSWriter></DFSWriter>
+          <Mode>ALL MACHINES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                if(DSpace_ExecArgs.Length < 3)
+                {
+                    throw new Exception("Error: RDBMS_Install_Query_Analyzer.DBCORE needs argument <installdir> <account> <password>");
+                }
+                
+                string installdir = DSpace_ExecArgs[0]; 	
+		        string account = DSpace_ExecArgs[1];
+                string pwd = DSpace_ExecArgs[2];
+                string tempdir = IOUtils.GetTempDirectory();
+                string destdir = "";
+                {
+                    int del = tempdir.LastIndexOf(@"\");               
+                    if (del > -1)
+                    {
+                        destdir = tempdir.Insert(del + 1, "RDBMS_");
+                    }
+                }
+                
+                if(destdir.Length == 0)
+                {
+                     throw new Exception("Error: RDBMS_Install_Query_Analyzer.DBCORE cannot locate destdir.");
+                }
+                
+                //Stop the service
+                if (System.IO.Directory.Exists(destdir))
+                {
+                    Shell(@"sc \\" + System.Net.Dns.GetHostName() + " stop QueryAnalyzer_Protocol");
+                    System.Threading.Thread.Sleep(5000);
+                }
+                else
+                {
+                    System.IO.Directory.CreateDirectory(destdir);
+                }
+
+                System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(installdir);
+                System.IO.FileInfo[] files = dir.GetFiles();
+
+                const int MAX_TRIES = 10;
+                
+                for (int i = 0; i < files.Length; i++)
+                {
+                    System.IO.FileInfo thisfile = files[i];
+                    string sfile = thisfile.FullName;
+                    string tfile = destdir + @"\" + thisfile.Name;
+                    int triesremain = MAX_TRIES;
+
+                    for (; ; )
+                    {
+                        if(sfile.EndsWith(".DBCORE", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                        
+                        try
+                        {
+                            System.IO.File.Copy(sfile, tfile, true);
+                            System.IO.File.SetAttributes(tfile, System.IO.FileAttributes.Normal);
+                            break;
+                        }
+                        catch
+                        {
+                            if (--triesremain <= 0)
+                            {
+                                throw;
+                            }
+                            System.Threading.Thread.Sleep(10000);
+                            continue;
+                        }
+                    }                
+                } 
+
+                // Add to Machine PATH... (if not found)
+                try
+                {
+                    string path = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);
+                    int del = destdir.IndexOf(@"\", 2);
+                    string addpath = destdir.Substring(del + 1).Replace('$', ':');
+                    string newpath = null;
+                    if (null == path || 0 == path.Trim().Length)
+                    {
+                        newpath = addpath;
+                    }
+                    else
+                    {
+                        if (-1 == (";" + path + ";").IndexOf(addpath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            newpath = path + ";" + addpath;
+                        }
+                    }
+                    if (null != newpath)
+                    {
+                        Environment.SetEnvironmentVariable("PATH", newpath, EnvironmentVariableTarget.Machine);
+                    }
+                }
+                catch(Exception e)
+                {
+                    throw new Exception("Problem updating PATH: " + e.ToString());
+                }
+                
+                //install data provider and protocol
+{
+int del = destdir.IndexOf(@"\", 2);
+string destdir_local = destdir.Substring(del + 1).Replace('$', ':');
+
+                DSpace_Log(Shell("cscript.exe " + destdir_local + "\\RDBMS_InstallDataProvider.js \"" +  account + "\" \"" + pwd + "\""));
+}
+                
+                _FixSciLexDLL(destdir);
+           }
+           
+
+            static void _FixSciLexDLL(string destdir)
+            {
+                if (IntPtr.Size > 4)
+                {
+                    string thisdir = destdir;
+                    string dll = thisdir + @"\SciLexer.dll";
+                    string dll64 = thisdir + @"\SciLexer64.dll";
+                    string dll32 = thisdir + @"\SciLexer32.dll";
+                    if (System.IO.File.Exists(dll64))
+                    {
+                        if (System.IO.File.Exists(dll32))
+                        {
+                            try
+                            {
+                                System.IO.File.Delete(dll);
+                            }
+                            catch
+                            {
+                            }
+                        }
+                        else
+                        {
+                            System.IO.File.Move(dll, dll32);
+                        }
+                        System.IO.File.Move(dll64, dll);
+                    }
+                }
+            }
+            
+            static void _FixSciLexDLL()
+            {
+                _FixSciLexDLL(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location));
+            }
+           
+           
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

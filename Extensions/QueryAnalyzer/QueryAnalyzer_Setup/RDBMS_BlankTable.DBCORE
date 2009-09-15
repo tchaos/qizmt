@@ -1,0 +1,20 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_BlankTable" Description="Creating blank table">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {
+          }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

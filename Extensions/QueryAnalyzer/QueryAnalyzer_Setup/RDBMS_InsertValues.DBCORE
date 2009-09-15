@@ -1,0 +1,257 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_InsertValues">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                string TableName = DSpace_ExecArgs[0];
+                string OutputDfsFile = DSpace_ExecArgs[1];
+                string QlArgVals = DSpace_ExecArgs[2];
+                string DfsTableFile = DSpace_ExecArgs[3];
+                string RowInfo = DSpace_ExecArgs[4];
+                string TypeInfo = DSpace_ExecArgs[5];
+                
+                string Vals = QlArgsUnescape(QlArgVals);
+                string[] valtoks = Vals.Split('\0');
+                
+                int[] RowTypeSizes;
+                string[] RowTypes;
+                
+                string[] sRowTypeSizes = RowInfo.Split(',');
+                RowTypeSizes = new int[sRowTypeSizes.Length];
+                for(int i = 0; i < RowTypeSizes.Length; i++)
+                {
+                    RowTypeSizes[i] = int.Parse(sRowTypeSizes[i]);
+                }
+                
+                RowTypes = TypeInfo.Split(',');
+                
+                // Note: most of this code is duplicated in RDBMS_QueryAnalyzer.DBCORE (BATCHEXECUTE)
+                
+                int ivtok = 0;
+                string vtok = "";
+                
+                vtok = (ivtok < valtoks.Length) ? valtoks[ivtok++] : "";
+                if("(" != vtok)
+                {
+                    throw new Exception("Expected (...) after VALUES");
+                }
+                
+                string[] uservalues = new string[RowTypes.Length];
+                int nuservals = 0;
+                bool expectcomma = false;
+                for(;;)
+                {
+                    vtok = (ivtok < valtoks.Length) ? valtoks[ivtok++] : "";
+                    if("," == vtok)
+                    {
+                        if(!expectcomma)
+                        {
+                            throw new Exception("Unexpected comma in VALUES (...)");
+                        }
+                        expectcomma = false;
+                        continue;
+                    }
+                    {
+                        // Expect value or ")"!
+                        if("" == vtok)
+                        {
+                            if(nuservals == uservalues.Length)
+                            {
+                                throw new Exception("Expected ) after VALUES(...");
+                            }
+                            else
+                            {
+                                throw new Exception("Expected " + nuservals.ToString() + " values and ) after VALUES(...");
+                            }
+                        }
+                        if(")" == vtok)
+                        {
+                            if(nuservals != uservalues.Length)
+                            {
+                                throw new Exception("Expected " + nuservals.ToString() + " values in VALUES(...");
+                            }
+                            break;
+                        }
+                        if(expectcomma)
+                        {
+                                throw new Exception("Expected comma in VALUES (...)");
+                        }
+                        if(nuservals >= uservalues.Length)
+                        {
+                            throw new Exception("Too many values in VALUES(...)");
+                        }
+                        string val = vtok;
+                        if("+" == val || "-" == val)
+                        {
+                            vtok = (ivtok < valtoks.Length) ? valtoks[ivtok++] : "";
+                            if(0 == vtok.Length)
+                            {
+                                throw new Exception("Expected number after sign");
+                            }
+                            val = val + vtok;
+                        }
+                        uservalues[nuservals++] = val;
+                    }
+                    expectcomma = true;
+                }
+                
+                List<byte> valuebuf = new List<byte>();
+                //valuebuf.Clear();
+                int icol = 0;
+                try
+                {
+                    for(; icol < RowTypes.Length; icol++)
+                    {
+                        string uval = uservalues[icol];
+                        string type = RowTypes[icol];
+                        int tsize = RowTypeSizes[icol];
+                        if(0 == string.Compare("NULL", uval, true))
+                        {
+                            valuebuf.Add(1); // Nullable, IsNull=true!
+                            for(int remain = (tsize - 1); remain > 0; remain--)
+                            {
+                                valuebuf.Add(0); // Padding to column size.
+                            }
+                        }
+                        else
+                        {
+                            if(type.StartsWith("char"))
+                            {
+                                if(uval.Length <= 2 || '\'' != uval[0] || '\'' != uval[uval.Length - 1])
+                                {
+                                    throw new Exception("Invalid string: " + uval);
+                                }
+                                string x = uval.Substring(1, uval.Length - 2).Replace("''", "'");
+                                byte[] bx = System.Text.Encoding.Unicode.GetBytes(x);
+                                if(bx.Length > tsize - 1)
+                                {
+                                    throw new Exception("String too large for " + type);
+                                }
+                                valuebuf.Add(0); // Not null.
+                                valuebuf.AddRange(bx);
+                                for(int remain = (tsize - 1) - bx.Length; remain > 0; remain--)
+                                {
+                                    valuebuf.Add(0); // Padding to char column size.
+                                }
+                            }
+                            else if("DateTime" == type)
+                            {                            
+                                if(uval.Length <= 2 || '\'' != uval[0] || '\'' != uval[uval.Length - 1])
+                                {
+                                    throw new Exception("Invalid DateTime: " + uval);
+                                }
+                                string xs = uval.Substring(1, uval.Length - 2);
+                                
+                                DateTime xdt = DateTime.Parse(xs);
+                                
+                                long x = xdt.Ticks;
+                                recordset rsx = recordset.Prepare();
+                                rsx.PutInt64(x);
+                                ByteSlice bsx = rsx.ToByteSlice();
+                                valuebuf.Add(0); // Not null.
+                                bsx.AppendTo(valuebuf);
+                            }
+                            else if("int" == type)
+                            {
+                                int x = int.Parse(uval);
+                                recordset rsx = recordset.Prepare();
+                                rsx.PutInt32((Int32)Entry.ToUInt32(x));
+                                ByteSlice bsx = rsx.ToByteSlice();
+                                valuebuf.Add(0); // Not null.
+                                bsx.AppendTo(valuebuf);
+                            }
+                            else if("long" == type)
+                            {
+                                long x = long.Parse(uval);
+                                recordset rsx = recordset.Prepare();
+                                rsx.PutInt64((Int64)Entry.ToUInt64(x));
+                                ByteSlice bsx = rsx.ToByteSlice();
+                                valuebuf.Add(0); // Not null.
+                                bsx.AppendTo(valuebuf);
+                            }
+                            else if("double" == type)
+                            {
+                                double x = double.Parse(uval);
+                                recordset rsx = recordset.Prepare();
+                                rsx.PutDouble(x);
+                                ByteSlice bsx = rsx.ToByteSlice();
+                                valuebuf.Add(0); // Not null.
+                                bsx.AppendTo(valuebuf);
+                            }
+                            else
+                            {
+                                throw new Exception("Unhandled data type " + type);
+                            }
+                        }
+                    }
+                }
+                catch(Exception e)
+                {
+                    throw new Exception("Problem with value " + uservalues[icol] + " of type " + RowTypes[icol] + ": " + e.Message, e);
+                }
+              
+                if(valuebuf.Count != DSpace_OutputRecordLength)
+                {
+                    throw new Exception("Record length mismatch (" + valuebuf.Count + " != " + DSpace_OutputRecordLength.ToString() + ") [#8129]");
+                }
+                else
+                {
+                    dfsoutput.WriteRecord(valuebuf);
+                }
+                
+            }
+        
+        
+        string QlArgsEscape(string args)
+        {
+            return Qa.QlArgsEscape(args);
+        }
+        
+        
+        string QlArgsUnescape(string eargs)
+        {
+            return Qa.QlArgsUnescape(eargs);
+        }
+        
+        string QlArgsUnescape(string[] eargs)
+        {
+            return Qa.QlArgsUnescape(eargs);
+        }
+        
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="RDBMS_InsertValues_Combine">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                string TableName = DSpace_ExecArgs[0];
+                string OutputDfsFile = DSpace_ExecArgs[1];
+                string QlArgVals = DSpace_ExecArgs[2];
+                string DfsTableFile = DSpace_ExecArgs[3];
+                string RowInfo = DSpace_ExecArgs[4];
+                string TypeInfo = DSpace_ExecArgs[5];
+                
+                Shell("dspace combine \"" + OutputDfsFile + "\" \"" + DfsTableFile + "\"");
+                
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
