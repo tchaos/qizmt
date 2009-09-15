@@ -1,0 +1,33 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_WriteTop">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[            
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {       
+                long TopCount = long.Parse(DSpace_ExecArgs[0]);
+                
+                for(List<byte> rowbuf = new List<byte>(); 
+                    (TopCount == -1 || TopCount > 0) && dfsinput.ReadRecordAppend(rowbuf);
+                    rowbuf.Clear())
+                {
+                    dfsoutput.WriteRecord(rowbuf); 
+                    
+                    if(TopCount != -1)
+                    {
+                        TopCount--;
+                    }                    
+                }                
+            }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RDBMS_DBCORE", "RDBMS_DBCORE.csproj", "{3E0DA77B-8FE7-4D50-83EF-25BA8D5A9878}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IMapReduce", "..\..\..\IMapReduce\IMapReduce.csproj", "{366F14FC-74F8-4F8B-9D30-33CFB37B2BEC}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 3
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://tfs:8080/
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = RDBMS_DBCORE.csproj
+		SccLocalPath1 = .
+		SccProjectUniqueName2 = ..\\..\\..\\IMapReduce\\IMapReduce.csproj
+		SccProjectName2 = ../../../IMapReduce
+		SccLocalPath2 = ..\\..\\..\\IMapReduce
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3E0DA77B-8FE7-4D50-83EF-25BA8D5A9878}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E0DA77B-8FE7-4D50-83EF-25BA8D5A9878}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E0DA77B-8FE7-4D50-83EF-25BA8D5A9878}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E0DA77B-8FE7-4D50-83EF-25BA8D5A9878}.Release|Any CPU.Build.0 = Release|Any CPU
+		{366F14FC-74F8-4F8B-9D30-33CFB37B2BEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{366F14FC-74F8-4F8B-9D30-33CFB37B2BEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{366F14FC-74F8-4F8B-9D30-33CFB37B2BEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{366F14FC-74F8-4F8B-9D30-33CFB37B2BEC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,159 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{3E0DA77B-8FE7-4D50-83EF-25BA8D5A9878}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>RDBMS_DBCORE</RootNamespace>
+    <AssemblyName>RDBMS_DBCORE</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\QueryAnalyzer_Setup\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\QueryAnalyzer_Setup\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
+    <Reference Include="Microsoft.VisualStudio.TeamSystem.Data.UnitTesting, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Xml.Linq">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="DbAggregators_AVG.cs" />
+    <Compile Include="DbAggregators_BIT_AND.cs" />
+    <Compile Include="DbAggregators_BIT_OR.cs" />
+    <Compile Include="DbAggregators_BIT_XOR.cs" />
+    <Compile Include="DbAggregators_CHOOSERND.cs" />
+    <Compile Include="DbAggregators_COUNT.cs" />
+    <Compile Include="DbAggregators_COUNTDISTINCT.cs" />
+    <Compile Include="DbAggregators_FIRST.cs" />
+    <Compile Include="DbAggregators_LAST.cs" />
+    <Compile Include="DbAggregators_MAX.cs" />
+    <Compile Include="DbAggregators_MIN.cs" />
+    <Compile Include="DbFunctions_DATEADD.cs" />
+    <Compile Include="DbFunctions_MONTHS_BETWEEN.cs" />
+    <Compile Include="DbAggregators_STD.cs" />
+    <Compile Include="DbAggregators_STD_SAMP.cs" />
+    <Compile Include="DbAggregators_SUM.cs" />
+    <Compile Include="DbAggregators_VAR_POP.cs" />
+    <Compile Include="DbAggregators_VAR_SAMP.cs" />
+    <Compile Include="DbFunctions_ACOS.cs" />
+    <Compile Include="DbFunctions_ADD_MONTHS.cs" />
+    <Compile Include="DbFunctions_ASIN.cs" />
+    <Compile Include="DbFunctions_ATAN.cs" />
+    <Compile Include="DbFunctions_ATN2.cs" />
+    <Compile Include="DbFunctions_CEILING.cs" />
+    <Compile Include="DbFunctions_CHARINDEX.cs" />
+    <Compile Include="DbFunctions_COMPARE.cs" />
+    <Compile Include="DbFunctions_CONCAT.cs" />
+    <Compile Include="DbFunctions_COS.cs" />
+    <Compile Include="DbFunctions_COT.cs" />
+    <Compile Include="DbFunctions_DEGREES.cs" />
+    <Compile Include="DbFunctions_EQUAL.cs" />
+    <Compile Include="DbFunctions_EXP.cs" />
+    <Compile Include="DbFunctions_FLOOR.cs" />
+    <Compile Include="DbFunctions_GREATER.cs" />
+    <Compile Include="DbFunctions_GREATEREQUAL.cs" />
+    <Compile Include="DbFunctions_INSTR.cs" />
+    <Compile Include="DbFunctions_ISLIKE.cs" />
+    <Compile Include="DbFunctions_ISNOTNULL.cs" />
+    <Compile Include="DbFunctions_ISNULL.cs" />
+    <Compile Include="DbFunctions_LAST_DAY.cs" />
+    <Compile Include="DbFunctions_LEFT.cs" />
+    <Compile Include="DbFunctions_LEN.cs" />
+    <Compile Include="DbFunctions_LESSER.cs" />
+    <Compile Include="DbFunctions_LESSEREQUAL.cs" />
+    <Compile Include="DbFunctions_LOG.cs" />
+    <Compile Include="DbFunctions_LOG10.cs" />
+    <Compile Include="DbFunctions_LOWER.cs" />
+    <Compile Include="DbFunctions_LPAD.cs" />
+    <Compile Include="DbFunctions_LTRIM.cs" />
+    <Compile Include="DbFunctions_MOD.cs" />
+    <Compile Include="DbFunctions_NEXT_DAY.cs" />
+    <Compile Include="DbFunctions_NOTEQUAL.cs" />
+    <Compile Include="DbFunctions_NULLIF.cs" />
+    <Compile Include="DbFunctions_NVL.cs" />
+    <Compile Include="DbFunctions_NVL2.cs" />
+    <Compile Include="DbFunctions_PATINDEX.cs" />
+    <Compile Include="DbFunctions_PI.cs" />
+    <Compile Include="DbFunctions_POWER.cs" />
+    <Compile Include="DbFunctions_RADIANS.cs" />
+    <Compile Include="DbFunctions_RAND.cs" />
+    <Compile Include="DbFunctions_REPLACE.cs" />
+    <Compile Include="DbFunctions_REVERSE.cs" />
+    <Compile Include="DbFunctions_RIGHT.cs" />
+    <Compile Include="DbFunctions_ROUND.cs" />
+    <Compile Include="DbFunctions_RPAD.cs" />
+    <Compile Include="DbFunctions_RTRIM.cs" />
+    <Compile Include="DbFunctions_SIGN.cs" />
+    <Compile Include="DbFunctions_SIN.cs" />
+    <Compile Include="DbFunctions_SPACE.cs" />
+    <Compile Include="DbFunctions_SQRT.cs" />
+    <Compile Include="DbFunctions_SQUARE.cs" />
+    <Compile Include="DbFunctions_SUBSTRING.cs" />
+    <Compile Include="DbFunctions_SYSDATE.cs" />
+    <Compile Include="DbFunctions_TAN.cs" />
+    <Compile Include="DbFunctions_TRUNC.cs" />
+    <Compile Include="DbFunctions_UPPER.cs" />
+    <Compile Include="DbRecordset.cs" />
+    <Compile Include="ExecDbFunction.cs" />
+    <Compile Include="FunctionTools.cs" />
+    <Compile Include="DbFunctions_ABS.cs" />
+    <Compile Include="Qa.cs" />
+    <Compile Include="QaPrepareImport.cs" />
+    <Compile Include="QaPrepareImportLines.cs" />
+    <Compile Include="QaPrepareInsertValues.cs" />
+    <Compile Include="QaPrepareSelect.cs" />
+    <Compile Include="QaQueryAnalyzer.cs" />
+    <Compile Include="Types.cs" />
+    <Compile Include="WhereClause.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\IMapReduce\IMapReduce.csproj">
+      <Project>{366F14FC-74F8-4F8B-9D30-33CFB37B2BEC}</Project>
+      <Name>IMapReduce</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

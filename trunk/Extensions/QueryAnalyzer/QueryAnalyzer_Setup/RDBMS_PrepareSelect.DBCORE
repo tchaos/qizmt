@@ -1,0 +1,26 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_Select_Prepare">
+      <SuppressDefaultOutput>true</SuppressDefaultOutput>
+      <IOSettings>
+        <JobType>local</JobType>
+        <Setting name="//MaxUserLogs" value="1000000" />
+      </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
+      <Local>
+        <![CDATA[
+        
+        public virtual void Local()
+        {
+            
+            RDBMS_DBCORE.Qa.PrepareSelect qalocal = new RDBMS_DBCORE.Qa.PrepareSelect();
+            DSpace_Log(qalocal.Exec(DSpace_ExecArgs));
+            
+        }
+        
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

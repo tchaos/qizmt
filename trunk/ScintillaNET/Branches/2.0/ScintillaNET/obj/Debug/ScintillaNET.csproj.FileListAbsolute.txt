@@ -1,0 +1,11 @@
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\bin\Debug\ScintillaNet.dll
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\bin\Debug\ScintillaNet.pdb
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ResolveAssemblyReference.cache
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNet.FindReplaceDialog.resources
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNet.IncrementalSearcher.resources
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNet.GoToDialog.resources
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNet.Properties.Resources.resources
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNet.SnippetChooser.resources
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNET.csproj.GenerateResource.Cache
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNet.dll
+C:\Users\cmiller\Solutions\Applications\DataMining\DistributedObjects5\ScintillaNET\Branches\2.0\ScintillaNET\obj\Debug\ScintillaNet.pdb

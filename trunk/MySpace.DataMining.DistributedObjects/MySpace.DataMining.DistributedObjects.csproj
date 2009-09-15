@@ -1,0 +1,146 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{278EF378-7DBC-47D5-B9F8-978E9B9FA1E5}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>MySpace.DataMining.DistributedObjects</RootNamespace>
+    <AssemblyName>MySpace.DataMining.DistributedObjects</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration.Install" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Management" />
+    <Reference Include="System.Xml.Linq">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="DistributedObjectsService.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="DistributedObjectsService.Designer.cs">
+      <DependentUpon>DistributedObjectsService.cs</DependentUpon>
+    </Compile>
+    <Compile Include="PacketMonitor.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="ProjectInstaller.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="ProjectInstaller.Designer.cs">
+      <DependentUpon>ProjectInstaller.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SpeedTest.cs" />
+    <Compile Include="XContent.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="ProjectInstaller.resx">
+      <DependentUpon>ProjectInstaller.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="SciLexer.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SciLexer64.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ScintillaNet.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="serviceconfig.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cleanup.bat">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="intlines.txt.gz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="MySpace.DataMining.DistributedObjects.DistributedObjectsSlave.exe.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AELight\AELight.csproj">
+      <Project>{99CA6113-09BB-4719-B33D-C1D1B0A95239}</Project>
+      <Name>AELight</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CollaborativeFilteringObjects3\CollaborativeFilteringObjectsSlave\CollaborativeFilteringObjectsSlave.csproj">
+      <Project>{01B9D89A-4E50-4D99-BEB1-B159173A86F8}</Project>
+      <Name>CollaborativeFilteringObjectsSlave</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CollaborativeFilteringObjects3\LongArray\LongArray.csproj">
+      <Project>{27B0ED78-C4C2-4C08-8CC5-3956140F1C25}</Project>
+      <Name>LongArray</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CollaborativeFilteringObjects3\MySpace.DataMining.CollaborativeFilteringObjects\MySpace.DataMining.CollaborativeFilteringObjects.csproj">
+      <Project>{91AF448B-E6C9-4C73-B8A1-2066ADE28348}</Project>
+      <Name>MySpace.DataMining.CollaborativeFilteringObjects</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\DProcess\DProcess.csproj">
+      <Project>{E63A37A4-FE35-4084-B394-1399A5D6DBBC}</Project>
+      <Name>DProcess</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\MDORedir\MDORedir.csproj">
+      <Project>{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}</Project>
+      <Name>MDORedir</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\MDO\MDO.csproj">
+      <Project>{52027191-DE9A-41F2-B3E6-C11784FE89A9}</Project>
+      <Name>MDO</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\mrdebug\mrdebug.csproj">
+      <Project>{2AA9BB79-EC2E-4340-9032-B96C3310C02E}</Project>
+      <Name>mrdebug</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
