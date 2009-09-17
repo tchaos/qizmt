@@ -219,7 +219,8 @@ namespace QueryAnalyzer_DataProvider
                             int left = 0;
                             int right = mi.Count - 1;
                             UInt64 ukey = (ulong)(key + long.MaxValue + 1);
-                            Utils.Int64ToBytes((Int64)ukey, buf, 1);  //is null = false on first byte.
+                            buf[0] = 0; //is null = false on first byte.
+                            Utils.Int64ToBytes((Int64)ukey, buf, 1); 
                             result = BSearch(mi, buf, ref left, ref right, 9);
                             if (result == -1)
                             {

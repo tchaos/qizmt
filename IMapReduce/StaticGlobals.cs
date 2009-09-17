@@ -29,10 +29,45 @@ namespace MySpace.DataMining.DistributedObjects
         public static long MapIteration = -1;        
         public static long ReduceIteration = -1;
         public static int DSpace_KeyLength = 0;
+        public static int Qizmt_KeyLength
+        {
+            get
+            {
+                return DSpace_KeyLength;
+            }
+        }
         public static string DSpace_SlaveIP;
+        public static string Qizmt_SlaveIP
+        {
+            get
+            {
+                return DSpace_SlaveIP;
+            }
+        }
         public static string DSpace_SlaveHost;
+        public static string Qizmt_SlaveHost
+        {
+            get
+            {
+                return DSpace_SlaveHost;
+            }
+        }
         public static int DSpace_BlocksTotalCount;
+        public static int Qizmt_BlocksTotalCount
+        {
+            get
+            {
+                return DSpace_BlocksTotalCount;
+            }
+        }
         public static int DSpace_BlockID;
+        public static int Qizmt_BlockID
+        {
+            get
+            {
+                return DSpace_BlockID;
+            }
+        }
         public static ExecutionContextType ExecutionContext = ExecutionContextType.UNKNOWN;
         public static ExecutionMode ExecutionMode = ExecutionMode.RELEASE;
         public static string[] Qizmt_Hosts
@@ -44,12 +79,61 @@ namespace MySpace.DataMining.DistributedObjects
         }
         public static string[] DSpace_Hosts;
         public static string DSpace_OutputDirection = "ascending";
+        public static string Qizmt_OutputDirection
+        {
+            get
+            {
+                return DSpace_OutputDirection;
+            }
+        }
         public static bool DSpace_OutputDirection_ascending = true;
+        public static bool Qizmt_OutputDirection_ascending
+        {
+            get
+            {
+                return DSpace_OutputDirection_ascending;
+            }
+        }
         public static int DSpace_InputRecordLength = int.MinValue;
+        public static int Qizmt_InputRecordLength
+        {
+            get
+            {
+                return DSpace_InputRecordLength;
+            }
+        }
         public static int DSpace_OutputRecordLength = int.MinValue;
+        public static int Qizmt_OutputRecordLength
+        {
+            get
+            {
+                return DSpace_OutputRecordLength;
+            }
+        }
         public static int DSpace_MaxDGlobals = 0;
+        public static int Qizmt_MaxDGlobals
+        {
+            get
+            {
+                return DSpace_MaxDGlobals;
+            }
+        }
         public static bool DSpace_Last = false;
+        public static bool Qizmt_Last
+        {
+            get
+            {
+                return DSpace_Last;
+            }
+        }
         public static long DSpace_InputBytesRemain = Int64.MaxValue;
+        public static long Qizmt_InputBytesRemain
+        {
+            get
+            {
+                return DSpace_InputBytesRemain;
+            }
+        }
     }
 
     public enum ExecutionContextType
