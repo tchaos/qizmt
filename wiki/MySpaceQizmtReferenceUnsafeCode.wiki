@@ -5,10 +5,10 @@
 
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
-=Use of Job/Unsafe to allow a job to run unsafe code=
+==Use of Job/Unsafe to allow a job to run unsafe code==
 
 
-==Example==
+===Example===
 This example uses Pointer.
 
 {{{
