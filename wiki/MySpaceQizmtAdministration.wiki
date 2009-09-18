@@ -156,27 +156,28 @@ View a list of all users currently logged into all windows machines of the clust
 <tr valign="top"><td> `networkspeedtest </td><td> [<filesize>]`</td><td> Test upload/download network speed test </td></tr>
 <tr valign="top"><td> `cputemp` </td><td> List cpu temperatures </td></tr>
 <tr valign="top"><td> `ghost` </td><td> List intermediate data leaked from when a job was aborted early across the cluster and is marked for deletion on next killall </td></tr>
-<tr valign="top"><td> `perfmon` </td><td> `<network|cputime|diskio|availablememory>`
- <br />        `[a=<Number of readings to get.  Return average.>]`
- <br />        `[t=<Number of threads>]`
- <br />        `[s=<Milliseconds of sleep to take between readings>]`
- <br />        get Perfmon counter readings
+<tr valign="top"><td> `perfmon` </td><td> <div>`<network|cputime|diskio|availablememory>`</div>
+  <div>  `  [a=<Number of readings to get.  Return average.>]`</div>
+  <div>  `  [t=<Number of threads>]`</div>
+  <div>  `  [s=<Milliseconds of sleep to take between readings>]`</div>
+<div>get Perfmon counter readings</div>
 
-generic
- <br />        `o=<Object/category name>`
- <br />        `c=<Counter name>`
- <br />        `i=<Instance Name>`
- <br />        `[f Display readings in friendly byte size units]`
- <br />        `[a=<Number of readings to get.  Return average.>]`
- <br />        `[t=<Number of threads>]`
- <br />        `[s=<Milliseconds of sleep to take between readings>]`
- <br />        specify a Perfmon counter to read
+<div>`generic`</div>
+  <div>  `  o=<Object/category name>`</div>
+  <div>  `  c=<Counter name>`</div>
+  <div>  `  i=<Instance Name>`</div>
+  <div>  `  [f Display readings in friendly byte size units]`</div>
+  <div>  `  [a=<Number of readings to get.  Return average.>]`</div>
+  <div>  `  [t=<Number of threads>]`</div>
+  <div>  `  [s=<Milliseconds of sleep to take between readings>]`</div>
+<div>specify a Perfmon counter to read</div>
 </td></tr>
-<tr valign="top"><td> `packetsniff` </td><td> `[t=<Number of threads>]`
-`[s=<Milliseconds to sniff>]`
-`[v verbose]`
-`[a include non-cluster machines]`
-Sniff packets
+<tr valign="top"><td> `packetsniff` </td><td>
+<div>`[t=<Number of threads>]`</div>
+<div>`[s=<Milliseconds to sniff>]`</div>
+<div>`[v verbose]`</div>
+<div>`[a include non-cluster machines]`</div>
+<div>Sniff packets</div>
 </td></tr>
 <tr valign="top"><td> `md5 <dfsfile>` </td><td> compute MD5 of DFS data file </td></tr>
 <tr valign="top"><td> `checksum <dfsfile>` </td><td> compute sum of DFS data file </td></tr>
@@ -184,27 +185,28 @@ Sniff packets
 <tr valign="top"><td> `nearprime <positiveNum>` </td><td> find the nearest prime number </td></tr>
 <tr valign="top"><td> `genhostnames <pattern> <startNum> <endNum> [<delimiter>]`
 generate host names </td><td> generate a list of hostnames using a pattern such as FOOBAR#### </td></tr>
-<tr valign="top"><td> viewlog </td><td> `[machine=<machineName>]`
-`[count=<number of entries to return>]`
-view log entries
-If you suspect that there is an error or a job is taking too long. This command can be used to view any errors that may have occurred even if the current running job or jobs have not yet completed execution.
+<tr valign="top"><td> `viewlog` </td><td>
+<div>`[machine=<machineName>]`</div>
+<div>`[count=<number of entries to return>]`</div>
+<div>view log entries</div>
+<div>If you suspect that there is an error or a job is taking too long. This command can be used to view any errors that may have occurred even if the current running job or jobs have not yet completed execution.</div>
 </td></tr>
-<tr valign="top"><td> `stresstests` </td><td> Generate a series of mapreducer jobs which may be executed to stresstest the capabilities of the current Qizmt cluster.
- <br />    `Qizmt exec grouped_10GB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec hashsorted_10GB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec sorted_10GB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec sorted_POS_10GB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec grouped_1TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec hashsorted_1TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec sorted_1TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec sorted_POS_1TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec grouped_5TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec hashsorted_5TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec sorted_5TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec sorted_POS_5TB_Of_100_Byte_Rows.xml`
- <br />    `Qizmt exec sortTestsDriver.xml [s = run tests]`
- <br />    `Qizmt exec sortTestsDriver.xml [sv = run tests and verify results]`
- <br />    `Qizmt exec sortTestsDriver.xml [v = verify results]`
+<tr valign="top"><td> `stresstests` </td><td> <div>Generate a series of mapreducer jobs which may be executed to stresstest the capabilities of the current Qizmt cluster.</div>
+ <div>    `Qizmt exec grouped_10GB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec hashsorted_10GB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec sorted_10GB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec sorted_POS_10GB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec grouped_1TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec hashsorted_1TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec sorted_1TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec sorted_POS_1TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec grouped_5TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec hashsorted_5TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec sorted_5TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec sorted_POS_5TB_Of_100_Byte_Rows.xml`</div>
+ <div>    `Qizmt exec sortTestsDriver.xml [s = run tests]`</div>
+ <div>    `Qizmt exec sortTestsDriver.xml [sv = run tests and verify results]`</div>
+ <div>    `Qizmt exec sortTestsDriver.xml [v = verify results]`</div>
 </td></tr>
 
 </table>
