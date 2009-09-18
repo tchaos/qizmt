@@ -5,9 +5,9 @@
 
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
-=Specify the sort order of keys, ascending or descending, in Job/IOSettings/OutputDirection. This only takes effect when the OutputMethod is sorted or hashsorted.=
+==Specify the sort order of keys, ascending or descending, in Job/IOSettings/OutputDirection. This only takes effect when the `OutputMethod` is sorted or hashsorted.==
 
-==Example==
+===Example===
 {{{
 
 <Job Name="outputDirection_desc_mapreduce" Custodian="" Email="">
