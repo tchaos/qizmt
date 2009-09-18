@@ -196,6 +196,7 @@ By default the OutputMethod is *sorted* however it may be explicitly changed to 
  :<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapReduceGroupedIntermediate.png" alt="MapReduceGroupedIntermediate" />
 </td>
 <td width="40%" valign="top">
+<br />
  * SourceCode/Jobs/Job/IOSettings/OutputMethod
 
 *Examples:*
@@ -205,6 +206,7 @@ By default the OutputMethod is *sorted* however it may be explicitly changed to 
  {{{<OutputMethod>grouped</OutputMethod>}}}
 </td>
 <td width="15%" valign="top">
+<br />
 grouped | sorted
 </td>
 </tr>
@@ -217,6 +219,7 @@ grouped | sorted
 Change KeyMajor to set how many bytes of the key to consider during machine exchange. By default the entire key is considered to ensure even distribution of data, however, significant performance gains can be achieved by using only a subset of the key during exchange. Generally random and less uniform keys may benefit from a reduction in KeyMajor without skewing the distribution.
 </td>
 <td width="40%" valign="top">
+<br />
  * SourceCode/Jobs/Job/IOSettings/KeyMajor
 
 *Examples:*
@@ -226,6 +229,7 @@ Change KeyMajor to set how many bytes of the key to consider during machine exch
  {{{<KeyMajor>100</KeyMajor>}}}
 </td>
 <td width="15%" valign="top">
+<br />
 1 - <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Infinity.png" alt="Infinity" />
 </td>
 </tr>
@@ -246,6 +250,7 @@ Sometimes automatic caching may have the effect of overly expanding the data. Fo
 }}} 
 </td>
 <td width="40%" valign="top">
+<br />
  * SourceCode/Jobs/Job/Delta/Name
  * SourceCode/Jobs/Job/Delta/DFSInput
 
@@ -264,6 +269,7 @@ Sometimes automatic caching may have the effect of overly expanding the data. Fo
 }}}
 </td>
 <td width="15%" valign="top">
+<br />
 Any valid windows file name.
 </td>
 </tr>
