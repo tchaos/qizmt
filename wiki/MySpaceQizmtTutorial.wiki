@@ -1,0 +1,740 @@
+#summary Qizmt Quick-Start Tutorial
+#labels Qizmt,Quick,Start,Tutorial,Walkthrough
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Qizmt]
+
+<wiki:toc />
+
+= Single Machine Qick-Start =
+
+== Run MSI to install driver on development machine ==
+
+ * Download and run:
+  * MySpace.DataMining.Qizmt.msi
+   # Click next and go with all defaults
+   # Enter `<windows login>` when prompted
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_InstallerFile.png" alt="InstallerFile" />
+<br />
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SetupWizard.png" alt="SetupWizard" />
+
+
+== Formatting MR.DFS ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_FormatMRDFS.png" alt="FormatMRDFS" />
+
+
+== Generate Stored Job Examples ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_GenerateExamples.png" alt="GenerateExamples" />
+
+
+== View Stored job examples in cluster ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_DirExamples.png" alt="DirExamples" />
+
+
+== Execute wordcount job ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExecWordCount.png" alt="ExecWordCount" />
+
+
+== View wordcount inputs and outputs ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewWordCountIO.png" alt="ViewWordCountIO" />
+
+
+== View/Edit the wordcount example ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewEditWordCount.png" alt="ViewEditWordCount" />
+
+
+== Word Count Logic Form ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_WordCountLogicForm.png" alt="WordCountLogicForm" />
+
+
+= More Examples =
+
+
+== K-Means Locator ==
+<table>
+<tr><td> *Obtain Code* </td> <td> Qizmt examples </td></tr>
+<tr><td>  *View/Edit Code* </td> <td> Qizmt edit Qizmt-CellularKMeans.xml </td></tr>
+<tr><td>  *Execute Code* </td> <td> Qizmt exec Qizmt-CelularKMeans.xml </td></tr>
+</table>
+
+This example calculates the K-Means of randomly generated vertices. The centroids are first randomly placed, during the map phase each centroids and vertices are rounded up to some range (Abstraction Sector) as the key. During the exchange phase all vertices and centroids are transferred between machines in the cluster such that all vertices within the same range are together. Within each range, the traditional k-means algorithm is applied to all sectors in parallel. As new data is added, this mapreducer only exchanges the delta vertices and the centroids.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_KMeansKey.png" alt="KMeansKey" />
+
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_KMeansInfo.png" alt="KMeansInfo" />
+
+
+== K-Means Mapreduce Form ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_KMeansMRForm.png" alt="KMeansMRForm" />
+
+
+== KMeans Example Map Logic ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_KMeansExampleMapLogic.png" alt="KMeansExampleMapLogic" />
+
+
+== K-Means Example Reduce Logic  ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_KMeansExampleReduceLogic.png" alt="KMeansExampleReduceLogic" />
+
+
+= Top-Down Collaborative Filtering =
+
+<table>
+<tr><td> *Obtain Code* </td><td> Qizmt examples </td></tr>
+<tr><td> *View/Edit Code* </td><td> Qizmt edit Qizmt-CollaborativeFiltering.xml </td></tr>
+<tr><td> *Execute Code* </td><td> Qizmt exec Qizmt-CollaborativeFiltering.xml </td></tr>
+</table>
+
+In this example, remote jobs are used to copy a MR.DFS document to every node in the MR.DFS and then perform Top-Down Collaborative Filtering on such that each core in the cluster does a subset of the work. The resulting scores are then redistributed back out into the MR.DFS. 
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CollaborativeFilteringExample.png" alt="CollaborativeFilteringExample" />
+
+
+= Job Types =
+
+
+== Local ==
+
+Method executes on 1 machine. The Shell() method is often used in Locals to script a set of tasks in a pipeline, input deltas and publish results. *Example:*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Local.png" alt="Local" />
+
+ :<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_LocalDiagram.png" alt="LocalDiagram" />
+
+
+== Remote ==
+
+Method executes on 1 or more remote machines to perform a task on a MR.DFS input file or wild card set of files. The resulting stream writes data back out to the DFS. Use this type of job for algorithms which are more cost-effectively executed on a single machine using top-down approach, such as Top-Down Collaborative Filtering. *Example:*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Remote.png" alt="Remote" />
+
+ :<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RemoteDiagram.png" alt="RemoteDiagram" />
+
+
+== MapReduce ==
+
+Most data processing tasks may be performed optimally and with ultra-simplistic code when written as a mapreducer. *Example:*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapReduce.png" alt="MapReduce" />
+
+ :<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapReduceDiagram.png" alt="MapReduceDiagram" />
+
+
+= Tag Ordering =
+
+The order of tags in jobs does matter for some tags. The required tags of each job type have a specific order as shown in the default template when creating a job. `<Job>` tags are executed in the order. In a mapreduce job, the child nodes of `<MapReduce>` must be in order, `<Map>` first, `<Reduce>` second.
+
+
+== Local Tag Ordering ==
+{{{
+    <Job Name="" Custodian="" email="">
+      <IOSettings> 
+                <!-- child nodes in any order -->
+      </IOSettings>
+      <Local>
+        <![CDATA[ ... ]]>
+      </Local>
+    </Job>
+}}}
+
+
+== Remote Tag Ordering ==
+{{{
+    <Job Name="" Custodian="" email="">
+      <IOSettings> 
+                <!-- child nodes in any order -->
+      </IOSettings>
+      <Remote>
+        <![CDATA[ ... ]]>
+      </Remote>
+    </Job>
+}}}
+
+
+== Mapreduce Tag Ordering ==
+{{{
+    <Job Name="" Custodian="" email="">
+      <IOSettings>
+                <!-- child nodes in any order -->
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[ ... ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[ ... ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+}}}
+
+== KeyLength ==
+The KeyLength tag of mapreducer jobs may be set to a specific number of bytes or set to comma separated list of data types, e.g. *`<KeyLength>int,long,double,55</KeyLength>`*
+
+
+= Advanced Optimizations =
+
+<table cellspacing="4">
+<tr><td> *Description* </td><td> *XPath in Job file (Qizmt edit `<myjob>`)* </td><td> *Value Range* </td></tr>
+
+<tr>
+<td width="45%" valign="top">
+=== OutputMethod ===
+*Default:* sorted
+
+By default the OutputMethod is *sorted* however it may be explicitly changed to *grouped* when fully sorted results are not required because grouped is a cheaper operation then fully sorted. Typically a series of mapreducer pipelines may be significantly optimized by using grouped for the intermediate outputs and sorted for the final mapreducer output:
+ :<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapReduceGroupedIntermediate.png" alt="MapReduceGroupedIntermediate" />
+</td>
+<td width="40%" valign="top">
+ * SourceCode/Jobs/Job/IOSettings/OutputMethod
+
+*Examples:*
+
+ {{{<OutputMethod>sorted</OutputMethod>}}}
+
+ {{{<OutputMethod>grouped</OutputMethod>}}}
+</td>
+<td width="15%" valign="top">
+grouped | sorted
+</td>
+</tr>
+
+<tr>
+<td width="45%" valign="top">
+=== KeyMajor ===
+*Default:* Entire Key Length
+
+Change KeyMajor to set how many bytes of the key to consider during machine exchange. By default the entire key is considered to ensure even distribution of data, however, significant performance gains can be achieved by using only a subset of the key during exchange. Generally random and less uniform keys may benefit from a reduction in KeyMajor without skewing the distribution.
+</td>
+<td width="40%" valign="top">
+ * SourceCode/Jobs/Job/IOSettings/KeyMajor
+
+*Examples:*
+
+ {{{<KeyMajor>16</KeyMajor>}}}
+
+ {{{<KeyMajor>100</KeyMajor>}}}
+</td>
+<td width="15%" valign="top">
+1 - <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Infinity.png" alt="Infinity" />
+</td>
+</tr>
+
+<tr>
+<td width="45%" valign="top">
+=== Delta ===
+*Default:* disabled
+
+When a delta node is added to a mapreducer job, the intermediate files of the mapreduce operation are cached automatically. Subsequent executions of the same mapreduce job will only exchange files which have not been cached by the mapreducer.
+
+==== Explicit Caching ====
+Sometimes automatic caching may have the effect of overly expanding the data. For example, if the delta contains random samples which can be redundant, these random samples will cause the cache to expand to fast if automatic caching is used. When delta is enabled, the reducer code may override the automatic caching by explicitly identifying which key/value pairs to cache after the exchange phase, e.g.
+{{{
+   ... void Reduce(...
+      
+            output.Cache(key, value);
+}}} 
+</td>
+<td width="40%" valign="top">
+ * SourceCode/Jobs/Job/Delta/Name
+ * SourceCode/Jobs/Job/Delta/DFSInput
+
+*Examples:*
+{{{
+      <Delta>
+        <Name>mydata_cacheA</Name>
+        <DFSInput>dfs://mydataA*.txt</DFSInput>
+      </Delta>
+}}}
+{{{
+      <Delta>
+        <Name>mydata_cacheB</Name>
+        <DFSInput>dfs://mydataB*.txt</DFSInput>
+      </Delta>
+}}}
+</td>
+<td width="15%" valign="top">
+Any valid windows file name.
+</td>
+</tr>
+
+</table>
+
+
+= Mapreducer Caching =
+
+<table>
+<tr><td> *Obtain Code* </td><td> Qizmt examples </td></tr>
+<tr><td> *View/Edit Code* </td><td> Qizmt edit Qizmt-ExplicitCacheWordCount.xml </td></tr>
+<tr><td> *Execute Code* </td><td> Qizmt exec Qizmt-ExplicitCacheWordCount.xml </td></tr>
+</table>
+
+Most mapreducer jobs can be executed faster in subsequent executions by caching intermediate data of a mapreducer job and only exchanging/sorting the delta input data. In this way only MR.DFS files that have not been picked up yet flow throughout the cluster during a mapreduce job rather than the entire input set. Typically, for production pipelines can be implemented with smaller clusters of servers than R&D clusters when Qizmt Mapreducer Caching is used.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapReduceCaching.png" alt="MapReduceCaching" />
+
+
+== Enabling Caching ==
+
+Caching is enabled by adding a `<Delta>` node under the `<Job>` node of a mapreducer job, e.g.
+{{{
+      <Delta>
+        <Name>*ExplicitCacheWordCount_Cache*</Name>
+        <DFSInput>*dfs://ExplicitCacheWordCount_Input*.txt*</DFSInput>
+      </Delta>
+}}}
+In this example, after the mapreducer job is run the first time, a file will be created in MR.DFS per the */Delta/Name* node containing the distributed cached intermediate data. e.g.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSCacheFile.png" alt="MRDFSCacheFile" />
+
+
+== Explicit Caching ==
+
+By default, all key/value pairs are cached when delta caching is enabled. In some scenarios you may want to override the contents of the cached intermediate data across the cluster. This can be done by setting the *`[ExplicitCache]`* function attribute on the reducer event and then explicitly adding key/value pairs to the cache. When this is done, the automatic cache is replaced with an explicit cache e.g.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExplicitCacheAttribute.png" alt="ExplicitCacheAttribute" />
+
+All key/value pairs sent into the output.Cache() will make their way back into this reducer after being merged with delta key/value pairs in subsequent runs of the mapreducer. Files are pulled into the cache by the name of the file in MR.DFS. Qizmt keeps track of which MR.DFS files have been pulled into the mapreducer per the wildcard specified in the */Delta/DFSInput* node, once they have been cached, the names of the MR.DFS files are stored in the cache file to avoid re-caching them in subsequent runs.
+
+
+== Viewing what MR.DFS Files have been Rolled into a Cache File ==
+The *Qizmt info* command, when applied to a cache file (aqua), shows which MR.DFS files have already been picked up by a mapreducer using the cache file.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSCacheFileViewInputs.png" alt="MRDFSCacheFileViewInputs" />
+
+
+== Invalidating MR.DFS Files Already in a Cache ==
+
+MR.DFS files already in a cache file can be removed so that they will be re-cached on the next run of the mapreducer using the cache e.g.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSCacheFileInvalidate.png" alt="MRDFSCacheFileInvalidate" />
+
+Once a MR.DFS file has been invalidated from a cache file, the mapreducer using the cache file will pick it up along with any other files which match the wild card specified in the */Delta/DFSInput*  node. Invalidating an MR.DFS file in a cache file does not clean up any data which that file may have input as it is already merged with inputs from all other cached MR.DFS files, however it does make the mapreducer using the cache re-pull that file as an input the next time it is executed.
+
+
+== Deleting a Cache File ==
+
+Deleting a cache file will both invalidate all cached inputs as well as delete all intermediate data cached by that cache file. When the mapreducer job which owns a deleted cache file is executed, all inputs picked up by the */Delta/DFSInput* wildcard are re-exchanged across the cluster and the intermediate data is re-cached.
+
+
+== Limitations of Qizmt Caching ==
+
+ * Cache files cannot be shared across different mapreducers, a mapreducer owns at most 1 cache file and a cache file is owned by at most one mapreducer.
+ * If any administrative action is taken on a cluster such as adding or removing machines, all cache files must be deleted.
+ * If replication is > 1, caching is ok but cached intermediate data itself is not replicated.
+
+
+= Creating New Job =
+
+ # RDP into any machine in the cluster
+ # Issue command: *Qizmt edit <_new stored SourceCode name_>*
+ # Edit stored SourceCode
+ # The Qizmt editor comes complete with: Auto-complete, Smart tabs and Auto-syntax Coloring 
+ # Click OK
+ # Test stored SourceCode with: *Qizmt exec <_new stored SourceCode name_>*
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_NewJobsFile.png" alt="NewJobsFile" />
+
+
+= Qizmt Editor =
+
+== Smart C# Syntax Coloring ==
+
+Qizmt editor automatically colors C# syntax as it is typed or when code is pasted into the editor.
+
+<table>
+<tr><td> *Concept* </td><td> *Color* </td><td> *Examples* </td></tr>
+
+<tr>
+<td> Keywords </td><td> Blue </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorKeywords.png" alt="SyntaxColorKeywords" /> </td>
+</tr>
+
+<tr>
+<td> Comments </td><td> Green </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorComments.png" alt="SyntaxColorComments" /> </td>
+</tr>
+
+<tr>
+<td> Strings </td><td> Brown </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorStrings.png" alt="SyntaxColorStrings" />
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorChars.png" alt="SyntaxColorChars" /> </td>
+</tr>
+
+<tr>
+<td> XML </td><td> GreyPurple </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorXML.png" alt="SyntaxColorXML" /> </td>
+</tr>
+
+<tr>
+<td> Other text </td><td> Black </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorOtherText1.png" alt="SyntaxColorOtherText1" />   <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorOtherText2.png" alt="SyntaxColorOtherText2" />   <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/" alt="Qizmt_SyntaxColorOtherText3.png" />  <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorOtherText2.png" alt="SyntaxColorOtherText2" />  <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorOtherText3.png" alt="SyntaxColorOtherText3" /> </td>
+</tr>
+
+<tr>
+<td> Heap Allocations </td> <td> Red </td> <td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorHeapAllocs.png" alt="SyntaxColorHeapAllocs" />
+ </td>
+</tr>
+
+</table>
+
+
+== C# Auto Complete ==
+
+Activated when ‘.’ Key is pressed. When available, displays list of member functions on an object:
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorAutoComplete.png" alt="EditorAutoComplete" />
+
+
+== Go to Line Number ==
+*Ctrl+G* or *Edit -> Go to...*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorGoto.png" alt="EditorGoto" />
+
+
+== Code Search ==
+*Ctrl+F* or *Edit->Find…/Find Next/Replace*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorFindReplace.png" alt="EditorFindReplace" />
+
+
+== Built-In Debugger == 
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorDebugger.png" alt="EditorDebugger" />
+
+<table>
+<tr><td> *Debug Command* </td><td> *Hot Key* </td><td> *Action* </td></tr>
+<tr><td> Resume Debugging </td><td> F5 </td><td> Execute to next breakpoint. </td></tr>
+<tr><td> Stop Debugging </td><td> F12 </td><td> Stop debug mode to continue editing mapreducer. </td></tr>
+<tr><td> Step Into </td><td> F11 </td><td> Step into a function on call stack. </td></tr>
+<tr><td> Step Over </td><td> F10 </td><td> Step over a function on call stack. </td></tr>
+<tr><td> Step Out </td><td> Shift-F11 </td><td> Step out of a function on call stack. </td></tr>
+<tr><td> Toggle Breakpoint </td><td> F9 </td><td> Add or remove a breakpoint. </td></tr>
+<tr><td> Skip to Reduce </td><td> Shift-F12 </td><td> Start reduce phase at end of current map cycle. </td></tr>
+</table>
+
+
+== Debugging Thrown Errors from Mapreduce Jobs ==
+
+ # Write a mapreducer that contains an error: <br /> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorSyntaxError.png" alt="EditorSyntaxError" />
+ # Run mapreducer: <br /> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExecSyntaxError.png" alt="ExecSyntaxError" />
+ # View executed code of last error from machine on which it occurred; use Ctrl-G to go to the line number of the error. In this example The error occurred on line *1307* and glyph 33:  <br />  *`Qizmt edit *errors*`* <br /><wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditErrors.png" alt="EditErrors" />
+
+
+= No Master Node in Qizmt =
+Unlike other mapreduce frameworks, there is no master node in a Qizmt cluster where commands have to be executed. Qizmt commands may be executed on any machine in the cluster.  For example:
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_NoMaster.png" alt="NoMaster" />
+
+
+= Qizmt Command Line =
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CommandLine.png" alt="CommandLine" />
+
+
+= Command History =
+View history of commands executed on the current cluster.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_History.png" alt="History" />
+
+
+= Qizmt Keys =
+
+Qizmt keys output from mappers are always stored in big-endian. Recordsets keys may not mix both strings and primitives, however when a key must consist both strings and primitives, can embed the primitives in a string key.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_KeyEndianness.png" alt="KeyEndianness" />  <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_KeyTypeStorage.png" alt="KeyTypeStorage" />
+
+
+= Output Methods =
+
+
+== Sorted ==
+
+<table><tr valign="top"><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_OutputMethodSorted.png" alt="OutputMethodSorted" /> </td><td> The Sorted output method sorts the data across the entire cluster in consistent timing regardless of how skewed the keys are but incurs consistent 2X performance cost. This method is typically used when producing a very large sorted index at the end of a pipeline of mapreducers.</td></tr></table>
+
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_FoilSorted.png" alt="FoilSorted" />
+
+
+=== Ascending/Descending sorted ===
+By default, keys are sorted in byte-ascending order. To sort keys in byte-descending order, add the output direction tag to the mapreducer:
+{{{ <OutputDirection>descending</OutputDirection> }}}
+
+
+=== Text Index Creation ===
+Instead of outputting back into MR.DFS in reduce, you can output data directly to the local file system or to a third party application local on each machine. When mapreducer complete, peek at the first line of each output file of each machine to construct a master index showing what range is covered by each file across the cluster.
+
+
+=== Ranged Foil Sorted ===
+{{{ <OutputMethod>rsorted</OutputMethod> }}}
+First range goes to reducer of first core of first machine of cluster; second range goes to second core of first machine in cluster, etc. Each core gets a range, and each machine also has a super-range.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RangedFoilSorted.png" alt="RangedFoilSorted" />
+
+
+=== Round Robin Foil Sorted ===
+{{{ <OutputMethod>fsorted</OutputMethod> }}}
+First range goes to reducer of first core of first machine of cluster; second range goes to first core of second machine in cluster, etc. Each core gets a range, but each machine has multiple ranges which are not sequential.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RoundRobinFoilSorted.png" alt="RoundRobinFoilSorted" />
+
+
+== Grouped ==
+
+<table><tr valign="top"><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_OutputMethodGrouped.png" alt="OutputMethodGrouped" /> </td><td> The default template uses the grouped sort algorithm. This output method grantees that all identical keys make their way to the same reducer, but does not produce a fully sorted index across the cluster. This output method is immune to skewing. </td></tr></table>
+
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Grouped.png" alt="Grouped" />
+
+
+== Hash Sorted ==
+
+<table><tr valign="top"><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_OutputMethodHashSorted.png" alt="OutputMethodHashSorted" /> </td><td> Hashsorted is the fastest output method for sorting data across a cluster but is not immune to skewing in the keys and only 2 bytes of the key may be considered for the exchange phase. `<KeyMajor>` must be set to 2 when using hashsorted. When using hashsorted, place the least redundant 2 bytes of the key in the first two bytes. Left padded string keys, for example, cannot be hashsorted. Hashsorted performs exceptionally well when keys are completely random. </td></tr></table>
+
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_HashSorted.png" alt="HashSorted" />
+
+
+= Parallel Disjoint Execution =
+
+Sometimes it is beneficial to stream the same MR.DFS file through every machine or a process on every core in the cluster. Parallel disjoint execution is typically useful when data is small enough to stream all data through one or more machines and perform hash based logic when this approach is more cost-effective them mapreduce.
+
+
+== Remote Job Multiple Hosts ==
+A remote job may be run on multiple explicitly specified hosts and even process a different MR.DFS file on each host. The `<Host>` tag is optional, if not specified, the remote jobs will live round robin across the cluster.
+
+<table><tr valign="top"><td>
+{{{
+    <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO>
+          <DFSReader>dfs://Input1.txt</DFSReader>
+          <DFSWriter>dfs://Output1.txt</DFSWriter>
+          <Host>Machine0</Host>
+        </DFS_IO>       
+        <DFS_IO>
+          <DFSReader>dfs://Input2.txt</DFSReader>
+          <DFSWriter>dfs://Output2.txt</DFSWriter>
+           <Host>Machine1</Host>
+        </DFS_IO>
+      </IOSettings>
+}}}
+</td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RemoteMultipleHosts.png" alt="RemoteMultipleHosts" /> </td></tr></table>
+
+
+== Remote Job All Machines ==
+A remote job may be run on one core per machine; each remote sub process will get an identical copy of the same document streamed in from MR.DFS. The # wildcard will be replaced with a numeric DPID unique across the cluster.
+
+<table><tr valign="top"><td>
+{{{
+      <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO_Multi>
+          <DFSReader>dfs://Input.txt</DFSReader>
+          <DFSWriter>dfs://Output####.txt</DFSWriter>
+          <Mode>ALL MACHINES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+}}}
+</td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RemoteAllMachines.png" alt="RemoteAllMachines" /> </td></tr></table>
+
+
+== Remote Job All Cores ==
+A remote job may be run on every core in the cluster without explicitly specifying host names, each remote will get an identical copy of the same document streamed from MR.DFS. The # wildcard will be replaced with a numeric DPID unique across the cluster.
+
+<table><tr valign="top"><td>
+{{{
+     <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO_Multi>
+          <DFSReader>dfs://Input.txt</DFSReader>
+          <DFSWriter>dfs://Output####.txt</DFSWriter>
+          <Mode>ALL CORES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+}}}
+</td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RemoteAllCores.png" alt="RemoteAllCores" /> </td></tr></table>
+
+
+= Manual Memory Management in Mapreducers =
+It is sometimes advantageous to use C-style pointers in C# mapreducers. Unsafe for a mapreducer may be enabled by adding an unsafe tag to a mapreducer job. For more on when unsafe should be enabled, see the MSDN documentation for unsafe C#.
+{{{ <Unsafe/> }}}
+
+
+= MR.DFS Filename Ranged Input =
+Mapreducers jobs can take inputs both by Date ranges and numeric ranges in the MR.DFS file names. Ranges may be specified in the `<DFSInput>` tag rather than solid filenames.
+
+
+== Wildcard Input ==
+The ‘*’ character may be used as wildcard for 0 or more characters in the MR.DFS file name.
+{{{ <DFSInput>dfs://SomeFile*.txt</DFSInput> }}}
+
+
+== Aggregate Input ==
+The ‘;’ character may be used to delimit multiple MR.DFS file inputs.
+{{{ <DFSInput>dfs://SomeFile1.txt;dfs://SomeFile2.txt</DFSInput> }}}
+
+
+== Numeric/Date Ranged Input ==
+The ‘|’ and ‘-’ characters may be used to input a range of files containing digits in their MR.DFS filenames. 
+{{{ DFSInput>dfs://Qizmt-WildCardNumericRanges_Input|20090601-20100101|*.txt</DFSInput> }}}
+
+
+== Aggregate Ranged Input ==
+Multiple ranged inputs may be aggregated.
+{{{ <DFSInput>dfs://Qizmt-WildCardNumericRanges_Input|11-12|*.txt;dfs://Qizmt-WildCardNumericRanges_Input15f.txt;dfs://Qizmt-WildCardNumericRanges_Input|20090601-20100101|*.txt</DFSInput> }}}
+
+
+= Cluster Assembly Cache (CAC) =
+.Net DLLs may be made accessible to mapreduce, local and remote jobs by simply putting them into MR.DFS then referencing them from the jobs. `<file>.DLLs` put into MR.DFS is redundantly copied to every machine in the cluster.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CAC.png" alt="CAC" />
+
+
+=== Referencing a Custom .Net DLL in a Mapreducer ===
+If you want to build a C# DLL and reference it, you can build a regular .net DLL and use Qizmt put to put it into MR.DFS then reference it in the job. Qizmt put automatically treats `<file>.dll` files differently as other files and makes a redundant copy of the DLL on every machine in the cluster. After putting a DLL into a Qizmt cluster, it can be referenced from within the job:
+
+{{{
+      <Job Name="testdll" Custodian="" email="">
+      <Add Reference="Qizmt-AddUsingReferences_testdll.dll" Type="dfs" /> <!- custom C# DLL put into MR.DFS ->
+      <Add Reference="Microsoft.VisualBasic.dll" Type="system" /> <!-- system DLL already in .NET -->
+      <Using>testdll</Using> <!-- using namespace -->
+      <Using>Microsoft.VisualBasic</Using><!-- using namespace -->
+       .
+       .
+       .
+}}}
+
+
+`*Qizmt put <name>.dll*` puts a dll into MR.DFS and makes it available to all job types; local, remote and mapreduce. There are two reference types supported *dfs* and *system*.
+
+Can use type *dfs* for custom DLLs or DLLs that are referenced by custom DLLs used in local, remote or mapreducer jobs.
+
+Can use type *system* for referencing system DLLs that are not referenced by default. Here are the system DLLs that are referenced by default:
+ * System.dll
+ * System.Xml.dll
+ * System.Data.dll    
+ * System.Drawing.dll
+ * System.Core.dll
+
+e.g.
+{{{
+      <Add Reference="regression_test_testdll.dll" Type="dfs" />
+      <Add Reference="Microsoft.VisualBasic.dll" Type="system" />
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              if(32 != Microsoft.VisualBasic.Strings.Asc(' '))
+              {
+                  throw new Exception("Map: (32 != Microsoft.VisualBasic.Strings.Asc(' '))");
+              }
+}}}
+
+
+= Working with Tables =
+Sometimes it is advantageous to store recordsets directly in MR.DFS table files rather than manually tokenizing the data into a text format. By convention, it is suggested to store recordsets in MR.DFS files using the `<file>.tbl` naming convention. If reading a table into a mapreducer job from MR.DFS, the DFSInput must contain `<filename>@<row size>` showing the number of bytes in each row. If writing a table to a mapreducer job from MR.DFS, the DFSOutput must contain `<filename>@<row size>` showing the number of bytes in each row.
+
+
+== Writing data from Mapreducer out to a Table ==
+A recordset may be directly written out to a MR.DFS file from a reducer as follows.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ReduceTableOutput.png" alt="ReduceTableOutput" />
+
+
+== Reading a Table data into a Mapreducer ==
+A line of data may be read directly into a recordset only if it was written out as a recordset in the reducer of another mapreducer job.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapTableInput.png" alt="MapTableInput" />
+
+
+== Walkthrough: Loading and Processing Rectangular Binary Data ==
+ # Generate rectangular binary data with *gensort* or other means consisting of 100 bytes per row
+ # Put the binary data into MR.DFS with: *Qizmt put \\MACHINEA\D$\binarydata.tbl@100*
+ # The rectangular binary data consisting of 100 bytes per row may now be input to a mapreducer
+ # Edit a mapreducer and add *`<DFSInput>dfs://binarydata.tbl@100</DFSInput>`* for the input
+ # To read each 100 byte row from the binary table into a recordset use: <br /> *recordset rline = recordset.PrepareRow(line);*
+
+
+== Walkthrough: Storing Mapreducer Results into a Table ==
+ # Modify the DFSOutput to include the size of recordset that will be output. If the recordsets change in size or are heterogeneous, then set the size to the largest possible size supported. E.g. *`<DFSOutput>dfs://SomeOutput.tbl@1024</DFSOutput>`*
+ # In reducer output a recordset directly:
+ <pre>
+              recordset rout = recordset.Prepare();
+              rout.PutInt(uid);
+              rout.PutDouble(total);
+              output.Add(rout);
+ </pre>
+   Note: the table row size may be larger than the recordset, but if smaller an exception will be thrown.
+
+
+= Stress Testing a Cluster =
+The Qizmt stresstests command may be used to generate a series of mapreduce jobs to stress test the capabilities of a cluster. The larger the cluster, the larger and faster stress tests are handled.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_StressTests.png" alt="StressTests" />
+
+
+= Building Infrastructures on top of Qizmt =
+
+
+== Building a RDBMS on top of Qizmt ==
+One way to support SQL against `<file>.tbl` files would be to write a series of mapreducers and a local job to parse SQL and fire off appropriate mapreducer jobs, by nature of mapreduce, you do not have to worry about the complexities of writing a query optimizer, e.g.
+<pre>
+Local job: SQL
+Mapreduce job: insert_into_select.xml
+Mapreduce job: select_standard_out.xml
+Mapreduce job: update_table.xml
+Local job: delete_from_table.xml
+Local job: drop_table.xml
+Local job: truncate_table.xml</pre>
+Note: `update_table.xml` actually creates a new table, deletes the old, and renames the new table back to the name of the old table, but could possibly safely support some mutating functionality in Qizmt to make this more efficient.
+
+An example run could look like:
+
+<pre>
+C:\> Qizmt gensql
+      Generating SQL Jobs: 
+      insert_into_select.xml – selecting into a new empty table from 1 or more other tables, could potentially support WITH INDEX and use Qizmt caching
+      select_standard_out.xml – display a resulting temporary table to the standard output and then delete it
+      update_table.xml – change lines in a table based on some criteria
+      delete_from_table.xml – delete lines in a table based on some criteria
+      drop_table.xml – Qizmt command to delete the MR.DFS file
+      truncate_table.xml – Qizmt command to delete the MR.DFS file and recreate it empty
+      .
+      .
+      .
+      SQL jobs generated, for help issue command: Qizmt sql "help"
+C:\> Qizmt exec sql "INSERT INTO Customer SELECT `*` FROM Customer_delta"
+</pre>
+
+
+== Building a Search Indexer on top of Qizmt ==
+Search indexing is easily done with Qizmt as mapreduce is the optimal way to sort large amounts of data evenly across many servers. Qizmt caching makes periodic deltas exchange and redistribute across a sorted cluster evenly without having to resort the entire index. This is typically useful for:
+ * Large scale existence checking
+ * Large scale end-user search services
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SearchIndexerAtop.png" alt="SearchIndexerAtop" />
+
+
+= Developers on Cluster =
+View a list of all users currently logged into all windows machines of the cluster.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Who.png" alt="Who" />
+
+
+= Uninstalling Qizmt Driver from Machine =
+ # Remove the machine from any cluster that it may be part of see: _Removing Node from Cluster_
+ # Start->Control Panel
+ # Select _Add/Remove Programs_ or _Programs and Features_
+ # Double click on the Qizmt installation and select Uninstall
+
+
+= Qizmt Mapreducer Analysis Form =
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapreducerAnalysisForm.png" alt="MapreducerAnalysisForm" />
