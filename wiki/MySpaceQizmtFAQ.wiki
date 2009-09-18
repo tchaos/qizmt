@@ -81,19 +81,20 @@ public virtual void Map(ByteSlice line, MapOutput output)
 ----
 IO tags of job, set the input of the mapreducer to the file in MR.DFS<br/>
 e.g.<br/>
-<source lang="xml">
+{{{
 <Job …
   <IOSettings>
     .
     .
     .
    <DFSInput>dfs://OpenCV_Input.blob</DFSInput>
-</source>
+}}}
 
-==How do I create a new job in MR.DFS?==
+===How do I create a new job in MR.DFS?===
+----
 To create a job in MR.DFS, RDP into any machine of the cluster and issue the edit with the name of the jobs file you wish to create.<br/>
 e.g.<br/>
-*qizmt edit* dfs://myjob.xml<br/><br/>
+{{{qizmt edit dfs://myjob.xml}}}<br/><br/>
 
 If a jobs file by the same name already exists, then the editor will open it for editing, however, if it does not exist, the editor will create an example job which includes 3 major job types: local, remote and mapreduce.
 ==What is the easiest way to quickly prototype mapreducer logic?==
