@@ -1,0 +1,280 @@
+#summary Qizmt Administrator's Guide
+#labels Qizmt,Administration,Guide
+
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Qizmt]
+
+<wiki:toc />
+
+= MySpace Qizmt Administrator Guide =
+
+
+== Suggested Requirements per node ==
+
+ * 8-way 2GHz cores
+ * 32GB RAM
+ * 1 Gb/s non-blocking network bandwidth
+ * 1TB – 4TB disk space per node in RAID 0 for installation drive
+ * RAID 10 for OS drive
+ * Windows 2003 SP2, Windows 2008 or Windows Vista
+ * .NET Framework 3.5 SP1
+
+
+== Single Machine Qick-Start ==
+
+=== Run MSI to install driver on development machine ===
+
+ * Download and run:
+  * MySpace.DataMining.Qizmt.msi
+   # Click next and go with all defaults
+   # Enter `<windows login>` when prompted
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_InstallerFileWithExtensions.png" alt="InstallerFileWithExtensions" />
+<br />
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SetupWizard.png" alt="SetupWizard" />
+
+
+=== Formatting MR.DFS ===
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_FormatMRDFS.png" alt="FormatMRDFS" />
+
+
+=== Generate Stored Job Examples ===
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_GenerateExamples.png" alt="GenerateExamples" />
+
+
+=== View Stored job examples in cluster ===
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_DirExamples.png" alt="DirExamples" />
+
+
+=== Execute wordcount job ===
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExecWordCount.png" alt="ExecWordCount" />
+
+
+=== View wordcount inputs and outputs ===
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewWordCountIO.png" alt="ViewWordCountIO" />
+
+
+=== View/Edit the wordcount example ===
+
+C:\> *Qizmt edit Qizmt-WordCount.xml*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewEditWordCount.png" alt="ViewEditWordCount" />
+
+
+== Cluster Installation ==
+
+ # Install MySpace.DataMining.Qizmt.msi and any extensions on all machines
+  # See *Quick Start* section for details on driver installation
+ # Pick one machine and issue the command: <br /> C:\>*`Qizmt  format Machines=<HOST0>,<HOST2>,<HOST2>,...`* <br />You may now issue Qizmt commands, build jobs, deploy jobs, execute jobs, etc. <br /> For command help, issue: <br /> C:\>*Qizmt*
+
+
+== Adding a New Machine to an Existing Cluster ==
+
+ # Install the Qizmt driver on the new machine along with any extensions, see section Single Machine Quick Start
+ # From any machine in the cluster, issue the command: *`Qizmt addmachine <hostname>`* <br /> Where `<hostname>` is the hostname of the new machine to add to the cluster
+  * Data in cluster will automatically be redistribute
+  * The new node will pull a subset of the data from the other machines
+  * All machines in cluster will have a smaller portion of the data after a node has been added
+
+
+== Removing Node from Cluster ==
+
+ # From any machine in cluster, issue command: *`Qizmt removemachine <hostname>`* <br /> Where `<hostname>` is the hostname of the machine to remove from the cluster
+  * Data in cluster will automatically redistribute
+
+
+== Uninstalling Qizmt Driver from Machine ==
+ # Remove the machine from any cluster that it may be part of see: _Removing Node from Cluster_
+ # Start->Control Panel
+ # Select _Add/Remove Programs_ or _Programs and Features_
+ # Double click on the Qizmt installation and select Uninstall
+
+
+== Qizmt Command Line Usage ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CommandLine.png" alt="CommandLine" />
+
+
+== Borrow Machines from another Cluster ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_BorrowNodes.png" alt="BorrowNodes" />
+
+As long as there is sufficient hard drive, machines may be borrowed from another cluster without affecting the contents each MR.DFS
+ # From Any Machine on Cluster A <br />  * Qizmt removemachine Machine2 && Qizmt removemachine Machine3 && Qizmt removemachine Machine4 *
+
+ # From Any Machine on Cluster B <br />  * Qizmt addmachine Machine2 && Qizmt addmachine Machine3 && Qizmt addmachine Machine4 *
+
+
+== Splitting a Cluster into Two Smaller Clusters ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SplitCluster.png" alt="SplitCluster" />
+
+A cluster may be split into two clusters such that one cluster retains the entire MR.DFS and the new cluster gets a clean new MR.DFS
+ # From any machine in Cluster B <br /> * Qizmt removemachine Machine8 && Qizmt removemachine Machine9 && Qizmt removemachine Machine2 && Qizmt removemachine Machine3 && Qizmt removemachine Machine4 *
+ # From any removed machine <br /> * Qizmt format Machines=Machine8,Machine9,Machine2,Machine3,Machine4 *
+
+
+== Cluster Health ==
+
+View the current health of the cluster. When this command is run any corrupted files, disconnected servers and other fault scenarios are detected. 
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Health.png" alt="Health" />
+
+
+== Command History ==
+View history of commands executed on the current cluster.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_History.png" alt="History" />
+
+
+== Developers on Cluster ==
+View a list of all users currently logged into all windows machines of the cluster.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Who.png" alt="Who" />
+
+
+== Other Qizmt Administration Commands ==
+
+<table>
+<tr><td> *Command* </td><td> *Usage* </td></tr>
+
+<tr valign="top"><td> `ps` </td><td> distributed process information </td></tr>
+<tr valign="top"><td> `who` </td><td>  </td></tr>
+<tr valign="top"><td> `history` </td><td>  </td></tr>
+<tr valign="top"><td> `killall` </td><td> kill all jobs, clean any orphaned intermediate data </td></tr>
+<tr valign="top"><td> `info [<dfspath>[:<host>]]`        </td><td> information for MR.DFS or a MR.DFS file </td></tr>
+<tr valign="top"><td> `getjobs \\<netpath>` </td><td> Archive all jobs from MR.DFS to a file on a network path. </td></tr>
+<tr valign="top"><td> `putjobs \\<net path>` </td><td> Put all jobs from an archive into MR.DFS. Jobs by the same name will be skipped. </td></tr>
+<tr valign="top"><td> `examples` </td><td> generate example jobs source code </td></tr>
+<tr valign="top"><td> `importdir` </td><td> import jobs from into MR.DFS </td></tr>
+<tr valign="top"><td> `listinstalldir` </td><td> List all installed directories </td></tr>
+<tr valign="top"><td> `exechistory` </td><td> List the most recent executed commands </td></tr>
+<tr valign="top"><td> `harddrivespeedtest </td><td> [<filesize>]`</td><td> Test write/read hard drive speed </td></tr>
+<tr valign="top"><td> `networkspeedtest </td><td> [<filesize>]`</td><td> Test upload/download network speed test </td></tr>
+<tr valign="top"><td> `cputemp` </td><td> List cpu temperatures </td></tr>
+<tr valign="top"><td> `ghost` </td><td> List intermediate data leaked from when a job was aborted early across the cluster and is marked for deletion on next killall </td></tr>
+<tr valign="top"><td> `perfmon` </td><td> `<network|cputime|diskio|availablememory>`
+ <br />        `[a=<Number of readings to get.  Return average.>]`
+ <br />        `[t=<Number of threads>]`
+ <br />        `[s=<Milliseconds of sleep to take between readings>]`
+ <br />        get Perfmon counter readings
+
+generic
+ <br />        `o=<Object/category name>`
+ <br />        `c=<Counter name>`
+ <br />        `i=<Instance Name>`
+ <br />        `[f Display readings in friendly byte size units]`
+ <br />        `[a=<Number of readings to get.  Return average.>]`
+ <br />        `[t=<Number of threads>]`
+ <br />        `[s=<Milliseconds of sleep to take between readings>]`
+ <br />        specify a Perfmon counter to read
+</td></tr>
+<tr valign="top"><td> `packetsniff` </td><td> `[t=<Number of threads>]`
+`[s=<Milliseconds to sniff>]`
+`[v verbose]`
+`[a include non-cluster machines]`
+Sniff packets
+</td></tr>
+<tr valign="top"><td> `md5 <dfsfile>` </td><td> compute MD5 of DFS data file </td></tr>
+<tr valign="top"><td> `checksum <dfsfile>` </td><td> compute sum of DFS data file </td></tr>
+<tr valign="top"><td> `sorted <dfsfile>` </td><td> check if a DFS data file has sorted lines in ascending big endian byte sorted </td></tr>
+<tr valign="top"><td> `nearprime <positiveNum>` </td><td> find the nearest prime number </td></tr>
+<tr valign="top"><td> `genhostnames <pattern> <startNum> <endNum> [<delimiter>]`
+generate host names </td><td> generate a list of hostnames using a pattern such as FOOBAR#### </td></tr>
+<tr valign="top"><td> viewlog </td><td> `[machine=<machineName>]`
+`[count=<number of entries to return>]`
+view log entries
+If you suspect that there is an error or a job is taking too long. This command can be used to view any errors that may have occurred even if the current running job or jobs have not yet completed execution.
+</td></tr>
+<tr valign="top"><td> `stresstests` </td><td> Generate a series of mapreducer jobs which may be executed to stresstest the capabilities of the current Qizmt cluster.
+ <br />    `Qizmt exec grouped_10GB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec hashsorted_10GB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec sorted_10GB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec sorted_POS_10GB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec grouped_1TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec hashsorted_1TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec sorted_1TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec sorted_POS_1TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec grouped_5TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec hashsorted_5TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec sorted_5TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec sorted_POS_5TB_Of_100_Byte_Rows.xml`
+ <br />    `Qizmt exec sortTestsDriver.xml [s = run tests]`
+ <br />    `Qizmt exec sortTestsDriver.xml [sv = run tests and verify results]`
+ <br />    `Qizmt exec sortTestsDriver.xml [v = verify results]`
+</td></tr>
+
+</table>
+
+
+= Data Replication =
+Clusters can have replication level up to the number of (machines / 2) -1. The higher the replication level, the more machines may have hard drive or network failures without loss of data in the cluster. The number of machines which may concurrently fail without loss of data is (replication level – 1). Higher replication levels cause the MR.DFS free disk space to drop. The cluster disk space in a cluster is dropped to (physical disk space / replication level).
+
+<table>
+<tr><td> *Replication Level* </td><td> *Allowed Concurrent Failures* </td><td> *Cluster Disk Space* </td></tr>
+<tr><td> 1 </td><td> 0 </td><td> 100% </td></tr>
+<tr><td> 2 </td><td> 1 </td><td> 50% </td></tr>
+<tr><td> 3 </td><td> 2 </td><td> 33% </td></tr>
+</table>
+
+Here are a few commands for viewing and managing the replication of a cluster:
+<table>
+<tr><td> *Command* </td><td> *Description* </td></tr>
+<tr><td> `Qizmt replicationview` </td><td> view the replication level of the current cluster </td></tr>
+<tr><td> `Qizmt replicationupdate <level>` </td><td> increase or decrease the replication level of the current cluster </td></tr>
+</table>
+
+Data replication is useful for:
+ #Clusters that need reliability
+ #Clusters used for data warehousing
+ #Extremely large clusters, even if used for transient data as the probability of failures increases with cluster size and age of hard drives. (the older the hard drives, the higher probability of a disk failure)
+
+
+== MR.DFS Chunks and MR.DFS Parts ==
+Each MR.DFS file is broken up into one or more parts. However, with replication enabled, each part consists of multiple redundant copies called chunks. By default files in a cluster are broken up into 64MB parts, so if a file has 320MB of data, it will be broken up into 5 parts across the MR.DFS. The number of chunks for an MR.DFS file is (parts * replication level)
+
+<table>
+<tr><td> *MR.DFS File Size* </td><td> *Parts* </td><td> *Replication Level* </td><td> *Chunks*</td></tr>
+<tr><td> 320MB </td><td> 5 </td><td> 1 </td><td> 5 </td></tr>
+<tr><td> 320MB </td><td> 5 </td><td> 2 </td><td> 10 </td></tr>
+<tr><td> 320MB </td><td> 5 </td><td> 3 </td><td> 15 </td></tr>
+</table>
+
+
+== Formatting Cluster with Data Replication ==
+
+If a cluster is formatted with replication, then machines may fail without loss of data and the cluster is recovered by removing the machine with disk failure or network failure. Both network failure and disk failure are the most likely failures in a cluster. Permissions issues and many other possible causes of failure are not used to chop a machine out of a cluster to avoid over-copping from occurring and should be addressed by solving the problem causing loss of connectivity. When redundancy is enabled or greater then 1, *Qizmt put* and *Qizmt exec* exclude failed machines at the start of execution and display a warning message listing any machines excluded due to failures. The failed machines, however, are not removed from the cluster until *Qizmt removemachine* is executed. It is when *Qizmt removemachine* is executed on a machine with disk or network failure, the remaining machines re-distribute file chunks evenly across the cluster.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSReplication.png" alt="MRDFSReplication" />
+
+
+== Increasing and Decreasing Replication ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSReplicationChunks.png" alt="MRDFSReplicationChunks" />
+
+A cluster that already has in its MR.DFS can still have its replication decreased or increased. For example, if a cluster has replication level of two and a machine is added, a small amount of data chunks on the other machines will move to the newly added machine until all machines have an even spread of the data in the MR.DFS.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSReplicationChunksAdd1.png" alt="MRDFSReplicationChunksAdd1" />
+
+If the replication level is then decreased, data chunks are removed from machines across the cluster such that the new replication level is maintained and the data remains evenly spread across the cluster.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSReplicationChunksRemove1.png" alt="MRDFSReplicationChunksRemove1" />
+
+
+== Cluster without Replication ==
+
+When a cluster is formatted, if no replication is specified e.g. set to the value of 1, then the cluster will split files up across the cluster without redundancy. If a machine is lost, the data chunks on the lost-machine are permanently lost. If a machine is still available but is removed, then the data chunks on the machine-to-remove will be redistributed across the rest of the machines. Having no replication has performance gains, as the replication phase of *Qizmt put* and *Qizmt exec* incur extra bandwidth cost to make redundant copies of MR.DFS file chunks. It is ideal to use clusters that have no replication for: 
+ # small clusters which are not warehousing data but do transient processing and the time to reload data after a failure is insignificant
+ # single machine desktop installations used for developing mapreducers offline
+ # small clusters which have RAID 5 or RAID 10 hard drives (this only works well for small clusters)
+ # large clusters used to do performance benchmarking/competitive sorting competitions
+
+For example, if we issue `Qizmt put \\SERVERX\fruit_*.txt` each machine gets a disjoint subset of all the `fruit_*.txt` files picked up by the *`Qizmt put`* command.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MRDFSChunksNoReplication.png" alt="MRDFSChunksNoReplication" />
