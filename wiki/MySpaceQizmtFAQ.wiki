@@ -44,40 +44,41 @@ Also, can pull the file out of mr.dfs and view it:<br/><br/>
 ----
 There are a few ways:
  # The C# function, struct or class declaration after “<![CDATA[“ and before  in map() or reduce() clause that will use it.<br/>This will allow for debugging the functionality while it is being executed by the mapreducer.<br/><br/>
- # Put '*'.dll – will put a DLL into MR.DFS and reference it from a mapreducer job with.<br/>e.g.<br/>
+ # Put `*`.dll – will put a DLL into MR.DFS and reference it from a mapreducer job with.<br/>e.g.<br/>
 {{{
 <Job …><Add Reference="regression_test_testdll.dll" Type="dfs" />
 }}}
 
 ==How to put a file into cluster from a remote machine?==
 There are a few ways:
-# Use the rput command, this will copy the file locally with the current credentials then put it into qizmt with the qizmt credentials.
-# Copy locally then put into qizmt with put command
-# Write a remote job that opens an ADO.Net connection and streams data in from an RDBMS
+ # Use the rput command, this will copy the file locally with the current credentials then put it into qizmt with the qizmt credentials.
+ # Copy locally then put into qizmt with put command
+ # Write a remote job that opens an ADO.Net connection and streams data in from an RDBMS
 ==Is byteslice equivalent to a line of text?==
 By default yes, however a “line” once in mr.dfs is not the same as a line in a text file but is an abstract tuple of data as it can also contain binary data.<br/><br/>
 In the case of *binaryput* a line stores an image with a header<br/>
 e.g.<br/>
-*qizmt binaryput* \\<hostname>\d$\images\*.png<br/><br/>
+{{{qizmt binaryput \\<hostname>\d$\images\*.png}}}<br/><br/>
 Accessed in mapreducer with:
-<source lang="csharp">
+{{{
 public virtual void Map(ByteSlice line, MapOutput output)
 {
    Blob b = line.ReadBinary();
    string name = b.name;
    byte[] data = b.data;
-
-</source>
+}
+}}}
 In the case of newline separated text data, can use put command.<br/>
 e.g.<br/>
-*qizmt put* \\<hostname>\d$\images\*.png<br/><br/>
+{{{qizmt put \\<hostname>\d$\images\*.png}}}<br/><br/>
 Accessed in mapreducer with:
-<source lang="csharp">
+{{{
 public virtual void Map(ByteSlice line, MapOutput output)
 {
    mstring sLine = mstring.Prepare(line);
-</source>
-==Ok, so when I move a file to the cluster, how do I reference it in the xml?==
+}}}
+===Ok, so when I move a file to the cluster, how do I reference it in the xml?===
+----
 IO tags of job, set the input of the mapreducer to the file in MR.DFS<br/>
 e.g.<br/>
 <source lang="xml">
@@ -860,4 +861,3 @@ However, you can use mapreducer caching on both the word counter and the count s
 [[Image:Qizmt_WordCountExample.png]]
 
 Qizmt-ExplicitCacheWordCount.xml is in the built-in examples and shows word count which only exchanges/sorts new texts in the cluster but producing a comprehensive word count after each iteration.
-
