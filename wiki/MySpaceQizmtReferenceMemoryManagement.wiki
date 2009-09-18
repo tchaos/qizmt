@@ -1,2 +1,1 @@
-#summary MySpace Qizmt Reference Memory Management
-
+#summary Qizmt Reference Memory Management
