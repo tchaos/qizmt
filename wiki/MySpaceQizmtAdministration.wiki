@@ -104,8 +104,7 @@ C:\> *Qizmt edit Qizmt-WordCount.xml*
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_BorrowNodes.png" alt="BorrowNodes" />
 
 As long as there is sufficient hard drive, machines may be borrowed from another cluster without affecting the contents each MR.DFS
- # From Any Machine on Cluster A <br />  * Qizmt removemachine Machine2 && Qizmt removemachine Machine3 && Qizmt removemachine Machine4 *
-
+ # From Any Machine on Cluster A <br />  * Qizmt removemachine Machine2 && Qizmt removemachine Machine3 && Qizmt removemachine Machine4 * <br />
  # From Any Machine on Cluster B <br />  * Qizmt addmachine Machine2 && Qizmt addmachine Machine3 && Qizmt addmachine Machine4 *
 
 
@@ -114,7 +113,7 @@ As long as there is sufficient hard drive, machines may be borrowed from another
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SplitCluster.png" alt="SplitCluster" />
 
 A cluster may be split into two clusters such that one cluster retains the entire MR.DFS and the new cluster gets a clean new MR.DFS
- # From any machine in Cluster B <br /> * Qizmt removemachine Machine8 && Qizmt removemachine Machine9 && Qizmt removemachine Machine2 && Qizmt removemachine Machine3 && Qizmt removemachine Machine4 *
+ # From any machine in Cluster B <br /> * Qizmt removemachine Machine8 && Qizmt removemachine Machine9 && Qizmt removemachine Machine2 && Qizmt removemachine Machine3 && Qizmt removemachine Machine4 * <br />
  # From any removed machine <br /> * Qizmt format Machines=Machine8,Machine9,Machine2,Machine3,Machine4 *
 
 
