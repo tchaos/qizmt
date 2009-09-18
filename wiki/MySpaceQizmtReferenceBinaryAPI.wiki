@@ -1335,15 +1335,13 @@ public override void Reduce(ByteSlice key, RandomAccessEntries values, RandomAcc
 
 
 
-=Qizmt_`*` Constants=
+=Qizmt`_``*` Constants=
 
 
 
 || *Name* || *Description* ||
-|| {{{const int Qizmt_ProcessID}}} || ID of current process in cluster, 0 to Qizmt_ProcessCount – 1.  ||
-|| {{{const int Qizmt_ProcessCount}}} || Total number of processes for the job, usually equal to the number of cores or a prime near the number of 
-
-cores. ||
+|| {{{const int Qizmt_ProcessID}}} || ID of current process in cluster, 0 to `Qizmt_ProcessCount` – 1.  ||
+|| {{{const int Qizmt_ProcessCount}}} || Total number of processes for the job, usually equal to the number of cores or a prime near the number of cores. ||
 || {{{const string Qizmt_MachineHost}}} || Host name of the machine that the current mapper, reducer, local or remote is running on.  ||
 || {{{const string Qizmt_MachineIP}}} || IP address of the machine that the current mapper, reducer, local or remote is running on.  ||
 || {{{const string[] Qizmt_ExecArgs}}} || 	Command line arguments sent in with the Qizmt exec command  ||
@@ -1351,8 +1349,10 @@ cores. ||
 || {{{const string Qizmt_LogName}}} || 	Name of log file ||
 
 
+<br/>
 
-=Qizmt_`*` Methods=
+
+=Qizmt`_``*` Methods=
 
 
 ==`Qizmt_Log`==
