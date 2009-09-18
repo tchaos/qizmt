@@ -1,4 +1,4 @@
-#summary Main Qizmt Wiki page
+#summary Qizmt Main Wiki Page
 #labels Qizmt,Wiki
 
 = MySpace Qizmt Wiki =
