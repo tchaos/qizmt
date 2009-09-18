@@ -83,4 +83,4 @@ This guide is intended for use by:
  # Right click on it and select *start*
  # At the Windows command line issue the command *qizmt @format machines=localhost*
  # Qizmt is now built and manually installed on your development computer as a single machine cluster.
- # You can request *SVN commit* access by sending the following information to http://www.myspace.com/qizmt<br/>Google account email address<br/><first name> <last name><br/>[<company>/<title>]<br/><telephone number><br/><address>
+ # You can request *SVN commit* access by sending the following information to http://www.myspace.com/qizmt<br/>Google account email address<br/>`<first name> <last name>`<br/>[`<company>/<title>`]<br/>`<telephone number>`<br/>`<address>`
