@@ -831,6 +831,8 @@ This would have to be two mapreducers because any server could contribute to the
 
 However, you can use mapreducer caching on both the word counter and the count sorter so that only delta gets exchanged/sorted each time you execute it.
  
+
 <img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_WordCountExample.png" alt="Qizmt Word Count Example" />
+
 
 Qizmt-ExplicitCacheWordCount.xml is in the built-in examples and shows word count which only exchanges/sorts new texts in the cluster but producing a comprehensive word count after each iteration.
