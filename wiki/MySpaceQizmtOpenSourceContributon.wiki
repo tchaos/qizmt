@@ -61,10 +61,9 @@ This guide is intended for use by:
  # In Visual Studio, select *VisualSVN -`>` Repo-Browser*
  # Enter http://qizmt.googlecode.com/svn/trunk into the *URL* box
   * (if you have a contributor account set up via request to myspace.com/Qizmt you will need to enter “https” instead of “http”)
-  <img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt googleCodeUrl.png" alt="Qizmt Google Url" />
- # Select *OK* and the *Repository Browser* will show<Br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt RepositoryBrowser.png" alt="Qizmt Repository Browser" />
- # Expand the tree view and Right-click the *trunk* folder and select *checkout*.<Br/>
- <img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt CheckOut.png" alt="Qizmt Checkout" />
+  <img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_googleCodeUrl.png" alt="Qizmt Google Url" />
+ # Select *OK* and the *Repository Browser* will show<Br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RepositoryBrowser.png" alt="Qizmt Repository Browser" />
+ # Expand the tree view and Right-click the *trunk* folder and select *checkout*.<Br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CheckOut.png" alt="Qizmt Checkout" /><br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CheckOutLocation.png" alt="Qizmt Checkout Location" />
  # Select *OK* on the *Checkout* window
  # Wait for the checkout progress to complete<br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CheckOutProgress.png" alt="Qizmt Checkout" />
  # At this point you have downloaded the Qizmt source code
@@ -74,13 +73,13 @@ This guide is intended for use by:
  # Select *“Temporarily work uncontrolled”* on the next Source Control prompt. The solution has both TFS and SVN bindings, however you will just be using SVN. If you commit (check-in) a patch with modifications to the TFS bindings it will be rejected<Br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_UnableAccessDB.png" alt="Qizmt Unable Access DB" />
  # Once the project is open you will see a little green light next to all items in the *Solutions Explorer*. This tells you that the item has not changed since you last *updated (same idea as “get latest” in TFS)*<Br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_VS.png" alt="Qizmt VS" />
  # Hit *Ctrl-Shift-B* to build
- # On your Windows desktop, right click on *my computer icon* and select *properties*. Then select *advanced system settings* then select *Environment Variables…* in the *Advanced* tab. Under *System variables* select the *path* variable and select *“Edit…”* Add *;<qizmtdir>\MySpace.DataMining.DistributedObjects\bin\Debug\* to the end of the path. Then select *OK, OK, OK*
+ # On your Windows desktop, right click on *my computer icon* and select *properties*. Then select *advanced system settings* then select *Environment Variables…* in the *Advanced* tab. Under *System variables* select the *path* variable and select *“Edit…”* Add `;<qizmtdir>\MySpace.DataMining.DistributedObjects\bin\Debug\` to the end of the path. Then select *OK, OK, OK*
  # In Windows, click on the start button and enter into *start search* “visual studio 2008 command prompt” and hit enter
- # Using the Visual Studio 2008 Command Prompt, navigate to:<Br/>*<qizmtdir>\MySpace.DataMining.DistributedObjects\bin\Debug\*
+ # Using the Visual Studio 2008 Command Prompt, navigate to:<Br/>`<qizmtdir>\MySpace.DataMining.DistributedObjects\bin\Debug\`
  # Run the command *installutil MySpace.DataMining.DistributedObjects.exe*
  # In Windows, click on the start button and enter into *start search* “Services” and hit enter.
  # Locate the *Distributed Objects* service<br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Services.png" alt="Qizmt Services" />
  # Right click on it and select *start*
  # At the Windows command line issue the command *qizmt @format machines=localhost*
  # Qizmt is now built and manually installed on your development computer as a single machine cluster.
- # You can request *SVN commit* access by sending the following information to http://www.myspace.com/qizmt<br/>Google account email address<br/>`<first name> <last name>`<br/>[`<company>/<title>`]<br/>`<telephone number>`<br/>`<address>`
+ # You can request *SVN commit* access by sending the following information to http://www.myspace.com/qizmt<br/>`Google account email address`<br/>`<first name> <last name>`<br/>`[<company>/<title>]`<br/>`<telephone number>`<br/>`<address>`
