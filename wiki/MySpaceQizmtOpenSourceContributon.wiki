@@ -1,4 +1,5 @@
-#summary Qizmt Open Source Contributon
+#summary Qizmt Open Source Contribution
+#labels Qizmt,Open,Source,Contribution
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
 
@@ -76,7 +77,7 @@ This guide is intended for use by:
  # On your Windows desktop, right click on *my computer icon* and select *properties*. Then select *advanced system settings* then select *Environment Variables…* in the *Advanced* tab. Under *System variables* select the *path* variable and select *“Edit…”* Add `;<qizmtdir>\MySpace.DataMining.DistributedObjects\bin\Debug\` to the end of the path. Then select *OK, OK, OK*
  # In Windows, click on the start button and enter into *start search* “visual studio 2008 command prompt” and hit enter
  # Using the Visual Studio 2008 Command Prompt, navigate to:<Br/>`<qizmtdir>\MySpace.DataMining.DistributedObjects\bin\Debug\`
- # Run the command *installutil MySpace.DataMining.DistributedObjects.exe*
+ # Run the command `installutil MySpace.DataMining.DistributedObjects.exe`
  # In Windows, click on the start button and enter into *start search* “Services” and hit enter.
  # Locate the *Distributed Objects* service<br/><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Services.png" alt="Qizmt Services" />
  # Right click on it and select *start*
