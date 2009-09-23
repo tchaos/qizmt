@@ -19,57 +19,11 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
  * Windows 2003 SP2, Windows 2008 or Windows Vista
  * .NET Framework 3.5 SP1
 
-
-== Single Machine Qick-Start ==
-
-=== Run MSI to install driver on development machine ===
-
- * Download and run:
-  * MySpace.DataMining.Qizmt.msi
-   # Click next and go with all defaults
-   # Enter `<windows login>` when prompted
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_InstallerFileWithExtensions.png" alt="InstallerFileWithExtensions" />
-<br />
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SetupWizard.png" alt="SetupWizard" />
-
-
-=== Formatting MR.DFS ===
-
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_FormatMRDFS.png" alt="FormatMRDFS" />
-
-
-=== Generate Stored Job Examples ===
-
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_GenerateExamples.png" alt="GenerateExamples" />
-
-
-=== View Stored job examples in cluster ===
-
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_DirExamples.png" alt="DirExamples" />
-
-
-=== Execute wordcount job ===
-
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExecWordCount.png" alt="ExecWordCount" />
-
-
-=== View wordcount inputs and outputs ===
-
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewWordCountIO.png" alt="ViewWordCountIO" />
-
-
-=== View/Edit the wordcount example ===
-
-C:\> *Qizmt edit Qizmt-WordCount.xml*
-
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewEditWordCount.png" alt="ViewEditWordCount" />
-
-
 == Cluster Installation ==
 
  # Install MySpace.DataMining.Qizmt.msi and any extensions on all machines
   # See *Quick Start* section for details on driver installation
- # Pick one machine and issue the command: <br /> C:\>*`Qizmt  format Machines=<HOST0>,<HOST2>,<HOST2>,...`* <br />You may now issue Qizmt commands, build jobs, deploy jobs, execute jobs, etc. <br /> For command help, issue: <br /> C:\>*Qizmt*
+ # Pick one machine and issue the command: <br /> C:\>*`Qizmt  format Machines=<HOST0>,<HOST2>,<HOST2>,...`* <br />You may now issue Qizmt commands from any of the specified  hosts, build/debug jobs, deploy jobs, execute jobs, etc. <br /> For command help, issue: <br /> C:\>*Qizmt*
 
 
 == Adding a New Machine to an Existing Cluster ==
