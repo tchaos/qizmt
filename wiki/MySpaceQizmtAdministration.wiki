@@ -43,7 +43,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
 
 == Uninstalling Qizmt Driver from Machine ==
- # Remove the machine from any cluster that it may be part of see: _Removing Node from Cluster_
+ # Remove the machine from any cluster that it may be part of see: _Removing Machine from a Cluster_
  # Start->Control Panel
  # Select _Add/Remove Programs_ or _Programs and Features_
  # Double click on the Qizmt installation and select Uninstall
