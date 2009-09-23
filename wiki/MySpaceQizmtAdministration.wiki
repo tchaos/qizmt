@@ -23,7 +23,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
  # Install MySpace.DataMining.Qizmt.msi and any extensions on all machines
   # See *Quick Start* section for details on driver installation
- # Pick one machine and issue the command: <br /> C:\>*`Qizmt  format Machines=<HOST0>,<HOST2>,<HOST2>,...`* <br />You may now issue Qizmt commands from any of the specified  hosts, build/debug jobs, deploy jobs, execute jobs, etc. <br /> For command help, issue: <br /> C:\>*Qizmt*
+ # Pick one machine and issue the command: <br /> C:\>*`Qizmt  format Machines=<HOST0>,<HOST2>,<HOST2>,...`* <br />You may now RDP into any of the specified hosts and issue Qizmt commands to code/debug jobs, execute jobs, etc. <br /> For command help, issue: <br /> C:\>*Qizmt*
 
 
 == Adding a New Machine to an Existing Cluster ==
