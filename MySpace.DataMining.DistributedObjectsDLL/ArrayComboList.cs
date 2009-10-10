@@ -722,7 +722,7 @@ namespace UserLoader
         public int OutputRecordLength = int.MinValue;
 
 
-        void _DoMap(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource)
+        void _DoMap(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             ensureopen("DoMap");
             ensurenotsortd("DoMap");
@@ -734,6 +734,17 @@ namespace UserLoader
                 fns += inputdfsnodes[i] + ";";
             }
             fns = fns.Trim(';');
+
+            if (fns.Length > 0)
+            {
+                string offsets = "";
+                for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
+                {
+                    offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                }
+                offsets = offsets.Trim(';');
+                fns = fns + "|" + offsets;               
+            }           
 
             foreach (SlaveInfo _slave in dslaves)
             {
@@ -750,7 +761,7 @@ namespace UserLoader
                 XContent.SendXContent(slave.nstm, pluginsource);
                 XContent.SendXContent(slave.nstm, dlldata, null == dlldata ? 0 : dlldata.Length);
 
-                slave.zmapblockbasename = "zmap_%n_" + Guid.NewGuid().ToString() + ".zm";
+                slave.zmapblockbasename = "zmap_%n_" + Guid.NewGuid().ToString() + ".j" + sjid + ".zm";
                 XContent.SendXContent(slave.nstm, slave.zmapblockbasename);
 
                 XContent.SendXContent(slave.nstm, fns); // All slaves of same DistObj get same input files.
@@ -770,7 +781,7 @@ namespace UserLoader
         }
 
 
-        public virtual void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname)
+        public virtual void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             byte[] dlldata = null;
             if (LocalCompile)
@@ -785,7 +796,7 @@ namespace UserLoader
                     CompilerInvoked("Map", true);
                 }
             }
-            _DoMap(inputdfsnodes, dlldata, classname, code);
+            _DoMap(inputdfsnodes, dlldata, classname, code, inputdfsfilenames, inputnodesoffsets);
         }
 
 
@@ -988,10 +999,10 @@ namespace UserMapper
 
 
         // inputdfsnodes must be accessible by the remote machine. Can be star-delimited failover names (starnames).
-        public virtual void DoMap(IList<string> inputdfsnodes, string code, string[] usings)
+        public virtual void DoMap(IList<string> inputdfsnodes, string code, string[] usings, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             const string classname = "DfsMapper";
-            DoMapFullSource(inputdfsnodes, GetMapSource(code, usings, classname), classname);
+            DoMapFullSource(inputdfsnodes, GetMapSource(code, usings, classname), classname, inputdfsfilenames, inputnodesoffsets);
         }
 
 
@@ -1000,7 +1011,7 @@ namespace UserMapper
         public string FoilCacheName = null;
 
 
-        void _BeginDoFoilMapSample(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource)
+        void _BeginDoFoilMapSample(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             ensureopen("DoFoilMapSample");
             ensurenotsortd("DoFoilMapSample");
@@ -1012,6 +1023,17 @@ namespace UserMapper
                 fns += inputdfsnodes[i] + ";";
             }
             fns = fns.Trim(';');
+
+            if (fns.Length > 0)
+            {
+                string offsets = "";
+                for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
+                {
+                    offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                }
+                offsets = offsets.Trim(';');
+                fns = fns + "|" + offsets;
+            }            
 
             if (1 != dslaves.Count)
             {
@@ -1046,7 +1068,7 @@ namespace UserMapper
                 {
                     zfin = Guid.NewGuid().ToString();
                 }
-                slave.zfoilbasename = "zfoil_" + zfin + ".zf";
+                slave.zfoilbasename = "zfoil_" + zfin + ".j" + sjid + ".zf";
                 XContent.SendXContent(slave.nstm, slave.zfoilbasename);
 
                 XContent.SendXContent(slave.nstm, fns);
@@ -1057,7 +1079,7 @@ namespace UserMapper
             }
         }
 
-        public virtual void BeginDoFoilMapSample(IList<string> inputdfsnodes, string code, string[] usings)
+        public virtual void BeginDoFoilMapSample(IList<string> inputdfsnodes, string code, string[] usings, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             const string classname = "DfsMapper";
             string source = GetMapSource(code, usings, classname);
@@ -1074,7 +1096,7 @@ namespace UserMapper
                     CompilerInvoked("FoilMapSample", true);
                 }
             }
-            _BeginDoFoilMapSample(inputdfsnodes, dlldata, classname, source);
+            _BeginDoFoilMapSample(inputdfsnodes, dlldata, classname, source, inputdfsfilenames, inputnodesoffsets);
         }
 
         public void EndDoFoilMapSample()
@@ -1082,9 +1104,9 @@ namespace UserMapper
             Ping("DoFoilMapSample");
         }
 
-        public void DoFoilMapSample(IList<string> inputdfsnodes, string code, string[] usings)
+        public void DoFoilMapSample(IList<string> inputdfsnodes, string code, string[] usings, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
-            BeginDoFoilMapSample(inputdfsnodes, code, usings);
+            BeginDoFoilMapSample(inputdfsnodes, code, usings, inputdfsfilenames, inputnodesoffsets);
             EndDoFoilMapSample();
         }
 
@@ -1515,11 +1537,7 @@ namespace MySpace.DataMining.EasyReducer
             raentries.SetInput(input);
             byte[] firstkeybuf, xkeybuf;
             int firstkeyoffset, xkeyoffset;
-            int firstkeylen, xkeylen;
-            if(StaticGlobals.DSpace_InputBytesRemain == 0 && i == input.entries.Count - 1)
-            {
-                StaticGlobals.DSpace_Last = true;
-            }
+            int firstkeylen, xkeylen;            
             for (; i < input.entries.Count; )
             {
                 input.entries[i].LocateKey(input, out firstkeybuf, out firstkeyoffset, out firstkeylen);
@@ -1547,6 +1565,10 @@ namespace MySpace.DataMining.EasyReducer
                     len++;
                 }
                 raentries.set(i, len);
+                if(StaticGlobals.DSpace_InputBytesRemain == 0 && ((i + len) == input.entries.Count))
+                {
+                    StaticGlobals.DSpace_Last = true;
+                }
                 OReduce(this, output);
                 i += len;
                 return true; // Continue.
@@ -1792,6 +1814,7 @@ namespace MySpace.DataMining.EasyReducer
                 {
                     raouts[i] = new RandomAccessOutput(output, filepaths[i]);
                     raouts[i].rar = rar;
+                    raouts[i].parentlist = raouts;
                 }
                 
                 {
@@ -1826,12 +1849,13 @@ namespace MySpace.DataMining.EasyReducer
                 key = rar.Values[0].Key.FlipAllBits(flipbuf);    
             }
 
-            for(int i = 0; i < NRAOUTS; i++)
+            //for(int i = 0; i < NRAOUTS; i++)
+            if(NRAOUTS > 0)
             {
                     Stack.ResetStack();
                     recordset.ResetBuffers();
                     ++StaticGlobals.ReduceIteration;
-                    Reduce(key, rar.Values, raouts[i]);                     
+                    Reduce(key, rar.Values, raouts[0]);                     
             }
         }
 
@@ -1873,6 +1897,7 @@ namespace MySpace.DataMining.EasyReducer
             List<byte> _bytebuf = new List<byte>();
 
             internal RandomAccessReducer rar;
+            internal RandomAccessOutput[] parentlist;
 
             long _nextsamplepos = -1;
 
@@ -1886,6 +1911,19 @@ namespace MySpace.DataMining.EasyReducer
                 this._basefilename = basefilename;
 
                 StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
+            }
+
+            public RandomAccessOutput GetOutputByIndex(int index)
+            {
+                if(parentlist == null)
+                {
+                    throw new Exception(`Error: GetOutputByIndex(int index) parent list is null.`);
+                }
+                if(index < 0 || index >= parentlist.Length)
+                {
+                    throw new Exception(`Error: GetOutputByIndex(int index) index is out of range.`);
+                }
+                return parentlist[index];
             }
 
             const string sBlockID = @`" + sBlockID + @"`; // Slave ID.

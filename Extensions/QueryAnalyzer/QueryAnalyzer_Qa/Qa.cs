@@ -164,7 +164,7 @@ namespace RDBMS_qa
             DbConnection conn = null;
             try
             {
-                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("DSpace_DataProvider");
+                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
                 conn = fact.CreateConnection();
                 conn.ConnectionString = ConnectionString;
                 conn.Open();
@@ -354,7 +354,7 @@ namespace RDBMS_qa
                 STORED_PROCEDURES  5
                 OPERATORS          6
              * */
-            txtQuery.Lexing.Keywords[0] = "AND OR UNION ALL INNERJOIN INPUT OUTPUT INNER JOIN LEFT OUTERJOIN LIKE HELP CREATE TABLE INSERT INTO IMPORT IMPORTLINES VALUES SELECT TOP FROM WHERE ORDER BY UPDATE SET TRUNCATE DROP INT LONG DOUBLE CHAR SHELL DELETE".ToLower();
+            txtQuery.Lexing.Keywords[0] = "AND OR UNION ALL INNERJOIN INPUT OUTPUT INNER JOIN LEFT OUTERJOIN LIKE HELP CREATE TABLE INSERT INTO IMPORT IMPORTLINES VALUES SELECT TOP FROM WHERE ORDER BY UPDATE SET TRUNCATE DROP INT LONG DOUBLE CHAR SHELL DELETE DISTINCT".ToLower();
             
             //txtQuery.Styles[(int)MssqlStyles.IDENTIFIER].ForeColor = 
             txtQuery.Styles[(int)MssqlStyles.STRING].ForeColor = Color.Brown;

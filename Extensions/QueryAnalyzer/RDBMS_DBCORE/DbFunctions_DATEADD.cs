@@ -65,7 +65,7 @@ namespace RDBMS_DBCORE
                 case "QUARTER":
                 case "QQ":
                 case "Q":
-                    newdt = dt.AddMonths(3);
+                    newdt = dt.AddMonths(num * 3);
                     break;
 
                 case "MONTH":

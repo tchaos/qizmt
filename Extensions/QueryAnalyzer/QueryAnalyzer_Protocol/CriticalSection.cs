@@ -110,6 +110,10 @@ namespace QueryAnalyzer_Protocol
             }
             catch
             {
+                if (object.ReferenceEquals(this, currentSection))
+                {
+                    currentSection = null;
+                }
                 ntsm.Close();
                 ntsm = null;
                 sock.Close();
@@ -152,6 +156,10 @@ namespace QueryAnalyzer_Protocol
             }
             catch
             {
+                if (object.ReferenceEquals(this, currentSection))
+                {
+                    currentSection = null;
+                }
                 ntsm.Close();
                 ntsm = null;
                 sock.Close();

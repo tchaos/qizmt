@@ -46,7 +46,7 @@ namespace RDBMS_DBCORE_RegressionTests
                 }
                 DbValue valOutput = DbAggregators.COUNTDISTINCT(tools, new DbAggregatorArguments(fargs));
                 ByteSlice bs = valOutput.Eval();
-                int output = tools.GetInt(bs);
+                int output = (int)tools.GetLong(bs);
                 int expected = dict.Count;
                 if (expected != output)
                 {
@@ -83,7 +83,7 @@ namespace RDBMS_DBCORE_RegressionTests
                 }
                 DbValue valOutput = DbAggregators.COUNTDISTINCT(tools, new DbAggregatorArguments(fargs));
                 ByteSlice bs = valOutput.Eval();
-                int output = tools.GetInt(bs);
+                int output = (int)tools.GetLong(bs);
                 int expected = dict.Count;
                 if (expected != output)
                 {
@@ -124,7 +124,7 @@ namespace RDBMS_DBCORE_RegressionTests
                 }
                 DbValue valOutput = DbAggregators.COUNTDISTINCT(tools, new DbAggregatorArguments(fargs));
                 ByteSlice bs = valOutput.Eval();
-                int output = tools.GetInt(bs);
+                int output = (int)tools.GetLong(bs);
                 int expected = dict.Count;
                 if (expected != output)
                 {
@@ -162,7 +162,7 @@ namespace RDBMS_DBCORE_RegressionTests
                 }
                 DbValue valOutput = DbAggregators.COUNTDISTINCT(tools, new DbAggregatorArguments(fargs));
                 ByteSlice bs = valOutput.Eval();
-                int output = tools.GetInt(bs);
+                int output = (int)tools.GetLong(bs);
                 int expected = dict.Count;
                 if (expected != output)
                 {

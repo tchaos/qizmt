@@ -142,7 +142,13 @@ namespace MySpace.DataMining.AELight
             int numwarnings = 0;
 #if REPLICATION_MUTEX
             System.Threading.Mutex repmutex = new System.Threading.Mutex(false, "DOreplication");
-            repmutex.WaitOne();
+            try
+            {
+                repmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
 #endif
             {
@@ -634,7 +640,13 @@ namespace MySpace.DataMining.AELight
         {
 #if REPLICATION_MUTEX
             System.Threading.Mutex repmutex = new System.Threading.Mutex(false, "DOreplication");
-            repmutex.WaitOne();
+            try
+            {
+                repmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
 #endif
             {
@@ -1544,7 +1556,13 @@ namespace MySpace.DataMining.AELight
                                     while (hnodes[si].Count < 1);
                                     int ni = rnd.Next(0, hnodes[si].Count);
                                     node = hnodes[si][ni];
-                                    hnodes[si].RemoveAt(ni); // ...
+                                    {
+                                        // Exclude from all machines to avoid getting another replicate.
+                                        for (int ihn = 0; ihn < hnodes.Count; ihn++)
+                                        {
+                                            hnodes[ihn].Remove(node);
+                                        }
+                                    }
                                 }
                                 {
                                     try

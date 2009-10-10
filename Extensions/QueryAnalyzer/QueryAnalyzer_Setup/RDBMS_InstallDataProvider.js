@@ -23,16 +23,23 @@ function forceCScript()
     }
 }
 
-function Main()
+function Main() 
 {
-    if (WScript.arguments.Length < 2)
+    var serviceinstall = 0;
+    var account = "";
+    var password = "";
+    if (WScript.arguments.Length < 2) 
     {
-        WScript.StdOut.WriteLine("Missing arguments: RDBMS_InstallDataProvider.js <account> <password>");
-        return;
+        //WScript.StdOut.WriteLine("Missing arguments: RDBMS_InstallDataProvider.js <account> <password>");
+        //return;
     }
-
-    var account = WScript.arguments(0);
-    var password = WScript.arguments(1);
+    else 
+    {
+        serviceinstall = 1;
+        account = WScript.arguments(0);
+        password = WScript.arguments(1);
+    }
+   
     var thispath = WScript.ScriptFullName;
     var del = thispath.lastIndexOf("\\");
     var thisdir = thispath.substr(0, del + 1);
@@ -53,24 +60,26 @@ function Main()
         msg = oExec.StdOut.ReadAll();        
         WScript.StdOut.WriteLine(msg);
 
-        WScript.StdOut.WriteLine("Begin installing service...");
-        var obj = ws.Exec("sc \\\\" + thismachine + " query QueryAnalyzer_Protocol");
-        var output = obj.StdOut.ReadAll();
-
-        if (output.indexOf("SERVICE_NAME: QueryAnalyzer_Protocol") > -1)
+        if (serviceinstall == 1) 
         {
-            WScript.StdOut.WriteLine("Service exists already.  Removing previous service...");
-            ws.Exec("sc \\\\" + thismachine + " stop QueryAnalyzer_Protocol");
-            ws.Exec("sc \\\\" + thismachine + " delete QueryAnalyzer_Protocol");
-            WScript.Sleep(7000);            
-        }
-        
-        ws.Exec("sc \\\\" + thismachine + " create QueryAnalyzer_Protocol binPath= \"" + thisdir + "QueryAnalyzer_Protocol.exe\" start= auto obj= \"" + account + "\" DisplayName= QueryAnalyzer_Protocol password= \"" + password + "\"");
-        WScript.Sleep(5000); 
-        WScript.StdOut.WriteLine("Service installed.");
+            WScript.StdOut.WriteLine("Begin installing service...");
+            var obj = ws.Exec("sc \\\\" + thismachine + " query QueryAnalyzer_Protocol");
+            var output = obj.StdOut.ReadAll();
 
-        ws.Exec("sc \\\\" + thismachine + " start QueryAnalyzer_Protocol");
-        WScript.StdOut.WriteLine("Service started.");
+            if (output.indexOf("SERVICE_NAME: QueryAnalyzer_Protocol") > -1) {
+                WScript.StdOut.WriteLine("Service exists already.  Removing previous service...");
+                ws.Exec("sc \\\\" + thismachine + " stop QueryAnalyzer_Protocol");
+                ws.Exec("sc \\\\" + thismachine + " delete QueryAnalyzer_Protocol");
+                WScript.Sleep(7000);
+            }
+
+            ws.Exec("sc \\\\" + thismachine + " create QueryAnalyzer_Protocol binPath= \"" + thisdir + "QueryAnalyzer_Protocol.exe\" start= auto obj= \"" + account + "\" DisplayName= QueryAnalyzer_Protocol password= \"" + password + "\"");
+            WScript.Sleep(5000);
+            WScript.StdOut.WriteLine("Service installed.");
+
+            ws.Exec("sc \\\\" + thismachine + " start QueryAnalyzer_Protocol");
+            WScript.StdOut.WriteLine("Service started.");
+        }        
         
         WScript.StdOut.WriteLine("Data Provider has been installed successfully.");
     }

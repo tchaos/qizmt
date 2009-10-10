@@ -26,7 +26,74 @@ namespace QueryAnalyzer_Protocol
         System.Threading.Thread rindexcleanupthd = null;
 
         internal static string CurrentDirNetPath;
-        internal static Dictionary<string, Dictionary<string, List<byte[]>>> rindexpins = new Dictionary<string,Dictionary<string,List<byte[]>>>();
+        internal static Dictionary<string, Dictionary<string, ChunkRowsData>> rindexpins = new Dictionary<string, Dictionary<string, ChunkRowsData>>();
+
+        public struct ChunkRowsData
+        {
+            public MySpace.DataMining.Binary.LongByteArray Bytes;
+            public int RowLength;
+
+            public ChunkRowsData(MySpace.DataMining.Binary.LongByteArray Bytes, int RowLength)
+            {
+                this.Bytes = Bytes;
+                this.RowLength = RowLength;
+            }
+
+            public long NumberOfRows
+            {
+                get
+                {
+                    return Bytes.LongLength / RowLength;
+                }
+            }
+
+            public RowData this[long index]
+            {
+                get
+                {
+                    RowData rd;
+                    rd.Chunk = this;
+                    rd.ChunkOffset = index * RowLength;
+                    return rd;
+                }
+            }
+        }
+
+        public struct RowData
+        {
+            public ChunkRowsData Chunk;
+            public long ChunkOffset;
+
+            public int Length
+            {
+                get
+                {
+                    return Chunk.RowLength;
+                }
+            }
+
+            public byte this[int index]
+            {
+                get
+                {
+                    if (index < 0 || index >= Chunk.RowLength)
+                    {
+                        throw new IndexOutOfRangeException("RowData index out of bounds");
+                    }
+                    return Chunk.Bytes[ChunkOffset + index];
+                }
+
+                set
+                {
+                    if (index < 0 || index >= Chunk.RowLength)
+                    {
+                        throw new IndexOutOfRangeException("RowData index out of bounds");
+                    }
+                    Chunk.Bytes[ChunkOffset + index] = value;
+                }
+            }
+        }
+
 
         public QueryAnalyzer_Protocol()
         {
@@ -50,7 +117,13 @@ namespace QueryAnalyzer_Protocol
                     dspaceexe = _test_dspaceexe;
                 }
             }
-            dspaceexe = @"C:\dspace\dspace.exe";
+            {
+                string _test_dspaceexe = @"C:\dspace\dspace.exe";
+                if (System.IO.File.Exists(_test_dspaceexe))
+                {
+                    dspaceexe = _test_dspaceexe;
+                }
+            }
 #endif
             string service_base_dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             System.Environment.CurrentDirectory = service_base_dir;
@@ -126,7 +199,7 @@ namespace QueryAnalyzer_Protocol
                 {
                     System.Net.Sockets.Socket dllclientSock = lsock.Accept();
                     ClientHandler ch = new ClientHandler();
-                    System.Threading.Thread cthd = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(ch.ClientThreadProc));                    
+                    System.Threading.Thread cthd = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(ch.ClientThreadProc));
                     cthd.IsBackground = true;
                     cthd.Start(dllclientSock);
                 }
@@ -201,8 +274,8 @@ namespace QueryAnalyzer_Protocol
                 {
                     rindexpins.Remove(bad);
                 }
-                System.Threading.Thread.Sleep(1000 * 60 * 10);
-            }           
+                System.Threading.Thread.Sleep(1000 * 10);
+            }
         }
 
         private void RIndexServListenThreadProc()
@@ -346,8 +419,8 @@ namespace QueryAnalyzer_Protocol
                                                 }
                                                 reader = cmd.ExecuteReader();
                                                 while (reader.Read() && !stoptest)
-                                                {                                                   
-                                                }                                                
+                                                {
+                                                }
                                             }
                                         }
                                         catch (Exception e)
@@ -356,7 +429,7 @@ namespace QueryAnalyzer_Protocol
                                             XLog.errorlog("StressClientHandler.ClientThreadProc exception: " + e.ToString());
                                         }
                                     }));
-                                }                                
+                                }
 
                                 testthd.IsBackground = true;
                                 testthd.Start();
@@ -377,10 +450,10 @@ namespace QueryAnalyzer_Protocol
                             throw new Exception("unknown action");
                     }
                 }
-            }            
+            }
             catch (Exception e)
             {
-                XLog.errorlog("StressClientHandler.ClientThreadProc exception: " + e.ToString());                
+                XLog.errorlog("StressClientHandler.ClientThreadProc exception: " + e.ToString());
             }
             finally
             {
@@ -393,7 +466,7 @@ namespace QueryAnalyzer_Protocol
                     }
                     catch
                     {
-                    }                    
+                    }
                 }
                 netstm.Close();
                 netstm = null;
@@ -739,7 +812,7 @@ namespace QueryAnalyzer_Protocol
                                     }
                                     else if ("DateTime" == type)
                                     {
-                                        DateTime dt = DateTime.Parse(uval.Substring(1, uval.Length - 2));                                  
+                                        DateTime dt = DateTime.Parse(uval.Substring(1, uval.Length - 2));
                                         RDBMS_DBCORE.Qa.DateTimeToDbBytesAppend(dt, valuebuf);
                                     }
                                     else
@@ -858,7 +931,7 @@ namespace QueryAnalyzer_Protocol
             catch (Exception e)
             {
                 throw new CommandFlushAbortException(e.ToString());
-            }           
+            }
         }
 
         private void FlushCommand(string fname)
@@ -879,7 +952,7 @@ namespace QueryAnalyzer_Protocol
                     output.IndexOf("at ", StringComparison.OrdinalIgnoreCase) > -1)
                 {
                     throw new Exception("exec RDBMS_QueryAnalyzer.DBCORE BATCHEXECUTE error: " + output);
-                }                
+                }
             }
             catch (Exception e)
             {
@@ -1108,7 +1181,7 @@ namespace QueryAnalyzer_Protocol
 
         }
 
-        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory)
+        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn)
         {
             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
             using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
@@ -1136,14 +1209,48 @@ namespace QueryAnalyzer_Protocol
             if (null == xeTable)
             {
                 throw new Exception("No such table or table cannot have RINDEX applied: " + SourceTable);
+            }           
+
+            string indexfilename = GetIndexFileName(IndexName);
+            if (System.IO.File.Exists(indexfilename))
+            {
+                throw new Exception("Index: " + IndexName + " already exists.");
             }
 
-            string sRowSize = xeTable["size"].InnerText;
-            int RowSize = int.Parse(sRowSize);
-
-            if (RowSize != 9 * 3 || 9 != int.Parse(xeTable.SelectNodes("column")[0]["bytes"].InnerText))
+            System.Xml.XmlNodeList xnColumns = xeTable.SelectNodes("column");
+            int keyordinal = -1;
+            int keyoffset = 0;
+            int keylen = 0;
+            if (keycolumn.Length > 0)
             {
-                throw new Exception("Table must contain exactly 3 columns of LONG");
+                for (int ci = 0; ci < xnColumns.Count; ci++)
+                {
+                    System.Xml.XmlNode xn = xnColumns[ci];
+                    int colbytes = int.Parse(xn["bytes"].InnerText);
+                    if (string.Compare(xn["name"].InnerText, keycolumn, true) == 0)
+                    {
+                        keyordinal = ci;
+                        keylen = colbytes;
+                        break;
+                    }
+                    keyoffset += colbytes;
+                }
+                if (keyordinal == -1)
+                {
+                    throw new Exception("Key column: " + keycolumn + " is not found in table definition.");
+                }
+            }
+            else
+            {
+                string sRowSize = xeTable["size"].InnerText;
+                int RowSize = int.Parse(sRowSize);
+                if (RowSize != 9 * 3 || 9 != int.Parse(xnColumns[0]["bytes"].InnerText))
+                {
+                    throw new Exception("Table must contain exactly 3 columns of LONG");
+                }
+                keyordinal = 0;
+                keyoffset = 0;
+                keylen = 9;
             }
 
             string SourceTableDfsFile = xeTable["file"].InnerText;
@@ -1182,11 +1289,11 @@ namespace QueryAnalyzer_Protocol
                     HostToNetPath[host] = netpath;
                 }
             }
-                        
+
             string mifn = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CMI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
-            using(System.IO.FileStream mi = new System.IO.FileStream(mifn, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
+            using (System.IO.FileStream mi = new System.IO.FileStream(mifn, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
             {
-                byte[] rowbuf = new byte[9 * 3];
+                byte[] rowbuf = new byte[keylen];
                 foreach (string line in bulkparts)
                 {
                     string[] parts = line.Split(' ');
@@ -1238,8 +1345,12 @@ namespace QueryAnalyzer_Protocol
                                 }
                             }
                         }
-                        StreamReadExact(fs, rowbuf, 9);
-                        mi.Write(rowbuf, 0, 9);
+                        if (keyoffset > 0)
+                        {
+                            fs.Seek((long)keyoffset, System.IO.SeekOrigin.Current);
+                        }
+                        StreamReadExact(fs, rowbuf, keylen);
+                        mi.Write(rowbuf, 0, keylen);
                         byte[] chunknamebuf = System.Text.Encoding.UTF8.GetBytes(HostToNetPath[host] + @"\" + chunkname);
                         mi.Write(chunknamebuf, 0, chunknamebuf.Length);
                         mi.WriteByte((byte)'\0');
@@ -1249,7 +1360,7 @@ namespace QueryAnalyzer_Protocol
                 mi.Close();
             }
 
-            string targetfn = "ind.Index." + IndexName + ".ind";
+            string targetfn = indexfilename;
             string targetpath = System.Environment.CurrentDirectory.Replace(':', '$');
             foreach (string host in HostToNetPath.Keys)
             {
@@ -1262,13 +1373,75 @@ namespace QueryAnalyzer_Protocol
                 string temppfn = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CMI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
                 System.IO.FileStream pfs = System.IO.File.Create(temppfn);
                 pfs.Close();
-                string pinfn = "ind.Pin." + IndexName + ".ind";
+                string pinfn = GetIndexPinFileName(IndexName);
                 foreach (string host in HostToNetPath.Keys)
                 {
                     System.IO.File.Copy(temppfn, @"\\" + host + @"\" + targetpath + @"\" + pinfn, true);
                 }
                 System.IO.File.Delete(temppfn);
             }
+
+            {
+                string sysindexesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\sys.indexes";
+                System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
+                if (System.IO.File.Exists(sysindexesfilepath))
+                {
+                    xi.Load(sysindexesfilepath);                    
+                }
+                else
+                {
+                    System.Xml.XmlElement xeIndexes = xi.CreateElement("indexes");
+                    xi.AppendChild(xeIndexes);
+                }
+                System.Xml.XmlElement xeIndex = xi.CreateElement("index");                
+                System.Xml.XmlElement xeIndexName = xi.CreateElement("name");
+                xeIndexName.InnerText = IndexName;
+                xeIndex.AppendChild(xeIndexName);
+                System.Xml.XmlElement xeOrdinal = xi.CreateElement("ordinal");
+                xeOrdinal.InnerText = keyordinal.ToString();
+                xeIndex.AppendChild(xeOrdinal);
+                System.Xml.XmlElement xePin = xi.CreateElement("pin");
+                xePin.InnerText = pinmemory ? "1" : "0";
+                xeIndex.AppendChild(xePin);
+                System.Xml.XmlElement xeIndTable = xi.CreateElement("table");
+                xeIndex.AppendChild(xeIndTable);
+                System.Xml.XmlElement xeIndTableName = xi.CreateElement("name");
+                xeIndTableName.InnerText = SourceTable;
+                xeIndTable.AppendChild(xeIndTableName);
+                foreach (System.Xml.XmlNode xn in xnColumns)
+                {
+                    System.Xml.XmlElement xeCol = xi.CreateElement("column");
+                    xeIndTable.AppendChild(xeCol);
+                    System.Xml.XmlElement xeColName = xi.CreateElement("name");
+                    xeColName.InnerText = xn["name"].InnerText;
+                    xeCol.AppendChild(xeColName);
+                    System.Xml.XmlElement xeColType = xi.CreateElement("type");
+                    xeColType.InnerText = xn["type"].InnerText;
+                    xeCol.AppendChild(xeColType);
+                    System.Xml.XmlElement xeColBytes = xi.CreateElement("bytes");
+                    xeColBytes.InnerText = xn["bytes"].InnerText;
+                    xeCol.AppendChild(xeColBytes);  
+                }
+                xi.DocumentElement.AppendChild(xeIndex);
+
+                string tempsifn = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CMI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
+                xi.Save(tempsifn);
+                foreach (string host in HostToNetPath.Keys)
+                {
+                    System.IO.File.Copy(tempsifn, @"\\" + host + @"\" + targetpath + @"\sys.indexes", true);
+                }
+                System.IO.File.Delete(tempsifn);
+            }
+        }
+
+        string GetIndexFileName(string indexName)
+        {
+            return "ind.Index." + indexName + ".ind";
+        }
+
+        string GetIndexPinFileName(string indexName)
+        {
+            return "ind.Pin." + indexName + ".ind";
         }
 
         bool QlCreateRIndex(string cmd)
@@ -1284,18 +1457,40 @@ namespace QueryAnalyzer_Protocol
                     {
                         throw new Exception("Expected table name for CREATE RINDEX");
                     }
+
                     bool pinmem = false;
-                    if (string.Compare("PINMEMORY", RDBMS_DBCORE.Qa.NextPart(ref cmd), true) == 0)
+                    string keycolumn = "";
+                    for (; ; )
                     {
-                        pinmem = true;
-                    }                   
-                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem);
+                        string nextcmd = RDBMS_DBCORE.Qa.NextPart(ref cmd).ToLower();
+                        if (nextcmd.Length == 0)
+                        {
+                            break;
+                        }
+                        switch (nextcmd)
+                        {
+                            case "pinmemory":
+                                pinmem = true;
+                                break;
+
+                            case "on":
+                                {
+                                    keycolumn = RDBMS_DBCORE.Qa.NextPart(ref cmd);
+                                    if (keycolumn.Length == 0)
+                                    {
+                                        throw new Exception("Expected key column name for CREATE RINDEX ON");
+                                    }
+                                }
+                                break;
+                        }
+                    }                  
+                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn);
                     return true;
                 }
                 else
                 {
                     throw new Exception("Expected FROM after CREATE RINDEX " + IndexName);
-                }                
+                }
             }
             return false;
         }
@@ -1356,7 +1551,7 @@ namespace QueryAnalyzer_Protocol
             }
             string targetpath = System.Environment.CurrentDirectory.Replace(':', '$');
             string indexfn1 = targetpath + @"\ind.Index." + indexname1 + ".ind";
-            string indexfn2 = targetpath + @"\ind.Index." + indexname2 + ".ind";            
+            string indexfn2 = targetpath + @"\ind.Index." + indexname2 + ".ind";
             string renaming = targetpath + @"\ind.Index.Renaming." + indexname1 + ".ind";
 
             foreach (string host in HostToNetPath.Keys)
@@ -1366,7 +1561,7 @@ namespace QueryAnalyzer_Protocol
                 string renamingnetpath = @"\\" + host + @"\" + renaming;
                 System.IO.File.Move(indexnetpath1, renamingnetpath);
                 System.IO.File.Move(indexnetpath2, indexnetpath1);
-                System.IO.File.Move(renamingnetpath, indexnetpath2);                
+                System.IO.File.Move(renamingnetpath, indexnetpath2);
             }
         }
 
@@ -1417,6 +1612,35 @@ namespace QueryAnalyzer_Protocol
                 System.IO.File.Delete(indexnetpath);
                 string pinnetpath = @"\\" + host + @"\" + pinfn;
                 System.IO.File.Delete(pinnetpath);
+            }
+
+            string sysindexesfn = "sys.indexes";
+            if (System.IO.File.Exists(sysindexesfn))
+            {
+                System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
+                xi.Load(sysindexesfn);
+                System.Xml.XmlNodeList xnIndexes = xi.SelectNodes("/indexes/index");
+                bool found = false;
+                for(int i = 0; i < xnIndexes.Count; i++)
+                {
+                    System.Xml.XmlNode xnIndex = xnIndexes[i];
+                    if (string.Compare(xnIndex["name"].InnerText, indexname, true) == 0)
+                    {
+                        xi.DocumentElement.RemoveChild(xnIndex);
+                        found = true;
+                        break;
+                    }
+                }
+                if (found)
+                {
+                    string tempsifn = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\DMI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
+                    xi.Save(tempsifn);
+                    foreach (string host in HostToNetPath.Keys)
+                    {
+                        System.IO.File.Copy(tempsifn, @"\\" + host + @"\" + targetpath + @"\sys.indexes", true);
+                    }
+                    System.IO.File.Delete(tempsifn);
+                }
             }
         }
 
@@ -1609,7 +1833,7 @@ namespace QueryAnalyzer_Protocol
                                             norm_cmd = cleaned_cmd;
                                         }
                                     }
-                                    IsDfsRef = RDBMS_DBCORE.Qa.CanUseDfsRef(norm_cmd);                                    
+                                    IsDfsRef = RDBMS_DBCORE.Qa.CanUseDfsRef(norm_cmd);
                                     escaped_cmd = EscapeCommandText(norm_cmd);
                                 }
 
@@ -1808,7 +2032,7 @@ namespace QueryAnalyzer_Protocol
                                         }
                                     }
                                 }
-                               
+
                                 Dictionary<string, string> HostToNetPath;
                                 {
                                     string[] htnlines = htnppartsoutput
@@ -1874,6 +2098,9 @@ namespace QueryAnalyzer_Protocol
                                 }
                                 try
                                 {
+                                    byte[] onerecord = new byte[recordsize];
+                                    byte[] recordbuf = new byte[recordsize + (0x400 * 0x400 * 5)];
+                                    int recordbufpos = 0;
                                     for (int i = 0; i < recordcount; i++)
                                     {
                                         if (eof)
@@ -1935,13 +2162,17 @@ namespace QueryAnalyzer_Protocol
                                         }
 
                                         //begin a row
-                                        netstm.WriteByte((byte)'+');
-                                        for (int j = 0; j < columns.Length; j++)
+                                        if (recordbufpos + recordsize > recordbuf.Length)
                                         {
-                                            MetaData column = columns[j];
-                                            StreamReadExact(fs, rowbuf, column.FrontBytes + column.Size + column.BackBytes);
-                                            XContent.SendXContent(netstm, rowbuf, column.FrontBytes + column.Size + column.BackBytes);
-                                            bytesremain = bytesremain - column.FrontBytes - column.Size - column.BackBytes;
+                                            netstm.WriteByte((byte)'+');
+                                            XContent.SendXContent(netstm, recordbuf, recordbufpos);
+                                            recordbufpos = 0;
+                                        }
+                                        {
+                                            StreamReadExact(fs, onerecord, recordsize);
+                                            Buffer.BlockCopy(onerecord, 0, recordbuf, recordbufpos, recordsize);
+                                            recordbufpos += recordsize;
+                                            bytesremain -= recordsize;
                                         }
 
                                         if (bytesremain <= 0)
@@ -1949,7 +2180,12 @@ namespace QueryAnalyzer_Protocol
                                             eof = true;
                                         }
                                     }
-
+                                    if (recordbufpos > 0)
+                                    {
+                                        netstm.WriteByte((byte)'+');
+                                        XContent.SendXContent(netstm, recordbuf, recordbufpos);
+                                        recordbufpos = 0;
+                                    }
                                     if (fs != null)
                                     {
                                         fs.Close();
@@ -2143,7 +2379,7 @@ namespace QueryAnalyzer_Protocol
                                     XContent.SendXContent(netstm, e.ToString());
                                     throw;
                                 }
-                                
+
                                 //Query succeeded.
                                 netstm.WriteByte((byte)'+');
 
@@ -2269,13 +2505,105 @@ namespace QueryAnalyzer_Protocol
                 return md;
             }
         }
-       
+
         public static void MyToBytes(Int32 x, byte[] resultbuf, int bufoffset)
+        {
+            Int32ToBytes(x, resultbuf, bufoffset);
+        }
+
+        public static void MyInt64ToBytes(long x, byte[] resultbuf, int bufoffset)
+        {
+            Int64ToBytes(x, resultbuf, bufoffset);
+        }
+
+        public static void Int64ToBytes(long x, byte[] resultbuf, int bufoffset)
+        {
+            resultbuf[bufoffset + 0] = (byte)(x >> 56);
+            resultbuf[bufoffset + 1] = (byte)(x >> 48);
+            resultbuf[bufoffset + 2] = (byte)(x >> 40);
+            resultbuf[bufoffset + 3] = (byte)(x >> 32);
+            resultbuf[bufoffset + 4] = (byte)(x >> 24);
+            resultbuf[bufoffset + 5] = (byte)(x >> 16);
+            resultbuf[bufoffset + 6] = (byte)(x >> 8);
+            resultbuf[bufoffset + 7] = (byte)x;
+        }
+
+        public static void Int32ToBytes(Int32 x, byte[] resultbuf, int bufoffset)
         {
             resultbuf[bufoffset + 0] = (byte)(x >> 24);
             resultbuf[bufoffset + 1] = (byte)(x >> 16);
             resultbuf[bufoffset + 2] = (byte)(x >> 8);
             resultbuf[bufoffset + 3] = (byte)x;
+        }
+
+        public static void DoubleToBytes(double x, byte[] buffer, int offset)
+        {
+            if (double.IsNaN(x))
+            {
+                buffer[offset] = 0x61;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (double.IsNegativeInfinity(x))
+            {
+                buffer[offset] = 0x62;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (isNegativeZero(x))
+            {
+                buffer[offset] = 0x64;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (x == 0)
+            {
+                buffer[offset] = 0x65;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (double.IsPositiveInfinity(x))
+            {
+                buffer[offset] = 0x67;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            long l = BitConverter.DoubleToInt64Bits(x);
+
+            if (x > 0)
+            {
+                buffer[offset] = 0x66;
+                Int64ToBytes(l, buffer, offset + 1);
+                return;
+            }
+
+            buffer[offset] = 0x63;
+            Int64ToBytes(~l, buffer, offset + 1);
+        }
+
+        internal static bool isNegativeZero(double x)
+        {
+            return x == 0 && 1 / x < 0;
         }
 
         public static long BytesToLong(IList<byte> x, int offset)

@@ -27,6 +27,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RDBMS_DBCORE_RegressionTest
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongArray", "LongArray\LongArray.csproj", "{27B0ED78-C4C2-4C08-8CC5-3956140F1C25}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RDBMS_Admin", "RDBMS_Admin\RDBMS_Admin.csproj", "{6553AEA2-79F3-45C5-AD39-CA3ACC60CE4D}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Qizmt_ADONET_DataProvider", "Qizmt_ADONET_DataProvider\Qizmt_ADONET_DataProvider.vdproj", "{22B595F4-4B3B-4D18-AC4E-C659D1DCB48A}"
+EndProject
 Global
 	GlobalSection(TeamFoundationVersionControl) = preSolution
 		SccNumberOfProjects = 12
@@ -150,6 +154,12 @@ Global
 		{27B0ED78-C4C2-4C08-8CC5-3956140F1C25}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{27B0ED78-C4C2-4C08-8CC5-3956140F1C25}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{27B0ED78-C4C2-4C08-8CC5-3956140F1C25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6553AEA2-79F3-45C5-AD39-CA3ACC60CE4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6553AEA2-79F3-45C5-AD39-CA3ACC60CE4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6553AEA2-79F3-45C5-AD39-CA3ACC60CE4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6553AEA2-79F3-45C5-AD39-CA3ACC60CE4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{22B595F4-4B3B-4D18-AC4E-C659D1DCB48A}.Debug|Any CPU.ActiveCfg = Debug
+		{22B595F4-4B3B-4D18-AC4E-C659D1DCB48A}.Release|Any CPU.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

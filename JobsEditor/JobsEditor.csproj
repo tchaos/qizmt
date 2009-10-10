@@ -122,6 +122,7 @@
     <None Include="Resources\DebugStepOver.bmp" />
     <None Include="Resources\DebugStepOut.bmp" />
     <None Include="Resources\DebugSkipToReduce.bmp" />
+    <Content Include="Resources\Qizmt.ico" />
     <Content Include="Resources\Save.bmp" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

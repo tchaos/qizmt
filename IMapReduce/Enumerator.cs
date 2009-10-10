@@ -2139,8 +2139,13 @@ namespace MySpace.DataMining.DistributedObjects
 
         public static void LogLine(string line)
         {
-            //lock (typeof(XLog))
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 System.IO.StreamWriter fstm = System.IO.File.AppendText("do5mapreduce.txt");

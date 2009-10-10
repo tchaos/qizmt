@@ -298,6 +298,7 @@ namespace MySpace.DataMining.DistributedObjects5
         public int slaveID;
         internal string[] blockinfo;
         internal string sblockinfo; // @"H|objectname|200MB|localhost|C:\hashtable_logs0|slaveid=0"
+        public int pid;
 
 
         public string Host
@@ -334,11 +335,25 @@ namespace MySpace.DataMining.DistributedObjects5
         protected System.Collections.Generic.List<SlaveInfo> dslaves; // Indexed by ID.
         protected bool didopen = false;
 
+        internal long jid = 0;
+        internal string sjid = "0";
+
 
         public DistObject(string objectname) :
             base(objectname)
         {
             dslaves = new System.Collections.Generic.List<SlaveInfo>(8);
+        }
+
+
+        public void SetJID(long jid)
+        {
+            if (0 != this.jid)
+            {
+                throw new Exception("DEBUG:  SetJID: cannot set JID twice");
+            }
+            this.jid = jid;
+            this.sjid = jid.ToString();
         }
 
 
@@ -419,6 +434,33 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
+        public void GetSlavePidInfoAppend(StringBuilder sb)
+        {
+            if (!didopen)
+            {
+                throw new Exception("Cannot get Slave PID information before Open");
+            }
+
+            for (int i = 0; i < dslaves.Count; i++)
+            {
+                if (0 != i)
+                {
+                    sb.Append(',');
+                }
+                sb.Append(dslaves[i].Host);
+                sb.Append('=');
+                sb.Append(dslaves[i].pid);
+            }
+        }
+
+        public string GetSlavePidInfo()
+        {
+            StringBuilder sb = new StringBuilder(30);
+            GetSlavePidInfoAppend(sb);
+            return sb.ToString();
+        }
+
+
         public virtual void Open()
         {
             if (didopen)
@@ -462,12 +504,22 @@ namespace MySpace.DataMining.DistributedObjects5
                     servStm.WriteByte((byte)'B'); // AddBlock.
                     XContent.SendXContent(servStm, slave.sblockinfo);
                     XContent.SendXContent(servStm, lipep.Port.ToString());
+                    XContent.SendXContent(servStm, sjid);
 
                     Socket slaveSock = lsock.Accept();
                     slave.nstm = new XNetworkStream(slaveSock);
                     if (1 != slave.nstm.ReadByte())
                     {
                         throw new Exception("Sub process connection error: invalid handshake  [Non-sub-process connection?]");
+                    }
+                    {
+                        int len;
+                        byte[] bpid = XContent.ReceiveXBytes(slave.nstm, out len, null);
+                        if (len < 4)
+                        {
+                            throw new Exception("Sub process connection error: invalid SlavePID handshake");
+                        }
+                        slave.pid = BytesToInt(bpid);
                     }
 
                     servStm.WriteByte((byte)'\\');
@@ -673,8 +725,13 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public static void LogLine(string line)
         {
-            //lock (typeof(XLog))
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 System.IO.StreamWriter fstm = System.IO.File.AppendText("do5.txt");

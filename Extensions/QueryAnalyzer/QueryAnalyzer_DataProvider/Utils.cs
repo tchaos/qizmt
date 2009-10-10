@@ -165,5 +165,82 @@ namespace QueryAnalyzer_DataProvider
             resultbuf[bufoffset + 7] = (byte)x;
         }
 
+        public static void Int32ToBytes(Int32 x, byte[] resultbuf, int bufoffset)
+        {
+            resultbuf[bufoffset + 0] = (byte)(x >> 24);
+            resultbuf[bufoffset + 1] = (byte)(x >> 16);
+            resultbuf[bufoffset + 2] = (byte)(x >> 8);
+            resultbuf[bufoffset + 3] = (byte)x;
+        }
+
+        public static void DoubleToBytes(double x, byte[] buffer, int offset)
+        {
+            if (double.IsNaN(x))
+            {
+                buffer[offset] = 0x61;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (double.IsNegativeInfinity(x))
+            {
+                buffer[offset] = 0x62;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (isNegativeZero(x))
+            {
+                buffer[offset] = 0x64;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (x == 0)
+            {
+                buffer[offset] = 0x65;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            if (double.IsPositiveInfinity(x))
+            {
+                buffer[offset] = 0x67;
+                for (int i = 1; i < 9; i++)
+                {
+                    buffer[i + offset] = 0x0;
+                }
+                return;
+            }
+
+            long l = BitConverter.DoubleToInt64Bits(x);
+
+            if (x > 0)
+            {
+                buffer[offset] = 0x66;
+                Int64ToBytes(l, buffer, offset + 1);
+                return;
+            }
+
+            buffer[offset] = 0x63;
+            Int64ToBytes(~l, buffer, offset + 1);
+        }
+
+        internal static bool isNegativeZero(double x)
+        {
+            return x == 0 && 1 / x < 0;
+        }
     }
 }

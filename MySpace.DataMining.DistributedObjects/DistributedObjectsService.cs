@@ -544,11 +544,11 @@ namespace MySpace.DataMining.DistributedObjects5
                                     stoplog.WriteLine("        {0}", fi.Name);
                                     if (fi.Exists)
                                     {
-                                        string spidSlave = fi.Name.Substring(0, fi.Name.IndexOf('.'));
-                                        int pidSlave = int.Parse(spidSlave);
-                                        Process slaveproc = Process.GetProcessById(pidSlave);
-                                        slaveproc.Kill();
-                                        slaveproc.WaitForExit(1000);
+                                        string spidStop = fi.Name.Substring(0, fi.Name.IndexOf('.'));
+                                        int pidStop = int.Parse(spidStop);
+                                        Process stopproc = Process.GetProcessById(pidStop);
+                                        stopproc.Kill();
+                                        stopproc.WaitForExit(1000);
                                         fi.Delete();
                                     }
                                 }
@@ -599,8 +599,13 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public static void errorlog(string line)
         {
-            //lock (typeof(XLog))
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 using (System.IO.StreamWriter fstm = System.IO.File.AppendText("errors.txt"))
@@ -633,8 +638,13 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public static void log(string name, string line)
         {
-            //lock (typeof(XLog))
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 StreamWriter fstm = File.AppendText(name + ".txt");
@@ -689,7 +699,7 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
-        public void AddingBlock(string[] blockinfo, ushort dllport)
+        public void AddingBlock(string[] blockinfo, ushort dllport, string sjid)
         {
             if (added)
             {
@@ -702,9 +712,9 @@ namespace MySpace.DataMining.DistributedObjects5
 
             try
             {
-                // args: <host> <portnum> <typechar> <capacity> <logfile>
+                // args: <host> <portnum> <typechar> <capacity> <logfile> <jid>
                 string procname = "MySpace.DataMining.DistributedObjects.DistributedObjectsSlave.exe";
-                string sargs = this.sdllclienthost + " " + dllport.ToString() + " \"" + blockinfo[0] + "\" \"" + blockinfo[2] + "\" \"" + blockinfo[4] + "\"";
+                string sargs = this.sdllclienthost + " " + dllport.ToString() + " \"" + blockinfo[0] + "\" \"" + blockinfo[2] + "\" \"" + blockinfo[4] + "\" " + sjid;
                 if (XLog.logging)
                 {
                     XLog.log(this.name, "Starting sub process \"" + procname + "\" with arguments: " + sargs);
@@ -972,7 +982,8 @@ namespace MySpace.DataMining.DistributedObjects5
                                  * */
                                 s = XContent.ReceiveXString(dllclientStm, buf);
                                 ushort dllport = ushort.Parse(s);
-                                AddingBlock(sblock.Split('|'), dllport);
+                                string sjid = XContent.ReceiveXString(dllclientStm, buf);
+                                AddingBlock(sblock.Split('|'), dllport, sjid);
                                 break;
 
                             case 'd': // Get current directory.
@@ -1720,6 +1731,32 @@ namespace MySpace.DataMining.DistributedObjects5
                                     {
                                         dllclientStm.WriteByte((byte)'-');
                                     }
+                                    throw;
+                                }
+                                break;
+
+                            case 'k': // Kill a slave!
+                                try
+                                {
+                                    string spidStop = XContent.ReceiveXString(dllclientStm, buf);
+                                    int pidStop = int.Parse(spidStop);
+                                    spidStop = pidStop.ToString(); // Normalize.
+                                    {
+                                        // Ensure it's a slave process...
+                                        if (0 == System.IO.Directory.GetFiles(".", spidStop + ".j*.slave.pid").Length)
+                                        {
+                                            throw new Exception("kill request is not a slave process; PID: " + spidStop);
+                                        }
+                                    }
+                                    System.Diagnostics.Process killproc = System.Diagnostics.Process.GetProcessById(pidStop);
+                                    killproc.Kill();
+                                    killproc.WaitForExit(1000 * 5);
+                                    killproc.Close();
+                                    dllclientStm.WriteByte((byte)'+');
+                                }
+                                catch
+                                {
+                                    dllclientStm.WriteByte((byte)'-');
                                     throw;
                                 }
                                 break;

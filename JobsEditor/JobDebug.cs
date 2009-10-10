@@ -21,7 +21,7 @@ namespace MySpace.DataMining.AELight
         public string MapSource = null;
         public string MapClassName = null;
 
-        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname)
+        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             MapSource = code;
             MapClassName = classname;
@@ -77,13 +77,25 @@ namespace MySpace.DataMining.AELight
         }
 
 
-        protected override int GetNumberOfRemoteOutputFilesCreated(IList<long> appendsizes)
+        protected override int GetNumberOfRemoteOutputFilesCreated(int n, IList<long> appendsizes)
         {
             if (null != appendsizes)
             {
                 throw new NotImplementedException("DebugRemote.GetNumberOfRemoteOutputFilesCreated must specify null appendsizes");
             }
             return 1; // ...
+        }
+
+        protected override void GetRemoteOutputFilesCreated(IList<string> outputfilenames, List<List<long>> outputsizeses, List<List<string>> outputdfsnodeses)
+        {
+            if (null != outputsizeses)
+            {
+                throw new NotImplementedException("DebugRemote.GetRemoteOutputFilesCreated must specify null outputsizeses");
+            }
+            if (null != outputdfsnodeses)
+            {
+                throw new NotImplementedException("DebugRemote.GetRemoteOutputFilesCreated must specify null outputdfsnodeses");
+            }
         }
 
         protected override void GetDGlobals()

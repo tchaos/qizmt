@@ -84,10 +84,14 @@ namespace MySpace.DataMining.DistributedObjects5
             _RemoteExec(dlldata, classname, code);
         }
 
-
-        public int RemoteExec(IList<string> inputdfsnodes, IList<string> outputdfsdirs, string outputfilename, long outputbasefilesize, string code, string[] usings)
+        public void RemoteExec(IList<string> inputdfsnodes, IList<string> outputdfsdirs, IList<string> outputfilenames, long outputbasefilesize, string code, string[] usings, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
-            return RemoteExec(inputdfsnodes, outputdfsdirs, outputfilename, outputbasefilesize, code, usings, null);
+            RemoteExec(inputdfsnodes, outputdfsdirs, outputfilenames, outputbasefilesize, code, usings, null, null, inputdfsfilenames, inputnodesoffsets);
+        }
+
+        public void RemoteExec(IList<string> inputdfsnodes, IList<string> outputdfsdirs, IList<string> outputfilenames, long outputbasefilesize, string code, string[] usings)
+        {
+            RemoteExec(inputdfsnodes, outputdfsdirs, outputfilenames, outputbasefilesize, code, usings, null, null, null, null);
         }
 
         // Returns number of files written.
@@ -97,7 +101,7 @@ namespace MySpace.DataMining.DistributedObjects5
         // inputdfsnodes must be accessible by the remote machine. Can be star-delimited failover names (starnames).
         // outputbasepath can contain %n for multiple outputs.
         // outputdfsdirs is a list of network directories of where to put the output files; each chunk is written to: outputdfsdirs[i % outputdfsdirs.Count]
-        public int RemoteExec(IList<string> inputdfsnodes, IList<string> outputdfsdirs, string outputfilename, long outputbasefilesize, string code, string[] usings, IList<long> appendsizes)
+        public void RemoteExec(IList<string> inputdfsnodes, IList<string> outputdfsdirs, IList<string> outputfilenames, long outputbasefilesize, string code, string[] usings, List<List<long>> outputsizeses, List<List<string>> outputdfsnodeses, List<string> inputdfsfilenames, List<int> inputdfsnodesoffsets)
         {
             if (outputbasefilesize <= 0)
             {
@@ -118,8 +122,26 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
             }
 
+            StringBuilder infilenames = new StringBuilder();
+            StringBuilder nodesoffsets = new StringBuilder();
+            if (inputdfsfilenames != null)
+            {
+                for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
+                {
+                    if (oi != 0)
+                    {
+                        infilenames.Append(", ");
+                        nodesoffsets.Append(", ");
+                    }
+                    infilenames.Append("@`");
+                    infilenames.Append(inputdfsfilenames[oi]);
+                    infilenames.Append("`");
+                    nodesoffsets.Append(inputdfsnodesoffsets[oi]);
+                }
+            }            
+
             StringBuilder outds = new StringBuilder();
-            if(null != outputdfsdirs)
+            if (null != outputdfsdirs)
             {
                 for (int i = 0; i < outputdfsdirs.Count; i++)
                 {
@@ -133,13 +155,28 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
             }
 
+            StringBuilder outfs = new StringBuilder();
+            if (null != outputfilenames)
+            {
+                for (int i = 0; i < outputfilenames.Count; i++)
+                {
+                    if (i != 0)
+                    {
+                        outfs.Append(", ");
+                    }
+                    outfs.Append("@`");
+                    outfs.Append(outputfilenames[i]);
+                    outfs.Append("`");
+                }
+            }
+
             string susings = "";
             if (usings != null)
             {
-                foreach(string nm in usings)
+                foreach (string nm in usings)
                 {
                     susings += "using " + nm + ";" + Environment.NewLine;
-                }                
+                }
             }
 
             RemoteExecFullSource(
@@ -157,12 +194,14 @@ namespace RemoteExec
     public class RemoteInputStream : System.IO.Stream, MySpace.DataMining.CollaborativeFilteringObjects3.ISequenceInput
     {
         string[] infs = new string [] { " + infs.ToString() + @" };
+        string[] infilenames = new string [] { " + infilenames.ToString() + @" };
+        int[] nodesoffsets = new int [] { " + nodesoffsets.ToString() + @" };
         int onf = -1;
 
         const int _CookTimeout = " + CookTimeout.ToString() + @";
         const int _CookRetries = " + CookRetries.ToString() + @";
 
-        const int InputRecordLength = " + InputRecordLength.ToString()  + @";
+        const int InputRecordLength = " + InputRecordLength.ToString() + @";
         
         public RemoteInputStream(UserRExec r)
         {
@@ -483,6 +522,7 @@ namespace RemoteExec
             {
                 whichseqreader = 0;
                 curfilename = infs[0];
+                _setinputfilename(0);
                 curseqfile = GetStreamFromSeqFileName(curfilename, true);
             }
         }
@@ -499,11 +539,26 @@ namespace RemoteExec
                     if(whichseqreader < infs.Length)
                     {
                         curfilename = infs[whichseqreader];
+                        _setinputfilename(whichseqreader);
                         curseqfile = GetStreamFromSeqFileName(infs[whichseqreader], true);
                     }
                     //return true;
                 }
                 //return false;
+            }
+        }
+
+        int curoffset = 0;
+        int curfi = 0;
+        void _setinputfilename(int offset)
+        {
+            if(offset == curoffset)
+            {
+                StaticGlobals.DSpace_InputFileName = infilenames[curfi++];
+                if(curfi < nodesoffsets.Length)
+                {
+                    curoffset = nodesoffsets[curfi];
+                }
             }
         }
 
@@ -583,6 +638,11 @@ namespace RemoteExec
             this.r = r;
 
             StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
+        }
+
+        public RemoteOutputStream(UserRExec r, string outputfilename): this(r)
+        {           
+            this._basefilename = outputfilename;
         }
 
         UserRExec r;
@@ -921,8 +981,21 @@ namespace RemoteExec
             _cursize = 0;
         }
 
+        public RemoteOutputStream GetOutputByIndex(int index)
+        {
+            if(parentlist == null)
+            {
+                throw new Exception(`RemoteOutputStream.GetOutputByIndex parentlist is null.`);
+            }
+            if(index < 0 || index > parentlist.Length - 1)
+            {
+                throw new Exception(`RemoteOutputStream.GetOutputByIndex index is out of range.`);
+            }
+            return parentlist[index];
+        }
 
-        const string _basefilename = @`" + outputfilename + @"`;
+        internal string _basefilename;
+        internal RemoteOutputStream[] parentlist;
         const long _basefilesize = " + outputbasefilesize.ToString() + @";
         const int OutputStartingPoint = " + OutputStartingPoint.ToString() + @";
         static byte compressenumout = " + CompressFileOutput.ToString() + @";
@@ -952,16 +1025,25 @@ namespace RemoteExec
     {
         RemoteInputStream rinput;
         RemoteOutputStream routput;
+        RemoteOutputStream[] routputs;
 
         public int GetOutputFileCount(int n, IList<long> appendsizes)
         {
-            return routput._getoutputfilecount(appendsizes);
+            return routputs[n]._getoutputfilecount(appendsizes);
         }
 
         public void OnRemote()
-        {
+        {                    
             rinput = new RemoteInputStream(this);
-            routput = new RemoteOutputStream(this);
+
+            string[] outputfilenames = new string[]{" + outfs.ToString() + @"};               
+            routputs = new RemoteOutputStream[outputfilenames.Length];
+            for(int oi = 0; oi < outputfilenames.Length; oi++)
+            {
+                routputs[oi] = new RemoteOutputStream(this, outputfilenames[oi]);
+                routputs[oi].parentlist = routputs;
+            }
+            routput = routputs[0];
 
             StaticGlobals.DSpace_SlaveIP = DSpace_SlaveIP;
             StaticGlobals.DSpace_SlaveHost = DSpace_SlaveHost;
@@ -972,26 +1054,49 @@ namespace RemoteExec
             StaticGlobals.DSpace_OutputDirection = `" + StaticGlobals.DSpace_OutputDirection + @"`;
             StaticGlobals.DSpace_OutputDirection_ascending = " + (StaticGlobals.DSpace_OutputDirection_ascending ? "true" : "false") + @";
             StaticGlobals.DSpace_MaxDGlobals = " + StaticGlobals.DSpace_MaxDGlobals.ToString() + @";
-").Replace('`', '"') + 
+").Replace('`', '"') +
             DGlobalsM.ToCode() + @"
             Remote(rinput, routput);
-            routput._done();
+
+            for(int oi = 0; oi < routputs.Length; oi++)
+            {
+                routputs[oi]._done();
+            }            
         }
 
 " + code + (@"
     }
 }"), "UserRExec");
 
-            return GetNumberOfRemoteOutputFilesCreated(appendsizes);
+            GetRemoteOutputFilesCreated(outputfilenames, outputsizeses, outputdfsnodeses);
         }
 
+        protected virtual void GetRemoteOutputFilesCreated(IList<string> outputfilenames, List<List<long>> outputsizeses, List<List<string>> outputdfsnodeses)
+        {
+            for (int oi = 0; oi < outputfilenames.Count; oi++)
+            {
+                outputsizeses.Add(new List<long>());
+                List<long> sizes = outputsizeses[oi];
+
+                outputdfsnodeses.Add(new List<string>());
+                List<string> nodes = outputdfsnodeses[oi];
+
+                int nfiles = GetNumberOfRemoteOutputFilesCreated(oi, sizes);
+
+                string basefilename = outputfilenames[oi];
+                for (int fi = 0; fi < nfiles; fi++)
+                {
+                    nodes.Add(basefilename.Replace("%n", fi.ToString()));
+                }
+            }
+        }
 
         public override void BeforeLoadFullSource(string code, string classname)
         {
             throw new NotSupportedException("Remote.BeforeLoadFullSource");
         }
 
-        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname)
+        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             throw new NotSupportedException("Remote.DoMapFullSource");
         }
@@ -1025,13 +1130,13 @@ namespace RemoteExec
 
         // Note: appendsizes can be null, but the return will still be valid.
         // Sizes exclude header data.
-        protected virtual int GetNumberOfRemoteOutputFilesCreated(IList<long> appendsizes)
+        protected virtual int GetNumberOfRemoteOutputFilesCreated(int n, IList<long> appendsizes)
         {
             int result = 0;
             foreach (SlaveInfo slave in dslaves)
             {
                 slave.nstm.WriteByte((byte)'r');
-                Entry.ToBytes(0, buf, 0);
+                Entry.ToBytes(n, buf, 0);
                 XContent.SendXContent(slave.nstm, buf, 4);
                 int len;
                 buf = XContent.ReceiveXBytes(slave.nstm, out len, buf);

@@ -19,6 +19,7 @@ namespace QueryAnalyzer_DataProvider
         internal Dictionary<string, List<KeyValuePair<byte[], string>>> mindexes = null;
         private Dictionary<string, System.Net.Sockets.Socket> sockpool = null;
         private Dictionary<string, System.Net.Sockets.NetworkStream> netstmpool = null;
+        internal Dictionary<string, Index> sysindexes = null;
 
         public QaConnection()
         {
@@ -100,7 +101,7 @@ namespace QueryAnalyzer_DataProvider
         {
             if (connstr.RIndex == QaConnectionString.RIndexType.POOLED && sockpool != null && sockpool.Count > 0)
             {
-                if (host == null)
+                if (host == null || host.Length == 0)
                 {
                     foreach (System.Net.Sockets.Socket sk in sockpool.Values)
                     {
@@ -125,43 +126,75 @@ namespace QueryAnalyzer_DataProvider
                     }
                 }
             }
+
             try
             {
-                if (host == null)
+                int tryremains = connstr.RetryMaxCount;
+                string[] hosts = null;
+                Random rnd = null;
+
+                for (; ; )
                 {
-                    string[] hosts = connstr.DataSource;
-                    Random rnd = new Random(unchecked(System.DateTime.Now.Millisecond + System.Threading.Thread.CurrentThread.ManagedThreadId));
-                    int index = rnd.Next() % hosts.Length;
-                    host = hosts[index];
-                    for (int startindex = index; ; )
+                    try
                     {
-                        try
+                        if (host == null || host.Length == 0)
+                        {
+                            if (rnd == null)
+                            {
+                                rnd = new Random(unchecked(System.DateTime.Now.Millisecond + System.Threading.Thread.CurrentThread.ManagedThreadId));
+                                hosts = connstr.DataSource;
+                            }
+                            int index = rnd.Next() % hosts.Length;
+                            host = hosts[index];
+                            for (int startindex = index; ; )
+                            {
+                                try
+                                {
+                                    sock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                                    sock.Connect(host, 55904);
+                                    break;
+                                }
+                                catch
+                                {
+                                    sock.Close();
+                                    index++;
+                                    if (index == hosts.Length)
+                                    {
+                                        index = 0;
+                                    }
+                                    if (index == startindex)
+                                    {
+                                        throw;
+                                    }
+                                    host = hosts[index];
+                                }
+                            }
+                        }
+                        else
                         {
                             sock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
                             sock.Connect(host, 55904);
-                            break;
                         }
-                        catch
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (connstr.RIndex == QaConnectionString.RIndexType.POOLED)
                         {
-                            sock.Close();
-                            index++;
-                            if (index == hosts.Length)
+                            if (--tryremains <= 0)
                             {
-                                index = 0;
+                                throw new Exception("Cannot connect.  Tried this many of times to connect already: " + tryremains.ToString() +
+                                    ". RetryMaxCount=" + connstr.RetryMaxCount.ToString() + 
+                                    ".  RetrySleep=" + connstr.RetrySleep.ToString() + ".  " + ex.ToString());
                             }
-                            if (index == startindex)
-                            {
-                                throw;
-                            }
-                            host = hosts[index];
+                            System.Threading.Thread.Sleep(connstr.RetrySleep);
+                        }
+                        else
+                        {
+                            throw;
                         }
                     }
-                }
-                else
-                {
-                    sock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
-                    sock.Connect(host, 55904);
-                }  
+                }    
                 netstm = new System.Net.Sockets.NetworkStream(sock, true); // Owned.  
 
                 if (connstr.RIndex == QaConnectionString.RIndexType.POOLED)
@@ -192,26 +225,91 @@ namespace QueryAnalyzer_DataProvider
                     throw new Exception("Connnection is already open.");
                 }
 
-                _OpenSocketRIndex(null);    
+                if (connstr.RIndex == QaConnectionString.RIndexType.POOLED)
+                {
+                    string[] hosts = connstr.DataSource;
+                    Random rnd = new Random(unchecked(System.DateTime.Now.Millisecond + System.Threading.Thread.CurrentThread.ManagedThreadId));
+                    for (int hi = 0; hi < hosts.Length; hi++)
+                    {
+                        int swapindex = rnd.Next() % hosts.Length;
+                        string oval = hosts[hi];
+                        hosts[hi] = hosts[swapindex];
+                        hosts[swapindex] = oval;
+                    }
+                    for (int hi = 0; hi < hosts.Length; hi++)
+                    {
+                        _OpenSocketRIndex(hosts[hi]);
+                    }                 
+                }
+                else
+                {
+                    _OpenSocketRIndex(null);
+                }
+  
                 netstm.WriteByte((byte)'i'); //get all master indexes.
+
+                sysindexes = new Dictionary<string, Index>();                
+                {
+                    string xml = XContent.ReceiveXString(netstm, buf);
+                    if (xml.Length > 0)
+                    {
+                        System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
+                        xi.LoadXml(xml);
+                        System.Xml.XmlNodeList xnIndexes = xi.SelectNodes("/indexes/index");
+                        foreach (System.Xml.XmlNode xnIndex in xnIndexes)
+                        {
+                            string indName = xnIndex["name"].InnerText;
+                            System.Xml.XmlElement xeTable = xnIndex["table"];
+                            System.Xml.XmlNodeList xnCols = xeTable.SelectNodes("column");
+
+                            Column[] cols = new Column[xnCols.Count];
+                            for (int ci = 0; ci < xnCols.Count; ci++)
+                            {
+                                System.Xml.XmlNode xnCol = xnCols[ci];
+                                cols[ci].Name = xnCol["name"].InnerText;
+                                cols[ci].Type = xnCol["type"].InnerText;
+                                cols[ci].Bytes = Int32.Parse(xnCol["bytes"].InnerText);
+                            }
+
+                            Table tab;
+                            tab.Name = xeTable["name"].InnerText;
+                            tab.Columns = cols;
+
+                            Index ind;
+                            ind.Name = indName;
+                            ind.Ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
+                            ind.Table = tab;
+
+                            sysindexes.Add(indName.ToLower(), ind);
+                        }
+                    }
+                }
+
                 int micnt = 0;
                 XContent.ReceiveXBytes(netstm, out micnt, buf);
                 micnt = Utils.BytesToInt(buf, 0);
                 mindexes = new Dictionary<string, List<KeyValuePair<byte[], string>>>(micnt);
                 for (int mi = 0; mi < micnt; mi++)
                 {
-                    string indexname = XContent.ReceiveXString(netstm, buf);
+                    string indexname = XContent.ReceiveXString(netstm, buf).ToLower();
                     List<KeyValuePair<byte[], string>> lines = new List<KeyValuePair<byte[], string>>();
-                    byte[] lastkeybuf = new byte[9];
+                    int keylen = 9;
+                    if (sysindexes.ContainsKey(indexname))
+                    {
+                        int ordinal = sysindexes[indexname].Ordinal;
+                        keylen = sysindexes[indexname].Table.Columns[ordinal].Bytes;
+                    }
+
+                    byte[] lastkeybuf = new byte[keylen];
                     int filelen = 0;
                     XContent.ReceiveXBytesNoCap(netstm, out filelen, ref buf);
                     if (filelen > 0)
                     {
                         int pos = 0;
                         while(pos < filelen)
-                        {                            
-                            byte[] keybuf = new byte[9];
-                            for (int ki = 0; ki < 9; ki++)
+                        {
+                            byte[] keybuf = new byte[keylen];
+                            for (int ki = 0; ki < keylen; ki++)
                             {
                                 keybuf[ki] = buf[pos++];
                             }
@@ -236,12 +334,12 @@ namespace QueryAnalyzer_DataProvider
                             if (!samekey)
                             {
                                 lines.Add(new KeyValuePair<byte[], string>(keybuf, chunkname));
-                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, 9);
+                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, keylen);
                             }                           
                         }
                     }
-                    mindexes.Add(indexname.ToLower(), lines);
-                }
+                    mindexes.Add(indexname, lines);
+                }                
 
                 if (connstr.RIndex == QaConnectionString.RIndexType.NOPOOL)
                 {
@@ -351,7 +449,11 @@ namespace QueryAnalyzer_DataProvider
                 }
                 if (ib != (byte)'+')
                 {
+#if DEBUG
+                    throw new Exception("Connection.Close() handshake with service failed. (byte)" + ib.ToString());
+#else
                     throw new Exception("Connection.Close() handshake with service failed.");
+#endif
                 }
             }
             finally
@@ -539,6 +641,8 @@ namespace QueryAnalyzer_DataProvider
             public long BatchSize;
             public long BlockSize;
             public RIndexType RIndex;
+            public int RetryMaxCount;
+            public int RetrySleep;
 
             internal enum RIndexType
             {
@@ -560,6 +664,8 @@ namespace QueryAnalyzer_DataProvider
                 cs.BatchSize = 1024 * 1024 * 64;
                 cs.BlockSize = 1024 * 1024 * 16;
                 cs.RIndex = RIndexType.DISABLED;
+                cs.RetryMaxCount = 20;
+                cs.RetrySleep = 1000 * 5;
 
                 string[] parts = connstr.Trim(';').Split(';');
                 for (int i = 0; i < parts.Length; i++)
@@ -624,6 +730,16 @@ namespace QueryAnalyzer_DataProvider
                                 {
                                     throw new Exception("Invalid value for RINDEX=" + val);
                                 }
+                            }
+                            break;
+                        case "retrymaxcount":
+                            {
+                                cs.RetryMaxCount = Int32.Parse(val);
+                            }
+                            break;
+                        case "retrysleep":
+                            {
+                                cs.RetrySleep = Int32.Parse(val);
                             }
                             break;
                     }
@@ -691,6 +807,26 @@ namespace QueryAnalyzer_DataProvider
                     throw new OverflowException("Invalid capacity: overflow: '" + capacity + "' problem: " + e.ToString());
                 }
             }
+        }
+
+        internal struct Column
+        {
+            public string Name;
+            public string Type;
+            public int Bytes;
+        }
+
+        internal struct Table
+        {
+            public string Name;
+            public Column[] Columns;
+        }
+
+        internal struct Index
+        {
+            public string Name;
+            public int Ordinal;
+            public Table Table;
         }
     }
 }

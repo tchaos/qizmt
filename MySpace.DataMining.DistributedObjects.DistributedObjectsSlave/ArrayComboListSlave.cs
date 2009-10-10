@@ -113,11 +113,28 @@ namespace MySpace.DataMining.DistributedObjects5
             }
 
 
+            internal static long jid
+            {
+                get
+                {
+                    return DistributedObjectsSlave.jid;
+                }
+            }
+
+            internal static string sjid
+            {
+                get
+                {
+                    return DistributedObjectsSlave.sjid;
+                }
+            }
+
+
             internal static string _spid = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
 
             internal static string CreateZBlockFileName(int zblockID, string otherinfo)
             {
-                return "zblock_" + _spid + "_" + zblockID.ToString() + "_" + otherinfo + ".zb";
+                return "zblock_" + _spid + "_" + zblockID.ToString() + "_" + otherinfo + ".j" + sjid + ".zb";
             }
 
             internal static string CreateZBallFileName(int zblockID, string cachename, string otherinfo)
@@ -126,7 +143,7 @@ namespace MySpace.DataMining.DistributedObjects5
                 {
                     throw new Exception("ZBlock.CreateZBallFileName: no cache name");
                 }
-                return "zsball_" + cachename + "_" + zblockID.ToString() + "_" + otherinfo + ".zsb";
+                return "zsball_" + cachename + "_" + zblockID.ToString() + "_" + otherinfo + ".j" + sjid + ".zsb";
             }
 
 
@@ -1626,7 +1643,7 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
-        void LoadFoilSamples(IMap mpsamp, string samplesoutputfn, string[] dfsfiles)
+        void LoadFoilSamples(IMap mpsamp, string samplesoutputfn, string[] dfsfiles, string[] dfsfilenames, int[] nodesoffsets)
         {
             if (System.IO.File.Exists(samplesoutputfn))
             {
@@ -1643,8 +1660,18 @@ namespace MySpace.DataMining.DistributedObjects5
                 if (dfsfiles.Length > 0)
                 {
                     StaticGlobals.DSpace_Last = false;
+                    int fi = 0;
+                    int curoffset = nodesoffsets[fi];  
                     for (int i = 0; i < dfsfiles.Length; i++)
                     {
+                        if (i == curoffset)
+                        {
+                            StaticGlobals.DSpace_InputFileName = dfsfilenames[fi++];
+                            if (fi < nodesoffsets.Length)
+                            {
+                                curoffset = nodesoffsets[fi];
+                            }
+                        }
                         _MapDfsFileNodeFromFn(dfsfiles[i], mpsamp, sampin, sampout, i == dfsfiles.Length - 1);
                         sampout._ChunkDone();
                     }
@@ -1746,7 +1773,13 @@ namespace MySpace.DataMining.DistributedObjects5
                     // Otherwise the snowball file name would have to include the blockid... all for redundant data.
                     using (System.Threading.Mutex sampmutex = new System.Threading.Mutex(false, "DO5_Sample_" + sampcachefile))
                     {
-                        sampmutex.WaitOne();
+                        try
+                        {
+                            sampmutex.WaitOne();
+                        }
+                        catch (System.Threading.AbandonedMutexException)
+                        {
+                        }
                         if (System.IO.File.Exists(sampcachefile))
                         {
                             sampmutex.ReleaseMutex(); // Don't need to stay in the mutex at this point.
@@ -2449,7 +2482,7 @@ namespace MySpace.DataMining.DistributedObjects5
 #if DEBUG
                         //System.Threading.Thread.Sleep(1000 * 8);
 #endif
-                      
+
                         string classname = XContent.ReceiveXString(nstm, buf);
 
                         string xlibfn = CreateXlibFileName("foil");
@@ -2481,7 +2514,34 @@ namespace MySpace.DataMining.DistributedObjects5
 
                         string samplesoutputfn = XContent.ReceiveXString(nstm, buf);
 
-                        string[] dfsfiles = XContent.ReceiveXString(nstm, buf).Split(';');
+                        string[] dfsfiles = null;// XContent.ReceiveXString(nstm, buf).Split(';');
+                        string[] dfsfilenames = null;
+                        int[] nodesoffsets = null;
+                        {
+                            string xfiles = XContent.ReceiveXString(nstm, buf);
+                            if (xfiles.Length > 0)
+                            {
+                                int pipe = xfiles.IndexOf('|');
+                                dfsfiles = xfiles.Substring(0, pipe).Split(';');
+                                string[] xoffsets = xfiles.Substring(pipe + 1).Split(';');
+                                dfsfilenames = new string[xoffsets.Length];
+                                nodesoffsets = new int[xoffsets.Length];
+                                for (int xi = 0; xi < xoffsets.Length; xi++)
+                                {
+                                    string xoffset = xoffsets[xi];
+                                    pipe = xoffset.IndexOf('|');
+                                    int offset = Int32.Parse(xoffset.Substring(0, pipe));
+                                    string fname = xoffset.Substring(pipe + 1);
+                                    dfsfilenames[xi] = fname;
+                                    nodesoffsets[xi] = offset;
+                                }
+                            }
+                            else
+                            {
+                                dfsfiles = new string[0];
+                            }
+                        }
+
                         if (dfsfiles.Length == 1 && 0 == dfsfiles[0].Length)
                         {
                             dfsfiles = new string[0];
@@ -2512,7 +2572,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             string sampleclassname = classname + "_Sample";
                             //IMap mpsamp = LoadPluginInterface<IMap>(dllfn, sampleclassname);
                             IMap mpsamp = null == asm ? LoadPluginInterface<IMap>(dllfn, sampleclassname) : LoadPluginInterface<IMap>(asm, dllfn, sampleclassname);
-                            LoadFoilSamples(mpsamp, samplesoutputfn, dfsfiles);
+                            LoadFoilSamples(mpsamp, samplesoutputfn, dfsfiles, dfsfilenames, nodesoffsets);
                         }
 
                     }
@@ -2571,7 +2631,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                 stm.Write(buf, 0, len);
                                 stm.Close();
                             }
-                        }                                              
+                        }
 
                         string dllfn = CreateDllFileName("map");
                         System.Reflection.Assembly asm = null;
@@ -2579,7 +2639,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             buf = XContent.ReceiveXBytes(nstm, out len, buf);
                             if (0 == len)
                             {
-                                asm = compiler.CompileSourceFile(xlibfn, false, dllfn);                                
+                                asm = compiler.CompileSourceFile(xlibfn, false, dllfn);
                             }
                             else
                             {
@@ -2591,7 +2651,33 @@ namespace MySpace.DataMining.DistributedObjects5
 
                         string zmapblockbasename = XContent.ReceiveXString(nstm, buf);
 
-                        string[] dfsfiles = XContent.ReceiveXString(nstm, buf).Split(';');
+                        string[] dfsfiles = null;// XContent.ReceiveXString(nstm, buf).Split(';');
+                        string[] dfsfilenames = null;
+                        int[] nodesoffsets = null;
+                        {
+                            string xfiles = XContent.ReceiveXString(nstm, buf);
+                            if (xfiles.Length > 0)
+                            {
+                                int pipe = xfiles.IndexOf('|');
+                                dfsfiles = xfiles.Substring(0, pipe).Split(';');
+                                string[] xoffsets = xfiles.Substring(pipe + 1).Split(';');
+                                dfsfilenames = new string[xoffsets.Length];
+                                nodesoffsets = new int[xoffsets.Length];
+                                for (int xi = 0; xi < xoffsets.Length; xi++)
+                                {
+                                    string xoffset = xoffsets[xi];
+                                    pipe = xoffset.IndexOf('|');
+                                    int offset = Int32.Parse(xoffset.Substring(0, pipe));
+                                    string fname = xoffset.Substring(pipe + 1);
+                                    dfsfilenames[xi] = fname;
+                                    nodesoffsets[xi] = offset;
+                                }
+                            }
+                            else
+                            {
+                                dfsfiles = new string[0];
+                            }
+                        }
 
                         XContent.ReceiveXBytes(nstm, out len, buf); // !
                         int numzmblocks = 0;
@@ -2733,18 +2819,32 @@ namespace MySpace.DataMining.DistributedObjects5
                         ACLMapOutput mapoutput = new ACLMapOutput(this);
                         int maxerrors = 10;
                         StaticGlobals.DSpace_Last = false;
+                        int curoffset = 0;
+                        int fi = 0;
+                        if (dfsfiles.Length > 0)
+                        {
+                            curoffset = nodesoffsets[fi];
+                        }
                         for (int i = 0; i < dfsfiles.Length; i++)
                         {
+                            if (i == curoffset)
+                            {
+                                StaticGlobals.DSpace_InputFileName = dfsfilenames[fi++];
+                                if (fi < nodesoffsets.Length)
+                                {
+                                    curoffset = nodesoffsets[fi];
+                                }
+                            }
                             if (0 == dfsfiles[i].Length)
                             {
                                 continue;
                             }
                             try
-                            {                                
+                            {
                                 mapinput.Name = dfsfiles[i];
                                 mapinput._compression = compressdfschunks;
                                 mapinput._open(); // Depends on MapInput.Name being the full file path.                              
-                                StaticGlobals.DSpace_InputBytesRemain = (i == dfsfiles.Length - 1 ? mapinput.Stream.Length - mapinput.Stream.Position : Int64.MaxValue);
+                                StaticGlobals.DSpace_InputBytesRemain = (i == dfsfiles.Length - 1 ? mapinput.Stream.Length - mapinput.Stream.Position : Int64.MaxValue);                                
                                 mp.OnMap(mapinput, mapoutput);
                                 mapinput._close();
                             }

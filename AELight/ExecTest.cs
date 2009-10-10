@@ -37,13 +37,14 @@ namespace MySpace.DataMining.AELight
 
             int BlockID = 0;
 
-            string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + "_log.txt";
+            string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + ".j" + sjid + "_log.txt";
 
             try
             {
                 string outputguid = Guid.NewGuid().ToString();
                 TestRemote dobj = new TestRemote(cfgj.NarrativeName + "_test");
                 string outputfilename = outputguid + ".local";
+                dobj.SetJID(jid);
                 dobj.AddBlock(@"127.0.0.1|" + outputfilename + @".log|slaveid=0");
                 string codectx = (@"
     public const int DSpace_BlockID = 0;
@@ -199,7 +200,7 @@ namespace MySpace.DataMining.AELight
                 RemoteClassName = classname;
             }
 
-            protected override int GetNumberOfRemoteOutputFilesCreated(IList<long> appendsizes)
+            protected override int GetNumberOfRemoteOutputFilesCreated(int n, IList<long> appendsizes)
             {
                 throw new NotSupportedException();
             }

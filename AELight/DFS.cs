@@ -785,6 +785,417 @@ namespace MySpace.DataMining.AELight
             DfsPut(args, 0x400 * 64);
         }
 
+        static void DfsFPut(string[] args)
+        {
+            string[] files = null;
+            string[] dirs = null;
+            string pttn = "*.txt";
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                string _arg = args[i].ToLower();
+                if (_arg.StartsWith("files="))
+                {
+                    files = args[i].Substring(6).Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                }
+                else if (_arg.StartsWith("dirs="))
+                {
+                    dirs = args[i].Substring(5).Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                }
+                else if (_arg.StartsWith("pattern="))
+                {
+                    pttn = args[i].Substring(8);
+                }
+            }
+
+            List<string> fileList = new List<string>();
+            List<string> nonExist = new List<string>();
+            List<string> srcHost = new List<string>();
+
+            if (files == null && dirs == null)
+            {
+                Console.Error.WriteLine("fput error:  {0} fput files|dirs=<item[,item,item]> [pattern=<pattern>] ", appname);
+                SetFailure();
+                return;
+            }
+            if (files != null)
+            {
+                for (int i = 0; i < files.Length; i++)
+                {
+                    if (System.IO.File.Exists(files[i]))
+                    {
+                        fileList.Add(files[i]);
+                        srcHost.Add(GetHostName(files[i]));
+                    }
+                    else
+                    {
+                        nonExist.Add(files[i]);
+                    }
+                }
+            }
+
+            if (dirs != null)
+            {
+                for (int i = 0; i < dirs.Length; i++)
+                {
+                    if (System.IO.Directory.Exists(dirs[i]))
+                    {
+                        string[] matched = System.IO.Directory.GetFiles(dirs[i], pttn);
+                        if (matched.Length > 0)
+                        {
+                            srcHost.Add(GetHostName(dirs[i]));
+                        }
+                        for (int j = 0; j < matched.Length; j++)
+                        {
+                            fileList.Add(matched[j]);
+                        }
+                    }
+                    else
+                    {
+                        nonExist.Add(dirs[i]);
+                    }
+                }
+            }
+
+            for (int i = 0; i < nonExist.Count; i++)
+            {
+                Console.Error.WriteLine(nonExist[i] + " does not exist");
+            }
+
+            if (fileList.Count == 0)
+            {
+                Console.WriteLine("There is no file to put.");
+                return;
+            }
+
+            string[] hosts = null;
+            {
+                dfs dc = LoadDfsConfig();               
+                hosts = dc.Slaves.SlaveList.Split(';');
+            }
+
+            Random rand = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            for (int i = 0; i < hosts.Length; i++)
+            {
+                int r = rand.Next() % hosts.Length;
+                string str = hosts[r];
+                hosts[r] = hosts[i];
+                hosts[i] = str;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append(@"<SourceCode>
+                <Jobs>
+                <Job Name="""" Custodian="""" Email="""" Description="""">
+                   <IOSettings>        
+                          <JobType>remote</JobType>");
+
+            List<string> nFileList = new List<string>();
+            int cnt = 0;
+            while (fileList.Count > 0)
+            {
+                for (int i = 0; i < fileList.Count; i++)
+                {
+                    if (fileList[i].Contains(srcHost[cnt % srcHost.Count]))
+                    {
+                        System.IO.FileInfo fInfo = new System.IO.FileInfo(fileList[i]);
+                        sb.Append(@"<DFS_IO>
+                                <DFSReader></DFSReader>          
+                                <DFSWriter>");
+                        sb.Append(fInfo.Name);
+                        sb.Append(@"</DFSWriter>
+                                <Host>");
+                        sb.Append(hosts[cnt % hosts.Length]);
+                        sb.Append(@"</Host>
+                                </DFS_IO>");
+                        nFileList.Add(fileList[i]);
+                        fileList.RemoveAt(i);
+                        break;
+                    }
+                }
+                cnt++;
+            }
+
+            sb.Append(@"      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                string inFile = """";
+                switch ( Qizmt_ProcessID ) 
+                {");
+
+            for (int i = 0; i < nFileList.Count; i++)
+            {
+                sb.Append("\n  case " + i);
+                sb.Append(":\n      inFile = @\"" + nFileList[i]);
+                sb.Append("\";\n      break;\n");
+            }
+            sb.Append(@"}
+                try 
+                {
+                      System.IO.StreamReader sr = new System.IO.StreamReader(inFile);
+                      string line = """";
+                      while ( (line = sr.ReadLine()) != null )
+                      {
+                          dfsoutput.WriteLine(line);
+                      }
+                      sr.Close();
+                      Qizmt_Log(""uploaded: "" + inFile);
+                }
+                catch
+                {
+                      Qizmt_Log(""error occurred during putting :"" + inFile);
+                }
+            }
+        $^$>
+              </Remote>
+    </Job>
+    </Jobs>
+</SourceCode>").Replace("$^$", "]]");
+
+            string tmpJobFile = @"fput_" + Guid.NewGuid().ToString();
+            using (System.IO.StreamWriter writer = new System.IO.StreamWriter(tmpJobFile))
+            {
+                writer.Write(sb.ToString());
+                writer.Close();
+            }
+            Console.WriteLine("Putting files...");
+            Exec("", LoadConfig(null, tmpJobFile), new string[] { }, false, false);
+            System.IO.File.Delete(tmpJobFile);
+            Console.WriteLine("Done");
+        }
+
+        static string GetHostName(string networkpath)
+        {
+            string host = "";
+            if (networkpath.StartsWith(@"\\"))
+            {
+                host = networkpath.Substring(2, networkpath.IndexOf('\\', 2));
+            }
+            return host;
+        }
+
+        static void DfsFGet(string[] args)
+        {
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("fget error:  {0} fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>]", appname);
+                SetFailure();
+                return;
+            }
+
+            string dfsfile = args[0];
+            if (dfsfile.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+            {
+                dfsfile = dfsfile.Substring(6);
+            }
+
+            string dfsfilename = "";
+            string dfsfileext = "";
+            {
+                int del = dfsfile.LastIndexOf('.');
+                if (del > -1)
+                {
+                    dfsfileext = dfsfile.Substring(del);
+                    dfsfilename = dfsfile.Substring(0, del);
+                }
+                else
+                {
+                    dfsfilename = dfsfile;
+                }
+            }
+
+            Dictionary<string, string> netpaths = new Dictionary<string, string>();
+            string[] hosts = null;
+            string[] parts = null;
+            {
+                dfs.DfsFile df;                
+                using (LockDfsMutex())
+                {
+                    dfs dc = LoadDfsConfig();
+                    df = dc.FindAny(dfsfile);
+                    if (null == df)
+                    {
+                        Console.Error.WriteLine("File not found in DFS: {0}", dfsfile);
+                        SetFailure();
+                        return;
+                    }
+                    hosts = dc.Slaves.SlaveList.Split(';');
+                }
+
+                foreach (string host in hosts)
+                {
+                    if (Surrogate.IsHealthySlaveMachine(host))
+                    {
+                        netpaths.Add(host.ToLower(), Surrogate.NetworkPathForHost(host));
+                    }
+                }
+
+                parts = new string[df.Nodes.Count];
+                for(int i = 0; i < df.Nodes.Count; i++)
+                {
+                    dfs.DfsFile.FileNode fn = df.Nodes[i];
+                    string fnhost = fn.Host.ToLower();
+                    if (!netpaths.ContainsKey(fnhost))
+                    {
+                        Console.Error.WriteLine("File node is on an unhealthy machine: {0}:{1}", fnhost, fn.Name);
+                        SetFailure();
+                        return;
+                    }                    
+                    parts[i] = netpaths[fnhost] + @"\" + fn.Name;
+                }
+            }
+
+            string[] targetdirs = new string[args.Length - 1];
+            for (int i = 1; i < args.Length; i++)
+            {
+                targetdirs[i - 1] = args[i];
+            }
+
+            Random rand = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            for (int i = 0; i < hosts.Length; i++)
+            {
+                int r = rand.Next() % hosts.Length;
+                string str = hosts[r];
+                hosts[r] = hosts[i];
+                hosts[i] = str;
+            }
+
+            int[] orders = new int[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                orders[i] = i;
+            }
+            for (int i = 0; i < orders.Length; i++)
+            {
+                int r = rand.Next() % orders.Length;
+                int num = orders[r];
+                orders[r] = orders[i];
+                orders[i] = num;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append(@"<SourceCode>
+                <Jobs>
+                <Job Name="""">
+                   <IOSettings>        
+                          <JobType>remote</JobType>");
+
+            for (int oi = 0; oi < orders.Length; oi++)
+            {
+                int index = orders[oi];
+                string partnetpath = parts[index];
+                string targetdir = targetdirs[index % targetdirs.Length];
+                string meta = partnetpath + '|' + targetdir + '|' + index;
+
+                sb.Append(@"<DFS_IO>
+                    <DFSReader></DFSReader>          
+                    <DFSWriter></DFSWriter>
+                    <Host>");
+                sb.Append(hosts[oi % hosts.Length]);
+                sb.Append(@"</Host>
+                    <Meta>");
+                sb.Append(meta);
+                sb.Append(@"</Meta>
+                    </DFS_IO>");
+            }
+
+            sb.Append(@"      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                string dfsfn = """ + dfsfilename + @""";
+                string dfsext = """ + dfsfileext + @""";
+                string[] meta = Qizmt_Meta.Split('|');
+                string srcfilepath = meta[0]; 
+                string targetdir = meta[1];
+                string index = meta[2];
+                if(!System.IO.Directory.Exists(targetdir))
+                {
+                    System.IO.Directory.CreateDirectory(targetdir);
+                }
+                string tarfilepath = targetdir+ @""\"" + dfsfn + ""_"" + index + dfsext; 
+                const int FILE_BUFFER_SIZE = 0x1000;
+                const int MAX_SIZE_PER_RECEIVE = 0x400 * 64;
+                byte[] fbuf = new byte[MAX_SIZE_PER_RECEIVE];
+
+                using (System.IO.FileStream fs = new System.IO.FileStream(tarfilepath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                {
+                    using (System.IO.Stream fc = new System.IO.FileStream(srcfilepath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                    {
+                        {
+                            int xread = StreamReadLoop(fc, fbuf, 4);
+                            if (4 == xread)
+                            {
+                                int hlen = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(fbuf);
+                                StreamReadExact(fc, fbuf, hlen - 4);
+                            }
+                        }
+
+                        for (; ; )
+                        {
+                            int xread = fc.Read(fbuf, 0, MAX_SIZE_PER_RECEIVE);
+                            if (xread <= 0)
+                            {
+                                break;
+                            }
+                            fs.Write(fbuf, 0, xread);
+                        }
+                        fc.Close();
+                        fs.Close();
+                    }
+                }
+            }
+            
+            static int StreamReadLoop(System.IO.Stream stm, byte[] buf, int len)
+            {
+                int sofar = 0;
+                try
+                {
+                    while (sofar < len)
+                    {
+                        int xread = stm.Read(buf, sofar, len - sofar);
+                        if (xread <= 0)
+                        {
+                            break;
+                        }
+                        sofar += xread;
+                    }
+                    return sofar;
+                }
+                catch (ArgumentException e)
+                {
+                    throw new ArgumentException(""StreamRead* Requested "" + len.ToString() + "" bytes; "" + e.Message, e);
+                }
+            }
+
+            static void StreamReadExact(System.IO.Stream stm, byte[] buf, int len)
+            {
+                if (len != StreamReadLoop(stm, buf, len))
+                {
+                    throw new System.IO.IOException(""Unable to read from stream"");
+                }
+            }
+        $^$>
+              </Remote>
+    </Job>
+    </Jobs>
+</SourceCode>").Replace("$^$", "]]");
+
+            string jobname = "fget_" + Guid.NewGuid().ToString();
+            using (System.IO.StreamWriter sw = System.IO.File.CreateText(jobname))
+            {
+                sw.Write(sb.ToString());
+                sw.Close();
+            }
+            Console.WriteLine("Getting files...");
+            Exec("", LoadConfig(null, jobname), new string[] { }, false, false);
+            System.IO.File.Delete(jobname);
+            Console.WriteLine("Done");
+        }
+
         static void DfsPut(string[] args, long maxLineSize)
         {
             if (args.Length > 0 && "-rv" == args[0])
@@ -3110,6 +3521,14 @@ namespace MySpace.DataMining.AELight
 
                     case "put":
                         DfsPut(args);
+                        break;
+
+                    case "fput":
+                        DfsFPut(args);
+                        break;
+
+                    case "fget":
+                        DfsFGet(args);
                         break;
 
                     case "putbinary":

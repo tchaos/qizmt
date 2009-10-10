@@ -3732,46 +3732,61 @@ namespace MySpace.DataMining.AELight
                         Console.WriteLine("[{0}]        [MapReduce: {1}]", starttime.ToString(), cfgj.NarrativeName);
                     }
                     int OutputRecordLength = int.MinValue;
-                    string prettyfilename = cfgj.IOSettings.DFSOutput;
-                    JobOutputFiles = new string[] { cfgj.IOSettings.DFSOutput };
-                    if (prettyfilename.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                    JobOutputFiles = new string[] { cfgj.IOSettings.DFSOutput };                    
+                    List<string> prettyfilenames = new List<string>();
                     {
-                        prettyfilename = prettyfilename.Substring(6);
+                        if (cfgj.IOSettings.DFSOutput.Trim().Length > 0)
+                        {
+                            string[] dfsoutputs = cfgj.IOSettings.DFSOutput.Split(';');
+                            for (int oi = 0; oi < dfsoutputs.Length; oi++)
+                            {
+                                string dfsoutput = dfsoutputs[oi].Trim();
+                                if (dfsoutput.Length == 0)
+                                {
+                                    continue;
+                                }
+                                if (dfsoutput.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    dfsoutput = dfsoutput.Substring(6);
+                                }
+                                int reclen = -1;
+                                int ic = dfsoutput.IndexOf('@');
+                                if (-1 != ic)
+                                {
+                                    try
+                                    {
+                                        reclen = Surrogate.GetRecordSize(dfsoutput.Substring(ic + 1));
+                                        dfsoutput = dfsoutput.Substring(0, ic);
+                                    }
+                                    catch (FormatException e)
+                                    {
+                                        throw new Exception(string.Format("Error: mapreduce output file record length error: {0} ({1})", dfsoutput, e.Message));
+                                    }
+                                    catch (OverflowException e)
+                                    {
+                                        throw new Exception(string.Format("Error: mapreduce output file record length error: {0} ({1})", dfsoutput, e.Message));
+                                    }                                    
+                                }
+                                if (OutputRecordLength != int.MinValue && OutputRecordLength != reclen)
+                                {
+                                    throw new Exception(string.Format("Error: all map outputs must have the same record length: {0}", dfsoutput));
+                                }
+                                string reason = "";
+                                if (dfs.IsBadFilename(dfsoutput, out reason))
+                                {
+                                    throw new Exception("Invalid output file: " + reason);
+                                }
+                                OutputRecordLength = reclen;
+                                prettyfilenames.Add(dfsoutput);
+                            }
+                        }
+                        else
+                        {
+                            prettyfilenames.Add("");
+                        }                        
                     }
-                    if(prettyfilename.Length > 0)
-                    {
-                        {
-                            int ic = prettyfilename.IndexOf('@');
-                            if (-1 != ic)
-                            {
-                                try
-                                {
-                                    OutputRecordLength = Surrogate.GetRecordSize(prettyfilename.Substring(ic + 1));
-                                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength;
-                                }
-                                catch (FormatException e)
-                                {
-                                    throw new Exception(string.Format("Error: mapreduce output file record length error: {0} ({1})", prettyfilename, e.Message));
-                                }
-                                catch (OverflowException e)
-                                {
-                                    throw new Exception(string.Format("Error: mapreduce output file record length error: {0} ({1})", prettyfilename, e.Message));
-                                }
-                                prettyfilename = prettyfilename.Substring(0, ic);
-                            }
-                            else
-                            {
-                                OutputRecordLength = -1;
-                                MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength;
-                            }
-                        }
-
-                        string reason = "";
-                        if (dfs.IsBadFilename(prettyfilename, out reason))
-                        {
-                            throw new Exception("Invalid output file: " + reason);
-                        }
-                    }                    
+                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength > 0 ? OutputRecordLength : -1;
+                    
                     dfs dc = LoadDfsConfig();
                     MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
                     MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_MaxDGlobals = dc.MaxDGlobals;
@@ -3779,6 +3794,8 @@ namespace MySpace.DataMining.AELight
                     MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection_ascending = (0 == string.Compare(cfgj.IOSettings.OutputDirection, "ascending", true));
                     int InputRecordLength = int.MinValue;
                     List<string> dfsinputpaths;
+                    List<string> inputfileswithnodes = new List<string>();
+                    List<int> inputnodesoffsets = new List<int>();
                     {
                         List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();
                         List<string> mapfiles = new List<string>();
@@ -3807,7 +3824,7 @@ namespace MySpace.DataMining.AELight
                                             try
                                             {
                                                 int reclen = Surrogate.GetRecordSize(dp.Substring(ic + 1));
-                                                if (RecordLength != int.MinValue && RecordLength == reclen)
+                                                if (RecordLength != int.MinValue && RecordLength != reclen)
                                                 {
                                                     throw new Exception(string.Format("Error: all cache inputs must have the same record length: {0}", dp));
                                                 }
@@ -3850,6 +3867,15 @@ namespace MySpace.DataMining.AELight
                                         {
                                             throw new Exception(string.Format("Error: cache input file does not have expected record length of {0}: {1}@{2}", RecordLength, dp, df.RecordLength));
                                         }
+                                    }
+                                    if (dp.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        dp = dp.Substring(6);
+                                    }
+                                    if (df.Nodes.Count > 0)
+                                    {
+                                        inputfileswithnodes.Add(dp);
+                                        inputnodesoffsets.Add(nodes.Count);
                                     }
                                     nodes.AddRange(df.Nodes);
                                 }
@@ -3919,6 +3945,11 @@ namespace MySpace.DataMining.AELight
                                         {
                                             throw new Exception(string.Format("Error: map input file does not have expected record length of {0}: {1}@{2}", RecordLength, dp, df.RecordLength));
                                         }
+                                    }
+                                    if (df.Nodes.Count > 0)
+                                    {
+                                        inputfileswithnodes.Add(dp);
+                                        inputnodesoffsets.Add(nodes.Count);
                                     }
                                     nodes.AddRange(df.Nodes);
                                 }
@@ -4249,6 +4280,7 @@ internal class MRRReducerBase
     public class RandomAccessOutput
     {
         public System.IO.Stream _outstm;
+        internal RandomAccessOutput[] parentlist = null;
 
         const int OutputRecordLength = " + OutputRecordLength.ToString() + @";
         
@@ -4261,6 +4293,19 @@ internal class MRRReducerBase
         public void Cache(mstring key, mstring value){}
 
         public void Cache(mstring key, recordset value){}
+
+        public RandomAccessOutput GetOutputByIndex(int index)
+        {
+            if(parentlist == null)
+            {
+                throw new Exception(`Error: RandomAccessOutput.GetOutputByIndex(int index) parent list is null.`);
+            }
+            if(index < 0 || index >= parentlist.Length)
+            {
+                throw new Exception(`Error: RandomAccessOutput.GetOutputByIndex(int index) index is out of range.`);
+            }
+            return parentlist[index];
+        }
 
 	    public void Add(ByteSlice entry, bool addnewline)
         {
@@ -4429,6 +4474,8 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
     MRRMapper mapper = new  MRRMapper();
     List<byte> curinput = new List<byte>(1000);
     List<byte> nextinput = new List<byte>(1000);
+    string curinputfn = null;
+    string nextinputfn = null;
     bool hascur = false;
     bool hasnext = false;
     StaticGlobals.MapIteration = 0;
@@ -4455,12 +4502,13 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
         {
             if(InputRecordLength > 0)
             {
-                hascur = dfsinput.ReadRecordAppend(curinput);
+                hascur = dfsinput.ReadRecordAppend(curinput);                
             }
             else
             {
                 hascur = dfsinput.ReadLineAppend(curinput);
             }
+            curinputfn = StaticGlobals.DSpace_InputFileName;
         }
         else
         {
@@ -4486,23 +4534,44 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
         else
         {
             hasnext = dfsinput.ReadLineAppend(nextinput);
-        }        
+        }     
+        nextinputfn = StaticGlobals.DSpace_InputFileName;  
+
         if(!hasnext)
         {
             StaticGlobals.DSpace_Last = true;
-        }        
+        }
+
+        bool changedinputfilename = curinputfn != nextinputfn;
+        if(changedinputfilename)
+        {
+            StaticGlobals.DSpace_InputFileName = curinputfn;
+            curinputfn = nextinputfn;
+        } 
         
         Stack.ResetStack();
-        recordset.ResetBuffers();
+        recordset.ResetBuffers();       
         mapper.Map(ByteSlice.Prepare(curinput), mapout);
         ++StaticGlobals.MapIteration;
+
+        if(changedinputfilename)
+        {
+            StaticGlobals.DSpace_InputFileName = nextinputfn;
+        } 
     }
     mapout.mrrentries.Sort(new System.Comparison<MRRKV>(mrr_kcmp)); // !
     MRRReducer reducer = new MRRReducer();
     MRRReducer.RandomAccessEntries rae = new MRRReducer.RandomAccessEntries();
     rae.mrrentries = mapout.mrrentries;
-    MRRReducer.RandomAccessOutput reduceout = new MRRReducer.RandomAccessOutput();
-    reduceout._outstm = dfsoutput;
+    int nreduceouts = " + prettyfilenames.Count.ToString() + @";
+    MRRReducer.RandomAccessOutput[] reduceouts = new MRRReducer.RandomAccessOutput[nreduceouts];
+    for(int oi = 0; oi < nreduceouts; oi++)
+    {
+        reduceouts[oi] = new MRRReducer.RandomAccessOutput();
+        reduceouts[oi]._outstm = dfsoutput.GetOutputByIndex(oi);
+        reduceouts[oi].parentlist = reduceouts;
+    }
+    MRRReducer.RandomAccessOutput reduceout = reduceouts[0];   
     StaticGlobals.ExecutionContext = ExecutionContextType.REDUCE; // !
     reducer.ReduceInitialize(); // !
     StaticGlobals.DSpace_Last = false;
@@ -4554,7 +4623,11 @@ static void Main(string[] args)
     MySpace.DataMining.DistributedObjects.IRemote A4BED95814AD446eB0C5B7B4154907A9 = new {E43B0DD7-EE4B-4665-873B-A385F98957C3}(); A4BED95814AD446eB0C5B7B4154907A9.OnRemote();
 }
 ";
-                    string outputfilename = "zd." + outputfilebase + ".zd";
+                    string[] outputfilenames = new string[prettyfilenames.Count];
+                    for (int oi = 0; oi < prettyfilenames.Count; oi++)
+                    {
+                        outputfilenames[oi] = "zd." + Guid.NewGuid().ToString() + ".mapreduce.remote" + ".zd";
+                    }
                     DebugRemote dobj = new DebugRemote(cfgj.NarrativeName + "_mapreduce_remote");
                     if (cfgj.OpenCVExtension != null)
                     {
@@ -4578,10 +4651,12 @@ static void Main(string[] args)
                     dobj.RemoteExec(
                         dfsinputpaths,
                         new string[] { "." },
-                        outputfilename,
+                        outputfilenames,
                         0,
                         mrrcode,
-                        cfgj.Usings);
+                        cfgj.Usings, 
+                        inputfileswithnodes,
+                        inputnodesoffsets);
 
                     string fullsource = "using ByteSliceList = RemoteExec.UserRExec.MRRReducerBase.RandomAccessEntries;\n"
                             + "using ReduceOutput = RemoteExec.UserRExec.MRRReducerBase.RandomAccessOutput;\n";
@@ -4631,14 +4706,14 @@ static void Main(string[] args)
                             return false;
                         }
 
+                        for(int oi = 0; oi < outputfilenames.Length; oi++)
                         {
                             string zdfn = "/"; // "/" is "none"
-                            if (System.IO.File.Exists(outputfilename))
+                            if (System.IO.File.Exists(outputfilenames[oi]))
                             {
-                                zdfn = outputfilename;
+                                zdfn = outputfilenames[oi];
                             }
-
-                            if (prettyfilename.Length > 0)
+                            if (prettyfilenames[oi].Length > 0)
                             {
                                 string filetype = DfsFileTypes.NORMAL;
                                 if (MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength > 0)
@@ -4646,9 +4721,9 @@ static void Main(string[] args)
                                     filetype = DfsFileTypes.BINARY_RECT + "@" + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString();
                                 }
                                 Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
-                                "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilename + "\" " + filetype
+                                "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
                                 ));
-                            }                            
+                            }
                         }
                     }
                     finally
@@ -4700,7 +4775,7 @@ static void Main(string[] args)
                     }
                     string DFSWriter = "";
                     string DFSReader = "";
-                    string prettyfilename = "";
+                    List<string> prettyfilenames = new List<string>();
                     if (cfgj.IOSettings.DFS_IOs.Length != 0)
                     {
                         JobOutputFiles = new string[] { cfgj.IOSettings.DFS_IOs[0].DFSWriter };
@@ -4712,48 +4787,62 @@ static void Main(string[] args)
                         DFSReader = cfgj.IOSettings.DFS_IOs[0].DFSReader;
                     }
                     int OutputRecordLength = int.MinValue;
+                    if (DFSWriter.Length > 0)
                     {
-                        int ic = DFSWriter.IndexOf('@');
-                        if (-1 != ic)
+                        string[] dfswriters = DFSWriter.Split(';');
+                        for (int oi = 0; oi < dfswriters.Length; oi++)
                         {
-                            try
+                            string dfswriter = dfswriters[oi].Trim();                            
+                            if (dfswriter.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
                             {
-                                int reclen = Surrogate.GetRecordSize(DFSWriter.Substring(ic + 1));
-                                if (OutputRecordLength != int.MinValue && OutputRecordLength == reclen)
+                                dfswriter = dfswriter.Substring(6);
+                            }
+                            if (dfswriter.Length == 0)
+                            {
+                                continue;
+                            }
+                            int reclen = -1;
+                            int ic = dfswriter.IndexOf('@');
+                            if (-1 != ic)
+                            {
+                                try
                                 {
-                                    throw new Exception(string.Format("Error: all remote outputs must have the same record length: {0}", DFSWriter));
+                                    reclen = Surrogate.GetRecordSize(dfswriter.Substring(ic + 1));
+                                    dfswriter = dfswriter.Substring(0, ic);
                                 }
-                                OutputRecordLength = reclen;
-                                DFSWriter = DFSWriter.Substring(0, ic);
+                                catch (FormatException e)
+                                {
+                                    throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", dfswriter, e.Message));
+                                }
+                                catch (OverflowException e)
+                                {
+                                    throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", dfswriter, e.Message));
+                                }
                             }
-                            catch (FormatException e)
+                            if (OutputRecordLength != int.MinValue && OutputRecordLength != reclen)
                             {
-                                throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", DFSWriter, e.Message));
+                                throw new Exception(string.Format("Error: all remote outputs must have the same record length: {0}", dfswriter));
                             }
-                            catch (OverflowException e)
+                            string reason = "";
+                            if (dfs.IsBadFilename(dfswriter, out reason))
                             {
-                                throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", DFSWriter, e.Message));
+                                throw new Exception("Invalid remote output file: " + reason);
                             }
-                        }
-                        else if (OutputRecordLength == int.MinValue)
-                        {
-                            OutputRecordLength = -1;
+                            OutputRecordLength = reclen;
+                            prettyfilenames.Add(dfswriter);
                         }
                     }
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength;
-                    prettyfilename = DFSWriter.Substring(6); // Since it's always added above.
-                    if (prettyfilename.Length > 0)
+                    if (prettyfilenames.Count == 0)
                     {
-                        string reason = "";
-                        if (dfs.IsBadFilename(prettyfilename, out reason))
-                        {
-                            throw new Exception("Invalid remote output file: " + reason);
-                        }
+                        prettyfilenames.Add("");
                     }
+                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength > 0 ? OutputRecordLength : -1;
                     int InputRecordLength = int.MinValue;
                     List<string> dfsinputpaths;
+                    List<string> inputfileswithnodes = new List<string>();
+                    List<int> inputnodesoffsets = new List<int>();
                     {
-                        List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();
+                        List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();                        
                         IList<string> mapfiles = dc.SplitInputPaths(DFSReader);
                         for (int i = 0; i < mapfiles.Count; i++)
                         {
@@ -4771,7 +4860,7 @@ static void Main(string[] args)
                                         try
                                         {
                                             int reclen = Surrogate.GetRecordSize(dp.Substring(ic + 1));
-                                            if (InputRecordLength != int.MinValue && InputRecordLength == reclen)
+                                            if (InputRecordLength != int.MinValue && InputRecordLength != reclen)
                                             {
                                                 throw new Exception(string.Format("Error: all remote inputs must have the same record length: {0}", dp));
                                             }
@@ -4811,15 +4900,25 @@ static void Main(string[] args)
                                     //_TSafe_LeaveDebugMode();
                                     //return false;
                                 }
+                                if (df.Nodes.Count > 0)
+                                {
+                                    inputfileswithnodes.Add(dp);
+                                    inputnodesoffsets.Add(nodes.Count);
+                                }
                                 nodes.AddRange(df.Nodes);
                             }
                         }
                         dfsinputpaths = new List<string>(nodes.Count);
                         dfs.MapNodesToNetworkPaths(nodes, dfsinputpaths);
                     }
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = InputRecordLength;
-                    string outputfilebase = outputguid + ".remote";
-                    string outputfilename = "zd." + outputfilebase + ".zd";
+                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = InputRecordLength;                    
+                    string[] outputfilenames = new string[prettyfilenames.Count];
+                    {
+                        for (int oi = 0; oi < prettyfilenames.Count; oi++)
+                        {
+                            outputfilenames[oi] = "zd." + Guid.NewGuid().ToString() + ".remote" + ".zd";
+                        }
+                    }
                     DebugRemote dobj = new DebugRemote(cfgj.NarrativeName + "_remote");
                     if (cfgj.OpenCVExtension != null)
                     {
@@ -4835,6 +4934,7 @@ static void Main(string[] args)
                     dobj.DfsSampleDistance = 0;
                     dobj.CompressFileOutput = dc.slave.CompressDfsChunks;
                     dobj.OutputStartingPoint = 0;
+                    string outputfilebase = outputguid + ".remote";
                     if (cfgj.AssemblyReferencesCount > 0)
                     {
                         cfgj.AddAssemblyReferences(dobj.CompilerAssemblyReferences, Surrogate.NetworkPathForHost(dc.Slaves.GetFirstSlave()));
@@ -4868,6 +4968,8 @@ static void Main(string[] args)
 
     public const int DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
     public const int Qizmt_OutputRecordLength = DSpace_OutputRecordLength;
+
+    public const string Qizmt_Meta = @`" + cfgj.IOSettings.DFS_IOs[0].Meta + @"`;
 
     const bool _ShouldDebugShellExec = " + (Outer.ShouldDebugShellExec ? "true" : "false") + @";
 
@@ -4929,10 +5031,12 @@ static void Main(string[] args)
                     dobj.RemoteExec(
                         dfsinputpaths,
                         new string[] { "." },
-                        outputfilename,
+                        outputfilenames,
                         0,
                         codectx + "\r\n#line " + cdatalines[curcdata].ToString() + " \"" + jobfilename + "\"\r\n" + cfgj.Remote + "\r\n#line default\r\nstatic void Main() { MySpace.DataMining.DistributedObjects.StaticGlobals.ExecutionMode = MySpace.DataMining.DistributedObjects.ExecutionMode.DEBUG; MySpace.DataMining.DistributedObjects.IRemote A4BED95814AD446eB0C5B7B4154907A9 = new {E43B0DD7-EE4B-4665-873B-A385F98957C3}(); A4BED95814AD446eB0C5B7B4154907A9.OnRemote(); }",
-                        cfgj.Usings);
+                        cfgj.Usings,
+                        inputfileswithnodes,
+                        inputnodesoffsets);
                     string fullsource = dobj.RemoteSource.Replace("{E43B0DD7-EE4B-4665-873B-A385F98957C3}", dobj.RemoteClassName);
                     dbgsourcepath = "dbg_" + Surrogate.SafeTextPath(JobsEdit.RealUserName) + "~fullsource_" + outputfilebase + ".cs";
                     System.IO.File.WriteAllText(dbgsourcepath, fullsource);
@@ -4970,14 +5074,15 @@ static void Main(string[] args)
                         return false;
                     }
 
+                    for(int oi = 0; oi < outputfilenames.Length; oi++)
                     {
                         string zdfn = "/"; // "/" is "none"
-                        if (System.IO.File.Exists(outputfilename))
+                        if (System.IO.File.Exists(outputfilenames[oi]))
                         {
-                            zdfn = outputfilename;
-                        }                      
+                            zdfn = outputfilenames[oi];
+                        }
 
-                        if (prettyfilename.Length > 0)
+                        if (prettyfilenames[oi].Length > 0)
                         {
                             string filetype = DfsFileTypes.NORMAL;
                             if (OutputRecordLength > 0)
@@ -4985,9 +5090,9 @@ static void Main(string[] args)
                                 filetype = DfsFileTypes.BINARY_RECT + "@" + OutputRecordLength.ToString();
                             }
                             Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
-                           "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilename + "\" " + filetype
+                           "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
                            ));
-                        }                       
+                        }
                     }
 
                     curcdata++;
@@ -6059,6 +6164,11 @@ static void Main(string[] args)
             {
                 throw new NotImplementedException();
             }
+
+            public RandomAccessOutput GetOutputByIndex(int index)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         public class ReduceOutput : InternalCode.RandomAccessOutput
@@ -6184,6 +6294,11 @@ static void Main(string[] args)
             }
 
             public void WriteBinary(MySpace.DataMining.DistributedObjects.Blob blob)
+            {
+                throw new NotImplementedException();
+            }
+
+            public RemoteOutputStream GetOutputByIndex(int index)
             {
                 throw new NotImplementedException();
             }

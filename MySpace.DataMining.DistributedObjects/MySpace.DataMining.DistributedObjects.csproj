@@ -77,6 +77,9 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="licenses_and_attributions.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="SciLexer.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -133,6 +136,18 @@
     <ProjectReference Include="..\mrdebug\mrdebug.csproj">
       <Project>{2AA9BB79-EC2E-4340-9032-B96C3310C02E}</Project>
       <Name>mrdebug</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\RegressionTests\RegressionTest2\mrdebugee\mrdebugee.csproj">
+      <Project>{CDC267D1-1F6E-4008-8E3B-B93EB0983768}</Project>
+      <Name>mrdebugee</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\RegressionTests\RegressionTest2\RegressionTest2\RegressionTest2.csproj">
+      <Project>{6687D78D-0396-4181-8A64-33182BFA9B84}</Project>
+      <Name>RegressionTest2</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\RegressionTests\RegressionTest\RegressionTest.csproj">
+      <Project>{51C1DC7F-7F9B-4CA4-9ADA-922421E0AEC7}</Project>
+      <Name>RegressionTest</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

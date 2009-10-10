@@ -127,6 +127,14 @@ namespace MySpace.DataMining.DistributedObjects
             }
         }
         public static long DSpace_InputBytesRemain = Int64.MaxValue;
+        public static string DSpace_InputFileName = null;
+        public static string Qizmt_InputFileName
+        {
+            get
+            {
+                return DSpace_InputFileName;
+            }
+        }
         public static long Qizmt_InputBytesRemain
         {
             get

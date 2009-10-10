@@ -103,7 +103,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             List<long> appendsizes = new List<long>();
                             try
                             {
-                                count = rem.GetOutputFileCount(0, appendsizes);
+                                count = rem.GetOutputFileCount(n, appendsizes);
                             }
                             catch(Exception e)
                             {

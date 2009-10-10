@@ -151,7 +151,13 @@ namespace DProcess
 
         public static void errorlog(string line)
         {
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 using (System.IO.StreamWriter fstm = System.IO.File.AppendText("dprocess-errors.txt"))
