@@ -1,0 +1,156 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.IndexOf(string)_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mstring.IndexOf(string)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.IndexOf(string)_Output.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.IndexOf(string)_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.IndexOf(string)_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 100;
+                int rowCount = 2000;
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        onerow.Add(b); 
+                    }     
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>mstring.IndexOf(string)</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_mstring.IndexOf(string)_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mstring.IndexOf(string)_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();  
+                string s1 = sLine.Substring(0, 25);
+                string s2 = sLine.Substring(25);
+                
+                mstring ms = mstring.Prepare(sLine);                
+                
+                int i1 = ms.IndexOf(s1);    //0
+                int i2 = ms.IndexOf(s2);    //25
+                
+                ByteSlice key = ByteSlice.Prepare(sLine.Substring(0, 1));
+                ByteSlice val = ByteSlice.Prepare(sLine.Substring(i1, 25) + sLine.Substring(i2));
+               
+                output.Add(key, val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int i = 0; i < values.Length; i++)
+                {
+                    string sLine = values.Items[i].ToString();  
+                    string s1 = sLine.Substring(0, 25);
+                    string s2 = sLine.Substring(25);
+                    
+                    mstring ms = mstring.Prepare(sLine);                 
+                    
+                    int i1 = ms.IndexOf(s1);    //0
+                    int i2 = ms.IndexOf(s2);    //25                    
+                  
+                    ByteSlice val = ByteSlice.Prepare(sLine.Substring(i1, 25) + sLine.Substring(i2));
+                   
+                    output.Add(val);                      
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.IndexOf(string)_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring.IndexOf(string)_Input.txt regression_test_mstring.IndexOf(string)_Output.txt regression_test_mstring.IndexOf(string).xml");          
+            
+            Shell(@"Qizmt del regression_test_mstring.IndexOf(string)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.IndexOf(string)_Output.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

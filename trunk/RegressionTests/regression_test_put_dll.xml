@@ -1,0 +1,247 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_put_dll_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_testdll.dll");
+            Shell(@"Qizmt del regression_test_put_dll_Input.txt");
+            Shell(@"Qizmt del regression_test_put_dll_Output1.txt");
+            Shell(@"Qizmt del regression_test_put_dll_Output2.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_put_dll PUT DLL</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = "regression_test_testdll.dll";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            /*
+            // Code for regression_test_testdll.dll:
+namespace testdll
+{
+    public class Test
+    {
+        static int x = 0;
+        public static void reset()
+        {
+            x = 0;
+        }
+        public static int next()
+        {
+            return x++;
+        }
+    }
+}
+            */
+            string testdlldatab64 = "TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAA4fug4AtAnNIbgBTM0hVGhpcyBwcm9ncmFtIGNhbm5vdCBiZSBydW4gaW4gRE9TIG1vZGUuDQ0KJAAAAAAAAABQRQAATAEDACjM90kAAAAAAAAAAOAAAiELAQgAAAgAAAAGAAAAAAAA7iYAAAAgAAAAQAAAAABAAAAgAAAAAgAABAAAAAAAAAAEAAAAAAAAAACAAAAAAgAAAAAAAAMAQIUAABAAABAAAAAAEAAAEAAAAAAAABAAAAAAAAAAAAAAAJQmAABXAAAAAEAAADgDAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAwAAAAMJgAAHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAAAAAAAAAAAAAAACCAAAEgAAAAAAAAAAAAAAC50ZXh0AAAA9AYAAAAgAAAACAAAAAIAAAAAAAAAAAAAAAAAACAAAGAucnNyYwAAADgDAAAAQAAAAAQAAAAKAAAAAAAAAAAAAAAAAABAAABALnJlbG9jAAAMAAAAAGAAAAACAAAADgAAAAAAAAAAAAAAAAAAQAAAQgAAAAAAAAAAAAAAAAAAAADQJgAAAAAAAEgAAAACAAUAdCAAAJgFAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4WgAEAAAQqOn4BAAAEJRdYgAEAAAQqBioeAigQAAAKKgAAAEJTSkIBAAEAAAAAAAwAAAB2Mi4wLjUwNzI3AAAAAAUAbAAAAOABAAAjfgAATAIAAHACAAAjU3RyaW5ncwAAAAC8BAAACAAAACNVUwDEBAAAEAAAACNHVUlEAAAA1AQAAMQAAAAjQmxvYgAAAAAAAAACAAABVxQAAAkAAAAA+gEzABYAAAEAAAARAAAAAgAAAAEAAAAEAAAAEAAAAA0AAAABAAAAAQAAAAAACgABAAAAAAAGAEMAPAAGAG8AXQAGAIYAXQAGAKMAXQAGAMIAXQAGANsAXQAGAPQAXQAGAA8BXQAGACoBXQAGAGIBQwEGAHYBQwEGAIQBXQAGAJ0BXQAGAM0BugE7AOEBAAAGABAC8AEGADAC8AEAAAAAAQAAAAAAAQABAAEAEAAmACsABQABAAEAEQBKAAoAUCAAAAAAlgBMAA0AAQBYIAAAAACWAFIAEQABAGkgAAAAAIYYVwAVAAEAZyAAAAAAkRhmAg0AAQARAFcAGQAZAFcAGQAhAFcAGQApAFcAGQAxAFcAGQA5AFcAGQBBAFcAGQBJAFcAGQBRAFcAHgBZAFcAGQBhAFcAGQBpAFcAGQBxAFcAIwCBAFcAKQCJAFcAFQAJAFcAFQAuAAsALgAuABMAOwAuABsAOwAuACMAOwAuACsALgAuADMAQQAuADsAOwAuAEsAOwAuAFMAWQAuAGMAgwAuAGsAkAAuAHMAmQAuAHsAogAEgAAAAQAAAAAAAAAAAAAAAABOAgAAAgAAAAAAAAAAAAAAAQAzAAAAAAAAAAA8TW9kdWxlPgByZWdyZXNzaW9uX3Rlc3RfdGVzdGRsbC5kbGwAVGVzdAB0ZXN0ZGxsAG1zY29ybGliAFN5c3RlbQBPYmplY3QAeAByZXNldABuZXh0AC5jdG9yAFN5c3RlbS5SZWZsZWN0aW9uAEFzc2VtYmx5VGl0bGVBdHRyaWJ1dGUAQXNzZW1ibHlEZXNjcmlwdGlvbkF0dHJpYnV0ZQBBc3NlbWJseUNvbmZpZ3VyYXRpb25BdHRyaWJ1dGUAQXNzZW1ibHlDb21wYW55QXR0cmlidXRlAEFzc2VtYmx5UHJvZHVjdEF0dHJpYnV0ZQBBc3NlbWJseUNvcHlyaWdodEF0dHJpYnV0ZQBBc3NlbWJseVRyYWRlbWFya0F0dHJpYnV0ZQBBc3NlbWJseUN1bHR1cmVBdHRyaWJ1dGUAU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzAENvbVZpc2libGVBdHRyaWJ1dGUAR3VpZEF0dHJpYnV0ZQBBc3NlbWJseVZlcnNpb25BdHRyaWJ1dGUAQXNzZW1ibHlGaWxlVmVyc2lvbkF0dHJpYnV0ZQBTeXN0ZW0uRGlhZ25vc3RpY3MARGVidWdnYWJsZUF0dHJpYnV0ZQBEZWJ1Z2dpbmdNb2RlcwBTeXN0ZW0uUnVudGltZS5Db21waWxlclNlcnZpY2VzAENvbXBpbGF0aW9uUmVsYXhhdGlvbnNBdHRyaWJ1dGUAUnVudGltZUNvbXBhdGliaWxpdHlBdHRy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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+            byte[] testdlldata = System.Convert.FromBase64String(testdlldatab64);
+            System.IO.File.WriteAllBytes(localfn, testdlldata);
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn);
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+
+    <Job Name="testdll" Custodian="" email="">
+      <Add Reference="regression_test_testdll.dll" Type="dfs" />
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            testdll.Test.reset();
+            if(0 != testdll.Test.next())
+            {
+                throw new Exception("Local: (0 != testdll.Test.next())");
+            }
+            if(1 != testdll.Test.next())
+            {
+                throw new Exception("Local: (1 != testdll.Test.next())");
+            }
+            if(2 != testdll.Test.next())
+            {
+                throw new Exception("Local: (2 != testdll.Test.next())");
+            }
+            if(3 != testdll.Test.next())
+            {
+                throw new Exception("Local: (3 != testdll.Test.next())");
+            }
+            const string want = "4513";
+            string str = testdll.Test.next().ToString() + testdll.Test.next().ToString()
+                + (testdll.Test.next() + testdll.Test.next()).ToString(); // 4.ToString() + 5.ToString() + (6 + 7).ToString()
+            if(want != str)
+            {
+                throw new Exception("Local: (want != str)");
+            }
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            string fn = "regression_test_put_dll_Input.txt";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            System.IO.File.WriteAllText(localfn, want + Environment.NewLine);
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn);
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+
+    <Job description="Create sample data" Name="testdll_CreateSampleData" Custodian="" email="">
+      <Add Reference="regression_test_testdll.dll" Type="dfs" />
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_put_dll_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_put_dll_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {
+              List<byte> line = new List<byte>();
+              dfsinput.ReadLineAppend(line);
+              
+              testdll.Test.reset();
+              const string want2 = "03";
+              string str2 = testdll.Test.next().ToString()
+                    + (testdll.Test.next() + testdll.Test.next()).ToString(); // 0.ToString() + (1 + 2).ToString()
+              if(want2 != str2)
+              {
+                throw new Exception("Remote: (want2 != str2)");
+              }
+              
+              dfsoutput.WriteLine(line);
+           }
+        ]]>
+      </Remote>
+    </Job>
+
+    <Job Name="testdll" Custodian="" email="">
+      <Add Reference="regression_test_testdll.dll" Type="dfs" />
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_put_dll_Output1.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_put_dll_Output2.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              const string want = "4513";
+              if(want == line.ToString())
+              {
+                    testdll.Test.reset();
+                    testdll.Test.next(); // 0
+                    testdll.Test.next(); // 1
+                    testdll.Test.next(); // 2
+                    
+                    string want3 = "39";
+                    string str3 = testdll.Test.next().ToString()
+                            + (testdll.Test.next() + testdll.Test.next()).ToString(); // 3.ToString() + (4+ 5).ToString()
+                    if(want3 != str3)
+                    {
+                        throw new Exception("Map: (want3 != str3)");
+                    }
+                    
+                    {
+                        testdll.Test.reset();
+                        if(0 != testdll.Test.next())
+                        {
+                            throw new Exception("Map: (0 != testdll.Test.next())");
+                        }
+                    }
+                    
+                    output.Add(ByteSlice.Prepare("x"), line);
+              }
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+                testdll.Test.reset();
+                if(0 != testdll.Test.next())
+                {
+                    throw new Exception("Reduce: (0 != testdll.Test.next())");
+                }
+                
+                while(values.MoveNext())
+                {
+                    output.Add(values.Current);
+                }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+
+    <Job>
+      <Narrative>
+        <Name>regression_test_put_dll_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_put_dll_Input.txt regression_test_put_dll_Output2.txt regression_test_put_dll.xml");
+            
+            Shell(@"Qizmt del regression_test_testdll.dll");
+            Shell(@"Qizmt del regression_test_put_dll_Input.txt");
+            Shell(@"Qizmt del regression_test_put_dll_Output1.txt");
+            Shell(@"Qizmt del regression_test_put_dll_Output2.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

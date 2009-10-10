@@ -1,0 +1,130 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_iocompare_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string f1 = Qizmt_ExecArgs[0];       
+            string f2 = Qizmt_ExecArgs[1];
+            string jobname = Qizmt_ExecArgs[2];
+            
+            Shell(@"Qizmt del " + jobname + ".????ED"); // Previous PASSED/FAILED
+            bool failed = true;
+            
+            string hostname = System.Net.Dns.GetHostName();
+            string guid = Guid.NewGuid().ToString();
+            string f1Local = @"\\" + hostname + @"\c$\temp\qizmt\" + guid + f1;
+            string f2Local = @"\\" + hostname + @"\c$\temp\qizmt\" + guid  + f2;
+            string tempLocal = @"\\" + hostname + @"\c$\temp\qizmt\" + guid + ".txt";
+            
+            try
+            {
+                
+                if(0 == string.Compare(f1, f2, true))
+                {
+                  throw new Exception("iocompare: cannot compare a file with itself: " + f1);
+                }
+            
+                if(!System.IO.Directory.Exists(@"\\" + hostname + @"\c$\temp"))
+                {
+                    System.IO.Directory.CreateDirectory(@"\\" + hostname + @"\c$\temp");
+                }
+                
+                if(!System.IO.Directory.Exists(@"\\" + hostname + @"\c$\temp\qizmt"))
+                {
+                    System.IO.Directory.CreateDirectory(@"\\" + hostname + @"\c$\temp\qizmt");
+                }
+                
+                System.IO.File.Delete(f1Local);
+                System.IO.File.Delete(f2Local);
+                
+                Shell(@"Qizmt get " + f1 + " " + f1Local);
+                Shell(@"Qizmt get " + f2 + " " + f2Local);
+                
+                List<string> arr1 = new List<string>();
+
+                using (System.IO.StreamReader reader = new System.IO.StreamReader(f1Local))
+                {
+                    while (reader.Peek() > -1)
+                    {
+                        string line = reader.ReadLine();
+                        arr1.Add(line);
+                    }
+                    reader.Close();
+                }
+
+                List<string> arr2 = new List<string>();
+
+                using (System.IO.StreamReader reader = new System.IO.StreamReader(f2Local))
+                {
+                    while (reader.Peek() > -1)
+                    {
+                        string line = reader.ReadLine();                  
+                        arr2.Add(line);
+                    }
+                    reader.Close();
+                }
+
+                arr1.Sort();
+                arr2.Sort();
+
+                bool diff = false;
+
+                if (arr1.Count != arr2.Count)
+                {
+                    diff = true;
+                }
+                else
+                {
+                    for (int i = 0; i < arr1.Count; i++)
+                    {
+                        if (arr1[i] != arr2[i])
+                        {
+                            diff = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if(!diff)
+                {
+                    failed = false;
+                }
+            }
+            catch(Exception e)
+            {
+                Console.Error.WriteLine(e.ToString());
+                failed = true;
+            }
+            using(System.IO.StreamWriter writer = new System.IO.StreamWriter(tempLocal))
+            {
+                //Divide by zero error if there is no sample.
+                writer.Write(".");
+                writer.Close();
+            }
+            if(failed)
+            {
+                Shell(@"Qizmt put " + tempLocal + " " + jobname + ".FAILED");
+            }
+            else
+            {
+                Shell(@"Qizmt put " + tempLocal + " " + jobname + ".PASSED");
+            }
+            System.IO.File.Delete(f1Local);
+            System.IO.File.Delete(f2Local);
+            System.IO.File.Delete(tempLocal);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

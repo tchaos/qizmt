@@ -1,0 +1,168 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_outputDirection_desc_mapreduce_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_outputDirection_desc_mapreduce_Input*.txt");
+            Shell(@"Qizmt del regression_test_outputDirection_desc_mapreduce_Output*.txt");                  
+            Shell(@"Qizmt asciigen regression_test_outputDirection_desc_mapreduce_Input.txt 20000B");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_outputDirection_desc_mapreduce" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_outputDirection_desc_mapreduce_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_outputDirection_desc_mapreduce_OutputD.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+        <OutputDirection>descending</OutputDirection>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          { 
+              for(int i = 0; i < values.Length; i++)
+              {                  
+                  output.Add(key);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_outputDirection_desc_mapreduce" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_outputDirection_desc_mapreduce_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_outputDirection_desc_mapreduce_OutputA.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          { 
+              for(int i = 0; i < values.Length; i++)
+              {                  
+                  output.Add(key);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.Consume(mstring)_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_outputDirection_desc_mapreduce_OutputA.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_outputDirection_desc_mapreduce_OutputD2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                List<string> lines = new List<string>();
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    lines.Add(sb.ToString());
+                    sb.Length = 0;
+                }
+                
+                for(int i = lines.Count - 1; i >= 0; i--)
+                {
+                    dfsoutput.WriteLine(lines[i]);
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_reverseByteSlice_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string f1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            string f2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            
+            Shell(@"Qizmt get regression_test_outputDirection_desc_mapreduce_OutputD.txt " + f1);
+            Shell(@"Qizmt get regression_test_outputDirection_desc_mapreduce_OutputD2.txt " + f2);
+            
+            if(CompareFiles(f1, f2))
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_outputDirection_desc_mapreduce.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_outputDirection_desc_mapreduce.xml 0");
+            }            
+           
+            Shell(@"Qizmt del regression_test_outputDirection_desc_mapreduce_Input*.txt");
+            Shell(@"Qizmt del regression_test_outputDirection_desc_mapreduce_Output*.txt");  
+            System.IO.File.Delete(f1);
+            System.IO.File.Delete(f2);
+        }
+        
+        private bool CompareFiles(string f1, string f2)
+        {
+            byte[] buf1 = null;
+            byte[] buf2 = null;
+            
+          buf1 = System.IO.File.ReadAllBytes(f1);
+                                  
+           buf2 = System.IO.File.ReadAllBytes(f2);            
+            
+            if(buf1.Length != buf2.Length)
+            {
+                return false;
+            }
+            
+            for(int i = 0; i < buf1.Length; i++)
+            {
+                if(buf1[i] != buf2[i])
+                {
+                    return false;
+                }
+            }
+            return true;            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

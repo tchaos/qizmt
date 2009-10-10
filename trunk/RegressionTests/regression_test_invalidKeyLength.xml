@@ -1,0 +1,96 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_invalidKeyLength_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_invalidKeyLength_*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_invalidKeyLength_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_invalidKeyLength_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("1498,The Last Supper,100.45,374000000"); 
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_invalidKeyLength" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>x</KeyLength>
+        <DFSInput>dfs://regression_test_invalidKeyLength_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_invalidKeyLength_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sLine = mstring.Prepare(line);
+                int year = sLine.NextItemToInt(',');
+                mstring title = sLine.NextItemToString(',');
+                double size = sLine.NextItemToDouble(',');
+                long pixel = sLine.NextItemToLong(',');
+                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(year);
+                rKey.PutDouble(size);
+                
+                recordset rValue = recordset.Prepare();
+                rValue.PutString(title);
+                rValue.PutLong(pixel);
+                
+                output.Add(rKey, rValue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              recordset rKey = recordset.Prepare(key);
+              int year = rKey.GetInt();
+              double size = rKey.GetDouble();                            
+             
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rValue = recordset.Prepare(values.Items[i]);
+                  mstring title = rValue.GetString();
+                  long pixel = rValue.GetLong();
+                  
+                  mstring sLine = mstring.Prepare(year);
+                  sLine = sLine.AppendM(',')
+                    .AppendM(title)
+                    .AppendM(',')
+                    .AppendM(size)
+                    .AppendM(',')
+                    .AppendM(pixel);
+                  
+                    output.Add(sLine);                    
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>

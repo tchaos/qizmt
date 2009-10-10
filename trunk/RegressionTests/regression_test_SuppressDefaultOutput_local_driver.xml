@@ -1,0 +1,53 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_SuppressDefaultOutput_local_driver_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string output = Shell(@"Qizmt exec regression_test_SuppressDefaultOutput_local.xml").Trim();
+            
+            bool ok = false;
+            
+            if(output.Length == 0)
+            {                
+                output = Shell(@"Qizmt exec regression_test_SuppressDefaultOutput_local_neg.xml").Trim();
+                ok = (output.IndexOf("duration", StringComparison.OrdinalIgnoreCase) > -1);
+                
+                if(ok)
+                {
+                    output = Shell(@"Qizmt exec regression_test_SuppressDefaultOutput_local_DSpace_Log.xml").Trim();
+                    ok = (output.IndexOf("apple", StringComparison.OrdinalIgnoreCase) > -1);
+                    
+                    if(ok)
+                    {
+                        ok = false;
+                        try
+                        {
+                            output = Shell(@"Qizmt exec regression_test_SuppressDefaultOutput_local_exception.xml").Trim();
+                        }
+                        catch(Exception e)
+                        {
+                            ok = (e.ToString().IndexOf("orange", StringComparison.OrdinalIgnoreCase) > -1);
+                        }
+                    }
+                }                
+            }
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_SuppressDefaultOutput_local_driver.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_SuppressDefaultOutput_local_driver.xml 0");
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

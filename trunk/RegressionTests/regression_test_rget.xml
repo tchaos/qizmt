@@ -1,0 +1,43 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_rget_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            
+            Shell(@"Qizmt del regression_test_rget_Input.txt");
+            
+            string dir = IOUtils.GetTempDirectory();
+            string inputfn = dir + @"\" + Guid.NewGuid().ToString();  
+            string outputfn = dir + @"\" + Guid.NewGuid().ToString();  
+            
+            System.IO.File.WriteAllText(inputfn, Guid.NewGuid().ToString());
+            
+            Shell(@"Qizmt rput " + inputfn + " regression_test_rget_Input.txt");            
+            Shell(@"Qizmt rget  regression_test_rget_Input.txt " + outputfn);
+            
+            //compare files
+            string s1 = System.IO.File.ReadAllText(inputfn);
+            string s2 = System.IO.File.ReadAllText(outputfn);
+            
+            if(s1 == s2)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_rget.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_rget.xml 0");
+            }
+            
+            System.IO.File.Delete(inputfn);
+            System.IO.File.Delete(outputfn);
+            Shell(@"Qizmt del regression_test_rget_Input.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

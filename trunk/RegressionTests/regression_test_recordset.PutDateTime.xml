@@ -1,0 +1,167 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutDateTime_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutDateTime_*", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutDateTime_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutDateTime_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int rowCount = 200;               
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+                DateTime dt = DateTime.Now;
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    DateTime newdt = dt.AddSeconds((double)rnd.Next());                    
+                    dfsoutput.WriteLine(newdt.ToString());                    
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutLong</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>long</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutDateTime_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutDateTime_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();                
+                DateTime dt = DateTime.Parse(sLine);
+                recordset key = recordset.Prepare();
+                key.PutDateTime(dt);
+                
+                output.Add(key, recordset.Prepare());               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {      
+                recordset rkey = recordset.Prepare(key);
+                DateTime dt = rkey.GetDateTime();
+                output.Add(mstring.Prepare(dt.ToString("yyyy-MM-dd hh:mm:ss")));                
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutDateTime_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_recordset.PutDateTime_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutDateTime_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                Dictionary<DateTime, int> dic = new Dictionary<DateTime, int>();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string line = sb.ToString();
+                    DateTime dt = DateTime.Parse(line);
+                    dic[dt] = 1;
+                    sb.Length = 0;
+                }
+                
+                List<KeyValuePair<DateTime, int>> sorted = new List<KeyValuePair<DateTime, int>>(dic);
+
+                sorted.Sort(delegate(KeyValuePair<DateTime, int> x, KeyValuePair<DateTime, int> y)
+                {
+                    return x.Key.CompareTo(y.Key);
+                });
+                
+                foreach (KeyValuePair<DateTime, int> pair in sorted)
+                {
+                    dfsoutput.WriteLine(pair.Key.ToString("yyyy-MM-dd hh:mm:ss"));
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutDateTime_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutDateTime_Output.txt regression_test_recordset.PutDateTime_Output2.txt regression_test_recordset.PutDateTime.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutDateTime_*", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

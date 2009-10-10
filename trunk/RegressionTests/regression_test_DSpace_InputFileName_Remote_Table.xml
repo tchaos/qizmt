@@ -1,0 +1,179 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_DSpace_InputFileName_Remote_Table_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Remote_Table_Input*.txt");
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Remote_Table_Output*.txt");
+            
+            Shell(@"Qizmt asciigen regression_test_DSpace_InputFileName_Remote_Table_Input1.txt 70MB 100B");
+            Shell(@"Qizmt asciigen regression_test_DSpace_InputFileName_Remote_Table_Input2.txt 20MB 100B");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Remote_Table_ConvertToTableFile" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_DSpace_InputFileName_Remote_Table_Input1.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_DSpace_InputFileName_Remote_Table_InputTBL1.txt@100</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+              List<byte> buf = new List<byte>();
+              while(dfsinput.ReadLineAppend(buf))
+              {
+                  dfsoutput.WriteRecord(buf);
+                  buf.Clear();
+              }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Remote_Table_ConvertToTableFile" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_DSpace_InputFileName_Remote_Table_Input2.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_DSpace_InputFileName_Remote_Table_InputTBL2.txt@100</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+              List<byte> buf = new List<byte>();
+              while(dfsinput.ReadLineAppend(buf))
+              {
+                  dfsoutput.WriteRecord(buf);
+                  buf.Clear();
+              }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Remote_Table_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_DSpace_InputFileName_Remote_Table_InputTBL*.txt@100</DFSReader>
+          <DFSWriter>dfs://regression_test_DSpace_InputFileName_Remote_Table_Output1.txt;dfs://regression_test_DSpace_InputFileName_Remote_Table_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+              List<byte> buf = new List<byte>();
+              while(dfsinput.ReadRecordAppend(buf))
+              {
+                    int key = 0;
+                    if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Remote_Table_InputTBL1.txt")
+                    {
+                        key = 1;
+                    }
+                    else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Remote_Table_InputTBL2.txt")
+                    {
+                        key = 2;
+                    }
+                    
+                    RemoteOutputStream thisoutput = dfsoutput.GetOutputByIndex(key - 1);
+                    thisoutput.WriteLine(buf);
+                    buf.Clear();
+              }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string dir = IOUtils.GetTempDirectory();
+            string result0 = dir + @"\" + Guid.NewGuid().ToString();
+            string result1 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected0 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected1 = dir + @"\" + Guid.NewGuid().ToString();
+            
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Remote_Table_Input1.txt " + expected0);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Remote_Table_Input2.txt " + expected1);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Remote_Table_Output1.txt " + result0);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Remote_Table_Output2.txt " + result1);
+            
+            bool ok = false;                        
+            ok = CompareFiles(result0, expected0);   
+            
+            if(ok)
+            {
+                Qizmt_Log("File 0 is ok");
+                ok = CompareFiles(result1, expected1);  
+                if(ok)
+                {
+                    Qizmt_Log("File 1 is ok");                
+                }
+            }        
+                 
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_DSpace_InputFileName_Remote_Table.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_DSpace_InputFileName_Remote_Table.xml 0");
+            }
+            
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Remote_Table_Input*.txt");
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Remote_Table_Output*.txt");
+            System.IO.File.Delete(result0);
+            System.IO.File.Delete(result1);
+            System.IO.File.Delete(expected0);
+            System.IO.File.Delete(expected1);
+        }
+                
+        private static bool CompareFiles(string f1, string f2)
+        {
+            System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+            System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+            System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+            bool ok = true;
+            for (int i = 0; i < info1.Length; i++)
+            {
+                int b1 = fs1.ReadByte();
+                int b2 = fs2.ReadByte();
+                if (b1 != b2)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            fs1.Close();
+            fs2.Close();
+            return ok;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

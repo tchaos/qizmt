@@ -1,0 +1,499 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_Input*.txt");
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_xInput*.txt");
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_Output*.txt");            
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_theCache");
+            
+            Shell(@"Qizmt asciigen regression_test_DSpace_InputFileName_Map_ExplicitCache_Input1.txt 75MB");
+            Shell(@"Qizmt asciigen regression_test_DSpace_InputFileName_Map_ExplicitCache_Input2.txt 40MB");            
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <Delta>
+        <Name>regression_test_DSpace_InputFileName_Map_ExplicitCache_theCache</Name>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input*.txt</DFSInput>
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput></DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                int key = 0;
+                if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input1.txt")
+                {
+                    key = 1;
+                }
+                else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input2.txt")
+                {
+                    key = 2;
+                }
+                else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input3.txt")
+                {
+                    key = 3;
+                }
+                else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input4.txt")
+                {
+                    key = 4;
+                }
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(key);
+                mstring val = mstring.Prepare(line);
+                output.Add(rkey, val);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          [ExplicitCache]
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  output.Cache(key, values[i].Value);                  
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {   
+            Shell(@"Qizmt rename regression_test_DSpace_InputFileName_Map_ExplicitCache_Input1.txt regression_test_DSpace_InputFileName_Map_ExplicitCache_xInput1.txt");
+            Shell(@"Qizmt rename regression_test_DSpace_InputFileName_Map_ExplicitCache_Input2.txt regression_test_DSpace_InputFileName_Map_ExplicitCache_xInput2.txt");         
+            
+            Shell(@"Qizmt asciigen regression_test_DSpace_InputFileName_Map_ExplicitCache_Input3.txt 80MB");
+            Shell(@"Qizmt asciigen regression_test_DSpace_InputFileName_Map_ExplicitCache_Input4.txt 30MB");            
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <Delta>
+        <Name>regression_test_DSpace_InputFileName_Map_ExplicitCache_theCache</Name>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input*.txt</DFSInput>
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput>regression_test_DSpace_InputFileName_Map_ExplicitCache_Output1.txt;regression_test_DSpace_InputFileName_Map_ExplicitCache_Output2.txt;regression_test_DSpace_InputFileName_Map_ExplicitCache_Output3.txt;regression_test_DSpace_InputFileName_Map_ExplicitCache_Output4.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                int key = 0;
+                if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input1.txt")
+                {
+                    key = 1;
+                }
+                else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input2.txt")
+                {
+                    key = 2;
+                }
+                else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input3.txt")
+                {
+                    key = 3;
+                }
+                else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Map_ExplicitCache_Input4.txt")
+                {
+                    key = 4;
+                }
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(key);
+                mstring val = mstring.Prepare(line);
+                output.Add(rkey, val);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {              
+              recordset rkey = recordset.Prepare(key);
+              int ikey = rkey.GetInt();
+              ReduceOutput thisoutput = output.GetOutputByIndex(ikey - 1);
+              
+              for(int i = 0; i < values.Length; i++)
+              {
+                 thisoutput.Add(values[i].Value);  
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_xInput1.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input1_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_xInput2.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input2_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input3.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input3_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input4.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Input4_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output1.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output1_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output2.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output2_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output3.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output3_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_ExplicitCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output4.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DSpace_InputFileName_Map_ExplicitCache_Output4_Sorted.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {     
+                output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              for(int i = 0; i < values.Length; i++)
+              {
+                 output.Add(values[i].Value);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DSpace_InputFileName_Map_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string dir = IOUtils.GetTempDirectory();          
+            string result1 = dir + @"\" + Guid.NewGuid().ToString();
+            string result2 = dir + @"\" + Guid.NewGuid().ToString();
+            string result3 = dir + @"\" + Guid.NewGuid().ToString();     
+            string result4 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected1 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected2 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected3 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected4 = dir + @"\" + Guid.NewGuid().ToString();
+            
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Input1_Sorted.txt " + expected1);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Input2_Sorted.txt " + expected2);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Input3_Sorted.txt " + expected3);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Input4_Sorted.txt " + expected4);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Output1_Sorted.txt " + result1);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Output2_Sorted.txt " + result2);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Output3_Sorted.txt " + result3);
+            Shell(@"Qizmt get regression_test_DSpace_InputFileName_Map_ExplicitCache_Output4_Sorted.txt " + result4);
+            
+            bool ok = false;                        
+            ok = CompareFiles(result1, expected1);   
+            
+            if(ok)
+            {
+                Qizmt_Log("File 1 is ok");
+                ok = CompareFiles(result2, expected2);  
+                if(ok)
+                {
+                    Qizmt_Log("File 2 is ok");
+                    ok = CompareFiles(result3, expected3);  
+                    if(ok)
+                    {
+                        Qizmt_Log("File 3 is ok");
+                        ok = CompareFiles(result4, expected4);  
+                        if(ok)
+                        {
+                            Qizmt_Log("File 4 is ok");
+                        }
+                    }
+                }
+            }        
+                 
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_DSpace_InputFileName_Map_ExplicitCache.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_DSpace_InputFileName_Map_ExplicitCache.xml 0");
+            }
+            
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_Input*.txt");
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_xInput*.txt");
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_Output*.txt");            
+            Shell(@"Qizmt del regression_test_DSpace_InputFileName_Map_ExplicitCache_theCache");
+            System.IO.File.Delete(result1);
+            System.IO.File.Delete(result2);
+            System.IO.File.Delete(result3);
+            System.IO.File.Delete(result4);
+            System.IO.File.Delete(expected1);
+            System.IO.File.Delete(expected2);
+            System.IO.File.Delete(expected3);
+            System.IO.File.Delete(expected4);
+        }
+                
+        private static bool CompareFiles(string f1, string f2)
+        {
+            System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+            System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+            System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+            bool ok = true;
+            for (int i = 0; i < info1.Length; i++)
+            {
+                int b1 = fs1.ReadByte();
+                int b2 = fs2.ReadByte();
+                if (b1 != b2)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            fs1.Close();
+            fs2.Close();
+            return ok;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,68 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_badKeyLength_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string output = "";           
+            try
+            {
+                output = Shell(@"Qizmt exec regression_test_emptyKeyLength.xml");                
+            }
+            catch(Exception e)
+            {
+                output = e.Message;
+            }
+            
+            bool ok = false;
+            if(output.IndexOf("KeyLength is required", StringComparison.OrdinalIgnoreCase) > -1)
+            {
+                ok = true;
+            }
+            
+            if(!ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_badKeyLength.xml 0");
+                return;
+            }
+            
+            try
+            {
+                output = Shell(@"Qizmt exec regression_test_invalidKeyLength.xml");                
+            }
+            catch(Exception e)
+            {
+                output = e.Message;
+            }
+            
+            if(output.IndexOf("KeyLength is invalid", StringComparison.OrdinalIgnoreCase) > -1)
+            {
+                ok = true;
+            }
+            else
+            {
+                ok = false;
+            }
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_badKeyLength.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_badKeyLength.xml 0");
+            }
+            
+            Shell(@"Qizmt del regression_test_emptyKeyLength_*.txt");
+            Shell(@"Qizmt del regression_test_invalidKeyLength_*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,81 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="failing_regression_test_mstring.TrimM()_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            bool ok = false;            
+            {
+                string x = "abc";
+                
+                char[] whiteSpaceChars = new char[] { '\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u0020', '\u0085', '\u00A0', 
+                '\u1680', '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200A', '\u200B', 
+                '\u2028', '\u2029', '\u3000', '\uFEFF'};
+                
+                for(int i = 0; i < whiteSpaceChars.Length; i++)
+                {
+                    x = x + whiteSpaceChars[i];
+                }
+                
+                for(int i = 0; i < whiteSpaceChars.Length; i++)
+                {
+                    x = whiteSpaceChars[i] + x;
+                }            
+                                
+                mstring s = mstring.Prepare(x);
+                mstring s2 = s.MTrim();
+                string z = s2.ToString();
+                
+                string y = x.Trim();
+                
+                ok = (z == y);                
+            }
+            
+            if(!ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml failing_regression_test_mstring.TrimM().xml 0"); 
+                return;
+            }
+            
+            {
+                string x = "abc";
+                
+                char[] whiteSpaceChars = new char[] { '\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u0020', '\u0085', '\u00A0', 
+                '\u1680', '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200A', '\u200B', 
+                '\u2028', '\u2029', '\u3000', '\uFEFF'};
+                
+                for(int i = 0; i < whiteSpaceChars.Length; i++)
+                {
+                    x = x + whiteSpaceChars[i];
+                }
+                
+                for(int i = 0; i < whiteSpaceChars.Length; i++)
+                {
+                    x = whiteSpaceChars[i] + x;
+                }            
+                                
+                mstring s = mstring.Prepare(x);
+                mstring s2 = s.TrimM();
+                string z = s2.ToString();
+                
+                string y = x.Trim();
+                
+                if(z == y)
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml failing_regression_test_mstring.TrimM().xml 1"); 
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml failing_regression_test_mstring.TrimM().xml 0"); 
+                }            
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

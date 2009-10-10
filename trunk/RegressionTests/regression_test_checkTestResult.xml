@@ -1,0 +1,295 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_checkTestResult</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string f1 = Qizmt_ExecArgs[0];       
+            string f2 = Qizmt_ExecArgs[1];
+            string jobname = Qizmt_ExecArgs[2];
+            bool checkDouble = false;
+            bool checkUnicode = false;
+            
+            if(Qizmt_ExecArgs.Length > 3)
+            {
+                if(Qizmt_ExecArgs[3].ToLower() == "double")
+                {
+                    checkDouble = true;
+                }
+                else
+                {
+                    if(Qizmt_ExecArgs[3].ToLower() == "unicode")
+                    {
+                        checkUnicode = true;
+                    }
+                }
+            }
+            
+            string hostname = System.Net.Dns.GetHostName();
+            string guid = Guid.NewGuid().ToString();
+            string f1Local = @"\\" + hostname + @"\c$\temp\qizmt\" + guid + f1;
+            string f2Local = @"\\" + hostname + @"\c$\temp\qizmt\" + guid  + f2;
+            string tempLocal = @"\\" + hostname + @"\c$\temp\qizmt\" + guid + ".txt";            
+                      
+            if(!System.IO.Directory.Exists(@"\\" + hostname + @"\c$\temp\qizmt"))
+            {
+                System.IO.Directory.CreateDirectory(@"\\" + hostname + @"\c$\temp\qizmt");
+            }
+            
+            System.IO.File.Delete(f1Local);
+            System.IO.File.Delete(f2Local);
+            
+            Shell(@"Qizmt get " + f1 + " " + f1Local);
+            Shell(@"Qizmt get " + f2 + " " + f2Local);
+            
+            bool same = false;
+            
+            if(!checkDouble)
+            {
+                if(checkUnicode)
+                {
+                    same = CompareStringsUnicode(f1Local, f2Local);
+                }
+                else
+                {
+                    same = CompareStrings(f1Local, f2Local);
+                }                
+            }
+            else
+            {
+                same = CompareDoubles(f1Local, f2Local);
+            }                        
+            
+            Shell(@"Qizmt del " + jobname + ".FAILED");
+            Shell(@"Qizmt del " + jobname + ".PASSED");            
+            
+            using(System.IO.StreamWriter writer = new System.IO.StreamWriter(tempLocal))
+            {                
+                //Divide by zero error if there is no sample.
+                writer.Write(".");
+                writer.Close();
+            }
+            
+            if(!same)
+            {
+                Shell(@"Qizmt put " + tempLocal + " " + jobname + ".FAILED");
+            }
+            else
+            {
+                Shell(@"Qizmt put " + tempLocal + " " + jobname + ".PASSED");
+            }          
+            
+            System.IO.File.Delete(f1Local);
+            System.IO.File.Delete(f2Local);
+            System.IO.File.Delete(tempLocal);            
+        }
+        
+        private bool CompareStrings(string f1Local, string f2Local)
+        {
+            List<string> arr1 = new List<string>();
+
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(f1Local))
+            {
+                while (reader.Peek() > -1)
+                {
+                    string line = reader.ReadLine();
+                    arr1.Add(line);
+                }
+                reader.Close();
+            }
+
+            List<string> arr2 = new List<string>();
+
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(f2Local))
+            {
+                while (reader.Peek() > -1)
+                {
+                    string line = reader.ReadLine();                  
+                    arr2.Add(line);
+                }
+                reader.Close();
+            }
+
+            arr1.Sort();
+            arr2.Sort();
+
+            if (arr1.Count != arr2.Count)
+            {
+                return false;
+            }
+            else
+            {
+                for (int i = 0; i < arr1.Count; i++)
+                {
+                    if (arr1[i] != arr2[i])
+                    {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;            
+        }
+        
+        private bool CompareDoubles(string f1Local, string f2Local)
+        {
+            Dictionary<string, string> dt1 = new Dictionary<string, string>();
+
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(f1Local))
+            {
+                while (reader.Peek() > -1)
+                {
+                    string line = reader.ReadLine();
+                    int col = line.IndexOf(':');
+                    string label = line.Substring(0, col);
+                    dt1.Add(label, line.Substring(col + 1));                    
+                }
+                reader.Close();
+            }
+
+            Dictionary<string, string> dt2 = new Dictionary<string, string>();           
+
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(f2Local))
+            {
+                while (reader.Peek() > -1)
+                {
+                    string line = reader.ReadLine();
+                    int col = line.IndexOf(':');
+                    string label = line.Substring(0, col);
+                    dt2.Add(label, line.Substring(col + 1));                   
+                }
+                reader.Close();
+            }
+           
+            double tolerance = 0.0000000000000001d;
+
+            if (dt1.Count != dt2.Count)
+            {
+               return false;
+            }
+            else
+            {
+                foreach (string key in dt1.Keys)
+                {
+                    if (!dt2.ContainsKey(key))
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        string line1 = dt1[key];
+                        string line2 = dt2[key];
+
+                        int del = line1.IndexOf(',');
+                        double d11 = double.Parse(line1.Substring(0, del));
+                        double d12 = double.Parse(line1.Substring(del + 1));
+
+                        del = line2.IndexOf(',');
+                        double d21 = double.Parse(line2.Substring(0, del));
+                        double d22 = double.Parse(line2.Substring(del + 1));
+
+                        if (Math.Abs(d11 - d21) > tolerance)
+                        {
+                            return false;
+                        }
+
+                        if (Math.Abs(d12 - d22) > tolerance)
+                        {
+                           return false;
+                        }
+                    }
+                }
+            }
+            
+            return true;
+        }
+        
+        private static bool CompareStringsUnicode(string f1Local, string f2Local)
+        {
+            List<string> arr1 = new List<string>();
+
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(f1Local, Encoding.UTF8))
+            {
+                while (reader.Peek() > -1)
+                {
+                    string line = reader.ReadLine();
+                    arr1.Add(line);
+                }
+                reader.Close();
+            }
+
+            List<string> arr2 = new List<string>();
+
+            using (System.IO.StreamReader reader = new System.IO.StreamReader(f2Local, Encoding.UTF8))
+            {
+                while (reader.Peek() > -1)
+                {
+                    string line = reader.ReadLine();
+                    arr2.Add(line);
+                }
+                reader.Close();
+            }
+
+            if (arr1.Count != arr2.Count)
+            {
+                Console.WriteLine("diff cnt");
+                return false;
+            }
+            else
+            {
+                for (int i = 0; i < arr1.Count; i++)
+                {
+                    bool found =false;
+                    for (int j = 0; j < arr2.Count; j++)
+                    {
+                        if (arr1[i] == arr2[j])
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found)
+                    {
+                        Console.WriteLine("1 not found");
+                        return false;
+                    }
+                }
+
+                for (int i = 0; i < arr2.Count; i++)
+                {
+                    bool found = false;
+                    for (int j = 0; j < arr1.Count; j++)
+                    {
+                        if (arr1[i] == arr2[j])
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found)
+                    {
+                        Console.WriteLine("2 not found");
+                        return false;
+
+                    }
+                }
+            }
+
+            return true;
+        }
+        ]]>
+      </Local>
+    </Job>    
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,225 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_reverseByteSlice_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_reverseByteSlice_*");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_reverseByteSlice_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_reverseByteSlice_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 16;
+                int rowCount = 20;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    int cnt = 0;
+                    while(cnt < stringLength)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);                           
+                        onerow.Add(b);   
+                        cnt++;                       
+                    }     
+                  
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_reverseByteSlice" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>16</KeyLength>
+        <DFSInput>dfs://regression_test_reverseByteSlice_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_reverseByteSlice_Output_D.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sline = mstring.Prepare(line);
+                ByteSlice bs = sline.ToByteSlice();
+                
+                byte[] buf = bs.ToBytes();     
+                
+                FlipBytes(buf);        
+                
+                output.Add(ByteSlice.Prepare(buf), ByteSlice.Prepare());
+          }
+          
+          public void FlipBytes(byte[] buf)
+          {
+                 for(int i=0; i < buf.Length; i++)
+                {
+                    buf[i] = (byte)(~buf[i]); 
+                }        
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+             Byte[] buf = key.ToBytes();
+             
+             FlipBytes(buf);
+             
+             output.Add(ByteSlice.Prepare(buf));
+          }
+          
+          public void FlipBytes(byte[] buf)
+          {
+                 for(int i=0; i < buf.Length; i++)
+                {
+                    buf[i] = (byte)(~buf[i]); 
+                }        
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_reverseByteSlice" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>16</KeyLength>
+        <DFSInput>dfs://regression_test_reverseByteSlice_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_reverseByteSlice_Output_A.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sline = mstring.Prepare(line);
+                ByteSlice bs = sline.ToByteSlice();
+                
+                output.Add(bs, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {             
+             output.Add(key);
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_reverseByteSlice_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_reverseByteSlice_Output_A.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_reverseByteSlice_Output_D2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+               StringBuilder sb = new StringBuilder();
+               List<string> lines = new List<string>();
+               
+               while(dfsinput.ReadLineAppend(sb))
+               {
+                   lines.Add(sb.ToString());
+                   sb.Length = 0;                   
+               }               
+              
+               for(int i=lines.Count-1; i>=0; i--)
+               {                   
+                   dfsoutput.WriteLine(lines[i]);
+               }               
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_reverseByteSlice_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string f1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            string f2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            
+            Shell(@"Qizmt get regression_test_reverseByteSlice_Output_D.txt " + f1);
+            Shell(@"Qizmt get regression_test_reverseByteSlice_Output_D2.txt " + f2);
+            
+            if(CompareFiles(f1, f2))
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_reverseByteSlice.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_reverseByteSlice.xml 0");
+            }
+            
+            Shell(@"Qizmt del regression_test_reverseByteSlice_*");
+            System.IO.File.Delete(f1);
+            System.IO.File.Delete(f2);
+        }
+        private bool CompareFiles(string f1, string f2)
+        {
+            byte[] buf1 = null;
+            byte[] buf2 = null;
+            
+          buf1 = System.IO.File.ReadAllBytes(f1);
+                                  
+           buf2 = System.IO.File.ReadAllBytes(f2);            
+            
+            if(buf1.Length != buf2.Length)
+            {
+                return false;
+            }
+            
+            for(int i = 0; i < buf1.Length; i++)
+            {
+                if(buf1[i] != buf2[i])
+                {
+                    return false;
+                }
+            }
+            return true;            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

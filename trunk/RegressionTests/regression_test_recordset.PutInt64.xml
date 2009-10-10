@@ -1,0 +1,198 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutInt64_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutInt64_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutInt64_Output.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutInt64_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutInt64_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //long 
+                    long l = DateTime.Now.Ticks + (long)rnd.Next();
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        l = l * (-1);
+                    }
+                    
+                    string s = l.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //long  
+                    l = DateTime.Now.Ticks + (long)rnd.Next();
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        l = l * (-1);
+                    }
+                    
+                    s = l.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                } 
+                 
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutInt64</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>long</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutInt64_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutInt64_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();                
+               
+                int del = sLine.IndexOf(',');
+                
+                long d = long.Parse(sLine.Substring(0, del));  
+                long d2 = long.Parse(sLine.Substring(del + 1));
+               
+                recordset key = recordset.Prepare();
+                key.PutInt64((Int64)(d % 10));
+                
+                //testing put
+                recordset rs = recordset.Prepare();
+                rs.PutInt64(d);
+                rs.PutInt64(d2);
+                
+                //testing get
+                d = rs.GetInt64();
+                d2 = rs.GetInt64();
+                
+                //testing put
+                recordset val = recordset.Prepare();
+                val.PutInt64(d);
+                val.PutInt64(d2);
+                
+                output.Add(key, val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {      
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rs = recordset.Prepare(values.Items[i]);
+                    
+                    //testing get
+                    long d = rs.GetInt64();
+                    long d2 = rs.GetInt64();
+                    
+                    recordset val = recordset.Prepare();
+                    val.PutInt64(d);
+                    val.PutInt64(d2);
+                    
+                    d = val.GetInt64();
+                    d2 = val.GetInt64();
+                    
+                    string s = d.ToString() + "," + d2.ToString();
+                    
+                    output.Add(ByteSlice.Prepare(s));                    
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutInt64_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutInt64_Input.txt regression_test_recordset.PutInt64_Output.txt regression_test_recordset.PutInt64.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutInt64_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutInt64_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

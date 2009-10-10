@@ -1,0 +1,101 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_RemoteOutputStream.WriteBinary_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_RemoteOutputStream.WriteBinary_Input.blob", true);
+            Shell(@"Qizmt del regression_test_RemoteOutputStream.WriteBinary_Output.blob", true);
+            
+            string dir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt\";
+            
+            if(!System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+            
+            //Prepare binary data.
+            string[] sImages = new string[3]{@"R0lGODlhDwAPALMOAP/qAEVFRQAAAP/OAP/JAP+0AP6dAP/+k//9E///////xzMzM///6//lAAAAAAAAACH5BAEAAA4ALAAAAAAPAA8AAARb0EkZap3YVabOGRcWcAgCnIMRTEEnCCfwpqt2mHEOagoOnz+CKnADxoKFyiHHBBCSAdOiCVg8KwPZa7sVrgJZQWI8FhB2msGgwTXTWGqCXP4WBQr4wjDDstQmEQA7", 
+@"R0lGODlhIAAgAPMIAAAAAAAAmQAA//8AAP//AJmZmci0yMzMzP///8i0yAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAkAIf5/SWNvbm9ncmFwaGVyIDogTWljcm9zb2Z0IFdpbmRvd3MKVGhlIEljb25vbG9nIDogVGhlIEFydCBvZiBWaXJ0dWFsIExpdHRlciAKICAgICAgICAgICAgICAgaHR0cDovL3d3dy5vemVtYWlsLmNvbS5hdS9+YWZhY3Rvci8gCgAsAAAAACAAIADDAAAAAACZAAD//wAA//8AmZmZyLTIzMzM////yLTIAAAAAAAAAAAAAAAAAAAAAAAABOUwyUlpuTiXyntBYCgeF8BdZHYcCBAAaxxjpicixVx3fD/lsiCN9zmYPiHjLVniBQRQaGAaKMCCq6FNlLNaZh8CQkze+YDYrNd3SuuMZ3MCnbbCK0U0QHPFak83AC5TfUJNHU9RAlNZhTJrRDdokHNjlmVtj3JfWQgpm2dujWyASyF/pBJ0flagZxp8JK49q4aCtC2qsLswlD+eOXsjjmC+cyRgLCCCbqg/SCEwg8RqxhKJUYOEzYcc2FKMdjIDA58934s6guvsbNAgk3K73aqSoz/FvPVclOx7ybIo+LvFY2C7CREAADs=", 
+@"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" };
+            
+            string[] fnames = new string[sImages.Length];
+            
+            for(int i=0; i < sImages.Length; i++)
+            {
+                string fname = dir + "image" + i.ToString() + ".gif";
+                fnames[i] = fname;
+                byte[] buf = Convert.FromBase64String(sImages[i]);
+                System.IO.File.WriteAllBytes(fname, buf);
+            }
+            
+            Shell(@"Qizmt putbinary " + dir + "*.gif regression_test_RemoteOutputStream.WriteBinary_Input.blob");
+            
+            //Clean up images.
+            for(int i=0; i < fnames.Length; i++)
+            {
+                System.IO.File.Delete(fnames[i]);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_RemoteOutputStream.WriteBinary_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_RemoteOutputStream.WriteBinary_Input.blob</DFSReader>
+          <DFSWriter>dfs://regression_test_RemoteOutputStream.WriteBinary_Output.blob</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {                           
+               Blob blob = Blob.Prepare(null, null);
+               while(dfsinput.ReadBinary(ref blob))
+               {
+                   dfsoutput.WriteBinary(blob);
+               }
+           }
+        ]]>
+      </Remote>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_RemoteOutputStream.WriteBinary_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_RemoteOutputStream.WriteBinary_Input.blob regression_test_RemoteOutputStream.WriteBinary_Output.blob regression_test_RemoteOutputStream.WriteBinary.xml");          
+            
+            Shell(@"Qizmt del regression_test_RemoteOutputStream.WriteBinary_Input.blob", true);
+            Shell(@"Qizmt del regression_test_RemoteOutputStream.WriteBinary_Output.blob", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

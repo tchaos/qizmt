@@ -1,0 +1,337 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_MultipleOutputFiles_MR_Table_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_MultipleOutputFiles_MR_Table_Input*.txt");
+            Shell(@"Qizmt del regression_test_MultipleOutputFiles_MR_Table_Output*.txt");
+            Shell(@"Qizmt del regression_test_MultipleOutputFiles_MR_Table_Expected*.txt");
+            
+            int rowcount = 5000;//(1024 * 1024 * 64 * 3) / 4;
+            List<int> rows = new List<int>(rowcount);
+            string tempfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString() + ".txt";            
+            Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+            using(System.IO.StreamWriter writer = new System.IO.StreamWriter(tempfile))
+            {
+                for(int i = 0; i < rowcount; i++)
+                {
+                    int num = rnd.Next();
+                    rows.Add(num);
+                    writer.WriteLine(num);                    
+                }
+                writer.Close();
+            }
+            
+            Shell(@"Qizmt put " + tempfile + " regression_test_MultipleOutputFiles_MR_Table_Input.txt");
+            System.IO.File.Delete(tempfile);
+            
+            string outfile0 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString() + ".txt"; 
+            string outfile1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString() + ".txt"; 
+            string outfile2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString() + ".txt"; 
+                        
+            using(System.IO.StreamWriter writer0 = new System.IO.StreamWriter(outfile0),
+                    writer1 = new System.IO.StreamWriter(outfile1),
+                    writer2 = new System.IO.StreamWriter(outfile2))
+            {
+                for(int i = 0; i < rows.Count; i++)
+                {
+                    int num = rows[i];
+                    if(num % 3 == 0)
+                    {
+                        writer0.WriteLine(num);
+                    }
+                    else if(num % 4 == 0)
+                    {
+                        writer1.WriteLine(num);
+                    }
+                    else if(num % 5 == 0)
+                    {
+                        writer2.WriteLine(num);
+                    }
+                }   
+                writer0.Close();
+                writer1.Close();
+                writer2.Close();  
+            }
+            
+            Shell(@"Qizmt put " + outfile0 + " regression_test_MultipleOutputFiles_MR_Table_Input0.txt");
+            Shell(@"Qizmt put " + outfile1 + " regression_test_MultipleOutputFiles_MR_Table_Input1.txt");
+            Shell(@"Qizmt put " + outfile2 + " regression_test_MultipleOutputFiles_MR_Table_Input2.txt");
+            
+            System.IO.File.Delete(outfile0);
+            System.IO.File.Delete(outfile1);
+            System.IO.File.Delete(outfile2);            
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_MultipleOutputFiles_MR_Table" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_MultipleOutputFiles_MR_Table_Input0.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_MultipleOutputFiles_MR_Table_Expected0.txt@4</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sline = mstring.Prepare(line);
+                int num = sline.ToInt();
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(num);
+                recordset rvalue = recordset.Prepare();
+                rvalue.PutInt(num);
+                output.Add(rkey, rvalue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rvalue = recordset.Prepare(values.Items[i]);
+                  output.Add(rvalue);           
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_MultipleOutputFiles_MR_Table" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_MultipleOutputFiles_MR_Table_Input1.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_MultipleOutputFiles_MR_Table_Expected1.txt@4</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sline = mstring.Prepare(line);
+                int num = sline.ToInt();
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(num);
+                recordset rvalue = recordset.Prepare();
+                rvalue.PutInt(num);
+                output.Add(rkey, rvalue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rvalue = recordset.Prepare(values.Items[i]);
+                  output.Add(rvalue);           
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_MultipleOutputFiles_MR_Table" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_MultipleOutputFiles_MR_Table_Input2.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_MultipleOutputFiles_MR_Table_Expected2.txt@4</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sline = mstring.Prepare(line);
+                int num = sline.ToInt();
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(num);
+                recordset rvalue = recordset.Prepare();
+                rvalue.PutInt(num);
+                output.Add(rkey, rvalue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rvalue = recordset.Prepare(values.Items[i]);
+                  output.Add(rvalue);           
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_MultipleOutputFiles_MR_Table" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_MultipleOutputFiles_MR_Table_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_MultipleOutputFiles_MR_Table_Output0.txt@4;dfs://regression_test_MultipleOutputFiles_MR_Table_Output1.txt@4;dfs://regression_test_MultipleOutputFiles_MR_Table_Output2.txt@4;dfs://regression_test_MultipleOutputFiles_MR_Table_Output3.txt@4</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sline = mstring.Prepare(line);
+                int num = sline.ToInt();
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(num);
+                recordset rvalue = recordset.Prepare();
+                rvalue.PutInt(num);
+                output.Add(rkey, rvalue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                    recordset rvalue = recordset.Prepare(values.Items[i]);
+                    int num = rvalue.GetInt();
+                    if(num % 3 == 0)
+                    {
+                        output.GetOutputByIndex(0).Add(rvalue);
+                    }
+                    else if(num % 4 == 0)
+                    {
+                        output.GetOutputByIndex(1).Add(rvalue);
+                    }
+                    else if(num % 5 == 0)
+                    {
+                        output.GetOutputByIndex(2).Add(rvalue);
+                    }                       
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string dir = IOUtils.GetTempDirectory();
+            string result0 = dir + @"\" + Guid.NewGuid().ToString();
+            string result1 = dir + @"\" + Guid.NewGuid().ToString();
+            string result2 = dir + @"\" + Guid.NewGuid().ToString();
+            string result3 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected0 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected1 = dir + @"\" + Guid.NewGuid().ToString();
+            string expected2 = dir + @"\" + Guid.NewGuid().ToString();
+            
+            Shell(@"Qizmt get regression_test_MultipleOutputFiles_MR_Table_Output0.txt " + result0);
+            Shell(@"Qizmt get regression_test_MultipleOutputFiles_MR_Table_Output1.txt " + result1);
+            Shell(@"Qizmt get regression_test_MultipleOutputFiles_MR_Table_Output2.txt " + result2);
+            Shell(@"Qizmt get regression_test_MultipleOutputFiles_MR_Table_Output3.txt " + result3);
+            Shell(@"Qizmt get regression_test_MultipleOutputFiles_MR_Table_Expected0.txt " + expected0);
+            Shell(@"Qizmt get regression_test_MultipleOutputFiles_MR_Table_Expected1.txt " + expected1);
+            Shell(@"Qizmt get regression_test_MultipleOutputFiles_MR_Table_Expected2.txt " + expected2);
+            
+            bool ok = false;                        
+            ok = CompareFiles(result0, expected0);   
+            
+            if(ok)
+            {
+                Qizmt_Log("File 0 is ok");
+                ok = CompareFiles(result1, expected1);  
+                if(ok)
+                {
+                    Qizmt_Log("File 1 is ok");
+                    ok = CompareFiles(result2, expected2);  
+                    if(ok)
+                    {
+                        Qizmt_Log("File 2 is ok");
+                        System.IO.FileInfo fi = new System.IO.FileInfo(result3);
+                        ok = fi.Length == 0;
+                        if(ok)
+                        {
+                            Qizmt_Log("File 3 is ok");
+                        }
+                    }
+                }
+            }        
+                 
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_MultipleOutputFiles_MR_Table.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_MultipleOutputFiles_MR_Table.xml 0");
+            }
+            
+            Shell(@"Qizmt del regression_test_MultipleOutputFiles_MR_Table_Input*.txt");
+            Shell(@"Qizmt del regression_test_MultipleOutputFiles_MR_Table_Output*.txt");
+            Shell(@"Qizmt del regression_test_MultipleOutputFiles_MR_Table_Expected*.txt");
+            System.IO.File.Delete(result0);
+            System.IO.File.Delete(result1);
+            System.IO.File.Delete(result2);
+            System.IO.File.Delete(result3);
+            System.IO.File.Delete(expected0);
+            System.IO.File.Delete(expected1);
+            System.IO.File.Delete(expected2);
+        }
+                
+        private static bool CompareFiles(string f1, string f2)
+        {
+            System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+            System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+            System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+            bool ok = true;
+            for (int i = 0; i < info1.Length; i++)
+            {
+                int b1 = fs1.ReadByte();
+                int b2 = fs2.ReadByte();
+                if (b1 != b2)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            fs1.Close();
+            fs2.Close();
+            return ok;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

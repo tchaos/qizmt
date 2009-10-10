@@ -1,0 +1,433 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_DGlobals_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_DGlobals_Input*.txt");
+            Shell(@"Qizmt del regression_test_DGlobals_Output*.txt");
+            
+            int maxlen = 1024 * 50;          
+            Random rnd = new Random();
+            
+            string s = "";
+            int i = 0;            
+            for(; i < maxlen;)
+            {
+                int codevalue = rnd.Next(0x0, 0xFFFF);
+                if(codevalue >= 0xD800 && codevalue <= 0xDFFF)  //don't want surrogates.
+                {
+                    continue;
+                }
+                char c = (char)codevalue;
+                s += c;    
+                i++;
+            }
+            
+            string s2 = "";
+            i = 0;
+            for(; i < maxlen;)
+            {
+                int codevalue = rnd.Next(0x0, 0xFFFF);
+                if(codevalue >= 0xD800 && codevalue <= 0xDFFF)  //don't want surrogates.
+                {
+                    continue;
+                }
+                char c = (char)codevalue;
+                s2 += c;    
+                i++;
+            }
+          
+            DGlobals.Add("myvar", s);
+            DGlobals.Add("myvar2", s2);
+            
+            string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+            if(System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.Delete(dir, true);                
+            }            
+            System.IO.Directory.CreateDirectory(dir);
+            
+            System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "vars1.txt", false, System.Text.Encoding.Unicode);
+            writer.Write(s);
+            writer.Write(s2);
+            writer.Close();
+            
+            System.IO.File.WriteAllText(dir + "vars2.txt", s, System.Text.Encoding.Unicode);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_DGlobals_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_DGlobals_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                dfsoutput.WriteLine("xxx");
+                
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "remote1.txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+          }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_DGlobals" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>3</KeyLength>
+        <DFSInput>dfs://regression_test_DGlobals_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DGlobals_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "map1.txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+                
+                output.Add(line, ByteSlice.Prepare());                
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[                  
+          string guid = Guid.NewGuid().ToString();
+          
+          public void ReduceInitialize()
+          { 
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "reduceinit1_" + guid + ".txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+          }        
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  output.Add(key);
+              }
+              
+              string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+              System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "reduce1.txt", false, System.Text.Encoding.Unicode);
+              writer.Write(DGlobals.Get("myvar"));
+              writer.Write(DGlobals.Get("myvar2"));
+              writer.Close();
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize()
+          {
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0]+ @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "reducefinal1_" + guid + ".txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+          }       
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DGlobals_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            
+            Shell(@"Qizmt del regression_test_DGlobals_Input*.txt");
+            Shell(@"Qizmt del regression_test_DGlobals_Output*.txt");
+            
+            int maxlen = 1024 * 50;          
+            Random rnd = new Random();
+            
+            string s2 = "";
+            int i = 0;            
+            for(; i < maxlen;)
+            {
+                int codevalue = rnd.Next(0x0, 0xFFFF);
+                if(codevalue >= 0xD800 && codevalue <= 0xDFFF)  //don't want surrogates.
+                {
+                    continue;
+                }
+                char c = (char)codevalue;
+                s2 += c;    
+                i++;
+            }                        
+            
+            DGlobals.Add("myvar2", s2); //Change myvar2
+            
+            string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+            System.IO.File.AppendAllText(dir + "vars2.txt", s2, System.Text.Encoding.Unicode);
+            
+            System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "local2.txt", false, System.Text.Encoding.Unicode);
+            writer.Write(DGlobals.Get("myvar"));
+            writer.Write(DGlobals.Get("myvar2"));
+            writer.Close();
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_DGlobals_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_DGlobals_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                dfsoutput.WriteLine("xxx");
+                
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "remote2.txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+          }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_DGlobals" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>3</KeyLength>
+        <DFSInput>dfs://regression_test_DGlobals_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_DGlobals_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "map2.txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+                
+                output.Add(line, ByteSlice.Prepare());                
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[                  
+          string guid = Guid.NewGuid().ToString();
+          //string thishost = StaticGlobals.Qizmt_Hosts[0];
+          
+          public void ReduceInitialize()
+          { 
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "reduceinit2_" + guid + ".txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+          }        
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  output.Add(key);
+              }
+              
+              string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+              System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "reduce2.txt", false, System.Text.Encoding.Unicode);
+              writer.Write(DGlobals.Get("myvar"));
+              writer.Write(DGlobals.Get("myvar2"));
+              writer.Close();
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize()
+          {
+                string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + "reducefinal2_" + guid + ".txt", false, System.Text.Encoding.Unicode);
+                writer.Write(DGlobals.Get("myvar"));
+                writer.Write(DGlobals.Get("myvar2"));
+                writer.Close();
+          }       
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_DGlobals_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string dir = @"\\" + StaticGlobals.Qizmt_Hosts[0] + @"\c$\temp\qizmt\regressionTestDGlobals\";            
+                  
+            bool ok = CompareFiles(dir + "vars1.txt", dir + "remote1.txt");
+            if(ok)
+            {
+                ok = CompareFiles(dir + "vars1.txt", dir + "map1.txt");
+                if(ok)
+                {
+                    ok = CompareFiles(dir + "vars1.txt", dir + "reduce1.txt");
+                    if(ok)
+                    {
+                        ok = CompareFiles(dir + "vars2.txt", dir + "local2.txt");
+                        if(ok)
+                        {
+                            ok = CompareFiles(dir + "vars2.txt", dir + "remote2.txt");
+                            if(ok)
+                            {
+                                ok = CompareFiles(dir + "vars2.txt", dir + "map2.txt");
+                                if(ok)
+                                {
+                                    ok = CompareFiles(dir + "vars2.txt", dir + "reduce2.txt");
+                                    if(ok)
+                                    {                                        
+                                        //get all reduceinit1 files.                                        
+                                        {
+                                            ok = false;
+                                            System.IO.FileInfo[] files = (new System.IO.DirectoryInfo(dir)).GetFiles("reduceinit1*");
+                                            foreach(System.IO.FileInfo file in files)
+                                            {
+                                                ok = CompareFiles(dir + "vars1.txt", file.FullName);
+                                                if(!ok)
+                                                {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        //get all reducefinal1 files.                                        
+                                        if(ok)
+                                        {
+                                            ok = false;
+                                            System.IO.FileInfo[] files = (new System.IO.DirectoryInfo(dir)).GetFiles("reducefinal1*");
+                                            foreach(System.IO.FileInfo file in files)
+                                            {
+                                                ok = CompareFiles(dir + "vars1.txt", file.FullName);
+                                                if(!ok)
+                                                {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        //get all reduceinit2 files.                                        
+                                        if(ok)
+                                        {
+                                            ok = false;
+                                            System.IO.FileInfo[] files = (new System.IO.DirectoryInfo(dir)).GetFiles("reduceinit2*");
+                                            foreach(System.IO.FileInfo file in files)
+                                            {
+                                                ok = CompareFiles(dir + "vars2.txt", file.FullName);
+                                                if(!ok)
+                                                {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        //get all reducefinal2 files.                                      
+                                        if(ok)
+                                        {
+                                            ok = false;
+                                            System.IO.FileInfo[] files = (new System.IO.DirectoryInfo(dir)).GetFiles("reducefinal2*");
+                                            foreach(System.IO.FileInfo file in files)
+                                            {
+                                                ok = CompareFiles(dir + "vars2.txt", file.FullName);
+                                                if(!ok)
+                                                {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }                                    
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_DGlobals.xml 1");
+                Qizmt_Log("ok");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_DGlobals.xml 0");
+                Qizmt_Log("not ok");
+            }            
+          
+            System.IO.Directory.Delete(dir, true);
+            Shell(@"Qizmt del regression_test_DGlobals_Input*.txt");
+            Shell(@"Qizmt del regression_test_DGlobals_Output*.txt");
+        }
+        
+        private static bool CompareFiles(string f1, string f2)
+        {
+            System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+            System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+            System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+            bool ok = true;
+            for (int i = 0; i < info1.Length; i++)
+            {
+                int b1 = fs1.ReadByte();
+                int b2 = fs2.ReadByte();
+                if (b1 != b2)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            fs1.Close();
+            fs2.Close();
+            return ok;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,275 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutBool_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutBool_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutBool_Output.txt", true);    
+            Shell(@"Qizmt del regression_test_recordset.PutBool_Output1.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutBool_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutBool_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 500;
+                int rowCount = 2000;               
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0 ; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        onerow.Add(b);  
+                    }      
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutBool</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutBool_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutBool_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString(); 
+                recordset rs = recordset.Prepare();
+                
+                //testing put
+                for(int i = 0; i < sLine.Length; i++)
+                {
+                    int x = (int)sLine[i];
+                    bool b = (x % 2 == 0);
+                    rs.PutBool(b);
+                }      
+                
+                string[] arr = new string[sLine.Length];
+                
+                //testing get
+                for(int i = 0; i < arr.Length; i++)
+                {
+                    if(rs.GetBool())
+                    {
+                        arr[i] = "a";
+                    }
+                    else
+                    {
+                        arr[i] = "b";
+                    }
+                }
+                
+                recordset val = recordset.Prepare();
+                
+                //put again to output the recordset to mapper. 
+                for(int i = 0; i < arr.Length; i++)
+                {
+                    if(arr[i] == "a")
+                    {
+                        val.PutBool(true);
+                    }
+                    else
+                    {
+                        if(arr[i] == "b")
+                        {
+                            val.PutBool(false);
+                        }                       
+                    }
+                }
+                
+                output.Add(mstring.Prepare(sLine[0]), val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int k = 0; k < values.Length; k++)
+                {                   
+                    recordset rs = recordset.Prepare(values.Items[k]);
+                    
+                    string[] arr = new string[500];
+                    
+                    //testing get
+                    for(int i = 0; i < arr.Length; i++)
+                    {
+                        if(rs.GetBool())
+                        {
+                            arr[i] = "a";
+                        }
+                        else
+                        {
+                            arr[i] = "b";
+                        }
+                    }
+                    
+                    recordset val = recordset.Prepare();
+                    
+                    //testing put
+                    for(int i = 0; i < arr.Length; i++)
+                    {
+                        if(arr[i] == "a")
+                        {
+                            val.PutBool(true);
+                        }
+                        else
+                        {
+                            if(arr[i] == "b")
+                            {
+                                val.PutBool(false);
+                            }
+                        }                            
+                    }
+                    
+                    for(int i = 0; i < arr.Length; i++)
+                    {
+                        if(val.GetBool())
+                        {
+                            arr[i] = "c";
+                        }
+                        else
+                        {
+                            arr[i] = "d";
+                        }
+                    }
+                    
+                    string oline = "";
+                    for(int i = 0; i < arr.Length; i++)
+                    {
+                        oline += arr[i];
+                    } 
+                    output.Add(ByteSlice.Prepare(oline));
+                }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutBool_Imitate_MapperReducer</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_recordset.PutBool_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutBool_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();
+                    
+                    for(int i = 0; i < sLine.Length; i++)
+                    {
+                        int x = (int)sLine[i];
+                        bool b = (x % 2 == 0);
+                        
+                        if(b)
+                        {
+                            dfsoutput.WriteByte((byte)'c');
+                        }
+                        else
+                        {
+                            dfsoutput.WriteByte((byte)'d');
+                        }
+                    }
+                    dfsoutput.WriteLine("");
+                    sb.Length = 0;
+                }                   
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutBool_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutBool_Output.txt regression_test_recordset.PutBool_Output1.txt regression_test_recordset.PutBool.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutBool_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutBool_Output.txt", true); 
+            Shell(@"Qizmt del regression_test_recordset.PutBool_Output1.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

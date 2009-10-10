@@ -1,0 +1,120 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_bulkput_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_bulkput_Input.gensort");
+            Shell(@"Qizmt del regression_test_bulkput_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_bulkput_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_bulkput_Input.gensort@6</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(new byte[] { 1, 1, 1, 1, (byte)'\r', (byte)'\n' } );
+                dfsoutput.WriteRecord(new byte[] { 2, 2, 2, 2, (byte)'\r', (byte)'\n' } );
+                dfsoutput.WriteRecord(new byte[] { 3, 3, 3, 3, (byte)'\r', (byte)'\n' } );
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_bulkput</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            
+            byte[] NOHEADER = Entry.ToBytes(4);
+            
+            string p1host = MySpace.DataMining.AELight.Surrogate.MasterHost;
+            string p1name = "zd.0.bulkput." + Guid.NewGuid().ToString() + ".zd";
+            System.IO.File.WriteAllBytes(MySpace.DataMining.AELight.Surrogate.NetworkPathForHost(p1host) + @"\" + p1name,
+                new byte[] {
+                NOHEADER[0], NOHEADER[1], NOHEADER[2], NOHEADER[3], // Header
+                1, 1, 1, 1, (byte)'\r', (byte)'\n' } );
+            
+            string p2host = MySpace.DataMining.AELight.Surrogate.MasterHost;
+            string p2name = "zd.1.bulkput." + Guid.NewGuid().ToString() + ".zd";
+            System.IO.File.WriteAllBytes(MySpace.DataMining.AELight.Surrogate.NetworkPathForHost(p2host) + @"\" + p2name,
+                new byte[] {
+                NOHEADER[0], NOHEADER[1], NOHEADER[2], NOHEADER[3], // Header
+                2, 2, 2, 2, (byte)'\r', (byte)'\n' } );
+            
+            string p3host = MySpace.DataMining.AELight.Surrogate.MasterHost;
+            string p3name = "zd.2.bulkput." + Guid.NewGuid().ToString() + ".zd";
+            System.IO.File.WriteAllBytes(MySpace.DataMining.AELight.Surrogate.NetworkPathForHost(p3host) + @"\" + p3name,
+                new byte[] {
+                NOHEADER[0], NOHEADER[1], NOHEADER[2], NOHEADER[3], // Header
+                3, 3, 3, 3, (byte)'\r', (byte)'\n' } );
+            
+            string inputfilepath = IOUtils.GetTempDirectory() + @"\bulkput-input-" + Guid.NewGuid().ToString() + ".txt";
+            
+            using(System.IO.StreamWriter sw = System.IO.File.CreateText(inputfilepath))
+            {
+                sw.WriteLine("{0} {1} {2}", p1host, p1name, "6");
+                sw.WriteLine("{0} {1} {2}", p2host, p2name, "6");
+                sw.WriteLine("{0} {1} {2}", p3host, p3name, "6");
+            }
+            
+            Console.WriteLine(Shell("Qizmt bulkput \"" + inputfilepath + "\" regression_test_bulkput_Output.gensort " + MySpace.DataMining.AELight.DfsFileTypes.BINARY_RECT + "@6").Trim());
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_bulkput_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_bulkput_Input.gensort regression_test_bulkput_Output.gensort regression_test_bulkput.xml");          
+            
+            Shell(@"Qizmt del regression_test_bulkput_Input.gensort");
+            Shell(@"Qizmt del regression_test_bulkput_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

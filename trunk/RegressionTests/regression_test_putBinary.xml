@@ -1,0 +1,228 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_putBinary_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_putBinary_Input1.blob");
+            Shell(@"Qizmt del regression_test_putBinary_Input2.blob");
+            Shell(@"Qizmt del regression_test_putBinary_Output.blob");
+            Shell(@"Qizmt del regression_test_putBinary_Result1.txt");
+            Shell(@"Qizmt del regression_test_putBinary_Result2.txt");
+            
+            string dir1 = IOUtils.GetTempDirectory() + @"\putbinaryinput1\";
+            
+            if(System.IO.Directory.Exists(dir1))
+            {
+                System.IO.Directory.Delete(dir1, true);
+            }
+            System.IO.Directory.CreateDirectory(dir1);
+            
+            string dir2 = IOUtils.GetTempDirectory() + @"\putbinaryinput2\";
+            
+            if(System.IO.Directory.Exists(dir2))
+            {
+                System.IO.Directory.Delete(dir2, true);
+            }   
+            System.IO.Directory.CreateDirectory(dir2);
+            
+                        
+            //Prepare binary data.
+            string[] sImages = new string[3]{@"R0lGODlhDwAPALMOAP/qAEVFRQAAAP/OAP/JAP+0AP6dAP/+k//9E///////xzMzM///6//lAAAAAAAAACH5BAEAAA4ALAAAAAAPAA8AAARb0EkZap3YVabOGRcWcAgCnIMRTEEnCCfwpqt2mHEOagoOnz+CKnADxoKFyiHHBBCSAdOiCVg8KwPZa7sVrgJZQWI8FhB2msGgwTXTWGqCXP4WBQr4wjDDstQmEQA7", @"R0lGODlhIAAgAPMIAAAAAAAAmQAA//8AAP//AJmZmci0yMzMzP///8i0yAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAkAIf5/SWNvbm9ncmFwaGVyIDogTWljcm9zb2Z0IFdpbmRvd3MKVGhlIEljb25vbG9nIDogVGhlIEFydCBvZiBWaXJ0dWFsIExpdHRlciAKICAgICAgICAgICAgICAgaHR0cDovL3d3dy5vemVtYWlsLmNvbS5hdS9+YWZhY3Rvci8gCgAsAAAAACAAIADDAAAAAACZAAD//wAA//8AmZmZyLTIzMzM////yLTIAAAAAAAAAAAAAAAAAAAAAAAABOUwyUlpuTiXyntBYCgeF8BdZHYcCBAAaxxjpicixVx3fD/lsiCN9zmYPiHjLVniBQRQaGAaKMCCq6FNlLNaZh8CQkze+YDYrNd3SuuMZ3MCnbbCK0U0QHPFak83AC5TfUJNHU9RAlNZhTJrRDdokHNjlmVtj3JfWQgpm2dujWyASyF/pBJ0flagZxp8JK49q4aCtC2qsLswlD+eOXsjjmC+cyRgLCCCbqg/SCEwg8RqxhKJUYOEzYcc2FKMdjIDA58934s6guvsbNAgk3K73aqSoz/FvPVclOx7ybIo+LvFY2C7CREAADs=", @"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" };
+            
+            for(int i=0; i < sImages.Length - 1; i++)
+            {
+                string fname = dir1 + "image" + i.ToString() + ".gif";
+                byte[] buf = Convert.FromBase64String(sImages[i]);
+                System.IO.File.WriteAllBytes(fname, buf);
+            }
+            
+             for(int i=sImages.Length - 1; i < sImages.Length; i++)
+            {
+                string fname = dir2 + "image" + i.ToString() + ".gif";
+                byte[] buf = Convert.FromBase64String(sImages[i]);
+                System.IO.File.WriteAllBytes(fname, buf);
+            }
+            
+            Shell(@"Qizmt putbinary " + dir1 + "*.* regression_test_putBinary_Input1.blob");
+            Shell(@"Qizmt putbinary " + dir2 + "*.* regression_test_putBinary_Input2.blob");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>putBinary</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>      
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_putBinary_Input*.blob</DFSInput>
+        <DFSOutput>dfs://regression_test_putBinary_Output.blob</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {                
+                Blob b = line.ReadBinary();                
+                output.Add(ByteSlice.PreparePaddedStringUTF8(b.name, Qizmt_KeyLength), line);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {  
+              for(int i=0; i < values.Length; i++)
+              {
+                  Blob b = values.Items[i].ReadBinary();                  
+                  output.AddBinary(b);
+              }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>   
+    <Job Name="DSpace-putBinary_Preprocessing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string outputdir1 = IOUtils.GetTempDirectory() + @"\putbinaryoutput1\";
+            
+            if(System.IO.Directory.Exists(outputdir1))
+            {
+                System.IO.Directory.Delete(outputdir1, true);
+            }
+            System.IO.Directory.CreateDirectory(outputdir1);
+            
+            string outputdir2 = IOUtils.GetTempDirectory() + @"\putbinaryoutput2\";
+            
+            if(System.IO.Directory.Exists(outputdir2))
+            {
+                System.IO.Directory.Delete(outputdir2, true);
+            }
+            System.IO.Directory.CreateDirectory(outputdir2);
+            
+            Shell(@"Qizmt getbinary regression_test_putBinary_Input*.blob " + outputdir1);         
+            Shell(@"Qizmt getbinary regression_test_putBinary_Output.blob " + outputdir2);         
+            
+            string inputdir1 = IOUtils.GetTempDirectory() + @"\putbinaryinput1\";
+            string inputdir2 = IOUtils.GetTempDirectory() + @"\putbinaryinput2\";
+            
+            inputdir1 = inputdir1.ToLower();
+            inputdir2 = inputdir2.ToLower();
+            
+            foreach(string s in System.IO.Directory.GetFiles(inputdir1))
+            {
+                System.IO.File.Copy(s, s.ToLower().Replace(inputdir1, inputdir2));                
+            }
+            
+            bool ok = CompareFolders(outputdir1, outputdir2) && CompareFolders(outputdir2, inputdir2);
+            
+            string f1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            System.IO.File.WriteAllText(f1, "1");
+            
+            string f2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString(); 
+            if(ok)
+            {
+                System.IO.File.WriteAllText(f2, "1");
+            }
+            else
+            {
+                System.IO.File.WriteAllText(f2, "2");
+            }       
+            
+            Shell(@"Qizmt put " + f1 + " regression_test_putBinary_Result1.txt");
+            Shell(@"Qizmt put " + f1 + " regression_test_putBinary_Result2.txt");
+            
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_putBinary_Result1.txt regression_test_putBinary_Result2.txt regression_test_putBinary.xml");          
+            
+            Shell(@"Qizmt del regression_test_putBinary_Input1.blob");
+            Shell(@"Qizmt del regression_test_putBinary_Input2.blob");
+            Shell(@"Qizmt del regression_test_putBinary_Output.blob");
+            Shell(@"Qizmt del regression_test_putBinary_Result1.txt");
+            Shell(@"Qizmt del regression_test_putBinary_Result2.txt"); 
+           
+           System.IO.File.Delete(f1);
+           System.IO.File.Delete(f2);
+           System.IO.Directory.Delete(outputdir1, true);
+           System.IO.Directory.Delete(outputdir2, true);
+           System.IO.Directory.Delete(inputdir1, true);
+           System.IO.Directory.Delete(inputdir2, true);
+        }
+        
+        private static bool CompareFolders(string f1, string f2)
+        {
+            System.IO.DirectoryInfo d1 = new System.IO.DirectoryInfo(f1);
+            System.IO.DirectoryInfo d2 = new System.IO.DirectoryInfo(f2);
+
+            System.IO.FileInfo[] files1 = d1.GetFiles("*.*");
+            System.IO.FileInfo[] files2 = d2.GetFiles("*.*");
+
+            if (files1.Length != files2.Length)
+            {                
+                return false;
+            }
+
+            foreach (System.IO.FileInfo sf in files1)
+            {
+                string filename = sf.Name;
+                if (System.IO.File.Exists(f2 + "\\" + filename))
+                {
+                    byte[] buf1 = System.IO.File.ReadAllBytes(sf.FullName);
+                    byte[] buf2 = System.IO.File.ReadAllBytes(f2 + "\\" + filename);
+
+                    if (buf1.Length != buf2.Length)
+                    {                        
+                        return false;
+                    }
+
+                    for (int i = 0; i < buf1.Length; i++)
+                    {
+                        if (buf1[i] != buf2[i])
+                        {                           
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    return false;
+                }   
+            }
+
+            return true;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

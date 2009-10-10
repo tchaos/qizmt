@@ -1,0 +1,127 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_DSpace_info_mt_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_DSpace_info_mt_result1.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_info_mt_result2.txt", true);
+            
+            string out1 = Shell(@"Qizmt info");
+            string out2 = Shell(@"Qizmt info -mt");     
+            
+            string[] lines1 = out1.Split(new string[]{Environment.NewLine} , StringSplitOptions.RemoveEmptyEntries);            
+            string[] lines2 = out2.Split(new string[]{Environment.NewLine} , StringSplitOptions.RemoveEmptyEntries);
+            
+            bool ok = true;
+            
+            for(int i=0; i < 3; i++)
+            {
+                if(lines1[i] != lines2[i])
+                {
+                    ok = false;
+                    break;
+                }
+            }
+            
+            if(ok)
+            {
+                Dictionary<string, string[]> hosts1 = new Dictionary<string, string[]>();
+                Dictionary<string, string[]> hosts2 = new Dictionary<string, string[]>();
+                
+                for(int i=3; i < lines1.Length; i+=5)
+                {
+                    string key = lines1[i];
+                    string[] val = new string[4];
+                    val[0] = lines1[i+1];
+                    val[1] = lines1[i+2];
+                    val[2] = lines1[i+3];
+                    val[3] = lines1[i+4];
+                    hosts1[key] = val;
+                }
+                
+                for(int i=3; i < lines2.Length; i+=5)
+                {
+                    string key = lines2[i];
+                    string[] val = new string[4];
+                    val[0] = lines2[i+1];
+                    val[1] = lines2[i+2];
+                    val[2] = lines2[i+3];
+                    val[3] = lines2[i+4];
+                    hosts2[key] = val;
+                }
+                
+                if(hosts1.Count != hosts2.Count)
+                {
+                    ok = false;
+                }
+                else
+                {
+                    foreach(string key in hosts1.Keys)
+                    {
+                        if(!hosts2.ContainsKey(key))
+                        {
+                            ok = false;
+                            break;
+                        }
+                        
+                        string[] val1 = hosts1[key];
+                        string[] val2 = hosts2[key];
+                        
+                        for(int i=0; i< val1.Length; i++)
+                        {
+                            if(val1[i] != val2[i])
+                            {
+                                ok = false;
+                                break;
+                            }
+                        }
+                        
+                        if(!ok)
+                        {
+                            break;
+                        }
+                    }                 
+                }                
+            }
+            
+            string f1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            string f2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            
+            System.IO.File.WriteAllText(f1, "1");
+            
+            if(ok)
+            {
+                System.IO.File.WriteAllText(f2, "1");
+            }
+            else
+            {
+                System.IO.File.WriteAllText(f2, "2");  
+            }
+            
+            Shell(@"Qizmt put " + f1 + " regression_test_DSpace_info_mt_result1.txt");
+            Shell(@"Qizmt put " + f2 + " regression_test_DSpace_info_mt_result2.txt");
+            
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_DSpace_info_mt_result1.txt regression_test_DSpace_info_mt_result2.txt regression_test_DSpace_info_mt.xml");          
+            
+            Shell(@"Qizmt del regression_test_DSpace_info_mt_result1.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_info_mt_result2.txt", true);
+            
+            System.IO.File.Delete(f1);
+            System.IO.File.Delete(f2);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

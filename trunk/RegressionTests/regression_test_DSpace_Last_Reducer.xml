@@ -1,0 +1,127 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_Qizmt_Last_Reducer_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_Qizmt_Last_Reducer_Input.txt");
+            Shell(@"Qizmt del regression_test_Qizmt_Last_Reducer_Output.txt");
+            
+            //Create data.      
+            int maxrows = 1024 * 1024;            
+            int dummyStrLen = 100; 
+            
+            string dummyStr = "";
+            for(int i = 0; i < dummyStrLen; i++)
+            {
+                dummyStr += "x";
+            }
+            
+            long total = 0;
+            Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            string tmpfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString() + ".txt";
+            System.IO.StreamWriter writer = new System.IO.StreamWriter(tmpfile);
+            for(int i = 0; i < maxrows; i++)
+            {
+                int x = rnd.Next();
+                total += x;
+                writer.WriteLine(x.ToString() + "," + dummyStr);    
+                
+            }           
+            writer.Close();
+            
+            DGlobals.Add("total", total.ToString());
+            Shell(@"Qizmt put " + tmpfile + " regression_test_Qizmt_Last_Reducer_Input.txt");
+            System.IO.File.Delete(tmpfile);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_Qizmt_Last_Reducer" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_Qizmt_Last_Reducer_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_Qizmt_Last_Reducer_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sLine = mstring.Prepare(line);
+                int x = sLine.NextItemToInt(',');
+                                
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(x);
+                output.Add(rkey, sLine);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          long total = 0;
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {              
+              for(int i = 0; i < values.Length; i++)
+              {                
+                  mstring ms = mstring.Prepare(values[i].Value);                  
+                  int x =  ms.NextItemToInt(',');
+                  total += x;
+              }
+             
+              if(StaticGlobals.Qizmt_Last)
+              {
+                  output.Add(mstring.Prepare(total));
+                  total = 0;
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_Qizmt_Last_Reducer_Verify" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string tmpfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString() + ".txt";
+            Shell(@"Qizmt get regression_test_Qizmt_Last_Reducer_Output.txt " + tmpfile);
+            
+            string[] lines = System.IO.File.ReadAllLines(tmpfile);
+            System.IO.File.Delete(tmpfile);
+            long total = 0;
+            foreach(string line in lines)
+            {
+                total += Int64.Parse(line);
+            }
+            
+            long realtotal = Int64.Parse(DGlobals.Get("total"));
+            if(total == realtotal)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_Qizmt_Last_Reducer.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_Qizmt_Last_Reducer.xml 0");
+            }        
+            
+            Qizmt_Log(realtotal.ToString());
+            Qizmt_Log(total.ToString());
+            
+            //Shell(@"Qizmt del regression_test_Qizmt_Last_Reducer_Input.txt");
+            //Shell(@"Qizmt del regression_test_Qizmt_Last_Reducer_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

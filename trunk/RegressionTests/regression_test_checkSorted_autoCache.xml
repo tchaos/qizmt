@@ -1,0 +1,131 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_checkSorted_autoCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_checkSorted_autoCache_cache");
+            Shell(@"Qizmt del regression_test_checkSorted_autoCache_Input*.txt");
+            Shell(@"Qizmt del regression_test_checkSorted_autoCache_Output.txt");   
+               
+            Shell(@"Qizmt asciigen regression_test_checkSorted_autoCache_Input1.txt 20000B");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_checkSorted_autoCache" Custodian="" Email="">
+      <Delta>
+        <Name>regression_test_checkSorted_autoCache_Cache</Name>
+        <DFSInput>dfs://regression_test_checkSorted_autoCache_Input*.txt</DFSInput>
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput>dfs://regression_test_checkSorted_autoCache_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          { 
+              for(int i = 0; i < values.Length; i++)
+              {                  
+                  output.Add(key);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_checkSorted_autoCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_checkSorted_autoCache_Input*.txt");
+            Shell(@"Qizmt del regression_test_checkSorted_autoCache_Output.txt"); 
+            Shell(@"Qizmt asciigen regression_test_checkSorted_autoCache_Input2.txt 20000B");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_checkSorted_autoCache" Custodian="" Email="">
+      <Delta>
+        <Name>regression_test_checkSorted_autoCache_Cache</Name>
+        <DFSInput>dfs://regression_test_checkSorted_autoCache_Input*.txt</DFSInput>
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput>dfs://regression_test_checkSorted_autoCache_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          { 
+              for(int i = 0; i < values.Length; i++)
+              {                  
+                  output.Add(key);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_checkSorted_autoCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {                          
+            string output = Shell(@"Qizmt checksorted regression_test_checkSorted_autoCache_Output.txt");
+            
+            Qizmt_Log(output);
+            
+            if(output.IndexOf("not sorted", StringComparison.OrdinalIgnoreCase) > -1)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_checkSorted_autoCache.xml 0");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_checkSorted_autoCache.xml 1");
+            }
+            
+            //Shell(@"Qizmt del regression_test_checkSorted_autoCache_Input*.txt");
+            //Shell(@"Qizmt del regression_test_checkSorted_autoCache_Output.txt"); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

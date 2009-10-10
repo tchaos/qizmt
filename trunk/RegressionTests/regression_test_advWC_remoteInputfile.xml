@@ -1,0 +1,255 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_advWC_remoteInputfile_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_advWC_remoteInputfile_Input*.txt");
+            Shell(@"Qizmt del regression_test_advWC_remoteInputfile_Output*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input11x.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("11a");
+                dfsoutput.WriteLine("11b");
+                dfsoutput.WriteLine("11c");      
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input12y.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("12a");
+                dfsoutput.WriteLine("12b");
+                dfsoutput.WriteLine("12c");               
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input13z.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("13a");
+                dfsoutput.WriteLine("13b");
+                dfsoutput.WriteLine("13c");       
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input14p.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("14a");
+                dfsoutput.WriteLine("14b");
+                dfsoutput.WriteLine("14c");                   
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input15f.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("15a");
+                dfsoutput.WriteLine("15b");
+                dfsoutput.WriteLine("15c");      
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input20090514x.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("20090514 a");
+                dfsoutput.WriteLine("20090514 b");
+                dfsoutput.WriteLine("20090514 c");      
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input20090615x.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("20090615 a");
+                dfsoutput.WriteLine("20090615 b");
+                dfsoutput.WriteLine("20090615 c");      
+           }
+        ]]>
+      </Remote>
+    </Job>    
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Input20091201x.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine("20091201 a");
+                dfsoutput.WriteLine("20091201 b");
+                dfsoutput.WriteLine("20091201 c");      
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_mrInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Output.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {                           
+                dfsoutput.WriteLine("11a");
+                dfsoutput.WriteLine("11b");
+                dfsoutput.WriteLine("11c");   
+                dfsoutput.WriteLine("12a");
+                dfsoutput.WriteLine("12b");
+                dfsoutput.WriteLine("12c");   
+                dfsoutput.WriteLine("15a");
+                dfsoutput.WriteLine("15b");
+                dfsoutput.WriteLine("15c");   
+                dfsoutput.WriteLine("20090615 a");
+                dfsoutput.WriteLine("20090615 b");
+                dfsoutput.WriteLine("20090615 c");
+                dfsoutput.WriteLine("20091201 a");
+                dfsoutput.WriteLine("20091201 b");
+                dfsoutput.WriteLine("20091201 c");  
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_advWC_remoteInputfile_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_advWC_remoteInputfile_Input|11-12|*.txt;dfs://regression_test_advWC_remoteInputfile_Input15f.txt;dfs://regression_test_advWC_remoteInputfile_Input|20090601-20100101|*.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_advWC_remoteInputfile_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {                           
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string line = sb.ToString();
+                    dfsoutput.WriteLine(line);                    
+                    sb.Length = 0;
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_advWC_remoteInputfile</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_advWC_remoteInputfile_Output.txt regression_test_advWC_remoteInputfile_Output2.txt regression_test_advWC_remoteInputfile.xml");          
+            
+            Shell(@"Qizmt del regression_test_advWC_remoteInputfile_Input*.txt");
+            Shell(@"Qizmt del regression_test_advWC_remoteInputfile_Output*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

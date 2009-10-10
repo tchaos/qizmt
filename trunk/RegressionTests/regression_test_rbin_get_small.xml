@@ -1,0 +1,107 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_get_small_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_rbin_get_small_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_get_small_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_rbin_get_small_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_rbin_get_small_Input.gensort@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nAB"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nCD"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nEF"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nGH"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nIJ"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nKL"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nMN"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_get_small</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = "regression_test_rbin_get_small_Output.gensort";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            Shell(@"Qizmt dfs get regression_test_rbin_get_small_Input.gensort " + localfn);
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn + "@4");
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_get_small_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_rbin_get_small_Input.gensort regression_test_rbin_get_small_Output.gensort regression_test_rbin_get_small.xml");          
+            
+            Shell(@"Qizmt del regression_test_rbin_get_small_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_get_small_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

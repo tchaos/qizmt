@@ -1,0 +1,160 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_IOUtils.GetTempDirectory_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_IOUtils.GetTempDirectory_Input.txt", true);
+            Shell(@"Qizmt del regression_test_IOUtils.GetTempDirectory_Input2.txt", true);
+            Shell(@"Qizmt del regression_test_IOUtils.GetTempDirectory_Output.txt", true);
+            
+            string tempfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            System.IO.File.WriteAllText(tempfile, "1" + Environment.NewLine);
+            
+            Shell(@"Qizmt put " + tempfile + " regression_test_IOUtils.GetTempDirectory_Input.txt");
+            
+            System.IO.File.Delete(tempfile);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_IOUtils.GetTempDirectory_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_IOUtils.GetTempDirectory_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_IOUtils.GetTempDirectory_Input2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {     
+                StringBuilder sb = new StringBuilder();
+                bool ok = false;
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string line = sb.ToString();                   
+                    if(line == "1")
+                    {
+                        ok = true;                      
+                        break;
+                    }
+                }
+                
+                if(ok)
+                {
+                    string tempfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    System.IO.File.WriteAllText(tempfile, "1");                    
+                   
+                    if(System.IO.File.ReadAllText(tempfile) == "1")
+                    {
+                        dfsoutput.WriteLine("1");                        
+                    }
+                    
+                    System.IO.File.Delete(tempfile);
+                }  
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>IOUtils.GetTempDirectory</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_IOUtils.GetTempDirectory_Input2.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_IOUtils.GetTempDirectory_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+               mstring s = mstring.Prepare(line);
+               string tempfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+               System.IO.File.WriteAllText(tempfile, s.ToString());
+               
+               if("1" == System.IO.File.ReadAllText(tempfile))
+               {
+                   output.Add(s, mstring.Prepare());
+               }
+               
+               System.IO.File.Delete(tempfile);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                      
+                mstring s = mstring.Prepare(key);
+                string tempfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                System.IO.File.WriteAllText(tempfile, s.ToString()); 
+                
+                if("1" == System.IO.File.ReadAllText(tempfile))
+               {
+                   output.Add(s);
+               }
+               
+               System.IO.File.Delete(tempfile);
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job> 
+    <Job>
+      <Narrative>
+        <Name>regression_test_IOUtils.GetTempDirectory_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_IOUtils.GetTempDirectory_Input.txt regression_test_IOUtils.GetTempDirectory_Output.txt regression_test_IOUtils.GetTempDirectory.xml");          
+            
+            Shell(@"Qizmt del regression_test_IOUtils.GetTempDirectory_Input.txt", true);
+            Shell(@"Qizmt del regression_test_IOUtils.GetTempDirectory_Input2.txt", true);
+            Shell(@"Qizmt del regression_test_IOUtils.GetTempDirectory_Output.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,231 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_outputDirection_asc_autoCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_cache");
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_Input*.txt");
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_Output*.txt");   
+               
+            Shell(@"Qizmt asciigen regression_test_outputDirection_asc_autoCache_Input1.txt 20000B");
+            
+            string f1 = IOUtils.GetTempDirectory() + @"\regression_test_outputDirection_asc_autoCache_Input1.txt";             
+            if(System.IO.File.Exists(f1))
+            {
+                System.IO.File.Delete(f1);
+            }
+            
+            Shell(@"Qizmt get regression_test_outputDirection_asc_autoCache_Input1.txt " + f1);                
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_outputDirection_asc_autoCache" Custodian="" Email="">
+      <Delta>
+        <Name>regression_test_outputDirection_asc_autoCache_Cache</Name>
+        <DFSInput>dfs://regression_test_outputDirection_asc_autoCache_Input*.txt</DFSInput>
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput>dfs://regression_test_outputDirection_asc_autoCache_OutputD.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+        <OutputDirection>ascending</OutputDirection>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          { 
+              for(int i = 0; i < values.Length; i++)
+              {                  
+                  output.Add(key);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_outputDirection_asc_autoCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_Input*.txt");
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_Output*.txt"); 
+            Shell(@"Qizmt asciigen regression_test_outputDirection_asc_autoCache_Input2.txt 20000B");
+            
+            string f2 = IOUtils.GetTempDirectory() + @"\regression_test_outputDirection_asc_autoCache_Input2.txt";   
+            
+            if(System.IO.File.Exists(f2))
+            {
+                System.IO.File.Delete(f2);
+            }
+            
+            Shell(@"Qizmt get regression_test_outputDirection_asc_autoCache_Input2.txt " + f2);             
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_outputDirection_asc_autoCache" Custodian="" Email="">
+      <Delta>
+        <Name>regression_test_outputDirection_asc_autoCache_Cache</Name>
+        <DFSInput>dfs://regression_test_outputDirection_asc_autoCache_Input*.txt</DFSInput>
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput>dfs://regression_test_outputDirection_asc_autoCache_OutputD.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+        <OutputDirection>ascending</OutputDirection>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          { 
+              for(int i = 0; i < values.Length; i++)
+              {                  
+                  output.Add(key);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_outputDirection_asc_autoCache_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {                          
+            string dir = IOUtils.GetTempDirectory();
+            string f1 = dir + @"\regression_test_outputDirection_asc_autoCache_Input1.txt";
+            string f2 = dir + @"\regression_test_outputDirection_asc_autoCache_Input2.txt";
+            
+            Shell(@"Qizmt put " + f1 + " regression_test_outputDirection_asc_autoCache_Input3.txt");
+            Shell(@"Qizmt put " + f2 + " regression_test_outputDirection_asc_autoCache_Input4.txt");
+            Shell(@"Qizmt combine regression_test_outputDirection_asc_autoCache_Input3.txt regression_test_outputDirection_asc_autoCache_Input4.txt +regression_test_outputDirection_asc_autoCache_Input5.txt");  
+            
+            System.IO.File.Delete(f1);
+            System.IO.File.Delete(f2);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_outputDirection_asc_autoCache" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_outputDirection_asc_autoCache_Input5.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_outputDirection_asc_autoCache_OutputA.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          { 
+              for(int i = 0; i < values.Length; i++)
+              {                  
+                  output.Add(key);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_reverseByteSlice_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string f1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            string f2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            
+            Shell(@"Qizmt get regression_test_outputDirection_asc_autoCache_OutputD.txt " + f1);
+            Shell(@"Qizmt get regression_test_outputDirection_asc_autoCache_OutputA.txt " + f2);
+            
+            if(CompareFiles(f1, f2))
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_outputDirection_asc_autoCache.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_outputDirection_asc_autoCache.xml 0");
+            }
+            
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_cache");
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_Input*.txt");
+            Shell(@"Qizmt del regression_test_outputDirection_asc_autoCache_Output*.txt");  
+            System.IO.File.Delete(f1);
+            System.IO.File.Delete(f2);
+        }
+        
+        private bool CompareFiles(string f1, string f2)
+        {
+            byte[] buf1 = null;
+            byte[] buf2 = null;
+            
+          buf1 = System.IO.File.ReadAllBytes(f1);
+                                  
+           buf2 = System.IO.File.ReadAllBytes(f2);            
+            
+            if(buf1.Length != buf2.Length)
+            {
+                return false;
+            }
+            
+            for(int i = 0; i < buf1.Length; i++)
+            {
+                if(buf1[i] != buf2[i])
+                {
+                    return false;
+                }
+            }
+            return true;            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

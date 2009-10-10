@@ -1,0 +1,203 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.ToDouble_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mstring.ToDouble_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.ToDouble_Output.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.ToDouble_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.ToDouble_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //label
+                    string s = rn.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)':');
+                    
+                    //double  
+                    double d = rnd.NextDouble();
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        d = d * -1;
+                    }
+                    
+                    s = d.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                     //double  
+                    d = rnd.NextDouble();
+                    
+                     if(rnd.Next() % 2 == 1)
+                    {
+                        d = d * -1;
+                    }
+                    
+                    s = d.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>mstring.ToDouble</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>3</KeyLength>
+        <DFSInput>dfs://regression_test_mstring.ToDouble_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mstring.ToDouble_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();                 
+                int col = sLine.IndexOf(':');
+                string label = sLine.Substring(0, col + 1);
+                
+                int del = sLine.IndexOf(',');
+                
+                mstring s = mstring.Prepare(sLine.Substring(col + 1, del - col - 1));
+                mstring s2 = mstring.Prepare(sLine.Substring(del + 1));
+                
+                double d = s.ToDouble();
+                double d2 = s2.ToDouble();
+               
+                int x = (int)Math.Round(d * 10);
+                string key = x.ToString();
+                
+                mstring val = mstring.Prepare();
+                val = val.AppendM(label).AppendM(d).AppendM(',').AppendM(d2);
+                
+                output.Add(mstring.Prepare(key), val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                               
+                for(int i = 0; i < values.Length; i++)
+                {
+                    string sLine = values.Items[i].ToString();                 
+                    int col = sLine.IndexOf(':');
+                    string label = sLine.Substring(0, col + 1);
+                    
+                    int del = sLine.IndexOf(',');
+                    
+                    mstring s = mstring.Prepare(sLine.Substring(col + 1, del - col - 1));
+                    mstring s2 = mstring.Prepare(sLine.Substring(del + 1));
+                    
+                    double d = s.ToDouble();
+                    double d2 = s2.ToDouble();
+                    
+                    mstring val = mstring.Prepare();
+                    val = val.AppendM(label).AppendM(d).AppendM(',').AppendM(d2);
+                    
+                    output.Add(val);                    
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.ToDouble_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring.ToDouble_Input.txt regression_test_mstring.ToDouble_Output.txt regression_test_mstring.ToDouble.xml double");          
+            
+            Shell(@"Qizmt del regression_test_mstring.ToDouble_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.ToDouble_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,252 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.ToByteSlice_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.ToByteSlice_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.ToByteSlice_Output.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.ToByteSlice_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.ToByteSlice_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 16;
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    int cnt = 0;
+                    while(cnt < stringLength)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        if(b != (byte)del)
+                        {
+                            onerow.Add(b);   
+                            cnt++;
+                        }
+                    }      
+                    
+                    onerow.Add((byte)del);
+                    
+                    //int 
+                    int x = rnd.Next();
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        x = x * -1;
+                    }
+                    
+                    string s = x.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //long 
+                    long l = DateTime.Now.Ticks + (long)rnd.Next();
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        l = l * (-1);
+                    }
+                    
+                    s = l.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //string  
+                    cnt = 0;
+                    while(cnt < stringLength)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        if(b != (byte)del)
+                        {
+                            onerow.Add(b);   
+                            cnt++;
+                        }
+                    }  
+                    
+                    onerow.Add((byte)del);
+                    
+                    //bool
+                    if(rnd.Next() % 2 == 0)
+                    {
+                        onerow.Add((byte)'0');
+                    }
+                    else
+                    {
+                        onerow.Add((byte)'1');
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.ToByteSlice</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.ToByteSlice_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.ToByteSlice_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString(); 
+                string[] parts = sLine.Split(',');
+                string s1 = parts[0];
+                int x = int.Parse(parts[1]);
+                long l = long.Parse(parts[2]);
+                string s2 = parts[3];
+                bool b;
+                if(parts[4] == "0")
+                {
+                    b = false;
+                }
+                else
+                {
+                    b = true;
+                }
+                
+                recordset rs = recordset.Prepare();
+                rs.PutString(s1);
+                rs.PutInt(x);
+                rs.PutLong(l);
+                rs.PutString(s2);
+                rs.PutBool(b);
+                
+                recordset key = recordset.Prepare();
+                key.PutInt(x % 10);
+                
+                ByteSlice bKey = key.ToByteSlice(Qizmt_KeyLength);
+                ByteSlice bVal = rs.ToByteSlice();
+                
+                output.Add(bKey, bVal);           
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rs = recordset.Prepare(values.Items[i]);
+                    ByteSlice bs = rs.ToByteSlice();
+                    
+                    recordset val = recordset.Prepare(bs);
+                    mstring s1 = rs.GetString();
+                    int x = rs.GetInt();
+                    long l = rs.GetLong();
+                    mstring s2 = rs.GetString();
+                    bool b = rs.GetBool();
+                    
+                    string s = s1.ToString() + "," + x.ToString() + "," + l.ToString() + "," + s2.ToString() + ",";
+                    
+                    if(b)
+                    {
+                        s += "1";
+                    }
+                    else
+                    {
+                        s += "0";
+                    }
+                    
+                    output.Add(ByteSlice.Prepare(s));                        
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.ToByteSlice_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.ToByteSlice_Input.txt regression_test_recordset.ToByteSlice_Output.txt regression_test_recordset.ToByteSlice.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.ToByteSlice_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.ToByteSlice_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

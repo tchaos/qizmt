@@ -1,0 +1,31 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_using_local_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Add Reference="system.printing.dll" Type="system"/>
+      <Add Reference="system.web.dll" Type="system"/>
+      <Using>System.Printing</Using>
+      <Using>System.Web</Using>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            
+            PrintJobStatus status = PrintJobStatus.Deleted;
+            AspNetHostingPermissionLevel permission = AspNetHostingPermissionLevel.Medium;
+            
+            if(status.ToString() == "Deleted" && permission.ToString() == "Medium")
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_using_local.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_using_local.xml 0");
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,32 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_maxUserLogsDriver_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_maxUserLogsDriver_Input.txt");
+            Shell(@"Qizmt del regression_test_maxUserLogsDriver_Output.txt");
+            
+            string r = Shell(@"Qizmt maxuserlogsview");
+            int maxuserlogs = Int32.Parse(r.Substring(22).Trim()); 
+            
+            r = Shell(@"Qizmt exec regression_test_maxUserLogs.xml " + maxuserlogs.ToString());
+            
+            if(r.IndexOf("dlog:" + maxuserlogs.ToString()) > -1)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_maxUserLogsDriver.xml 0");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_maxUserLogsDriver.xml 1");
+            }            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
