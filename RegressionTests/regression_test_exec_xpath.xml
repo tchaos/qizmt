@@ -1,0 +1,107 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_exec_xpath_Preprocessing">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            if(Qizmt_ExecArgs.Length > 1)
+            {
+            }
+            else
+            {
+                Shell(@"Qizmt del regression_test_exec_xpath_*.txt");
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_exec_xpath_remote">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_exec_xpath_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("a few lines");
+                dfsoutput.WriteLine("testing");
+                dfsoutput.WriteLine("xpath stuff!");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_exec_xpath_mapreduce">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput>dfs://regression_test_exec_xpath_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_exec_xpath_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(ByteSlice.Prepare(line, 0, 4), line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              IEnumerator<ByteSlice> evalues = values;
+              while(evalues.MoveNext())
+              {
+                  output.Add(evalues.Current);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_exec_xpath_Postprocessing">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            if(Qizmt_ExecArgs.Length > 1)
+            {
+                // New intput/output files were supploied, so check the new stuff and finish.
+                // Compare outputs of first (normal) and second (modified) runs:
+                Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_exec_xpath_Output.txt " + Qizmt_ExecArgs[1] + " regression_test_exec_xpath.xml"); 
+                Shell(@"Qizmt del regression_test_exec_xpath_*.txt");
+            }
+            else
+            {
+                // Input/output files aren't supplied in the args, so re-run these jobs with these modifications:
+                //Qizmt exec "//Job[@Name='regression_test_exec_xpath_remote']//DFSWriter=regression_test_exec_xpath_Input{new}.txt" "//Job[@Name='regression_test_exec_xpath_mapreduce']//DFSInput=regression_test_exec_xpath_Input{new}.txt" "//Job[@Name='regression_test_exec_xpath_mapreduce']//DFSOutput=regression_test_exec_xpath_Output{new}.txt" regression_test_exec_xpath.xml regression_test_exec_xpath_Input{new}.txt regression_test_exec_xpath_Output{new}.txt
+                string output = Shell(@"Qizmt exec"
+    + @" ""//Job[@Name='regression_test_exec_xpath_remote']//DFSWriter=regression_test_exec_xpath_Input{new}.txt"""
+    + @" ""//Job[@Name='regression_test_exec_xpath_mapreduce']//DFSInput=regression_test_exec_xpath_Input{new}.txt"""
+    + @" ""//Job[@Name='regression_test_exec_xpath_mapreduce']//DFSOutput=regression_test_exec_xpath_Output{new}.txt"""
+    + @" regression_test_exec_xpath.xml regression_test_exec_xpath_Input{new}.txt regression_test_exec_xpath_Output{new}.txt");
+                
+                
+                Qizmt_Log("Output of jobs modified by xpath:");
+                Qizmt_Log(output);
+            }
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

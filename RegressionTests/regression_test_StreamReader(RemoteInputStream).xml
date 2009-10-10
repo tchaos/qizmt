@@ -1,0 +1,240 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_StreamReader(RemoteInputStream)_Input*.txt");
+            Shell(@"Qizmt del regression_test_StreamReader(RemoteInputStream)_Output*.txt");
+            Shell(@"Qizmt asciigen regression_test_StreamReader(RemoteInputStream)_Input.txt 100MB 100B");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_StreamReader(RemoteInputStream)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_StreamReader(RemoteInputStream)_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                int cnt = 0;
+                System.IO.StreamReader r = new System.IO.StreamReader(dfsinput);
+                while(r.Peek() > -1)
+                {                    
+                    cnt++;
+                    string line = r.ReadLine();
+                    dfsoutput.WriteLine(line);                    
+                }                
+                r.Close();   
+                
+                Qizmt_Log("cnt=" + cnt.ToString());
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_StreamReader(RemoteInputStream)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_StreamReader(RemoteInputStream)_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                System.IO.StreamReader r = new System.IO.StreamReader(dfsinput);                
+                while(!r.EndOfStream)
+                {
+                    dfsoutput.WriteByte((byte)r.Read());         
+                }                
+                r.Close();            
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_StreamReader(RemoteInputStream)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_StreamReader(RemoteInputStream)_Output3.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                System.IO.StreamReader r = new System.IO.StreamReader(dfsinput);
+                char[] buf = new char[20];
+                int read = 0;
+                while((read = r.Read(buf, 0, buf.Length)) > 0)
+                {
+                    for(int i = 0; i < read; i++)
+                    {
+                        dfsoutput.WriteByte((byte)buf[i]);
+                    }
+                }                
+                r.Close();            
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_StreamReader(RemoteInputStream)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_StreamReader(RemoteInputStream)_Output4.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                System.IO.StreamReader r = new System.IO.StreamReader(dfsinput);
+                string content = r.ReadToEnd();
+                r.Close();            
+                dfsoutput.WriteLine(content.Trim());
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_StreamReader(RemoteInputStream)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_StreamReader(RemoteInputStream)_Output5.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                System.IO.StreamReader r = new System.IO.StreamReader(dfsinput);
+                char[] buf = new char[20];
+                int read = 0;
+                while((read = r.ReadBlock(buf, 0, buf.Length)) > 0)
+                {
+                    for(int i = 0; i < read; i++)
+                    {
+                        dfsoutput.WriteByte((byte)buf[i]);
+                    }
+                }                
+                r.Close();            
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_StreamReader(RemoteInputStream)_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string dir = IOUtils.GetTempDirectory();
+            string input = dir + @"\" + Guid.NewGuid().ToString();
+            string output1 = dir + @"\" + Guid.NewGuid().ToString();
+            string output2 = dir + @"\" + Guid.NewGuid().ToString();
+            string output3 = dir + @"\" + Guid.NewGuid().ToString();
+            string output4 = dir + @"\" + Guid.NewGuid().ToString();
+            string output5 = dir + @"\" + Guid.NewGuid().ToString();
+            
+            Shell(@"Qizmt get regression_test_StreamReader(RemoteInputStream)_Input.txt " + input);
+            Shell(@"Qizmt get regression_test_StreamReader(RemoteInputStream)_Output1.txt " + output1);
+            Shell(@"Qizmt get regression_test_StreamReader(RemoteInputStream)_Output2.txt " + output2);
+            Shell(@"Qizmt get regression_test_StreamReader(RemoteInputStream)_Output3.txt " + output3);
+            Shell(@"Qizmt get regression_test_StreamReader(RemoteInputStream)_Output4.txt " + output4);
+            Shell(@"Qizmt get regression_test_StreamReader(RemoteInputStream)_Output5.txt " + output5);
+            
+            bool ok = false;                        
+            ok = CompareFiles(input, output1);   
+            
+            if(ok)
+            {
+                Qizmt_Log("1ok");
+                ok = CompareFiles(input, output2); 
+                if(ok)
+                {
+                    Qizmt_Log("2ok");
+                    ok = CompareFiles(input, output3);
+                    if(ok)
+                    {
+                        Qizmt_Log("3ok");
+                        ok = CompareFiles(input, output4);   
+                        if(ok)
+                        {
+                            Qizmt_Log("4ok");
+                            ok = CompareFiles(input, output5);   
+                        }
+                    }
+                }
+            }        
+                 
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_StreamReader(RemoteInputStream).xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_StreamReader(RemoteInputStream).xml 0");
+            }
+            /*
+            Shell(@"Qizmt del regression_test_StreamReader(RemoteInputStream)_Input*.txt");
+            Shell(@"Qizmt del regression_test_StreamReader(RemoteInputStream)_Output*.txt");
+            System.IO.File.Delete(input);
+            System.IO.File.Delete(output1);
+            System.IO.File.Delete(output2);
+            System.IO.File.Delete(output3);
+            System.IO.File.Delete(output4);
+            System.IO.File.Delete(output5);*/
+        }
+                
+        private static bool CompareFiles(string f1, string f2)
+        {
+            System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+            System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+            System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+            bool ok = true;
+            for (int i = 0; i < info1.Length; i++)
+            {
+                int b1 = fs1.ReadByte();
+                int b2 = fs2.ReadByte();
+                if (b1 != b2)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            fs1.Close();
+            fs2.Close();
+            return ok;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

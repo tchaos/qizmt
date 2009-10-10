@@ -1,0 +1,236 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MReplace(string_mstring)_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Output.txt", true);   
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Output1.txt", true);    
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Output2.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.MReplace(string_mstring)_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.MReplace(string_mstring)_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 100;
+                int rowCount = 2000;               
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                       onerow.Add(b);   
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>mstring.MReplace(string_mstring)</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_mstring.MReplace(string_mstring)_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mstring.MReplace(string_mstring)_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();   
+                char key = sLine[0];
+                
+                string oldStr = sLine.Substring(10, 2);
+                mstring newStr = mstring.Prepare(sLine.Substring(30, 2));               
+                mstring ms = mstring.Prepare(line);                
+                mstring val = ms.MReplace(oldStr, ref newStr); 
+                output.Add(mstring.Prepare(key), val);     
+                
+                oldStr = sLine.Substring(20, 10);
+                newStr = mstring.Prepare(sLine.Substring(50, 30));
+                ms = mstring.Prepare(line);                
+                val = ms.MReplace(oldStr, ref newStr);  
+                output.Add(mstring.Prepare(key), val);                   
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int i = 0; i < values.Length; i++)
+                {
+                    string sLine = values.Items[i].ToString();  
+                    
+                    string oldStr = sLine.Substring(8, 3);
+                    mstring newStr = mstring.Prepare(sLine.Substring(90, 3));               
+                    mstring ms = mstring.Prepare(values.Items[i]);                
+                    mstring val = ms.MReplace(oldStr, ref newStr); 
+                    output.Add(val);     
+                    
+                    oldStr = sLine.Substring(80, 10);
+                    newStr = mstring.Prepare(sLine.Substring(20, 30));
+                    ms = mstring.Prepare(values.Items[i]);                
+                    val = ms.MReplace(oldStr, ref newStr);  
+                    output.Add(val);                   
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MReplace(string_mstring)_Imitate_Mapper</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_mstring.MReplace(string_mstring)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.MReplace(string_mstring)_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();
+                      
+                    string oldStr = sLine.Substring(10, 2);
+                    string newStr = sLine.Substring(30, 2); 
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));     
+                    
+                    oldStr = sLine.Substring(20, 10);
+                    newStr = sLine.Substring(50, 30);                   
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));                  
+                    
+                    sb.Length = 0;                    
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MReplace(string_mstring)_Imitate_Reducer</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_mstring.MReplace(string_mstring)_Output1.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.MReplace(string_mstring)_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();
+                      
+                    string oldStr = sLine.Substring(8, 3);
+                    string newStr = sLine.Substring(90, 3); 
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));     
+                    
+                    oldStr = sLine.Substring(80, 10);
+                    newStr = sLine.Substring(20, 30);                   
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));                  
+                    
+                    sb.Length = 0;                   
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MReplace(string_mstring)_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring.MReplace(string_mstring)_Output.txt regression_test_mstring.MReplace(string_mstring)_Output2.txt regression_test_mstring.MReplace(string_mstring).xml");          
+            
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Output.txt", true); 
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Output1.txt", true); 
+            Shell(@"Qizmt del regression_test_mstring.MReplace(string_mstring)_Output2.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,31 @@
+<SourceCode>
+  <Jobs>  
+    <Job Name="RDBMS_Distinct">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength></KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput></DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                output.Add(line, ByteSlice.Prepare());
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                output.Add(key);
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>

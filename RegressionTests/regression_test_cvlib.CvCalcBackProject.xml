@@ -1,0 +1,196 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_cvlib.CvCalcBackProject_Preprocessing">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_cvlib.CvCalcBackProject_Output.blob");
+            Shell(@"Qizmt del regression_test_cvlib.CvCalcBackProject_Output2.blob");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_cvlib.CvCalcBackProject" Description="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_cvlib.CvCalcBackProject_Output.blob</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                byte[] binimg = System.Convert.FromBase64String("Qk02MAAAAAAAADYAAAAoAAAAQAAAAEAAAAABABgAAAAAAAAAAADEDgAAxA4AAAAAAAAAAAAA29vbsLCwISEhDg4ODg4OODg4AAAA1tbWGxsbAAAAampqampqmJiYsLCwRkZGUFBQIyMjKysrFRUVQEBAY2NjISEhKysrTU1NampqTU1Nampq29vbzs7Ozs7O29vb////1tbWWVlZmJiYmJiYUFBQUFBQmJiYUFBQsLCwsLCwsLCwsLCwsLCw7u7u7u7u7u7u1tbW1tbW29vb29vb////ampq29vba2trR0dHGxsbGxsbGxsbJiYmPT09PT09PT0929vbmJiYISEhDg4OFRUVODg4kJCQa2trR0dHAAAATU1NampqmJiYsLCwRkZGUFBQKysrKysrFRUVISEhQEBAFRUVKysrTU1NampqTU1Nampq29vbzs7Ozs7O29vbzs7O1tbWWVlZmJiYUFBQRkZGUFBQmJiYmJiYZmZmZmZmZmZmZmZmsLCw7u7u7u7u7u7u7u7u////zs7Oampqzs7OTU1N////1tbWR0dHGxsbR0dHR0dHGxsbLCwsPT09LCws29vbUFBQISEhISEhFRUVAAAAkJCQa2trR0dHODg4TU1NampqsLCwmJiYUFBQUFBQKysrKysrFRUVFRUVISEhDg4OKysrTU1NampqTU1Nampq29vbzs7Ozs7O29vbzs7O7u7uZmZmRkZGRkZGKysrRkZGmJiYmJiYZmZmZmZmZmZmZmZmZmZm7u7u7u7u7u7u1tbW////zs7OampqTU1Nzs7O7u7u7u7ua2trR0dHR0dHR0dHR0dHLCwsLCwsLCwszs7ORkZGISEhISEhFRUVODg4ampqR0dHa2trODg4TU1N29vbsLCwmJiYRkZGRkZGKysrKysrFRUVFRUVISEhDg4OKysrampqampqampq29vb29vbzs7Ozs7O29vbzs7O////mJiYKysrKysrIyMjRkZGmJiYsLCwZmZmZmZmZmZmZmZm7u7u7u7u////7u7u1tbW1tbWampqampqAAAA1tbW7u7u////1tbWa2trR0dHa2trR0dHLCwsLCwsLCws////KysrQEBAISEhDg4OODg4zs7Oa2tr7u7uODg429vb29vbsLCwRkZGRkZGIyMjIyMjIyMjFRUVFRUVISEhKysrIyMjampqampqampq29vb29vbzs7Ozs7O29vbzs7Ozs7ORkZGODg4KysrKysrRkZGmJiYsLCwZmZmZmZmZmZmZmZm7u7u7u7u7u7u7u7u1tbW1tbWampqkJCQ29vba2trzs7Ozs7O7u7u1tbWR0dH1tbWa2trLCwsLCwsLCws////RkZGY2NjFRUVODg4AAAA////a2trzs7OODg429vbRkZGmJiYKysrKysrODg4ODg4KysrFRUVISEhQEBAKysrKysrampqTU1Nampq29vbzs7Ozs7Ozs7O29vb29vb29vbKysrODg4RkZGRkZGUFBQsLCwsLCwZmZmsLCwsLCw7u7u7u7u7u7u////7u7uZmZm////29vbAAAA7u7u1tbW29vb29vbzs7O7u7ua2tr7u7ua2trLCwsLCwsLCws7u7uUFBQY2NjDg4OAAAAODg47u7ua2trampqODg4RkZGKysrmJiYIyMjRkZGODg4ODg4KysrFRUVFRUVISEhKysrampq29vbampqampq29vbzs7Ozs7Ozs7O29vb29vbampqIyMjIyMjUFBQUFBQUFBQmJiYmJiYsLCw////7u7u7u7u////////////////sLCw////TU1Nampq1tbW////29vbzs7O29vbICAgBAQE29vb1tbWOTk5OTk5LCws7u7uUFBQdXV1Dg4OODg4AAAA7u7ua2trkJCQODg4UFBQIyMjmJiYIyMjUFBQKysrKysrRkZGFRUVFRUVFRUVKysrampq29vbampq29vb29vbzs7Ozs7Ozs7O29vbampqampqODg4IyMjUFBQUFBQUFBQmJiYzs7O////////7u7u7u7u////////////////mJiY////AAAA////1tbWzs7Ozs7Ozs7OAgICPDw8FBQUAAAA////SkpKSkpKOTk5zs7OmJiYRkZGKysrODg4ampq1tbW1tbWAAAAODg4UFBQsLCwFRUVAAAAKysrIyMjODg4AAAAQEBAY2NjAAAAODg4zs7O29vb29vb29vb29vb29vbzs7Ozs7Ozs7O29vbkJCQKysrKysrRkZGUFBQ////////////29vb////////////////7u7u////zs7OmJiYampqkJCQ1tbW////29vb7u7u29vbAAAAGRkZGRkZAAAA7u7uZmZmZmZmWVlZ////sLCwRkZGKysrODg4zs7O1tbW1tbWODg4Dg4OFRUVDg4OFRUVUFBQmJiYKysrmJiYISEhFRUVISEhISEhUFBQzs7O29vb29vb29vb29vb29vbzs7Ozs7Ozs7O29vbTU1NKysrKysr29vbzs7O////////zs7Ozs7Ozs7O////////////////////////29vbampq////7u7u29vbzs7O7u7uTU1NAAAAGRkZICAgAAAA1tbWZmZmsLCwsLCw////mJiYRkZGKysrAAAA////1tbW7u7uAAAAFRUVY2NjFRUVY2NjmJiYkJCQODg4ODg4Dg4OQEBAQEBAY2NjmJiYzs7Ozs7O29vb29vb29vb29vbzs7Ozs7Ozs7OampqampqRkZGRkZGzs7Ozs7O////////zs7O////zs7Ozs7O////zs7Ozs7O////////kJCQ29vb7u7uzs7Oampq////1tbWAAAAAgICFBQUPDw8kJCQ1tbWWVlZmJiYzs7Ozs7OmJiYKysrODg4AAAA7u7u1tbW////AAAAQEBAIiIiBQUFY2NjKysrAAAA29vbmJiYUFBQdXV1FRUVmJiYsLCw29vbzs7O29vb29vb29vb29vbzs7Ozs7Ozs7Oampq29vbUFBQzs7Ozs7Ozs7O////////////////29vbzs7O////zs7O////7u7u29vbkJCQ////////ampqampq////7u7uAAAADQ0NFBQUAwMDkJCQWVlZWVlZ////29vb29vbUFBQKysrODg4ODg47u7u1tbW29vbAAAAERERKysrAAAABQUFAAAA////JiYmOzs7JycnEhISAAAARkZGZmZmzs7O29vb29vb29vb29vb29vbzs7Ozs7Ozs7O29vbzs7OmJiY////////////zs7Ozs7Ozs7Ozs7Ozs7O////zs7O////////////kJCQzs7O7u7u29vbampq29vbzs7O29vbAAAAFhYWFBQUkJCQ29vbWVlZZmZm////ampqzs7OmJiYRkZGODg4ODg41tbW1tbWkJCQODg4BgYGIiIiERERKysrAAAA7u7uLCwsOzs7GRkZGRkZHx8fRkZGZmZmzs7O29vbzs7O29vb29vb29vbzs7Ozs7O////zs7Ozs7O////////////////////zs7Ozs7Ozs7O////zs7O29vbzs7Ozs7O29vbTU1N7u7u7u7uTU1Nampqzs7O29vbODg429vbICAgGRkZkJCQ////ZmZmZmZm29vbTU1Nzs7OUFBQKysrAAAAkJCQa2tr1tbWkJCQODg4BgYGBwcHKysrExMTODg4////LCwsDAwMEBAQEBAQGRkZRkZGsLCw////zs7Ozs7O29vb29vb29vbzs7Ozs7O////////////////7u7u////////zs7Ozs7Ozs7O29vb////zs7O29vb////29vb29vb7u7u1tbW////TU1NTU1N29vbTU1NODg47u7uFBQUICAgAAAA7u7uUFBQdXV1TU1NAAAAmJiYRkZGODg4AAAAAAAAa2tra2trAAAAODg4ERERBwcHBgYGQEBAODg4zs7ODg4ODAwMEBAQEBAQPT09Kysr7u7u////zs7Ozs7O29vb29vb29vbzs7Ozs7O////////zs7O////7u7u7u7u////zs7O29vb29vbampqzs7O29vbzs7O7u7uTU1Nampq1tbW7u7uampq29vbampq29vbAAAAODg4////a2trICAgkJCQzs7OZmZmsLCwTU1NkJCQKysrISEhISEhODg4ampq7u7uGxsbJiYmEhISAAAAJycndXV1ODg4AAAAZmZmPT09Ozs7DAwMOzs7ZmZmampq////zs7O29vbzs7O29vb29vbzs7Ozs7O////////////29vbzs7O7u7u7u7u7u7uzs7Oampqampqampq////sLCwsLCwmJiYkJCQampq7u7uampqampq29vb////ampqAAAAAAAA////Gxsb1tbWkJCQkJCQUFBQUFBQODg4ODg4ISEhFRUVFRUVAAAAkJCQ////JiYmOzs7CgoKAwMDAAAARkZGkJCQODg4sLCwLCwsWVlZSkpKsLCwODg4ampqzs7O29vbzs7O29vb29vb29vbzs7Ozs7O////////////29vbzs7O7u7uZmZm7u7u////ampqTU1Nampqzs7OsLCwsLCw////zs7O////zs7Oampqampq////1tbWAAAAAAAAkJCQ29vbGxsb1tbWkJCQAAAAampqKysrAAAAAAAAKysrAAAADg4OODg429vb7u7uJiYmOzs7CQkJERERBQUFmJiYTU1NAAAAZmZmLCwsZmZmODg4ODg4kJCQ29vb29vb29vbzs7Ozs7O29vbzs7Ozs7Ozs7Ozs7O////zs7O29vb29vb7u7uZmZm7u7u////ampqampqampq////mJiYsLCw29vb1tbW7u7uampqTU1Nzs7O////zs7OAAAAAAAAkJCQ7u7uGxsbUFBQampqAAAARkZGKysrAAAAODg4RkZGQEBADg4OODg4ampq7u7u1tbWAAAADg4OAAAAUFBQmJiYAAAAAAAAZmZmLCwsSkpKUFBQIyMjampqampqzs7Ozs7Ozs7Ozs7Ozs7Ozs7O29vbzs7Ozs7O////zs7O29vb29vb////7u7u7u7u////29vb29vbampq////////7u7uAAAA1tbW////ampqzs7Ozs7O7u7uzs7OkJCQAAAAkJCQ1tbWGxsbODg429vbODg4UFBQIyMjAAAAIyMjODg4UFBQDg4OAAAA29vb1tbW1tbWAAAAISEhERERY2NjIyMjODg4ODg4ZmZmLCwsZmZmAAAAAAAAampqampqzs7Ozs7Ozs7Ozs7Ozs7Ozs7O29vb29vb29vbzs7Ozs7Oampqampq////7u7u7u7u////zs7O29vb29vbzs7O////ampq29vb1tbW29vb29vb////7u7u////AAAA////TU1NkJCQ1tbWR0dHAAAAzs7OkJCQRkZGDg4ODg4OISEhUFBQRkZGAAAAkJCQ29vb7u7uzs7OODg4UFBQY2NjISEhUFBQTU1NAAAA7u7uLCwsWVlZODg4AAAA29vb29vb29vbzs7Ozs7Ozs7Ozs7Ozs7O29vb29vb29vbzs7Ozs7O29vb29vbzs7O////////////zs7Ozs7O////ampq////kJCQ7u7u////ampq29vbzs7O1tbWR0dH////zs7OODg4AwMDFBQU1tbWAAAA29vbTU1NRkZGAAAAFRUVY2NjUFBQODg4ODg4zs7O////1tbWzs7ORkZGQEBAQEBAQEBAsLCwampqODg4////JiYmZmZmODg4ODg4TU1N29vb29vbzs7O////zs7Ozs7Ozs7O29vb29vb29vbzs7Ozs7O29vbampq29vb////////////////zs7Ozs7OampqampqkJCQ1tbWzs7O29vb29vb////7u7uJiYmLCws////kJCQPDw8BAQEzs7OAAAAkJCQTU1NKysrDg4OQEBAHx8fODg4ODg4AAAAzs7Ozs7O7u7uTU1NIyMjQEBAUFBQRkZGODg4kJCQODg41tbWGxsbmJiYODg4AAAATU1N29vbzs7Ozs7Ozs7Ozs7Ozs7Ozs7O29vb29vb29vbzs7Ozs7O29vbampq29vbzs7O////////////////29vbzs7OkJCQzs7O7u7u29vb29vbzs7O////29vb29vbGxsbLCwsR0dHDQ0NFBQUTU1NAAAAkJCQTU1NIyMjDg4OdXV1DAwMKysrRkZGAAAA29vb7u7u7u7uAAAAQEBAUFBQsLCwUFBQIyMjIyMjAAAA7u7uGxsbmJiYODg4TU1N29vbampq29vbzs7Ozs7Ozs7Ozs7Ozs7O29vbampqampq29vbzs7O29vb29vb29vb29vbzs7O////////zs7O29vbkJCQAAAA7u7u////29vb29vbzs7O////ampqampqkJCQa2trR0dHFhYWGRkZTU1NAAAAAAAAkJCQUFBQKysrmJiYOTk5FRUVRkZGAAAA29vb7u7u////AAAAQEBARkZGmJiYUFBQKysrRkZGODg47u7uGxsbmJiYODg4TU1N29vb29vb29vbzs7Ozs7Ozs7Ozs7Ozs7O29vbampqampq29vbzs7O29vb29vb29vb29vbzs7Ozs7O////zs7OampqkJCQ29vb7u7uzs7O29vb29vbzs7Oampq29vbampqampqODg4AwMDICAgGRkZGxsbR0dHkJCQODg4ODg4UFBQ////R0dHDg4OODg4AAAA////7u7uzs7OODg4Y2NjRkZGUFBQUFBQRkZGKysrODg47u7uGxsbUFBQAAAATU1N29vbampq29vbzs7Ozs7Ozs7Ozs7Ozs7O29vb29vbampq29vbzs7Ozs7Ozs7O29vb29vbzs7Ozs7Ozs7O29vbTU1NAAAA////////29vbzs7Ozs7Ozs7OampqTU1NTU1NampqAAAAFhYWICAgBAQEGxsbLCwsLCwsGxsbzs7OAAAAAAAA1tbWFRUVAAAAAAAA7u7u1tbW29vbODg4Y2NjUFBQUFBQmJiYRkZGIyMjAAAA7u7uR0dHRkZGODg4ampq29vbampq29vbzs7Ozs7Ozs7Ozs7Ozs7O29vbampqampq29vbzs7O////////29vb29vb29vb29vbzs7O29vbAAAA29vb7u7uzs7Oampq29vbzs7O29vbkJCQAAAA////TU1NkJCQ////PDw8FBQUkJCQampqGxsbDg4OOzs7LCws////AAAAFRUVODg4kJCQ7u7u1tbWTU1NODg4QEBAUFBQRkZGUFBQRkZGDg4OODg41tbWR0dHRkZGAAAAampq29vbampq29vb29vb29vbzs7Ozs7Ozs7O29vbampqampq29vbzs7OsLCwmJiYzs7O29vbampqampq29vbampqAAAA7u7u////TU1N29vbzs7O////TU1NAAAAzs7O////AAAAODg47u7uGRkZICAgAAAAAAAAIyMjRkZGLCwsDg4OLCwsJiYmISEhAAAAampq7u7u1tbWkJCQAAAAAwMDRkZGIyMjUFBQKysrAAAAODg41tbWGxsbUFBQODg429vbzs7O29vb29vb29vb29vbzs7Ozs7O29vbampqampqampq29vb////sLCwsLCw29vbampqampqTU1NampqTU1NkJCQ1tbWzs7OTU1Nzs7Ozs7Ozs7OAAAAzs7Ozs7O29vbODg4TU1Na2trFBQUBAQE1tbWIyMjAAAAODg4ODg4AAAA1tbWJiYmDg4OODg4////1tbW1tbWAAAAFRUVJycnZmZmsLCwWVlZdXV1AAAAODg41tbWR0dHmJiYKysrzs7Ozs7O29vbzs7O29vb29vb29vb29vb29vbampqTU1Nampq29vb////sLCwsLCwzs7OampqTU1NTU1NampqTU1N////7u7u29vbampqzs7Ozs7OampqAAAAkJCQODg4UFBQODg4zs7OR0dHFBQUR0dHR0dHY2NjDg4ODg4OISEhAAAAODg4kJCQAAAAODg4zs7O1tbWa2trkJCQmJiYUFBQOTk5OTk5LCwsDAwMISEhAAAA1tbWR0dHmJiYRkZGzs7Ozs7O29vbzs7Ozs7Ozs7O29vb29vb29vbampqTU1Nampq29vb////sLCwsLCw29vbampqTU1NTU1NTU1NkJCQ1tbW////29vbampq29vb////TU1NKysrRkZGmJiYODg4UFBQAAAA1tbWAAAAkJCQAAAAODg4QEBADg4OAAAAKysrkJCQkJCQY2NjAAAAampq1tbWGxsbsLCwWVlZDAwMOTk5PT09Ozs7LCwsdXV1AAAA7u7ua2trmJiYUFBQzs7Ozs7Ozs7Ozs7O29vbzs7Ozs7O29vb29vbampqampq29vbzs7OUFBQUFBQUFBQ29vbAAAAkJCQTU1NkJCQ29vb1tbW////ampq29vbzs7O29vbIyMjRkZGRkZGRkZGAAAAODg4kJCQGRkZFBQUAAAAODg4ODg4QEBAQEBAKysrODg4TU1NampqQEBAODg4ampq1tbWJiYmWVlZSkpKOTk5PT09PT09Dg4OPT09Hx8fKysr7u7ua2trzs7OUFBQzs7Ozs7Ozs7Ozs7O29vbzs7Ozs7Ozs7O29vbampqampq29vbUFBQUFBQUFBQUFBQTU1NampqkJCQTU1NkJCQ7u7u1tbWzs7O29vbzs7O////kJCQRkZGFRUVRkZGKysrDg4OODg4AgICICAgFBQUAAAAAAAAODg4QEBAERERKysrODg4KysrRkZGDg4OODg4zs7O1tbWJiYmGRkZPT09PT09Ozs7DAwMBQUFGRkZDAwMUFBQ1tbWa2trzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7O29vbampqampq29vb29vbzs7OUFBQUFBQampq29vbTU1NkJCQkJCQa2tr////zs7O29vb////////ODg4RkZGFRUVIyMjODg4Dg4OODg4DQ0NICAgFBQUAAAAAAAAODg4ISEhERERKysrODg4IyMjKysrODg4AAAA////1tbWLCwsGRkZGRkZOzs7DAwMDAwMAAAADAwMEhISmJiY1tbWa2tr29vb29vbzs7Ozs7O29vbzs7Ozs7Ozs7Ozs7Ozs7O29vbampq29vb29vb29vb29vbzs7Ozs7O29vbTU1NampqODg4////1tbW29vbzs7Ozs7O7u7ukJCQAAAAODg4UFBQODg4ODg4Dg4OAAAAFhYWGRkZFBQUODg4AAAAkJCQY2NjERERIyMjODg4AAAAAAAAODg4kJCQ////a2trDg4OEBAQEBAQAgICAAAAAAAAAgICDAwMEhISmJiY1tbW1tbWTU1Nampq29vbzs7O29vbzs7O29vbzs7Ozs7Ozs7O29vbampq29vb29vbampq29vb29vb////29vbTU1NAAAAAAAA1tbWzs7Oampq29vb////////ODg4kJCQODg4UFBQIyMjAAAADg4OAAAAPDw8GRkZ1tbWAAAAODg4kJCQQEBAERERDg4OAAAAODg4AAAAODg429vb////a2trDg4OBAQEBAQEEBAQAgICAAAAAAAADAwMGRkZsLCw1tbW1tbWampqTU1N29vbzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7O29vb29vb29vb29vbampqampqTU1N////ampqampqAAAAzs7O7u7uampq29vb29vb7u7uampqODg4KysrIyMjRkZGKysrAAAAAAAATU1NICAgGRkZ1tbWODg4AAAAODg4ERERERERDg4OAAAAODg4ODg4AAAAzs7O7u7ua2trBQUFBAQEAAAAAgICAAAAAgICAAAADAwMGRkZsLCw1tbW1tbWzs7Oampq29vbzs7Ozs7Ozs7O29vbzs7O////zs7O29vb29vb29vbampqampqampqampqzs7O29vbTU1NkJCQ7u7uzs7Oampq29vb29vb7u7uAAAAODg4IyMj////KysrKysrAAAAAAAAzs7OICAgFBQU1tbWAAAAAAAAKysrERERBQUFDg4ODg4OODg4ODg4ODg4////////a2trBQUFAAAAAAAAAgICAgICBQUFAAAADAwMGRkZsLCw1tbW1tbW7u7u29vb29vbzs7Ozs7Ozs7O29vbzs7O////zs7O29vb29vb29vbampqTU1Nampq29vbkJCQ////ODg4zs7O1tbWampqampqampqzs7Ozs7OAAAAODg4IyMjampqAAAAIyMjAAAAAAAA////ICAgFBQU1tbWAAAAkJCQRkZGERERJycnQEBAFRUVDg4OAAAAODg4////////1tbWDg4OAAAAAAAAAAAABQUFAgICAgICDg4ODAwMsLCwR0dHa2tr7u7u////zs7O////////zs7Ozs7O////////29vbampq29vbzs7O29vbTU1NTU1NkJCQampqkJCQkJCQ1tbW7u7uTU1N29vbampq////TU1NODg4Dg4OAAAA7u7uAAAARkZGAAAAODg41tbWICAgFBQU7u7uAAAAKysrUFBQY2NjJycnERERFRUVDg4OODg4ODg47u7u////1tbWR0dHAAAADAwMBQUFBQUFDg4ODg4OJiYmZmZmmJiYR0dHa2tr7u7u1tbW1tbW7u7u////zs7Ozs7O////////zs7Oampqzs7Ozs7O29vbTU1Nampqampq29vbAAAAampq1tbWzs7Oampqampqzs7Ozs7OAAAAODg4FRUVAAAAampqAAAAAAAAODg4a2trR0dHDQ0NICAga2trAAAAKysrUFBQsLCwdXV1JycnDg4ODg4OODg4ODg47u7u////1tbWAAAAGxsbLCwsLCwsJiYmGxsbGxsba2trmJiYsLCwa2tra2tr1tbWR0dHR0dH1tbW////zs7Ozs7O////zs7O29vb29vbzs7Ozs7O29vbampqampqampqTU1NkJCQ7u7u7u7u29vb29vb29vb7u7uTU1NODg4ODg4FRUVAAAAAAAAampqISEhAAAAGxsbFBQUAwMDGRkZLCwsdXV1Dg4OUFBQsLCwsLCwJycnDg4ODg4OODg4ODg47u7u////7u7uAAAA29vba2tra2tr1tbW1tbW1tbW7u7usLCwWVlZa2tr1tbWR0dHGxsbR0dH1tbW7u7u////////zs7Ozs7O29vb29vbzs7O////zs7O29vb29vbampqAAAATU1N1tbW29vb29vb29vbzs7O7u7uAAAAAAAADg4OFRUVISEhAAAARkZGUFBQAAAAGxsbFBQUGRkZAAAADg4OExMTFRUVmJiYmJiYsLCwJycnDg4OODg4ODg4ODg47u7uzs7Ozs7OODg47u7ua2tr7u7u7u7u7u7u7u7u////sLCwa2tra2trBAQEJiYmJiYmGxsba2tr7u7u////////zs7O29vb29vb29vbzs7O////zs7O29vb29vbampqkJCQ////7u7uTU1Nzs7Oampq////7u7uAAAAAAAAQEBAAAAAmJiYAAAAODg4AAAAODg4kJCQFBQUICAgFBQUSkpKAAAAISEhmJiY29vbmJiYY2NjQEBAKysrODg4ODg47u7u////ampqAAAA////1tbW7u7u////////////zs7O////a2tra2trAAAALCwsDg4OJiYmR0dH1tbW////////zs7Oampqampq29vb////////zs7O29vb29vbampqkJCQ1tbW29vbampq29vb29vb7u7u29vbAAAAQEBAdXV1ODg4UFBQAAAAAAAAFRUVampqkJCQPDw8FhYWICAgAAAAAQEBERERsLCwampqzs7OUFBQY2NjKysrIyMjampq7u7u////kJCQAAAAzs7O////////zs7O29vbzs7Ozs7O7u7uR0dHR0dHAAAABQUFDAwMLCwsGxsb1tbW////zs7Ozs7OTU1Nampqzs7O////7u7u////UFBQRkZGRkZG7u7u7u7uTU1NampqTU1Nzs7O7u7uODg4AAAAQEBAHx8fAAAAAAAAODg4AAAAAAAAODg4FhYWPDw8ICAgPDw8ODg4AAAAJycnZmZm29vb29vbZmZmdXV1RkZGkJCQzs7O7u7u////kJCQAAAA////zs7O////zs7Ozs7O29vbzs7O////R0dHR0dHAAAADg4ODg4OJiYmR0dH7u7u////zs7Oampqampq29vb////7u7u7u7umJiYUFBQampq29vba2tr29vb29vbampqTU1Nzs7O////AAAAAAAAKysrsLCwODg4AAAAODg4AAAAERERAAAADQ0NICAgICAgPDw8ODg4AwMDERERsLCw////29vbmJiYUFBQRkZGKysrampq////1tbWAAAAAAAA////zs7O////29vb29vb29vb29vbzs7O1tbWGxsbGxsbJiYmGxsba2tr7u7u////zs7O29vb29vb29vb////7u7u1tbWmJiYzs7O////kJCQ////////29vb29vbampq29vb7u7uIyMjAAAADg4OAAAAAAAAIyMjFRUVFRUVFRUVAAAAAAAAFhYWPDw8GRkZPDw8AAAAFRUVBgYGAwMDISEhRkZGkJCQkJCQIyMjKysrTU1N////1tbWkJCQAAAAzs7O////////zs7O29vbDQ0Nampq29vb////a2tra2tr1tbW7u7u7u7uzs7Ozs7O29vb29vb29vbzs7O7u7u1tbWZmZm////////29vb29vb////29vb29vbzs7Oampqzs7Oa2trODg4Dg4OIyMjODg4AAAAIyMjISEhISEhFRUVDg4OAAAAFhYWPDw8FBQUFhYWAAAAFRUVBgYGBgYGAwMDFRUVkJCQkJCQIyMjFRUVampq////1tbWAAAATU1Nzs7O////////zs7O29vb29vb29vb29vbzs7O7u7u1tbWzs7O////////zs7O29vb29vb29vb29vb////1tbW1tbW////////////TU1N7u7u7u7uampqzs7Ozs7OkJCQzs7Oa2trODg4ISEhRkZGAAAAAAAARkZGISEhQEBAFRUVDg4OAAAAPDw8PDw8FBQUAAAAAAAAFRUVAwMDAwMDERERQEBAkJCQkJCQKysrFRUV29vb////7u7uODg4ampqzs7O////////zs7Ozs7O29vb29vb29vbzs7O7u7u7u7u////////////zs7O29vb29vbzs7Ozs7O////7u7u7u7uzs7O////zs7Ozs7O1tbW////ampq29vbampqkJCQ////a2trKysrY2NjmJiYTU1NkJCQmJiYY2NjQEBAFRUVODg4kJCQICAgPDw8FBQUAAAAODg4ISEhAwMDAwMDERERQEBAkJCQkJCQKysrFRUV29vb////////ODg429vbzs7O////zs7OFhYWzs7Ozs7O29vbTU1N29vb7u7u////zs7Ozs7Ozs7Ozs7O29vbzs7O////////////7u7u7u7u////////29vb1tbW1tbW29vbampq29vbkJCQTU1N7u7u1tbWUFBQsLCwsLCw29vbampqmJiYY2NjQEBAKysrODg429vbICAgPDw8FBQUAAAAAAAAISEhFRUVERERERERQEBATU1NTU1NFRUVFRUV29vb////zs7OAAAAzs7O////zs7OPDw8FhYWzs7Ozs7OampqTU1N29vb////////zs7Ozs7Ozs7O29vb29vbzs7O////////////////7u7u////////zs7O1tbW////ampq29vb29vbkJCQ29vb7u7u7u7uzs7OZmZmZmZmzs7O29vbsLCwdXV1Y2NjKysrAAAA////PDw8ICAgGRkZAAAAAAAAQEBAISEhISEhBQUFISEhRkZGKysrFRUVAwMD29vb7u7u29vbkJCQ////7u7uzs7OPDw8FhYW29vb29vbampqampqzs7O////zs7O29vbzs7O29vb29vb29vbzs7O////////7u7u7u7u7u7u7u7uzs7O7u7u7u7uzs7O29vb29vbTU1NampqICAg7u7u7u7uzs7OZmZmZmZm////////ZmZmdXV1dXV1RkZGAAAA7u7uPDw8ICAgICAgAAAATU1NFRUVFRUVISEhERERERERKysrKysrDg4OBgYG29vb7u7uTU1NkJCQ////7u7uzs7OFhYWFhYWampqampqampq29vbzs7Ozs7O29vb29vb29vb29vbampq29vb////7u7u////7u7u1tbW7u7u////29vb1tbWzs7Oampqzs7OampqkJCQ29vbGRkZGRkZ7u7uzs7OWVlZZmZm////////ZmZmUFBQdXV1ampqODg47u7uFhYWICAgPDw8ODg4RkZGFRUVRkZGISEhBQUFBQUFRkZGKysrDg4OAAAAzs7O////kJCQampq////////////FhYWFhYWampqampq29vbzs7Ozs7Ozs7O29vbFhYWFhYW29vb29vbzs7O////7u7u7u7u7u7u1tbW1tbW29vb1tbW////ampq29vb29vbampqampq////GRkZGRkZ7u7uampqWVlZWVlZ7u7uZmZmUFBQUFBQUFBQAAAAkJCQ////FhYWGRkZ29vbAAAAsLCwY2NjKysrKysrBQUFAAAAAAAAAAAAAAAAAAAAzs7O7u7u29vbzs7O7u7u////ICAgFhYWFhYWampqampqzs7Ozs7Ozs7O29vb29vbFhYWFhYW29vb29vbzs7O////7u7u7u7u1tbW1tbWzs7Ozs7O7u7uzs7O29vb29vb29vbzs7Oampq////GRkZGRkZzs7O29vbWVlZWVlZ7u7uZmZmUFBQUFBQZmZmkJCQkJCQzs7OFhYWGRkZTU1NAAAAQEBAFRUVkJCQAAAAISEhAwMDAAAAAAAAAAAAAAAA////7u7u7u7u////7u7u////ICAgFhYW29vbampq29vbzs7Ozs7Ozs7O29vb29vbFhYWFhYWampq29vbzs7O////7u7u1tbW1tbW7u7u29vb7u7u////29vb29vb29vb29vb////TU1N////GRkZGRkZ29vbzs7OWVlZWVlZZmZmZmZmHx8fUFBQsLCwAAAAampqPDw8FhYWGRkZAAAAAAAAFRUVAAAAAAAAAAAAISEhDg4OAAAAAAAAAAAAAAAA1tbW1tbW1tbW////////////PDw8PDw829vb29vbzs7Ozs7Ozs7Ozs7O29vbDQ0NFhYW29vb29vb29vbzs7O////1tbWa2tr1tbWzs7Ozs7O1tbW////29vbampqampqzs7O////TU1N1tbWGRkZGRkZ29vb29vbWVlZWVlZWVlZsLCwUFBQUFBQUFBQAAAA29vbFhYWFhYWICAgAAAADg4OJycnBQUFAAAAAAAAUFBQDg4OAAAAAAAAAAAAAAAAa2tr1tbW7u7u////////////PDw8zs7O29vb29vbzs7Ozs7Ozs7Ozs7O29vbDQ0NPDw8PDw829vbzs7O////7u7u1tbWa2tr7u7u29vb////1tbW29vb29vbTU1Nampq7u7uampqampq1tbWFBQUICAg29vbTU1NZmZmZmZmZmZmsLCwdXV1dXV1KysrkJCQ29vbFhYWFhYWPDw8ODg4QEBAKysrERERAAAAAAAAKysrIyMjAAAAAAAAAAAAAAAAa2tr7u7u////////////PDw8PDw8zs7Ozs7O29vbzs7Ozs7O29vb29vb29vbDQ0NPDw8zs7O29vb29vb////1tbW1tbW1tbW7u7uzs7O7u7u////ampq29vbTU1N29vb7u7ukJCQampq1tbWFBQUPDw8zs7OkJCQZmZmsLCwZmZmmJiYY2NjQEBAAAAAampqzs7ODQ0NPDw8ampqODg4JycnCQkJBQUFAAAAAAAAAAAAKysrAAAAAAAAAAAAAAAA1tbW7u7u////////PDw8PDw8PDw8zs7Ozs7Ozs7Ozs7Ozs7O29vb29vb29vb29vbPDw8zs7O29vb29vb7u7u1tbWa2tr1tbW////7u7u7u7uzs7Oampqampqampq29vb29vbIyMjzs7Oa2trGRkZPDw829vbAAAAsLCwmJiYsLCwUFBQY2NjISEhAAAAzs7Ozs7ODQ0NICAgAAAAAAAABQUFCQkJJycnAAAAAAAAAAAAKysrAAAAAAAAODg4ODg4a2tra2tr7u7u7u7uPDw8PDw8PDw8zs7O////////zs7Ozs7O29vb29vb29vb29vb7u7u7u7u////////7u7ua2tra2tr7u7uzs7O1tbW7u7u29vb29vbampqampqTU1NAAAARkZGzs7Oa2trGRkZICAgampqkJCQmJiYRkZGsLCwRkZGQEBAISEhODg4////zs7OAwMDICAgkJCQAAAAAQEBBgYGIiIiAAAAAAAAAAAARkZGAAAAODg4KysrIyMj");
+                
+                Blob blob = Blob.Prepare("BackProject_Output.bmp", binimg);
+                dfsoutput.WriteBinary(blob);
+                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_cvlib.CvCalcBackProject" Description="">
+      <OpenCVExtension/>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_cvlib.CvCalcBackProject_Output2.blob</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                openCV.IplImage[] src = new openCV.IplImage[2];
+                
+                {
+                    byte[] bin = System.Convert.FromBase64String("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");
+                    System.IO.MemoryStream ms = new System.IO.MemoryStream(bin);
+                    System.Drawing.Bitmap bm = new System.Drawing.Bitmap(ms);
+                    ms.Close();
+                    src[0] = openCV.cvlib.ToIplImage(bm, true); // dispose=true
+                }
+                
+                {
+                    byte[] bin = System.Convert.FromBase64String("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");
+                    System.IO.MemoryStream ms = new System.IO.MemoryStream(bin);
+                    System.Drawing.Bitmap bm = new System.Drawing.Bitmap(ms);
+                    ms.Close();
+                    src[1] = openCV.cvlib.ToIplImage(bm, true); // dispose=true
+                }
+                
+                
+                
+                openCV.CvRect rect = openCV.cvlib.cvRect(0, 0, 64, 64);
+                //openCV.CvRect rect = openCV.cvlib.cvRect(24, 24, 32, 32);
+                
+                openCV.cvlib.CvSetImageROI(ref src[0], rect);
+                
+                openCV.IplImage[] hsv = new openCV.IplImage[2];
+                openCV.IplImage[] h_plane = new openCV.IplImage[2];
+                openCV.IplImage[] s_plane = new openCV.IplImage[2];
+                openCV.IplImage[] v_plane = new openCV.IplImage[2];
+                openCV.IplImage[][] planes = new openCV.IplImage[2][];
+                planes[0] = new openCV.IplImage[2];
+                planes[1] = new openCV.IplImage[2];
+                openCV.IplImage[] hist_img = new openCV.IplImage[2];
+                openCV.CvHistogram[] hist = new openCV.CvHistogram[2];
+                
+                int h_bins = 16, s_bins = 16;
+                int[] hist_size = new int[] { h_bins, s_bins };
+                float[] h_ranges = new float[] { 0, 180 };          // hue is [0,180]
+                float[] s_ranges = new float[] { 0, 255 };
+                float[][] ranges = new float[][] { h_ranges, s_ranges };
+                int scale = 10;
+                
+                openCV.IplImage dst = openCV.cvlib.CvCreateImage(openCV.cvlib.CvGetSize(ref src[0]), 8, 1);
+                
+                // Loop over both src images...
+                for (int i = 0; i < 2; i++)
+                {
+                    hsv[i] = openCV.cvlib.CvCreateImage(openCV.cvlib.CvGetSize(ref src[i]), 8, 3);
+                    openCV.cvlib.CvCvtColor(ref src[i], ref hsv[i], openCV.cvlib.CV_BGR2HSV);
+
+                    h_plane[i] = openCV.cvlib.CvCreateImage(openCV.cvlib.CvGetSize(ref src[i]), 8, 1);
+                    s_plane[i] = openCV.cvlib.CvCreateImage(openCV.cvlib.CvGetSize(ref src[i]), 8, 1);
+                    v_plane[i] = openCV.cvlib.CvCreateImage(openCV.cvlib.CvGetSize(ref src[i]), 8, 1);
+                    planes[i][0] = h_plane[i];
+                    planes[i][1] = s_plane[i];
+                    openCV.cvlib.CvSplit(ref hsv[i], ref h_plane[i], ref s_plane[i], ref v_plane[i]);
+
+                    hist[i] = openCV.cvlib.CvCreateHist(2, hist_size, openCV.cvlib.CV_HIST_ARRAY, ranges, 1);
+
+                    openCV.cvlib.CvPtrArray pai = new openCV.cvlib.CvPtrArray(planes[i].Length);
+                    for (int j = 0; j < planes[i].Length; j++)
+                    {
+                        pai.Add(ref planes[i][j]);
+                    }
+                    openCV.cvlib.CvCalcHist(pai, ref hist[i], 0, IntPtr.Zero);
+                    
+                    hist_img[i] = openCV.cvlib.CvCreateImage(
+                        openCV.cvlib.CvSize(h_bins * scale, s_bins * scale),
+                        8, 3);
+                    
+                    float max_value = 0;
+                    openCV.cvlib.CvGetMinMaxHistValue(ref hist[i], ref (new float[1])[0], ref max_value, ref (new int[1])[0], ref (new int[1])[0]);
+
+                    for (int h = 0; h < h_bins; h++)
+                    {
+                        for (int s = 0; s < s_bins; s++)
+                        {
+                            float bin_val = (float)openCV.cvlib.CvGetReal2D(hist[i].bins, h, s);
+                            int intensity = openCV.cvlib.CvRound(bin_val * 255 / max_value);
+                            openCV.cvlib.CvRectangle(
+                                ref hist_img[i],
+                                openCV.cvlib.CvPoint(h * scale, s * scale),
+                                openCV.cvlib.CvPoint((h + 1) * scale - 1, (s + 1) * scale - 1),
+                                openCV.cvlib.CV_RGB(intensity, intensity, intensity),
+                                openCV.cvlib.CV_FILLED, 8, 0);
+                        }
+                    }
+                }
+                
+                
+                {
+                    openCV.cvlib.CvPtrArray pa1 = new openCV.cvlib.CvPtrArray(planes[1].Length);
+                    for (int j = 0; j < planes[1].Length; j++)
+                    {
+                        pa1.Add(ref planes[1][j]);
+                    }
+                    openCV.cvlib.CvCalcBackProject(pa1, ref dst, ref hist[0]);
+                }
+                
+                //openCV.cvlib.CvSaveImage(@"c:\temp\regression_test_BackProject_Output.jpg", ref dst);
+                byte[] binimg;
+                {
+                    openCV.IplImage xdst = openCV.cvlib.CvCreateImage(openCV.cvlib.CvGetSize(ref dst), (int)openCV.cvlib.IPL_DEPTH_8U, 3);
+                    openCV.cvlib.CvCvtColor(ref dst, ref xdst, openCV.cvlib.CV_GRAY2RGB);
+                    System.Drawing.Bitmap bmp = openCV.cvlib.ToBitmap(xdst, false); // dispose=false
+                    openCV.cvlib.CvReleaseImage(ref xdst);
+                    System.IO.MemoryStream ms = new System.IO.MemoryStream();
+                    bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
+                    binimg = ms.ToArray();
+                    ms.Close();
+                }
+                
+                openCV.cvlib.CvReleaseImage(ref dst);
+                openCV.cvlib.CvReleaseImage(ref hsv[0]);
+                openCV.cvlib.CvReleaseImage(ref hsv[1]);
+
+                openCV.cvlib.CvReleaseImage(ref h_plane[0]); openCV.cvlib.CvReleaseImage(ref h_plane[1]);
+                openCV.cvlib.CvReleaseImage(ref s_plane[0]); openCV.cvlib.CvReleaseImage(ref s_plane[1]);
+                openCV.cvlib.CvReleaseImage(ref v_plane[0]); openCV.cvlib.CvReleaseImage(ref v_plane[1]);
+                openCV.cvlib.CvReleaseImage(ref hist_img[0]); openCV.cvlib.CvReleaseImage(ref hist_img[1]);
+                
+                Blob blob = Blob.Prepare("BackProject_Output.bmp", binimg);
+                dfsoutput.WriteBinary(blob);
+                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="Post-processing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_cvlib.CvCalcBackProject_Output.blob regression_test_cvlib.CvCalcBackProject_Output2.blob regression_test_cvlib.CvCalcBackProject.xml");          
+            
+            Shell(@"Qizmt del regression_test_cvlib.CvCalcBackProject_Output.blob");
+            Shell(@"Qizmt del regression_test_cvlib.CvCalcBackProject_Output2.blob");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

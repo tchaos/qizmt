@@ -1,0 +1,218 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="Preprocessing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvLaplace_Input.blob");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvLaplace_Output.txt");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvLaplace_Output2.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="Create sample data" Custodian="" email="">      
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_cvlib.CvLaplace_Input.blob</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample image.
+                string pic64 = @"Qk1mDAAAAAAAADYAAAAoAAAAIgAAAB4AAAABABgAAAAAADAMAAAAAAAAAAAAAAAAAAAAAAAA////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAP///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wAA////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAP///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wAA////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////////////////////////////AAD///////////////////////8AAAD///////////////////////////////////////////////////////////////////////////8AAAD///////////////////////////8AAP///////////////////////wAAAP///////////////////////////////////////////////////////////////////////////wAAAP///////////////////////////wAA////////////////////////AAAA////////////////////////////////////////////////////////////////////////////AAAA////////////////////////////AAD///////////////////////8AAAD///////////////////////////////////////////////////////////////////////////8AAAD///////////////////////////8AAP///////////////////////wAAAP///////////////////////////////////////////////////////////////////////////wAAAP///////////////////////////wAA////////////////////////AAAA////////////////////////////////////////////////////////////////////////////AAAA////////////////////////////AAD///////////////////////8AAAD///////////////////////////////////////////////////////////////////////////8AAAD///////////////////////////8AAP///////////////////////wAAAP///////////////////////////////////////////////////////////////////////////wAAAP///////////////////////////wAA////////////////////////AAAA////////////////////////////////////////////////////////////////////////////AAAA////////////////////////////AAD///////////////////////8AAAD///////////////////////////////////////////////////////////////////////////8AAAD///////////////////////////8AAP///////////////////////wAAAP///////////////////////////////////////////////////////////////////////////wAAAP///////////////////////////wAA////////////////////////AAAA////////////////////////////////////////////////////////////////////////////AAAA////////////////////////////AAD///////////////////////8AAAD///////////////////////////////////////////////////////////////////////////8AAAD///////////////////////////8AAP///////////////////////wAAAP///////////////////////////////////////////////////////////////////////////wAAAP///////////////////////////wAA////////////////////////AAAA////////////////////////////////////////////////////////////////////////////AAAA////////////////////////////AAD///////////////////////8AAAD///////////////////////////////////////////////////////////////////////////8AAAD///////////////////////////8AAP///////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////////////////////////wAA////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAP///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wAA////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAP///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wAA";
+                
+                byte[] data = Convert.FromBase64String(pic64);
+                string imgName = "rectangle.bmp";
+                Blob blob = Blob.Prepare(imgName, data);                
+                dfsoutput.WriteBinary(blob);          
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="M/R" Custodian="" email="">
+       <OpenCVExtension/>      
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>260</KeyLength>
+        <DFSInput>dfs://regression_test_cvlib.CvLaplace_Input.blob</DFSInput>
+        <DFSOutput>dfs://regression_test_cvlib.CvLaplace_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                Blob blob = line.ReadBinary();
+                string imgName = blob.name;
+                byte[] data = blob.data;
+                
+                mstring key = mstring.Prepare(imgName);
+                recordset value = recordset.Prepare();
+                value.PutBytes(data, 0, data.Length);
+                
+                output.Add(key, value);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              string imgName = mstring.Prepare(UnpadKey(key)).ToString();
+              byte[] data = values[0].Value.ToBytes();
+              
+              System.IO.MemoryStream ms = new System.IO.MemoryStream(data);
+              System.Drawing.Bitmap srcBmp = new System.Drawing.Bitmap(ms);
+              ms.Close();
+              
+              int err = Laplace(srcBmp);
+              srcBmp = null;
+              
+              output.Add(mstring.Prepare(err));
+          }
+          
+          private int Laplace(System.Drawing.Bitmap srcBmp)
+        {
+            openCV.IplImage image = openCV.cvlib.ToIplImage(srcBmp, false);
+            int i;
+            openCV.IplImage[] planes = new openCV.IplImage[3];
+            openCV.IplImage laplace;
+
+            for (i = 0; i < 3; i++)
+            {
+                planes[i] = openCV.cvlib.CvCreateImage(new openCV.CvSize(image.width, image.height), 8, 1);
+            }
+
+            unchecked 
+            {
+                laplace = openCV.cvlib.CvCreateImage(new openCV.CvSize(image.width, image.height), (int)openCV.cvlib.IPL_DEPTH_16S, 1);
+            }
+
+            openCV.IplImage colorlaplace = openCV.cvlib.CvCreateImage(new openCV.CvSize(image.width, image.height), 8, 3);
+
+            openCV.cvlib.CvSplit(ref image, ref planes[0], ref planes[1], ref planes[2]);
+            
+            int err = 0;
+
+            for (i = 0; i < 3; i++)
+            {
+                openCV.cvlib.CvLaplace(ref planes[i], ref laplace, 1);
+                
+                err = openCV.cvlib.CvGetErrStatus();
+                
+                if(err != 0)
+                {
+                    if (image.imageData != IntPtr.Zero)
+                    {
+                        openCV.cvlib.CvReleaseImage(ref image);
+                    }
+                    if (laplace.imageData != IntPtr.Zero)
+                    {
+                        openCV.cvlib.CvReleaseImage(ref laplace);
+                    }
+                    if (colorlaplace.imageData != IntPtr.Zero)
+                    {
+                        openCV.cvlib.CvReleaseImage(ref colorlaplace);
+                    }
+                    for (i = 0; i < 3; i++)
+                    {
+                        openCV.cvlib.CvReleaseImage(ref planes[i]);
+                    }
+                    
+                    return err;
+                }
+
+                openCV.cvlib.CvConvertScaleAbs(ref laplace, ref planes[i], 1, 0);
+            }
+
+            openCV.cvlib.CvMerge(ref planes[0], ref planes[1], ref planes[2], ref colorlaplace);
+
+            System.Drawing.Bitmap bmp = openCV.cvlib.ToBitmap(colorlaplace, false);
+            System.IO.MemoryStream ms = new System.IO.MemoryStream();
+            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
+            byte[] result = ms.ToArray();
+            ms.Close();
+            ms = null;
+            bmp = null;
+
+            if (image.imageData != IntPtr.Zero)
+            {
+                openCV.cvlib.CvReleaseImage(ref image);
+            }
+            if (laplace.imageData != IntPtr.Zero)
+            {
+                openCV.cvlib.CvReleaseImage(ref laplace);
+            }
+            if (colorlaplace.imageData != IntPtr.Zero)
+            {
+                openCV.cvlib.CvReleaseImage(ref colorlaplace);
+            }
+
+            for (i = 0; i < 3; i++)
+            {
+                openCV.cvlib.CvReleaseImage(ref planes[i]);
+            }
+
+            return err;
+        }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>   
+    <Job Name="Post-processing" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_cvlib.CvLaplace_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {                            
+                dfsoutput.WriteLine("0");
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="Post-processing" Custodian="" email="">      
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_cvlib.CvLaplace_Output.txt regression_test_cvlib.CvLaplace_Output2.txt regression_test_cvlib.CvLaplace.xml");          
+            
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvLaplace_Input.blob");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvLaplace_Output.txt");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvLaplace_Output2.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

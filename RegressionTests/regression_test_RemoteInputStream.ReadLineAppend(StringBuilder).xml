@@ -1,0 +1,113 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Input*.txt", true);
+            Shell(@"Qizmt del regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Output.txt", true);
+            Shell(@"Qizmt asciigen regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Input.txt 200MB 100B", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)" Custodian="" Email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Input2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    dfsoutput.WriteLine(sb.ToString());
+                    sb.Length = 0;
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>RemoteInputStream.ReadLineAppend(StringBuilder)</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Input2.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {               
+               output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                      
+                for(int i = 0; i < values.Length; i++)
+                {
+                    output.Add(key);
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Input.txt regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Output.txt regression_test_RemoteInputStream.ReadLineAppend(StringBuilder).xml");          
+            
+            Shell(@"Qizmt del regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Input*.txt", true);
+            Shell(@"Qizmt del regression_test_RemoteInputStream.ReadLineAppend(StringBuilder)_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

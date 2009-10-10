@@ -1,0 +1,47 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RegressionTest2", "RegressionTest2\RegressionTest2.csproj", "{6687D78D-0396-4181-8A64-33182BFA9B84}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mrdebugee", "mrdebugee\mrdebugee.csproj", "{CDC267D1-1F6E-4008-8E3B-B93EB0983768}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Surrogate", "..\..\Surrogate\Surrogate.csproj", "{ED7CFA32-911C-4E41-A4E8-8D7E325DF6E7}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 4
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://tfs:8080/
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = RegressionTest2\\RegressionTest2.csproj
+		SccProjectName1 = RegressionTest2
+		SccLocalPath1 = RegressionTest2
+		SccProjectUniqueName2 = mrdebugee\\mrdebugee.csproj
+		SccProjectName2 = mrdebugee
+		SccLocalPath2 = mrdebugee
+		SccProjectUniqueName3 = ..\\..\\Surrogate\\Surrogate.csproj
+		SccProjectName3 = ../../Surrogate
+		SccLocalPath3 = ..\\..\\Surrogate
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6687D78D-0396-4181-8A64-33182BFA9B84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6687D78D-0396-4181-8A64-33182BFA9B84}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6687D78D-0396-4181-8A64-33182BFA9B84}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6687D78D-0396-4181-8A64-33182BFA9B84}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDC267D1-1F6E-4008-8E3B-B93EB0983768}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDC267D1-1F6E-4008-8E3B-B93EB0983768}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDC267D1-1F6E-4008-8E3B-B93EB0983768}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDC267D1-1F6E-4008-8E3B-B93EB0983768}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED7CFA32-911C-4E41-A4E8-8D7E325DF6E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED7CFA32-911C-4E41-A4E8-8D7E325DF6E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED7CFA32-911C-4E41-A4E8-8D7E325DF6E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED7CFA32-911C-4E41-A4E8-8D7E325DF6E7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

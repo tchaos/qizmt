@@ -1,0 +1,18 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="local_Preprocessing" Custodian="" Email="">
+      <SuppressDefaultOutput/>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            throw new Exception("orange");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

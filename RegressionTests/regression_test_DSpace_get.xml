@@ -1,0 +1,195 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_DSpace_get_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_DSpace_get_Input0.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Input1.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Input2.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Input3.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Result1.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Result2.txt", true);
+            
+            string dir = IOUtils.GetTempDirectory() + @"\dspaceGetTest\";
+            
+            if(System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.Delete(dir, true);
+            }
+            System.IO.Directory.CreateDirectory(dir);
+            
+            int stringLength = 2;
+            int rowCount = 2000;
+            Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+            string[] fns = new string[4];
+            
+            for(int i = 0; i < fns.Length; i++)
+            {                
+                fns[i] = "regression_test_DSpace_get_Input" + i.ToString() + ".txt";
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(dir + fns[i]);
+            
+                string onerow = "";
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow = "";    
+                    for(int cnt = 0; cnt < stringLength; cnt++)
+                    {
+                        char c = (char)rnd.Next((int)' ' + 1, (int)'~' + 1);                           
+                        onerow += c; 
+                    }     
+                    writer.WriteLine(onerow);        
+                }    
+                
+                writer.Close(); 
+                
+                Shell(@"Qizmt put " + dir + fns[i], true);
+            }
+            
+            string d1 = IOUtils.GetTempDirectory() + @"\dspaceGetTest\d1\";
+            if(System.IO.Directory.Exists(d1))
+            {
+                System.IO.Directory.Delete(d1, true);
+            }
+            System.IO.Directory.CreateDirectory(d1);
+            
+            int error = 0;
+            
+            for(int round = 0; round < 2; round++)
+            {           
+                string parts = "";
+                if(round == 1)
+                {
+                    parts = "parts=0-0 ";
+                }
+                
+                //TEST 1
+                Shell(@"Qizmt get " + parts + fns[0] + " " + d1 + fns[0], true);
+                            
+                if(!CompareFiles(dir + fns[0], d1 + fns[0]))
+                {
+                    error++;
+                }
+                
+                System.IO.File.Delete(d1 + fns[0]);
+                
+                //TEST 2
+                Shell(@"Qizmt get " + parts + fns[0] + " " + d1 + "regression_test_DSpace_get_Input0.gz", true);
+                           
+                if(!CompareFiles(dir + fns[0], d1 + "regression_test_DSpace_get_Input0.part0.gz"))
+                {
+                    error++;
+                }
+                            
+                System.IO.File.Delete(d1 + "regression_test_DSpace_get_Input0.part0.gz");
+                
+                //TEST 3
+                Shell(@"Qizmt get " + parts + "regression_test_DSpace_get_Input*.txt " + d1, true);
+                
+                for(int i = 0; i < fns.Length; i++)
+                {
+                    if(!CompareFiles(dir + fns[i],  d1 + fns[i]))
+                    {
+                        error++;
+                    } 
+                    
+                    System.IO.File.Delete(d1 + fns[i]);
+                }   
+            }
+            
+            System.IO.File.WriteAllText(d1 + "result1.txt", "0");
+            System.IO.File.WriteAllText(d1 + "result2.txt", error.ToString());
+            
+            Shell(@"Qizmt put " + d1 + "result1.txt regression_test_DSpace_get_Result1.txt");
+            Shell(@"Qizmt put " + d1 + "result2.txt regression_test_DSpace_get_Result2.txt");
+            
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_DSpace_get_Result1.txt regression_test_DSpace_get_Result2.txt regression_test_DSpace_get.xml");       
+            
+            System.IO.Directory.Delete(dir, true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Input0.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Input1.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Input2.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Input3.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Result1.txt", true);
+            Shell(@"Qizmt del regression_test_DSpace_get_Result2.txt", true);            
+        }
+        
+        private bool CompareFiles(string f1, string f2)
+        {
+            byte[] buf1 = null;
+            byte[] buf2 = null;
+            
+            if(f1.EndsWith(".gz"))
+            {
+                buf1 = DecompressFile(f1);
+            }
+            else
+            {
+                buf1 = System.IO.File.ReadAllBytes(f1);
+            }
+           
+            if(f2.EndsWith(".gz"))
+            {
+                buf2 = DecompressFile(f2);
+            }
+            else
+            {
+                buf2 = System.IO.File.ReadAllBytes(f2);
+            }
+            
+            if(buf1.Length != buf2.Length)
+            {
+                return false;
+            }
+            
+            for(int i = 0; i < buf1.Length; i++)
+            {
+                if(buf1[i] != buf2[i])
+                {
+                    return false;
+                }
+            }
+            return true;            
+        }
+        
+        private byte[] DecompressFile(string fname)
+        {
+            System.IO.FileStream _fs = new System.IO.FileStream(fname, System.IO.FileMode.Open);
+            System.IO.Compression.GZipStream fs = new System.IO.Compression.GZipStream(_fs, System.IO.Compression.CompressionMode.Decompress);
+            List<byte> buf = new List<byte>();
+
+            for (; ; )
+            {
+                int ib = fs.ReadByte();
+
+                if (ib != -1)
+                {
+                    buf.Add((byte)ib);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            _fs.Close();
+            fs.Close();
+
+            return buf.ToArray();
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

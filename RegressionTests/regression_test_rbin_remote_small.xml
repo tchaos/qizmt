@@ -1,0 +1,127 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_remote_small_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_rbin_remote_small_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_remote_small_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_remote_small</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = "regression_test_rbin_remote_small_Input.gensort";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            System.IO.File.WriteAllBytes(localfn, Encoding.UTF8.GetBytes("\0\nAB\0\nCD\0\nEF\0\nGH\0\nIJ\0\nKL\0\nMN"));
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn + "@4");
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_rbin_remote_small_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>regression_test_rbin_remote_small_Input.gensort@4</DFSReader>
+          <DFSWriter>dfs://regression_test_rbin_remote_small_Output.gensort@2</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                List<byte> input = new List<byte>();
+                List<byte> output = new List<byte>();
+                
+                for(;;)
+                {
+                    input.Clear();
+                    if(!dfsinput.ReadRecordAppend(input))
+                    {
+                        break;
+                    }
+                    if(input.Count != 4)
+                    {
+                        throw new Exception("input: expected record length of 4");
+                    }
+                    if(input[0] != '\0' || input[1] != '\n')
+                    {
+                        throw new Exception("input: first-2-bytes mismatch");
+                    }
+                    output.Clear();
+                    output.Add(input[0]);
+                    output.Add(input[1]);
+                    dfsoutput.WriteRecord(output);
+                    output.Clear();
+                    output.Add(input[2]);
+                    output.Add(input[3]);
+                    dfsoutput.WriteRecord(output);
+                }
+                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_remote_small_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_rbin_remote_small_Input.gensort regression_test_rbin_remote_small_Output.gensort regression_test_rbin_remote_small.xml");          
+            
+            Shell(@"Qizmt del regression_test_rbin_remote_small_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_remote_small_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,189 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutBytes_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutBytes_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutBytes_Output.txt", true);  
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutBytes_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutBytes_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 500;
+                int rowCount = 2000;               
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0 ; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        onerow.Add(b);  
+                    }      
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutBytes</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutBytes_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutBytes_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString(); 
+                recordset rs = recordset.Prepare();
+                
+                byte[] buf = Encoding.UTF8.GetBytes(sLine);
+                                
+                //testing put
+                rs.PutBytes(buf, 0, 250);
+                rs.PutBytes(buf, 250, 250);
+                
+                //testing get
+                byte[] buf2 = new byte[250];
+                byte[] buf3 = new byte[250];
+                rs.GetBytes(buf2, 0, 250);           
+                rs.GetBytes(buf3, 0, 250);
+                
+                recordset val = recordset.Prepare();
+                
+                //put again to output the recordset to mapper. 
+                val.PutBytes(buf2, 0, buf2.Length);
+                val.PutBytes(buf3, 0, buf3.Length);
+                
+                recordset key = recordset.Prepare();
+                key.PutBytes(buf, 0, 1);
+                
+                output.Add(key, val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int k = 0; k < values.Length; k++)
+                {                   
+                    recordset rs = recordset.Prepare(values.Items[k]);
+                    
+                    //testing get
+                    byte[] buf = new byte[250];
+                    byte[] buf3 = new byte[250];
+                    rs.GetBytes(buf, 0, buf.Length);
+                    rs.GetBytes(buf3, 0, buf3.Length);
+                                       
+                    recordset val = recordset.Prepare();
+                    
+                    //testing put
+                    val.PutBytes(buf, 0, buf.Length);
+                    val.PutBytes(buf3, 0, buf3.Length);
+                    
+                   byte[] buf2 = new byte[250];
+                   byte[] buf4 = new byte[250];
+                   
+                   val.GetBytes(buf2, 0, buf2.Length);
+                   val.GetBytes(buf4, 0, buf4.Length);
+                   
+                   byte[] buf5 = new byte[500];
+                   
+                   for(int i = 0; i < 250; i++)
+                   {
+                       buf5[i] = buf2[i];
+                   }
+                   
+                   for(int i = 0; i < 250; i++)
+                   {
+                       buf5[i + 250] = buf4[i];
+                   }
+                   
+                    output.Add(ByteSlice.Prepare(buf5));
+                }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutBytes_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutBytes_Input.txt regression_test_recordset.PutBytes_Output.txt regression_test_recordset.PutBytes.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutBytes_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutBytes_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

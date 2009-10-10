@@ -1,0 +1,131 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_combine_wildcard_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_combine_wildcard_Input.txt");
+            Shell(@"Qizmt del regression_test_combine_wildcard_Output*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_combine_wildcard_CreateSampleData - whole</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_combine_wildcard_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("A few");
+                dfsoutput.WriteLine("lines");
+                dfsoutput.WriteLine("go here!");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_combine_wildcard_CreateSampleData - first half</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_combine_wildcard_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("A few");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_combine_wildcard_CreateSampleData - second half</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_combine_wildcard_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("lines");
+                dfsoutput.WriteLine("go here!");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_combine_wildcard COMBINE!</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt combine regression_test_combine_wildcard_Output?.txt + regression_test_combine_wildcard_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_combine_wildcard_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_combine_wildcard_Input.txt regression_test_combine_wildcard_Output.txt regression_test_combine_wildcard.xml");          
+            
+            Shell(@"Qizmt del regression_test_combine_wildcard_Input.txt");
+            Shell(@"Qizmt del regression_test_combine_wildcard_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

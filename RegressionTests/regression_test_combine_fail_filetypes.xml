@@ -1,0 +1,147 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_combine_fail_filetypes_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_combine_fail_filetypes_Input.gensort");
+            Shell(@"Qizmt del regression_test_combine_fail_filetypes_Output.*");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_combine_fail_filetypes_CreateSampleData - whole</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_combine_fail_filetypes_Input.gensort@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nAB"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nCD"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nEF"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_combine_fail_filetypes_CreateSampleData - first half</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_combine_fail_filetypes_Output.gensort@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nAB"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nCD"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nEF"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_combine_fail_filetypes_CreateSampleData - second half</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_combine_fail_filetypes_Output.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine(Encoding.UTF8.GetBytes("GH"));
+                dfsoutput.WriteLine(Encoding.UTF8.GetBytes("IJ"));
+                dfsoutput.WriteLine(Encoding.UTF8.GetBytes("KL"));
+                dfsoutput.WriteLine(Encoding.UTF8.GetBytes("MN"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_combine_fail_filetypes COMBINE!</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            bool ok = false;
+            try
+            {
+                Shell(@"Qizmt combine regression_test_combine_fail_filetypes_Output.gensort regression_test_combine_fail_filetypes_Output.txt + regression_test_combine_fail_filetypes_Output.fail");
+            }
+            catch
+            {
+                ok = true;
+            }
+            if(!ok)
+            {
+                throw new Exception("Combine (binary record file + line file) did not fail as expected");
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_combine_fail_filetypes_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_combine_fail_filetypes_Input.gensort regression_test_combine_fail_filetypes_Output.gensort regression_test_combine_fail_filetypes.xml");          
+            
+            Shell(@"Qizmt del regression_test_combine_fail_filetypes_Input.gensort");
+            Shell(@"Qizmt del regression_test_combine_fail_filetypes_Output.*");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

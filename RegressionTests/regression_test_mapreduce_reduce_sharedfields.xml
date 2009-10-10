@@ -1,0 +1,135 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_reduce_sharedfields_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mapreduce_reduce_sharedfields_Input.txt");
+            Shell(@"Qizmt del regression_test_mapreduce_reduce_sharedfields_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mapreduce_reduce_sharedfields_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mapreduce_reduce_sharedfields_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("samekey 1) a few lines");
+                dfsoutput.WriteLine("samekey 2) testing");
+                dfsoutput.WriteLine("samekey 3) a small mapreduce job!");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_reduce_sharedfields</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput>dfs://regression_test_mapreduce_reduce_sharedfields_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mapreduce_reduce_sharedfields_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(ByteSlice.Prepare(line, 0, 4), line);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          int shared = 33;
+          bool first = true;
+          void func() { shared++; }
+          public void ReduceInitialize()
+          {
+              shared++;
+              func();
+          }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              if(first)
+              {
+                  first = false;
+                  if(shared != 35)
+                  {
+                      throw new Exception("Not shared");
+                  }
+              }
+              shared++;
+              func();
+              IEnumerator<ByteSlice> evalues = values;
+              while(evalues.MoveNext())
+              {
+                  output.Add(evalues.Current);
+              }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize()
+          {
+              shared++;
+              func();
+          }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_reduce_sharedfields_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_mapreduce_reduce_sharedfields_Input.txt regression_test_mapreduce_reduce_sharedfields_Output.txt regression_test_mapreduce_reduce_sharedfields.xml");          
+            
+            Shell(@"Qizmt del regression_test_mapreduce_reduce_sharedfields_Input.txt");
+            Shell(@"Qizmt del regression_test_mapreduce_reduce_sharedfields_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,79 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_using_mr_sorted_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_using_mr_sorted_*.txt");
+            Shell(@"Qizmt gen regression_test_using_mr_sorted_Input.txt 500KB");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_using_mr_sorted" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>100</KeyLength>
+        <DFSInput>dfs://regression_test_using_mr_sorted_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_using_mr_sorted_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <Add Reference="system.printing.dll" Type="system"/>
+      <Add Reference="system.web.dll" Type="system"/>
+      <Using>System.Printing</Using>
+      <Using>System.Web</Using>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                PrintJobStatus status = PrintJobStatus.Deleted;
+                AspNetHostingPermissionLevel permission = AspNetHostingPermissionLevel.Medium;
+                               
+                output.Add(line, ByteSlice.Prepare());
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+                PrintJobStatus status = PrintJobStatus.Deleted;
+                AspNetHostingPermissionLevel permission = AspNetHostingPermissionLevel.Medium;
+              
+               output.Add(key);
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>    
+    <Job Name="regression_test_using_mr_sorted_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string rr = Shell(@"Qizmt checksorted regression_test_using_mr_sorted_Output.txt");
+            
+            if(rr.IndexOf("Sorted") == -1)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml egression_test_using_mr_sorted.xml 0");
+                return;
+            }
+       
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_using_mr_sorted_Output.txt regression_test_using_mr_sorted_Input.txt regression_test_using_mr_sorted.xml unicode");   
+            
+           Shell(@"Qizmt del regression_test_using_mr_sorted_*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

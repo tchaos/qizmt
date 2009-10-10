@@ -1,0 +1,188 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutChar_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutChar_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutChar_Output.txt", true);  
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutChar_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutChar_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 500;
+                int rowCount = 2000;               
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0 ; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        onerow.Add(b);  
+                    }      
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutChar</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>2</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutChar_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutChar_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString(); 
+                recordset rs = recordset.Prepare();
+                                
+                //testing put
+                for(int i = 0; i < sLine.Length; i++)
+                {
+                    rs.PutChar(sLine[i]);
+                }
+                             
+                //testing get
+                char[] buf = new char[sLine.Length];
+                
+                for(int i = 0; i < buf.Length; i++)
+                {
+                    buf[i] = rs.GetChar();
+                }              
+                
+                recordset val = recordset.Prepare();
+                
+                //put again to output the recordset to mapper. 
+                for(int i = 0; i < buf.Length; i++)
+                {
+                    val.PutChar(buf[i]);
+                }
+                
+                recordset key = recordset.Prepare();
+                key.PutChar(sLine[0]);
+                
+                output.Add(key, val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int k = 0; k < values.Length; k++)
+                {                                       
+                    recordset rs = recordset.Prepare(values.Items[k]);
+                    
+                    //testing get
+                    char[] buf = new char[500];
+                    
+                    for(int i = 0; i < buf.Length; i++)
+                    {
+                        buf[i] = rs.GetChar();
+                    }          
+                                              
+                    recordset val = recordset.Prepare();
+                    
+                    //testing put
+                    for(int i = 0; i < buf.Length; i++)
+                    {
+                        val.PutChar(buf[i]);
+                    }
+                    
+                    char[] buf2 = new char[500];
+                    
+                    for(int i = 0; i < buf2.Length; i++)
+                    {
+                        buf2[i] = val.GetChar();
+                    }
+                          
+                    string s = new String(buf2);
+                    
+                    output.Add(ByteSlice.Prepare(s));
+                }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutChar_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutChar_Input.txt regression_test_recordset.PutChar_Output.txt regression_test_recordset.PutChar.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutChar_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutChar_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

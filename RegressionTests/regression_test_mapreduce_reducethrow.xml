@@ -1,0 +1,114 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_reducethrow_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mapreduce_reducethrow_Input.txt");
+            Shell(@"Qizmt del regression_test_mapreduce_reducethrow_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mapreduce_reducethrow_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mapreduce_reducethrow_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("Start...");
+                dfsoutput.WriteLine("Stop!");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_reducethrow</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>5</KeyLength>
+        <DFSInput>dfs://regression_test_mapreduce_reducethrow_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mapreduce_reducethrow_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(ByteSlice.Prepare(line, 0, 5), line);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              IEnumerator<ByteSlice> evalues = values;
+              while(evalues.MoveNext())
+              {
+                  output.Add(evalues.Current);
+              }
+              throw new Exception("Throw from reduce (expected exception)");
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_reducethrow_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_mapreduce_reducethrow_Input.txt regression_test_mapreduce_reducethrow_Output.txt regression_test_mapreduce_reducethrow.xml");          
+            
+            Shell(@"Qizmt del regression_test_mapreduce_reducethrow_Input.txt");
+            Shell(@"Qizmt del regression_test_mapreduce_reducethrow_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

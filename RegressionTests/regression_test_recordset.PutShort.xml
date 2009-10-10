@@ -1,0 +1,199 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutShort_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutShort_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutShort_Output.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutShort_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutShort_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int rowCount = 2000;
+                char del = ',';                     
+                
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //int 
+                    Int16 x = (Int16)rnd.Next(0, Int16.MaxValue);
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        x = (Int16)(x * -1);
+                    }
+                    
+                    string s = x.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //int  
+                    x = (Int16)rnd.Next(0, Int16.MaxValue);
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        x = (Int16)(x * -1);
+                    }
+                    
+                    s = x.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }        
+                 
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutShort</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutShort_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutShort_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();                
+               
+                int del = sLine.IndexOf(',');
+                
+                Int16 d = Int16.Parse(sLine.Substring(0, del));  
+                Int16 d2 = Int16.Parse(sLine.Substring(del + 1));
+               
+                recordset key = recordset.Prepare();
+                key.PutShort((Int16)(d % 10));
+                
+                //testing put
+                recordset rs = recordset.Prepare();
+                rs.PutShort(d);
+                rs.PutShort(d2);
+                
+                //testing get
+                d = rs.GetShort();
+                d2 = rs.GetShort();
+                
+                //testing put
+                recordset val = recordset.Prepare();
+                val.PutShort(d);
+                val.PutShort(d2);
+                
+                output.Add(key, val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {      
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rs = recordset.Prepare(values.Items[i]);
+                    
+                    //testing get
+                    Int16 d = rs.GetShort();
+                    Int16 d2 = rs.GetShort();
+                    
+                    recordset val = recordset.Prepare();
+                    val.PutShort(d);
+                    val.PutShort(d2);
+                    
+                    d = val.GetShort();
+                    d2 = val.GetShort();
+                    
+                    string s = d.ToString() + "," + d2.ToString();
+                    
+                    output.Add(ByteSlice.Prepare(s));                    
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutShort_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutShort_Input.txt regression_test_recordset.PutShort_Output.txt regression_test_recordset.PutShort.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutShort_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutShort_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

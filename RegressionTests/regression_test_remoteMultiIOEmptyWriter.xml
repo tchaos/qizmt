@@ -1,0 +1,66 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_remoteMultiIOEmptyWriter_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_remoteMultiIOEmptyWriter_*.txt");
+            string tmp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            
+            System.IO.StreamWriter w = new System.IO.StreamWriter(tmp);
+            
+            for(int i=0;i<500;i++)
+            {
+                w.WriteLine(i.ToString() + "test");
+            }
+            
+            w.Close();
+            
+            Shell(@"Qizmt put " + tmp + " regression_test_remoteMultiIOEmptyWriter_Input.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_remoteMultiIOEmptyWriter_CreateSampleData" Custodian="" Email="">
+      <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO_Multi>
+          <DFSReader>dfs://regression_test_remoteMultiIOEmptyWriter_Input.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+          <Mode>ALL MACHINES</Mode>
+        </DFS_IO_Multi>
+        <DFS_IO_Multi>
+          <DFSReader>dfs://regression_test_remoteMultiIOEmptyWriter_Input.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+          <Mode>ALL CORES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {                           
+                int processID = Qizmt_ProcessID;
+                int processCount = Qizmt_ProcessCount;
+                
+                StringBuilder sb = new StringBuilder();
+                int i = 0;
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    if(i % processCount == processID)
+                    {
+                        Qizmt_Log(sb.ToString());
+                    }                    
+                    sb.Length = 0;
+                    i++;
+                }          
+           }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

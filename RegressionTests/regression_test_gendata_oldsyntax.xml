@@ -1,0 +1,199 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_gendata_oldsyntax_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_gendata_oldsyntax_Input.txt");
+            Shell(@"Qizmt del regression_test_gendata_oldsyntax_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_gendata_oldsyntax_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_gendata_oldsyntax_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("gendata regression test");
+                dfsoutput.WriteLine("{A7F1F327-5E4B-4b31-9EDD-5C95AAD45D78}");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_gendata_oldsyntax</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_gendata_oldsyntax_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_gendata_oldsyntax_Output.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Using>MySpace.DataMining.AELight</Using>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                
+                string sguid = Guid.NewGuid().ToString();
+                try
+                {
+                    
+                    // *** Confirm old syntax still works:
+                    // [ascii|word|bin]gen <output-dfsfile> <outputsize> [<rowsize> [<writerCount> [customrandom]]] 
+                    
+                    {
+                        string outfn_rt001 = sguid + "_rt001";
+                        string cmd_rt001 = "qizmt gen " + outfn_rt001 + " 200";
+                        Shell(cmd_rt001);
+                        long Size_rt001 = _GetDfsFileInfo(outfn_rt001);
+                        if(Size_rt001 < 200)
+                        {
+                            throw new Exception("(Size_rt001 < 200) -- " + cmd_rt001);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt002 = sguid + "_rt002";
+                        string cmd_rt002 = "qizmt bingen " + outfn_rt002 + " 256B 32B";
+                        Shell(cmd_rt002);
+                        long Size_rt002 = _GetDfsFileInfo(outfn_rt002);
+                        if(Size_rt002 < 256)
+                        {
+                            throw new Exception("(Size_rt002 < 256) -- " + cmd_rt002);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt003 = sguid + "_rt003";
+                        string cmd_rt003 = "qizmt asciigen " + outfn_rt003 + " 2000 50 5";
+                        Shell(cmd_rt003);
+                        int NumberOfParts_rt003;
+                        long Size_rt003 = _GetDfsFileInfo(outfn_rt003, out NumberOfParts_rt003);
+                        if(Size_rt003 < 2000)
+                        {
+                            throw new Exception("(Size_rt003 < 2000) -- " + cmd_rt003);
+                        }
+                        if(5 != NumberOfParts_rt003)
+                        {
+                            throw new Exception("(5 != NumberOfParts_rt003) -- " + cmd_rt003);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt004 = sguid + "_rt004";
+                        string cmd_rt004 = "qizmt wordgen " + outfn_rt004 + " 2KB 128B 4 customrandom";
+                        Shell(cmd_rt004);
+                        int NumberOfParts_rt004;
+                        long Size_rt004 = _GetDfsFileInfo(outfn_rt004, out NumberOfParts_rt004);
+                        if(Size_rt004 < 1024 * 2)
+                        {
+                            throw new Exception("(Size_rt004 < 1024 * 2) -- " + cmd_rt004);
+                        }
+                        if(4 != NumberOfParts_rt004)
+                        {
+                            throw new Exception("(4 != NumberOfParts_rt004) -- " + cmd_rt004);
+                        }
+                    }
+                    
+                    for(List<byte> line = new List<byte>();
+                        dfsinput.ReadLineAppend(line);
+                        line.Clear())
+                    {
+                        dfsoutput.WriteLine(line);
+                    }
+                    
+                }
+                finally
+                {
+                    Shell("Qizmt del " + sguid + "*");
+                }
+                
+            }
+            
+            
+            // Returns file size; optional parameter for number of parts.
+            // Returns -1 if file not found.
+            // Sets NumberOfParts to -1 if not applicable.
+            long _GetDfsFileInfo(string name, out int NumberOfParts)
+            {
+                string masterhost = Surrogate.LocateMasterHost(Environment.CurrentDirectory);
+                string masterservicedir = Surrogate.NetworkPathForHost(masterhost);
+                dfs dc = dfs.ReadDfsConfig_unlocked(masterservicedir + @"\" + dfs.DFSXMLNAME);
+                dfs.DfsFile df = dc.FindAny(name);
+                if(null == df)
+                {
+                    NumberOfParts = -1;
+                    return -1;
+                }
+                if(0 == string.Compare(DfsFileTypes.NORMAL, df.Type, StringComparison.OrdinalIgnoreCase)
+                    || 0 == string.Compare(DfsFileTypes.JOB, df.Type, StringComparison.OrdinalIgnoreCase)
+                    || 0 == string.Compare(DfsFileTypes.BINARY_RECT, df.Type, StringComparison.OrdinalIgnoreCase))
+                {
+                    NumberOfParts = df.Nodes.Count;
+                }
+                else
+                {
+                    NumberOfParts = -1;
+                }
+                return df.Size;
+            }
+            
+            long _GetDfsFileInfo(string name)
+            {
+                int NumberOfParts;
+                return _GetDfsFileInfo(name, out NumberOfParts);
+            }
+            
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_gendata_oldsyntax_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_gendata_oldsyntax_Input.txt regression_test_gendata_oldsyntax_Output.txt regression_test_gendata_oldsyntax.xml");          
+            
+            Shell(@"Qizmt del regression_test_gendata_oldsyntax_Input.txt");
+            Shell(@"Qizmt del regression_test_gendata_oldsyntax_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

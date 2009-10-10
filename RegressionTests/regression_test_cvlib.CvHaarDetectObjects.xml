@@ -1,0 +1,214 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="Preprocessing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvHaarDetectObjects_Input.blob");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvHaarDetectObjects_Output.txt");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvHaarDetectObjects_Output2.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="Create sample data" Custodian="" email="">      
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_cvlib.CvHaarDetectObjects_Input.blob</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample image.
+                string pic64 = @"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";
+                
+                byte[] data = Convert.FromBase64String(pic64);
+                string imgName = "beatles.jpg";
+                Blob blob = Blob.Prepare(imgName, data);                
+                dfsoutput.WriteBinary(blob);          
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="M/R" Custodian="" email="">
+       <OpenCVExtension/>      
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>260</KeyLength>
+        <DFSInput>dfs://regression_test_cvlib.CvHaarDetectObjects_Input.blob</DFSInput>
+        <DFSOutput>dfs://regression_test_cvlib.CvHaarDetectObjects_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                Blob blob = line.ReadBinary();
+                string imgName = blob.name;
+                byte[] data = blob.data;
+                
+                mstring key = mstring.Prepare(imgName);
+                recordset value = recordset.Prepare();
+                value.PutBytes(data, 0, data.Length);
+                
+                output.Add(key, value);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              string imgName = mstring.Prepare(UnpadKey(key)).ToString();
+              byte[] data = values[0].Value.ToBytes();
+              
+              System.IO.MemoryStream ms = new System.IO.MemoryStream(data);
+              System.Drawing.Bitmap srcBmp = new System.Drawing.Bitmap(ms);
+              ms.Close();
+              
+              List<byte[]> faces = GetFaces(srcBmp);
+              srcBmp = null;
+              
+              output.Add(mstring.Prepare(faces.Count));
+          }
+          
+          private List<byte[]> GetFaces(System.Drawing.Bitmap srcBmp)
+        {            
+            openCV.IplImage srcImg = openCV.cvlib.ToIplImage(srcBmp, false);            
+
+            // create gray scale image
+			openCV.IplImage gray = openCV.cvlib.CvCreateImage(new openCV.CvSize(srcImg.width, srcImg.height), (int)openCV.cvlib.IPL_DEPTH_8U, 1);				
+			// do color conversion
+			openCV.cvlib.CvCvtColor(ref srcImg, ref gray, openCV.cvlib.CV_BGR2GRAY);
+
+			openCV.IplImage smImg = srcImg;
+			openCV.CvMemStorage storage = openCV.cvlib.CvCreateMemStorage(0);
+			openCV.CvSeq faces;
+			int i, scale = 1;
+            bool do_pyramids = false;
+            string xmlpath = @".\temp\haarcascade_frontalface_alt2.xml";
+
+			if (!System.IO.File.Exists(xmlpath))
+			{                
+				openCV.cvlib.CvReleaseMemStorage(ref storage);
+                openCV.cvlib.CvReleaseImage(ref gray);
+                openCV.cvlib.CvReleaseImage(ref smImg);
+                openCV.cvlib.CvReleaseImage(ref srcImg);
+				throw new Exception("haarcascade_frontalface_alt2.xml is not found.");
+			}
+
+			IntPtr p = openCV.cvlib.CvLoad(xmlpath);
+			openCV.CvHaarClassifierCascade cascade = (openCV.CvHaarClassifierCascade)openCV.cvtools.ConvertPtrToStructure(p, typeof(openCV.CvHaarClassifierCascade));
+			cascade.ptr = p;
+
+			//down-scale the input image to get a performance boost w/o loosing quality (perhaps)
+			if (do_pyramids)
+			{
+                smImg = openCV.cvlib.CvCreateImage(new openCV.CvSize(srcImg.width / 2, srcImg.height / 2), (int)openCV.cvlib.IPL_DEPTH_8U, 3);
+                openCV.cvlib.CvPyrDown(ref srcImg, ref smImg, (int)openCV.CvFilter.CV_GAUSSIAN_5x5);
+				scale = 2;
+			}
+
+			//use the fastest variant
+            faces = openCV.cvlib.CvHaarDetectObjects(ref smImg, ref cascade, ref storage, 1.2, 2, openCV.cvlib.CV_HAAR_DO_CANNY_PRUNING, new openCV.CvSize(0, 0));
+
+            List<byte[]> results = new List<byte[]>();
+
+			//Crop all the rectangles
+			for (i = 0; i < faces.total; i++)
+			{
+				//extract the rectanlges
+				openCV.CvRect face_rect = (openCV.CvRect)openCV.cvtools.ConvertPtrToStructure(openCV.cvlib.CvGetSeqElem(ref faces, i), typeof(openCV.CvRect));
+
+                //Crop faces
+                openCV.cvlib.CvSetImageROI(ref srcImg, openCV.cvlib.cvRect(face_rect.x * scale, face_rect.y * scale, face_rect.width * scale, face_rect.height * scale));
+                openCV.IplImage subImg = openCV.cvlib.CvCreateImage(openCV.cvlib.CvGetSize(ref srcImg), srcImg.depth, srcImg.nChannels);
+                openCV.cvlib.CvCopy(ref srcImg, ref subImg);
+                openCV.cvlib.CvResetImageROI(ref srcImg);
+                System.Drawing.Bitmap subbmp = openCV.cvlib.ToBitmap(subImg, false);
+                System.IO.MemoryStream ms = new System.IO.MemoryStream();
+                subbmp.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
+                results.Add(ms.ToArray());
+                ms.Close();
+                ms = null;
+                subbmp = null;
+                openCV.cvlib.CvReleaseImage(ref subImg);
+			}
+
+            openCV.cvlib.CvReleaseMemStorage(ref storage);
+            openCV.cvlib.CvReleaseHaarClassifierCascade(ref cascade);
+            if (srcImg.imageData != IntPtr.Zero)
+            {
+                openCV.cvlib.CvReleaseImage(ref srcImg);
+            }
+            if (gray.imageData != IntPtr.Zero)
+            {
+                openCV.cvlib.CvReleaseImage(ref gray);
+            }
+            if (smImg.imageData != IntPtr.Zero)
+            {
+                openCV.cvlib.CvReleaseImage(ref smImg);
+            }
+
+            return results;
+        }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>   
+    <Job Name="Post-processing" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_cvlib.CvHaarDetectObjects_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+               dfsoutput.WriteLine("4");
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="Post-processing" Custodian="" email="">      
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_cvlib.CvHaarDetectObjects_Output.txt regression_test_cvlib.CvHaarDetectObjects_Output2.txt regression_test_cvlib.CvHaarDetectObjects.xml");          
+            
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvHaarDetectObjects_Input.blob");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvHaarDetectObjects_Output.txt");
+            Shell(@"Qizmt -dfs del regression_test_cvlib.CvHaarDetectObjects_Output2.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,167 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MToLower_Reducer_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mstring.MToLower_Reducer_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.MToLower_Reducer_Output.txt", true);  
+            Shell(@"Qizmt del regression_test_mstring.MToLower_Reducer_Output1.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.MToLower_Reducer_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.MToLower_Reducer_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 300;
+                int rowCount = 2000;                
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                       onerow.Add(b);   
+                    }     
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>mstring.MToLower_Reducer</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>        
+        <DFSInput>dfs://regression_test_mstring.MToLower_Reducer_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mstring.MToLower_Reducer_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              string t = line.ToString();   
+              output.Add(ByteSlice.Prepare(t.Substring(0, 1)), line);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                      
+                for(int i = 0; i < values.Length; i++)
+                {   
+                      mstring val = mstring.Prepare(values.Items[i]);
+                      val = val.MToLower();
+                      output.Add(val);                
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MToLower_Reducer_Imitate_Reducer</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_mstring.MToLower_Reducer_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.MToLower_Reducer_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();
+                    dfsoutput.WriteLine(sLine.ToLower());
+                    sb.Length = 0;
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MToLower_Reducer_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring.MToLower_Reducer_Output.txt regression_test_mstring.MToLower_Reducer_Output1.txt regression_test_mstring.MToLower_Reducer.xml");          
+            
+            Shell(@"Qizmt del regression_test_mstring.MToLower_Reducer_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.MToLower_Reducer_Output.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.MToLower_Reducer_Output1.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,267 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_recordset.PrepareRow.xml_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PrepareRow_*");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_recordset.PrepareRow_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PrepareRow_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+              //Create sample data.
+                int stringLength = 16;
+                int rowCount = 500;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //int 
+                    int x = rnd.Next();
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        x = x * -1;
+                    }
+                    
+                    string s = x.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //string  
+                    int cnt = 0;
+                    while(cnt < stringLength)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        if(b != (byte)del)
+                        {
+                            onerow.Add(b);   
+                            cnt++;
+                        }
+                    }      
+                    
+                    onerow.Add((byte)del);
+                    
+                    //double  
+                    double d = rnd.NextDouble();
+                    
+                    /*if(rnd.Next() % 2 == 1)
+                    {
+                        d = d * -1;
+                    }*/
+                    
+                    s = d.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //long 
+                    long l = DateTime.Now.Ticks + (long)rnd.Next();
+                    
+                    if(rnd.Next() % 2 == 1)
+                    {
+                        l = l * (-1);
+                    }
+                    
+                    s = l.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }                   
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }  
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_recordset.PrepareRow" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PrepareRow_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PrepareRow_Input.tbl@64</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                mstring sLine = mstring.Prepare(line);
+                int year = sLine.NextItemToInt(',');
+                mstring title = sLine.NextItemToString(',');
+                double size = sLine.NextItemToDouble(',');
+                long pixel = sLine.NextItemToLong(',');
+                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(year);
+                
+                recordset rValue = recordset.Prepare();
+                rValue.PutInt(year);
+                rValue.PutString(title);
+                rValue.PutDouble(size);
+                rValue.PutLong(pixel);
+                
+                output.Add(rKey, rValue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rValue = recordset.Prepare(values.Items[i]);                  
+                  output.Add(rValue);                    
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_recordset.PrepareRow" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PrepareRow_Input.tbl@64</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PrepareRow_Input2.tbl@64</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                recordset rValue = recordset.PrepareRow(line);
+                int year = rValue.GetInt();               
+                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(year);
+                
+                output.Add(rKey, rValue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rValue = recordset.Prepare(values.Items[i]);                  
+                  output.Add(rValue);                    
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_recordset.PrepareRow" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PrepareRow_Input2.tbl@64</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PrepareRow_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                recordset rValue = recordset.PrepareRow(line);
+                int year = rValue.GetInt();               
+                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(year);
+                
+                output.Add(rKey, rValue);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              recordset rKey = recordset.Prepare(key);
+             
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rValue = recordset.Prepare(values.Items[i]);
+                  int year = rValue.GetInt();
+                  mstring title = rValue.GetString();
+                  double size = rValue.GetDouble();
+                  long pixel = rValue.GetLong();
+                  
+                  mstring outline = mstring.Prepare(year);
+                  outline = outline.AppendM(',').AppendM(title).AppendM(',').AppendM(size).AppendM(',').AppendM(pixel);
+                  
+                  
+                  output.Add(outline);                    
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PrepareRow_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PrepareRow_Input.txt regression_test_recordset.PrepareRow_Output.txt regression_test_recordset.PrepareRow.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PrepareRow_*"); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

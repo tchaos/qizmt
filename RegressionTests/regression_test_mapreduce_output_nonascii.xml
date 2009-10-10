@@ -1,0 +1,125 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_output_nonascii_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mapreduce_output_nonascii_Input.txt");
+            Shell(@"Qizmt del regression_test_mapreduce_output_nonascii_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_output_nonascii gen</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = "regression_test_mapreduce_output_nonascii_Input.txt";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            System.IO.File.WriteAllBytes(localfn, Encoding.UTF8.GetBytes("Non-ASCII '±' character." + Environment.NewLine));
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn);
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_output_nonascii</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput>dfs://regression_test_mapreduce_output_nonascii_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mapreduce_output_nonascii_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              // Ignore input because this is just testing output.
+              output.Add("Non-", "Non-ASCII '±' character.");
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              IEnumerator<ByteSlice> evalues = values;
+              while(evalues.MoveNext())
+              {
+                  output.Add(evalues.Current);
+              }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mapreduce_output_nonascii_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_mapreduce_output_nonascii_Input.txt regression_test_mapreduce_output_nonascii_Output.txt regression_test_mapreduce_output_nonascii.xml");          
+            
+            Shell(@"Qizmt del regression_test_mapreduce_output_nonascii_Input.txt");
+            Shell(@"Qizmt del regression_test_mapreduce_output_nonascii_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

@@ -1,0 +1,39 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_remoteMultiIOEmptyWriter-Driver_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string output = Shell(@"Qizmt exec regression_test_remoteMultiIOEmptyWriter.xml");
+            
+            bool ok = true;
+            for(int i=0;i<500;i++)
+            {
+                string line = i.ToString() + "test";
+                
+                if(output.IndexOf(line) == -1)
+                {
+                    ok = false;
+                    break;
+                }                
+            }
+            
+            if(!ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_remoteMultiIOEmptyWriter-Driver.xml 0");   
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_remoteMultiIOEmptyWriter-Driver.xml 1");   
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

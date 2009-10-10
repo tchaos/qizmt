@@ -1,0 +1,181 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutString(string)_unicode_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutString(string)_unicode_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutString(string)_unicode_Output.txt", true);  
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutString(string)_unicode_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutString(string)_unicode_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 500;
+                int rowCount = 2000;               
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0 ; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        onerow.Add(b);  
+                    }      
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutString(string)_unicode</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>2</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutString(string)_unicode_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutString(string)_unicode_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();
+                string s1 = sLine.Substring(0, 100);
+                string s2 = sLine.Substring(100, 200);
+                string s3 = sLine.Substring(300);
+                
+                recordset rs = recordset.Prepare();
+                                
+                //testing put              
+                
+                rs.PutString(s1);
+                rs.PutString(s2);
+                rs.PutString(s3);
+                             
+                //testing get
+                mstring m1 = rs.GetString();
+                mstring m2 = rs.GetString();
+                mstring m3 = rs.GetString();
+                
+                recordset val = recordset.Prepare();
+                
+                //put again to output the recordset to mapper. 
+                val.PutString(m1.ToString());
+                val.PutString(m2.ToString());
+                val.PutString(m3.ToString());
+                
+                recordset key = recordset.Prepare();
+                key.PutChar(sLine[0]);
+                
+                output.Add(key, val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                        
+                for(int k = 0; k < values.Length; k++)
+                {                                       
+                    recordset rs = recordset.Prepare(values.Items[k]);
+                    
+                    //testing get
+                    mstring m1 = rs.GetString();
+                    mstring m2 = rs.GetString();
+                    mstring m3 = rs.GetString();
+                                              
+                    recordset val = recordset.Prepare();
+                    
+                    //testing put
+                    val.PutString(m1.ToString());
+                    val.PutString(m2.ToString());
+                    val.PutString(m3.ToString());
+                    
+                    m1 = val.GetString();
+                    m2 = val.GetString();
+                    m3 = val.GetString();
+                          
+                    string s = m1.ToString() + m2.ToString() + m3.ToString();
+                    
+                    output.Add(ByteSlice.Prepare(s));
+                }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutString(string)_unicode_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutString(string)_unicode_Input.txt regression_test_recordset.PutString(string)_unicode_Output.txt regression_test_recordset.PutString(string)_unicode.xml unicode");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutString(string)_unicode_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutString(string)_unicode_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
