@@ -14,7 +14,7 @@ namespace QueryAnalyzer_ADONET_Example
             string datasource = "localhost";
             string tablename = "ExampleTable";
 
-            System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("DSpace_DataProvider");
+            System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
 
             DbConnection conn = fact.CreateConnection();
             conn.ConnectionString = "Data Source = " + datasource + "; Batch Size = 64MB";
@@ -28,11 +28,14 @@ namespace QueryAnalyzer_ADONET_Example
             {
                 cmd.CommandText = "DROP TABLE " + tablename;
                 int rows = cmd.ExecuteNonQuery();
+                conn.Close();
                 Console.WriteLine("Old table dropped.");
             }
             catch
             {
             }
+
+            conn.Open();
 
             //Create table
             {

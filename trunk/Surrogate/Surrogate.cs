@@ -679,24 +679,17 @@ namespace MySpace.DataMining.AELight
 
         public static IDisposable LockDfsMutex()
         {
-            AEDFSM x;
-            for (; ; )
+            AEDFSM x = new AEDFSM();
+            System.Threading.Mutex mutex = null;
+            mutex = new System.Threading.Mutex(false, "AEDFSM");
+            try
             {
-                System.Threading.Mutex mutex = null;
-                try
-                {
-                    mutex = new System.Threading.Mutex(false, "AEDFSM");
-                    mutex.WaitOne();
-                    x = new AEDFSM();
-                    x.mutex = mutex;
-                }
-                catch (System.Threading.AbandonedMutexException e)
-                {
-                    mutex.Close();
-                    continue;
-                }
-                break;
+                mutex.WaitOne(); // Lock also taken by kill.
             }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
+            x.mutex = mutex;
             return x;
         }
 
@@ -847,9 +840,19 @@ namespace MySpace.DataMining.AELight
             return sbfnn.ToString();
         }
 
+        public static string GenerateDataNodeName(string dfspath, string prefix, long jid, string suffix)
+        {
+            return GenerateDataNodeName(dfspath, prefix, ".j" + jid.ToString() + suffix);
+        }
+
         public static string GenerateZdFileDataNodeName(string dfspath)
         {
             return GenerateDataNodeName(dfspath, "zd.", ".zd");
+        }
+
+        public static string GenerateZdFileDataNodeName(string dfspath, long jid)
+        {
+            return GenerateDataNodeName(dfspath, "zd.", jid, ".zd");
         }
 
     }
@@ -1809,6 +1812,7 @@ namespace MySpace.DataMining.AELight
                             {
                                 newio.DFSWriter = "";
                             }
+                            newio.Meta = multi.Meta;
                             
                             newios.Add(newio);
                         }
@@ -2021,6 +2025,7 @@ namespace MySpace.DataMining.AELight
                     public string DFSReader = "";
                     public string DFSWriter = "";
                     public string Host = ""; // Host of "Remote" for this I/O.
+                    public string Meta = "";
                 }
                 [System.Xml.Serialization.XmlElement("DFS_IO")]
                 public DFS_IO[] DFS_IOs;
@@ -2030,6 +2035,7 @@ namespace MySpace.DataMining.AELight
                     public string DFSReader = "";
                     public string DFSWriter = "";
                     public string Mode = ""; // Host of "Remote" for this I/O.
+                    public string Meta = "";
                 }
                 [System.Xml.Serialization.XmlElement("DFS_IO_Multi")]
                 public DFS_IO_Multi[] DFS_IO_Multis;

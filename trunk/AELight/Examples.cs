@@ -2956,6 +2956,154 @@ Qizmt exec Qizmt-ClusterLock.xml -c
             */
             #endregion
 
+            #region MultipleInputOutputFiles
+            alljobfiles.Add(@"Qizmt_MultipleInputOutputFiles.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+                @"<SourceCode>
+  <Jobs>
+    <Job Name=`Qizmt_MultipleInputOutputFiles_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del Qizmt_MultipleInputOutputFiles_Paintings*.txt`);
+                Shell(@`Qizmt del Qizmt_MultipleInputOutputFiles_Output*.txt`);
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`Qizmt_MultipleInputOutputFiles_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt_MultipleInputOutputFiles_Paintings001.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.                
+                dfsoutput.WriteLine(`1499,The Sunset,10.0,39000000`);
+                dfsoutput.WriteLine(`1498,The Last Supper,100.45,374000000`);
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`Qizmt_MultipleInputOutputFiles_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt_MultipleInputOutputFiles_Paintings002.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`1503,Mona Lisa,4.75,600000000`);
+                dfsoutput.WriteLine(`1501,Study for a portrait of Isabella d'Este,1.5,100000000`);
+                dfsoutput.WriteLine(`1501,Study of horse,1.5,100000000`);
+            }
+        ]]>
+      </Remote>
+    </Job>    
+    <Job Name=`Qizmt_MultipleInputOutputFiles_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt_MultipleInputOutputFiles_Paintings003.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.                
+                dfsoutput.WriteLine(`1605,Dog and Master,60.0,500000`);
+                dfsoutput.WriteLine(`1655,The Garden,35,689000000`);
+                dfsoutput.WriteLine(`1689,Sunrise,58,1000000`);
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`Qizmt_MultipleInputOutputFiles` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int,double</KeyLength>
+        <DFSInput>dfs://Qizmt_MultipleInputOutputFiles_Paintings*.txt</DFSInput>
+        <DFSOutput>dfs://Qizmt_MultipleInputOutputFiles_Output1.txt;dfs://Qizmt_MultipleInputOutputFiles_Output2.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                string inputFileName = StaticGlobals.Qizmt_InputFileName;  
+                mstring ms = mstring.Prepare(inputFileName);
+                mstring strSetID = ms.SubstringM(ms.Length - 7, 3);
+                int setID = strSetID.ToInt();
+                
+                mstring sline = mstring.Prepare(line);
+                int paintingID = sline.NextItemToInt(',');
+                
+                recordset key = recordset.Prepare();
+                key.PutInt(paintingID);
+                
+                recordset val = recordset.Prepare();
+                val.PutInt(setID);
+                
+                output.Add(key, val);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rKey = recordset.Prepare(key);
+                int paintingID = rKey.GetInt();     
+                
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rval = recordset.Prepare(values[i].Value);
+                    int setID = rval.GetInt();
+                    
+                    ReduceOutput thisoutput = null;
+                    if(setID > 1)
+                    {
+                        thisoutput = output.GetOutputByIndex(1);
+                    }
+                    else
+                    {
+                        thisoutput = output.GetOutputByIndex(0);
+                    }
+                    mstring outline = mstring.Prepare(paintingID);
+                    outline.AppendM(':');
+                    outline.AppendM(setID);
+                    thisoutput.Add(outline);
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
             #region Test
             StringBuilder csjobs = new StringBuilder();
             for (int ij = 0; ij < alljobfiles.Count; ij++)

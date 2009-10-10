@@ -716,8 +716,13 @@ namespace MySpace.DataMining.CollaborativeFilteringObjects3
 
         public static void LogLine(string line)
         {
-            //lock (typeof(XLog))
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 System.IO.StreamWriter fstm = System.IO.File.AppendText("cfolog.txt");

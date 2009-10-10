@@ -7,16 +7,6 @@ namespace QueryAnalyzer_Protocol
 {
     partial class QueryAnalyzer_Protocol
     {
-        public class RIndex
-        {
-            public string IndexName;
-            public int RowSize;
-            public int KeyOffset;
-            public int KeySize;
-            //public string ChunkInfoString;
-            public string[] ChunkInfo;
-            public MySpace.DataMining.Binary.LongByteArray KeyInfo;
-        }
 
         public class RIndexServClientHandler
         {
@@ -221,7 +211,7 @@ namespace QueryAnalyzer_Protocol
                                         XContent.SendXContent(netstm, firstkeysbuf.ToArray());
                                         netstm.WriteByte((byte)'+');
                                     }
-                                    catch(Exception ep)
+                                    catch (Exception ep)
                                     {
                                         netstm.WriteByte((byte)'-');
                                         XContent.SendXContent(netstm, ep.ToString());
@@ -233,6 +223,16 @@ namespace QueryAnalyzer_Protocol
                             case (byte)'i': // Getting all Master Indexes.
                                 try
                                 {
+                                    string sysindexesfn = "sys.indexes";
+                                    string sysindexesxml = "";
+                                    if (System.IO.File.Exists(sysindexesfn))
+                                    {
+                                        System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
+                                        xi.Load(sysindexesfn);
+                                        sysindexesxml = xi.OuterXml;                                       
+                                    }
+                                    XContent.SendXContent(netstm, sysindexesxml);
+
                                     System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(".");
                                     System.IO.FileInfo[] indfiles = dir.GetFiles("ind.Index.*.ind");
                                     ClientHandler.MyToBytes(indfiles.Length, buf, 0);
@@ -261,161 +261,230 @@ namespace QueryAnalyzer_Protocol
                                         {
                                             XContent.SendXContent(netstm, buf, 0);
                                         }
-                                    }
+                                    }                               
                                 }
                                 catch (Exception e)
                                 {
                                     netstm.WriteByte((byte)'-');
                                     XContent.SendXContent(netstm, e.ToString());
                                     throw;
-                                }                              
+                                }
                                 break;
 
                             case (byte)'s': //Search master index.
                                 {
                                     string indexname = XContent.ReceiveXString(netstm, buf);
-                                    byte[] keybuf = new byte[9];
-                                    XContent.ReceiveXBytes(netstm, out buflen, keybuf);
-                                    string chunkname = XContent.ReceiveXString(netstm, buf);
+                                    string keydata = XContent.ReceiveXString(netstm, buf);
                                     bool ispin = false;
+                                    
+                                    string keydatatype = "long";
+                                    int keylen = 9;
+                                    int keyoffset = 0;
+                                    int rowlen = 9 * 3;        
+                            
+                                    Column[] columns = null;
+
+                                    string sysindexesfn = "sys.indexes";
+                                    if (System.IO.File.Exists(sysindexesfn))
+                                    {
+                                        System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
+                                        xi.Load(sysindexesfn);
+                                        System.Xml.XmlNodeList xnIndexes = xi.SelectNodes("/indexes/index");
+                                        foreach (System.Xml.XmlNode xnIndex in xnIndexes)
+                                        {
+                                            if (string.Compare(indexname, xnIndex["name"].InnerText, true) == 0)
+                                            {                                               
+                                                int ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
+                                                System.Xml.XmlNode xnTable = xnIndex.SelectSingleNode("table");
+                                                System.Xml.XmlNodeList xnCols = xnTable.SelectNodes("column");
+                                                columns = new Column[xnCols.Count];
+                                                rowlen = 0;
+                                                for (int ci = 0; ci < xnCols.Count; ci++)
+                                                {
+                                                    System.Xml.XmlNode xnCol = xnCols[ci];
+                                                    int colBytes = Int32.Parse(xnCol["bytes"].InnerText);
+                                                    string colType = xnCol["type"].InnerText.ToLower();
+                                                    if (colType.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        colType = "char";
+                                                    }
+                                                    if (ci == ordinal)
+                                                    {
+                                                        keydatatype = colType;
+                                                        keylen = colBytes;
+                                                    }
+                                                    else if(ci < ordinal)
+                                                    {
+                                                        keyoffset += colBytes;
+                                                    }
+                                                    rowlen += colBytes;
+
+                                                    Column col;
+                                                    col.Name = xnCol["name"].InnerText;
+                                                    switch(colType)
+                                                    {
+                                                        case "long":
+                                                            col.Type = typeof(System.Int64);
+                                                            break;
+
+                                                        case "int":
+                                                            col.Type = typeof(System.Int32);
+                                                            break;
+
+                                                        case "double":
+                                                            col.Type = typeof(System.Double);
+                                                            break;
+
+                                                        case "char":
+                                                            col.Type = typeof(System.String);
+                                                            break;
+
+                                                        case "datetime":
+                                                            col.Type = typeof(System.DateTime);
+                                                            break;
+
+                                                        default:
+                                                            throw new Exception("Type: " + colType + " is invalid.");
+                                                    }
+                                                    col.Size = colBytes - 1;
+                                                    col.FrontBytes = 1;
+                                                    col.BackBytes = 0;
+                                                    columns[ci] = col;
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }                       
+
+                                    if(columns == null)
+                                    {
+                                        columns = new Column[3];
+                                        for(int ci = 0; ci < columns.Length; ci++)
+                                        {
+                                            Column col;
+                                            col.Name = "Column" + ci.ToString();
+                                            col.Type = typeof(System.Int64);
+                                            col.Size = 8;
+                                            col.FrontBytes = 1;
+                                            col.BackBytes = 0;
+                                            columns[ci] = col;
+                                        }
+                                    }
 
                                     //Query succeeded.
                                     netstm.WriteByte((byte)'+');
-                                   
-                                    int columncount = 3;
-                                    ClientHandler.MyToBytes(columncount, buf, 0);
+
+                                    ClientHandler.MyToBytes(columns.Length, buf, 0);
                                     XContent.SendXContent(netstm, buf, 4);
-                                   
-                                    for (int i = 0; i < columncount; i++)
+
+                                    foreach(Column col in columns)
                                     {
-                                        string cname = "Column" + i.ToString();
-                                        Type ctype = typeof(System.Int64);
-                                        int csize = 8;
-                                        int frontbytes = 1;
-                                        int backbytes = 0;
+                                        XContent.SendXContent(netstm, col.Name);
+                                        XContent.SendXContent(netstm, col.Type.FullName);
+                                        ClientHandler.MyToBytes(col.FrontBytes, buf, 0);
+                                        XContent.SendXContent(netstm, buf, 4);
+                                        ClientHandler.MyToBytes(col.Size, buf, 0);
+                                        XContent.SendXContent(netstm, buf, 4);
+                                        ClientHandler.MyToBytes(col.BackBytes, buf, 0);
+                                        XContent.SendXContent(netstm, buf, 4);
+                                    }                                                                     
 
-                                        XContent.SendXContent(netstm, cname);
-                                        XContent.SendXContent(netstm, ctype.FullName);
-                                        ClientHandler.MyToBytes(frontbytes, buf, 0);
-                                        XContent.SendXContent(netstm, buf, 4);
-                                        ClientHandler.MyToBytes(csize, buf, 0);
-                                        XContent.SendXContent(netstm, buf, 4);
-                                        ClientHandler.MyToBytes(backbytes, buf, 0);
-                                        XContent.SendXContent(netstm, buf, 4);
-                                    }
-
-                                    //return rows. 
+                                    //return rows.
                                     List<byte> allrowsbuf = new List<byte>(1024 * 1024 * 1);
-                                    if (chunkname.Length > 0)
-                                    {                 
-                                        List<byte[]> chunkbuf = LoadFileChunk(chunkname, indexname, ispin, true);
-                                        if (chunkbuf.Count == 0)
+                                    byte[] keybuf = new byte[keylen];
+
+                                    string[] xparts = keydata.Split('\0');
+                                    for(int pi = 0; pi < xparts.Length; pi += 2)
+                                    {
+                                        string chunkname = xparts[pi];
+                                        string skey = xparts[pi + 1];
+
+                                        keybuf[0] = 0; // IsNull=false
+                                        switch (keydatatype)
                                         {
-                                            throw new Exception("Chunk referenced by a master index is not supposed to be empty: " + chunkname);
+                                            case "long":
+                                                {
+                                                    long key = long.Parse(skey);
+                                                    UInt64 ukey = (ulong)(key + long.MaxValue + 1);
+                                                    ClientHandler.Int64ToBytes((Int64)ukey, keybuf, 1);
+                                                }
+                                                break;
+
+                                            case "int":
+                                                {
+                                                    int key = int.Parse(skey);
+                                                    uint ukey = (uint)(key + int.MaxValue + 1);
+                                                    ClientHandler.Int32ToBytes((int)ukey, keybuf, 1);
+                                                }
+                                                break;
+
+                                            case "double":
+                                                {
+                                                    double key = double.Parse(skey);
+                                                    ClientHandler.DoubleToBytes(key, keybuf, 1);
+                                                }
+                                                break;
+
+                                            case "datetime":
+                                                {
+                                                    DateTime key = DateTime.Parse(skey);
+                                                    ClientHandler.Int64ToBytes(key.Ticks, keybuf, 1);
+                                                }
+                                                break;
+
+                                            case "char":
+                                                {
+                                                    string key = skey.Replace("''", "'");
+                                                    byte[] strbuf = System.Text.Encoding.Unicode.GetBytes(key);
+                                                    if (strbuf.Length > keylen - 1)
+                                                    {
+                                                        throw new Exception("String too large.");
+                                                    }
+                                                    for (int si = 0; si < strbuf.Length; si++)
+                                                    {
+                                                        keybuf[si + 1] = strbuf[si];
+                                                    }
+                                                    int padlen = keylen - 1 - strbuf.Length;
+                                                    for (int si = strbuf.Length + 1; padlen > 0; padlen--)
+                                                    {
+                                                        keybuf[si++] = 0;
+                                                    }
+                                                }
+                                                break;
                                         }
-
-                                        int left = 0;
-                                        int right = chunkbuf.Count - 1;
-                                        int result = BSearch(chunkbuf, keybuf, ref left, ref right, 9);
-                                        if (result > -1) 
+                                       
+                                        if (chunkname.Length > 0)
                                         {
-                                            int startingrowpos = result;
-
-                                            //begin a row       
-                                            for (int ci = 0; ci < 27; ci++)
+                                            ChunkRowsData chunkbuf = LoadFileChunk(chunkname, indexname, ispin, true, rowlen);
+                                            if (chunkbuf.NumberOfRows == 0)
                                             {
-                                                allrowsbuf.Add(chunkbuf[result][ci]);
+                                                throw new Exception("Chunk referenced by a master index is not supposed to be empty: " + chunkname);
                                             }
 
-                                            bool lookforward = true;                                            
-                                            int rowpos = startingrowpos;
-                                            for (; ; )
+                                            long left = 0;
+                                            long right = chunkbuf.NumberOfRows - 1;
+                                            long result = BSearch(chunkbuf, keybuf, ref left, ref right, keyoffset);
+                                            if (result > -1)
                                             {
-                                                if (++rowpos > chunkbuf.Count - 1)
-                                                {
-                                                    break;
-                                                }
-                                                if (CompareBytes(chunkbuf[rowpos], keybuf, 9) == 0)
-                                                {
-                                                    for (int ci = 0; ci < 27; ci++)
-                                                    {
-                                                        allrowsbuf.Add(chunkbuf[rowpos][ci]);
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    lookforward = false;
-                                                    break;
-                                                }
-                                            }
+                                                long startingrowpos = result;
 
-                                            bool lookbackward = true;
-                                            rowpos = startingrowpos;
-                                            for (; ; )
-                                            {
-                                                if (--rowpos < 0)
+                                                //begin a row       
+                                                for (int ci = 0; ci < rowlen; ci++)
                                                 {
-                                                    break;
+                                                    allrowsbuf.Add(chunkbuf[result][ci]);
                                                 }
-                                                if (CompareBytes(chunkbuf[rowpos], keybuf, 9) == 0)
-                                                {
-                                                    for (int ci = 0; ci < 27; ci++)
-                                                    {
-                                                        allrowsbuf.Add(chunkbuf[rowpos][ci]);
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    lookbackward = false;
-                                                    break;
-                                                }
-                                            }
 
-                                            int startingchunkpos = -1;
-                                            List<KeyValuePair<string, byte[]>> mi = null;
-                                            if (lookforward || lookbackward)
-                                            {
-                                                mi = LoadMasterIndex(indexname, ref ispin);                                                
-                                                for (int i = 0; i < mi.Count; i++)
-                                                {
-                                                    if (string.Compare(chunkname, mi[i].Key, true) == 0)
-                                                    {
-                                                        startingchunkpos = i;
-                                                        break;
-                                                    }
-                                                }
-                                                if (startingchunkpos == -1)
-                                                {
-                                                    throw new Exception("Chunk file name " + chunkname + " is not found in master index: " + indexname);
-                                                }
-                                            }
-
-                                            int chunkpos = startingchunkpos;
-                                            while (lookforward)
-                                            {         
-                                                if (++chunkpos > mi.Count - 1)
-                                                {
-                                                    break;
-                                                }
-                                                else if (CompareBytes(mi[chunkpos].Value, keybuf, 9) != 0)
-                                                {
-                                                    break;
-                                                }
-                                                else
-                                                {
-                                                    chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false);
-                                                    rowpos = -1;
-                                                }
-                                                  
+                                                bool lookforward = true;
+                                                long rowpos = startingrowpos;
                                                 for (; ; )
                                                 {
-                                                    if (++rowpos > chunkbuf.Count - 1)
+                                                    if (++rowpos > chunkbuf.NumberOfRows - 1)
                                                     {
                                                         break;
                                                     }
-                                                    if (CompareBytes(chunkbuf[rowpos], keybuf, 9) == 0)
+                                                    if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
                                                     {
-                                                        for (int ci = 0; ci < 27; ci++)
+                                                        for (int ci = 0; ci < rowlen; ci++)
                                                         {
                                                             allrowsbuf.Add(chunkbuf[rowpos][ci]);
                                                         }
@@ -425,31 +494,19 @@ namespace QueryAnalyzer_Protocol
                                                         lookforward = false;
                                                         break;
                                                     }
-                                                }                 
-                                            }
-
-                                            chunkpos = startingchunkpos;
-                                            while (lookbackward)
-                                            {
-                                                if (--chunkpos < 0)
-                                                {
-                                                    break;
-                                                }
-                                                else
-                                                {
-                                                    chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false);
-                                                    rowpos = chunkbuf.Count;
                                                 }
 
+                                                bool lookbackward = true;
+                                                rowpos = startingrowpos;
                                                 for (; ; )
                                                 {
                                                     if (--rowpos < 0)
                                                     {
                                                         break;
                                                     }
-                                                    if (CompareBytes(chunkbuf[rowpos], keybuf, 9) == 0)
+                                                    if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
                                                     {
-                                                        for (int ci = 0; ci < 27; ci++)
+                                                        for (int ci = 0; ci < rowlen; ci++)
                                                         {
                                                             allrowsbuf.Add(chunkbuf[rowpos][ci]);
                                                         }
@@ -459,11 +516,102 @@ namespace QueryAnalyzer_Protocol
                                                         lookbackward = false;
                                                         break;
                                                     }
-                                                } 
+                                                }
+
+                                                int startingchunkpos = -1;
+                                                List<KeyValuePair<string, byte[]>> mi = null;
+                                                if (lookforward || lookbackward)
+                                                {
+                                                    mi = LoadMasterIndex(indexname, ref ispin, keylen);
+                                                    for (int i = 0; i < mi.Count; i++)
+                                                    {
+                                                        if (string.Compare(chunkname, mi[i].Key, true) == 0)
+                                                        {
+                                                            startingchunkpos = i;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (startingchunkpos == -1)
+                                                    {
+                                                        throw new Exception("Chunk file name " + chunkname + " is not found in master index: " + indexname);
+                                                    }
+                                                }
+
+                                                int chunkpos = startingchunkpos;
+                                                while (lookforward)
+                                                {
+                                                    if (++chunkpos > mi.Count - 1)
+                                                    {
+                                                        break;
+                                                    }
+                                                    else if (CompareBytes(mi[chunkpos].Value, keybuf, keylen) != 0)
+                                                    {
+                                                        break;
+                                                    }
+                                                    else
+                                                    {
+                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen);
+                                                        rowpos = -1;
+                                                    }
+
+                                                    for (; ; )
+                                                    {
+                                                        if (++rowpos > chunkbuf.NumberOfRows - 1)
+                                                        {
+                                                            break;
+                                                        }
+                                                        if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                        {
+                                                            for (int ci = 0; ci < rowlen; ci++)
+                                                            {
+                                                                allrowsbuf.Add(chunkbuf[rowpos][ci]);
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            lookforward = false;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+
+                                                chunkpos = startingchunkpos;
+                                                while (lookbackward)
+                                                {
+                                                    if (--chunkpos < 0)
+                                                    {
+                                                        break;
+                                                    }
+                                                    else
+                                                    {
+                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen);
+                                                        rowpos = chunkbuf.NumberOfRows;
+                                                    }
+
+                                                    for (; ; )
+                                                    {
+                                                        if (--rowpos < 0)
+                                                        {
+                                                            break;
+                                                        }
+                                                        if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                        {
+                                                            for (int ci = 0; ci < rowlen; ci++)
+                                                            {
+                                                                allrowsbuf.Add(chunkbuf[rowpos][ci]);
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            lookbackward = false;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                    XContent.SendXContent(netstm, allrowsbuf.ToArray());                                 
+                                    XContent.SendXContent(netstm, allrowsbuf.ToArray());
                                     //end all rows.
                                 }
                                 break;
@@ -503,14 +651,26 @@ namespace QueryAnalyzer_Protocol
                 return 0;
             }
 
-            private int BSearch(List<byte[]> keys, byte[] key, ref int left, ref int right, int length)
+            private int CompareBytes(byte[] x, RowData y, int length, int rowkeyoffset)
             {
-                int cl = CompareBytes(key, keys[left], length);
+                for (int i = 0; i < length; i++)
+                {
+                    if (x[i] != y[i + rowkeyoffset])
+                    {
+                        return x[i] - y[i + rowkeyoffset];
+                    }
+                }
+                return 0;
+            }
+
+            private long BSearch(ChunkRowsData keys, byte[] key, ref long left, ref long right, int rowkeyoffset)
+            {
+                int cl = CompareBytes(key, keys[left], key.Length, rowkeyoffset);
                 if (cl == 0)
                 {
                     return left;
                 }
-                int cr = CompareBytes(key, keys[right], length);
+                int cr = CompareBytes(key, keys[right], key.Length, rowkeyoffset);
                 if (cr == 0)
                 {
                     return right;
@@ -527,8 +687,8 @@ namespace QueryAnalyzer_Protocol
                 {
                     return -1;   //nothing in between 
                 }
-                int mid = (right - left) / 2 + left;
-                int cm = CompareBytes(key, keys[mid], length);
+                long mid = (right - left) / 2 + left;
+                int cm = CompareBytes(key, keys[mid], key.Length, rowkeyoffset);
                 if (cm == 0)
                 {
                     return mid;
@@ -541,10 +701,10 @@ namespace QueryAnalyzer_Protocol
                 {
                     right = mid;
                 }
-                return BSearch(keys, key, ref left, ref right, length);
+                return BSearch(keys, key, ref left, ref right, rowkeyoffset);
             }
 
-            private List<KeyValuePair<string, byte[]>> LoadMasterIndex(string indexName, ref bool isPinMemory)
+            private List<KeyValuePair<string, byte[]>> LoadMasterIndex(string indexName, ref bool isPinMemory, int keylength)
             {
                 string indexfn = CurrentDirNetPath + @"\ind.Index." + indexName + ".ind";
                 List<KeyValuePair<string, byte[]>> mi = new List<KeyValuePair<string, byte[]>>();
@@ -553,11 +713,11 @@ namespace QueryAnalyzer_Protocol
                 {
                     for (; ; )
                     {
-                        byte[] keybuf = new byte[9];
-                        if (fs.Read(keybuf, 0, 9) < 9)
+                        byte[] keybuf = new byte[keylength];
+                        if (fs.Read(keybuf, 0, keylength) < keylength)
                         {
                             break;
-                        }                        
+                        }
                         int chunknamebuflen = 0;
                         for (; ; )
                         {
@@ -579,7 +739,7 @@ namespace QueryAnalyzer_Protocol
                 return mi;
             }
 
-            private List<byte[]> LoadFileChunk(string chunkname, string indexname, bool ispin, bool determinepinornot)
+            private ChunkRowsData LoadFileChunk(string chunkname, string indexname, bool ispin, bool determinepinornot, int rowlength)
             {
                 string _chunkname = chunkname.ToLower();
                 string _indexname = indexname.ToLower();
@@ -594,9 +754,10 @@ namespace QueryAnalyzer_Protocol
                     }
                 }
 
-                List<byte[]> fbuf = new List<byte[]>();
+                ChunkRowsData fbuf;
                 using (System.IO.FileStream fs = new System.IO.FileStream(chunkname, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
-                {                    
+                {
+                    long datalength;
                     {
                         // Skip the dfs-chunk file-header...
                         int headerlength = 0;
@@ -607,7 +768,7 @@ namespace QueryAnalyzer_Protocol
                             }
                             if (4 != fs.Read(buf, 0, 4))
                             {
-                                return fbuf;
+                                throw new Exception("Invalid chunk '" + chunkname + "' for index '" + indexname + "': unable to read chunk file header");
                             }
                             {
                                 headerlength = ClientHandler.BytesToInt(buf, 0);
@@ -622,32 +783,44 @@ namespace QueryAnalyzer_Protocol
                                 }
                             }
                         }
+                        datalength = fs.Length - headerlength;
                     }
 
-                    for (; ; )
                     {
-                        byte[] linebuf = new byte[9 * 3];
-                        int read = fs.Read(linebuf, 0, 9 * 3);
-                        if (read < 9 * 3)
+                        MySpace.DataMining.Binary.LongByteArray fbufBytes = new MySpace.DataMining.Binary.LongByteArray(datalength);
+                        fbuf = new ChunkRowsData(fbufBytes, rowlength);
+                    }
+
+                    byte[] xbuf = new byte[0x400 * 0x400 * 4];
+                    for (long xoffset = 0; xoffset < datalength; )
+                    {
+                        int read = fs.Read(xbuf, 0, xbuf.Length);
+                        if (read <= 0)
                         {
-                            break;
+                            throw new Exception("Unexpected end-of-file when reading chunk '"
+                                + chunkname + "' of index '"
+                                + indexname + "'; expected "
+                                + (datalength - xoffset).ToString() + " more bytes");
                         }
-                        fbuf.Add(linebuf);
-                    }     
-                    fs.Close();
+                        for (int ir = 0; ir < read; ir++, xoffset++)
+                        {
+                            fbuf.Bytes[xoffset] = xbuf[ir];
+                        }
+                    }
+
                 }
 
                 if (determinepinornot)
                 {
                     ispin = System.IO.File.Exists(CurrentDirNetPath + @"\ind.Pin." + indexname + ".ind");
                 }
-                if(ispin)
+                if (ispin)
                 {
                     lock (rindexpins)
                     {
                         if (!rindexpins.ContainsKey(_indexname))
                         {
-                            rindexpins.Add(_indexname, new Dictionary<string, List<byte[]>>());
+                            rindexpins.Add(_indexname, new Dictionary<string, ChunkRowsData>());
                         }
                         if (!rindexpins[_indexname].ContainsKey(_chunkname))
                         {
@@ -657,6 +830,15 @@ namespace QueryAnalyzer_Protocol
                 }
 
                 return fbuf;
+            }
+
+            internal struct Column
+            {
+                public string Name;
+                public Type Type;
+                public int Size;
+                public int FrontBytes;
+                public int BackBytes;
             }
         }
     }

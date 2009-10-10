@@ -36,7 +36,7 @@ namespace MySpace.DataMining.AELight
             int BlockID = 0;
             string SlaveIP = null;
 
-            string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + "_log.txt";
+            string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + ".j" + sjid + "_log.txt";
 
             try
             {
@@ -67,6 +67,7 @@ namespace MySpace.DataMining.AELight
                 {
                     cfgj.AddAssemblyReferences(rem.CompilerAssemblyReferences, Surrogate.NetworkPathForHost(firstslave));
                 }
+                rem.SetJID(jid);
                 rem.AddBlock(SlaveHost + @"|" + logname + @"|slaveid=0");
                 rem.Open();
 
@@ -118,7 +119,13 @@ public static void DSpace_Log(string line)
     {
         return;
     }
-    _logmutex.WaitOne();
+    try
+    {
+        _logmutex.WaitOne();
+    }
+    catch (System.Threading.AbandonedMutexException)
+    {
+    }
     try
     {
         using (System.IO.StreamWriter fstm = System.IO.File.AppendText(_userlogname))

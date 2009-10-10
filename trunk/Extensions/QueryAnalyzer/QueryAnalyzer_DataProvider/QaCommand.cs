@@ -194,68 +194,213 @@ namespace QueryAnalyzer_DataProvider
                     {
                         throw new Exception("Index " + indexname + " is not found in the master indexes.");
                     }
-                    if (0 == string.Compare("WHERE", Qa.NextPart(ref xcmd), true) &&
-                    0 == string.Compare("KEY", Qa.NextPart(ref xcmd), true) &&
-                    0 == string.Compare("=", Qa.NextPart(ref xcmd), true))
+                    if (0 == string.Compare("WHERE", Qa.NextPart(ref xcmd), true))
                     {
-                        string skey = Qa.NextPart(ref xcmd);
-                        if (skey == "-")
+                        string keytype = "long";
+                        int keylen = 9;
+                        if (conn.sysindexes.ContainsKey(indexname))
                         {
-                            string numpart = Qa.NextPart(ref xcmd);
-                            skey += numpart;
-                        }
-                        if (skey.Length == 0)
-                        {
-                            throw new Exception("RSELECT expects a key value of LONG data type in where clause.");
-                        }
-                        long key = Int64.Parse(skey);
-
-                        List<KeyValuePair<byte[], string>> mi = conn.mindexes[indexname];                        
-                        string chunkname = "";
-                        string host = "";
-                        if (mi.Count > 0)
-                        {
-                            int result = -2;
-                            int left = 0;
-                            int right = mi.Count - 1;
-                            UInt64 ukey = (ulong)(key + long.MaxValue + 1);
-                            buf[0] = 0; //is null = false on first byte.
-                            Utils.Int64ToBytes((Int64)ukey, buf, 1); 
-                            result = BSearch(mi, buf, ref left, ref right, 9);
-                            if (result == -1)
+                            QaConnection.Index sysindex = conn.sysindexes[indexname];
+                            keytype = sysindex.Table.Columns[sysindex.Ordinal].Type.ToLower();
+                            keylen = sysindex.Table.Columns[sysindex.Ordinal].Bytes;
+                            if (keytype.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
                             {
-                                result = left;   //Though not found in master index, but still in range.
-                            }
-                            else if (result == -3)
-                            {
-                                result = right;  //out of range: too big.
-                            }
-                            if (result >= 0)
-                            {
-                                chunkname = mi[result].Value;
-                                int del = chunkname.IndexOf(@"\", 2);
-                                host = chunkname.Substring(2, del - 2);
+                                keytype = "char";
                             }
                         }
-                        conn.OpenSocketRIndex(host);
-                        conn.netstm.WriteByte((byte)'s'); //search master index
-                        XContent.SendXContent(conn.netstm, indexname);
-                        XContent.SendXContent(conn.netstm, buf, 9);
-                        XContent.SendXContent(conn.netstm, chunkname);
 
-                        int ib = conn.netstm.ReadByte();
-
-                        if (ib == (byte)'-')
+                        Dictionary<string, StringBuilder> batches = new Dictionary<string, StringBuilder>(new _CaseInsensitiveEqualityComparer_2664());
+                        char op = 'x';
+                        if (buf.Length < keylen)
                         {
-                            string errmsg = XContent.ReceiveXString(conn.netstm, buf);
-                            throw new Exception("_ExecuteDbDataReaderRIndex error: " + errmsg);
+                            buf = new byte[keylen];
                         }
-                        if (ib != (byte)'+')
+                        for (; ; )
                         {
-                            throw new Exception("_ExecuteDbDataReaderRIndex did not receive a success signal from service.");
-                        }
+                            if (0 == string.Compare("KEY", Qa.NextPart(ref xcmd), true)
+                                && 0 == string.Compare("=", Qa.NextPart(ref xcmd), true))
+                            {
+                                string skey = Qa.NextPart(ref xcmd);
+                                if (skey == "-")
+                                {
+                                    string numpart = Qa.NextPart(ref xcmd);
+                                    skey += numpart;
+                                }
+                                if (skey.Length == 0)
+                                {
+                                    throw new Exception("RSELECT expects a key value of " + keytype + " data type in where clause.");
+                                }
+                                                                
+                                buf[0] = 0; //is null = false on first byte.
+                                switch (keytype)
+                                {
+                                    case "long":
+                                        {
+                                            long key = Int64.Parse(skey);
+                                            UInt64 ukey = (ulong)(key + long.MaxValue + 1);  
+                                            Utils.Int64ToBytes((Int64)ukey, buf, 1);
+                                        }
+                                        break;
 
-                        return new QaDataReader(this, conn.netstm);
+                                    case "int":
+                                        {
+                                            int key = Int32.Parse(skey);
+                                            uint ukey = (uint)(key + int.MaxValue + 1);
+                                            Utils.Int32ToBytes((int)ukey, buf, 1);
+                                        }
+                                        break;
+
+                                    case "double":
+                                        {
+                                            double key = Double.Parse(skey);
+                                            Utils.DoubleToBytes(key, buf, 1);
+                                        }
+                                        break;
+
+                                    case "datetime":
+                                        {
+                                            skey = skey.Substring(1, skey.Length - 2);
+                                            DateTime key = DateTime.Parse(skey);
+                                            Utils.Int64ToBytes(key.Ticks, buf, 1);
+                                        }
+                                        break;
+
+                                    case "char":
+                                        {
+                                            skey = skey.Substring(1, skey.Length - 2);
+                                            string key = skey.Replace("''", "'");
+                                            byte[] strbuf = System.Text.Encoding.Unicode.GetBytes(key);
+                                            if (strbuf.Length > keylen - 1)
+                                            {
+                                                throw new Exception("String too large.");
+                                            }
+                                            for (int si = 0; si < strbuf.Length; si++)
+                                            {
+                                                buf[si + 1] = strbuf[si];
+                                            }
+                                            int padlen = keylen - 1 - strbuf.Length;
+                                            for (int si = strbuf.Length + 1; padlen > 0; padlen--)
+                                            {
+                                                buf[si++] = 0;
+                                            }
+                                        }
+                                        break;
+                                }                               
+
+                                List<KeyValuePair<byte[], string>> mi = conn.mindexes[indexname];
+                                string chunkname = "";
+                                string host = "";
+                                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+                                if (mi.Count > 0)
+                                {
+                                    int result = -2;
+                                    int left = 0;
+                                    int right = mi.Count - 1;
+                                    result = BSearch(mi, buf, ref left, ref right, keylen);
+                                    if (result == -1)
+                                    {
+                                        result = left;   //Though not found in master index, but still in range.
+                                    }
+                                    else if (result == -3)
+                                    {
+                                        result = right;  //out of range: too big.
+                                    }
+                                    if (result >= 0)
+                                    {
+                                        chunkname = mi[result].Value;
+                                        int del = chunkname.IndexOf(@"\", 2);
+                                        host = chunkname.Substring(2, del - 2);
+                                    }
+                                    else
+                                    {
+                                        host = conn.connstr.DataSource[rnd.Next() % conn.connstr.DataSource.Length];
+                                    }
+                                }
+
+                                StringBuilder batch;
+                                if (batches.ContainsKey(host))
+                                {
+                                    batch = batches[host];
+                                }
+                                else
+                                {
+                                    batch = new StringBuilder(1024);
+                                    batches.Add(host, batch);
+                                }
+                                if ('x' != op)
+                                {
+                                    if (batch.Length > 0)
+                                    {
+                                        batch.Append(op);
+                                    }
+                                }
+                                batch.Append(chunkname);
+                                batch.Append('\0');
+                                batch.Append(skey);
+
+                                if (0 == string.Compare("OR", Qa.NextPart(ref xcmd), true))
+                                {
+                                    {
+                                        QaConnection.QaConnectionString xconnstr = conn.connstr;
+                                        QaConnection.QaConnectionString.RIndexType xrindextype = xconnstr.RIndex;
+                                        if (xrindextype != QaConnection.QaConnectionString.RIndexType.POOLED)
+                                        {
+                                            throw new Exception("RSELECT: cannot use OR in WHERE if rindex is not pooled");
+                                        }
+                                    }
+                                    op = '\0';
+                                    continue;
+                                }
+                                //else
+                                {
+                                    // Done!
+                                    List<string> bhosts = new List<string>(batches.Keys);
+                                    List<QaDataReader> xreaders = new List<QaDataReader>(batches.Count);                                    
+                                    for (; ; )
+                                    {
+                                        int bhostindex = rnd.Next() % bhosts.Count;
+                                        string bhost = bhosts[bhostindex];                                      
+                                        StringBuilder bbatch = batches[bhost];
+                                        conn.OpenSocketRIndex(bhost);
+                                        conn.netstm.WriteByte((byte)'s'); //search master index
+                                        XContent.SendXContent(conn.netstm, indexname);
+                                        XContent.SendXContent(conn.netstm, bbatch.ToString());
+
+                                        int ib = conn.netstm.ReadByte();
+
+                                        if (ib == (byte)'-')
+                                        {
+                                            string errmsg = XContent.ReceiveXString(conn.netstm, buf);
+                                            throw new Exception("_ExecuteDbDataReaderRIndex error: " + errmsg);
+                                        }
+                                        if (ib != (byte)'+')
+                                        {
+                                            throw new Exception("_ExecuteDbDataReaderRIndex did not receive a success signal from service.");
+                                        }
+
+                                        QaDataReader xreader = new QaDataReader(this, conn.netstm);
+
+                                        xreaders.Add(xreader);
+
+                                        bhosts.RemoveAt(bhostindex);
+                                        if(bhosts.Count == 0)
+                                        {
+                                            break;
+                                        } 
+                                    }                                    
+                                    if (1 == xreaders.Count)
+                                    {
+                                        return xreaders[0];
+                                    }
+                                    return new QaDataReaderMulti(xreaders);
+                                }
+
+                            }
+                            else
+                            {
+                                throw new Exception("Expected KEY = ... in WHERE clause");
+                            }
+                        }
                     }                    
                 }
                 throw new Exception("Query not recognized.");
@@ -542,5 +687,35 @@ namespace QueryAnalyzer_DataProvider
                 conn.Close();
             }
         }
+
+
+        internal class _CaseInsensitiveEqualityComparer_2664 : IEqualityComparer<string>
+        {
+            bool IEqualityComparer<string>.Equals(string x, string y)
+            {
+                return 0 == string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
+            }
+
+            int IEqualityComparer<string>.GetHashCode(string obj)
+            {
+                unchecked
+                {
+                    int result = 8385;
+                    int cnt = obj.Length;
+                    for (int i = 0; i < cnt; i++)
+                    {
+                        result <<= 4;
+                        char ch = obj[i];
+                        if (ch >= 'A' && ch <= 'Z')
+                        {
+                            ch = (char)('a' + (ch - 'A'));
+                        }
+                        result += ch;
+                    }
+                    return result;
+                }
+            }
+        }
+
     }
 }

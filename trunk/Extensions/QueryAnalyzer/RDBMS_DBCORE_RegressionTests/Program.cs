@@ -11,6 +11,59 @@ namespace RDBMS_DBCORE_RegressionTests
         {
             List<KeyValuePair<string, bool>> AllTests = new List<KeyValuePair<string, bool>>();
             {
+                string testname = "DbFunctions_FORMAT";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    DbFunctions_FORMAT();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "DbFunctions_DATEADD";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    DbFunctions_DATEADD();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
+                string testname = "DbFunctions_DATEDIFF";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    DbFunctions_DATEDIFF();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
                 string testname = "DbFunctions_NULLIF";
                 Console.WriteLine("*** Running test {0}...", testname);
                 try
@@ -1342,7 +1395,9 @@ namespace RDBMS_DBCORE_RegressionTests
             }
             Console.WriteLine("--ENDRESULTS--");
 
-            Console.Read();
+#if DEBUG
+            //Console.Read();
+#endif
         }
 
         public static void DSpace_LogResult(string name, bool passed)

@@ -63,6 +63,8 @@ function Main()
     var account = WScript.arguments(0);
     var password = WScript.arguments(1);
 
+    var notables = (WScript.arguments.Length > 2 && "-notables" == WScript.arguments(2));
+
     WScript.StdOut.WriteLine("Begin installation...");
 
     var thispath = WScript.ScriptFullName;
@@ -123,66 +125,69 @@ function Main()
         ExecDSpace("exec " + install_query_analyzer_xml + " \"" + nextargt + "\" \"" + account + "\" \"" + password + "\" {73045AA6-2F6B-4166-BDE2-806F1E43854B}", true);
         WScript.StdOut.WriteLine("Completed executing " + install_query_analyzer_xml + "...");
 
-        try
+        if (!notables)
         {
-            //WScript.StdOut.WriteLine("Checking existence of RDBMS_SysTables...");
-            var output = ExecDSpace("info RDBMS_SysTables"); // Doesn't return "No such file", but throws it.
+            try
             {
-                //WScript.StdOut.WriteLine("RDBMS_SysTables is found.");
-                //WScript.StdOut.WriteLine("Checking existence of paintings table...");
-                //output = ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"select TOP 1 * FROM sys.tables WHERE table = 'paintings' ORDER BY table\"", true);
-                //if (output.indexOf("paintings") > -1)
+                //WScript.StdOut.WriteLine("Checking existence of RDBMS_SysTables...");
+                var output = ExecDSpace("info RDBMS_SysTables"); // Doesn't return "No such file", but throws it.
                 {
-                    //WScript.StdOut.WriteLine("paintings table is found.  Dropping paintings table...");
-                    ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"DROP TABLE paintings\"", true);
-                    //WScript.StdOut.WriteLine("paintings table is dropped.");
-                }
+                    //WScript.StdOut.WriteLine("RDBMS_SysTables is found.");
+                    //WScript.StdOut.WriteLine("Checking existence of paintings table...");
+                    //output = ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"select TOP 1 * FROM sys.tables WHERE table = 'paintings' ORDER BY table\"", true);
+                    //if (output.indexOf("paintings") > -1)
+                    {
+                        //WScript.StdOut.WriteLine("paintings table is found.  Dropping paintings table...");
+                        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"DROP TABLE paintings\"", true);
+                        //WScript.StdOut.WriteLine("paintings table is dropped.");
+                    }
 
-                //WScript.StdOut.WriteLine("Checking existence of artists table...");
-                //output = ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"select TOP 1 * FROM sys.tables WHERE table = 'artists' ORDER BY table\"", true);
-                //if (output.indexOf("artists") > -1)
-                {
-                    //WScript.StdOut.WriteLine("artists table is found.  Dropping artists table...");
-                    ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"DROP TABLE artists\"", true);
-                    //WScript.StdOut.WriteLine("artists table is dropped.");
-                }
+                    //WScript.StdOut.WriteLine("Checking existence of artists table...");
+                    //output = ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"select TOP 1 * FROM sys.tables WHERE table = 'artists' ORDER BY table\"", true);
+                    //if (output.indexOf("artists") > -1)
+                    {
+                        //WScript.StdOut.WriteLine("artists table is found.  Dropping artists table...");
+                        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"DROP TABLE artists\"", true);
+                        //WScript.StdOut.WriteLine("artists table is dropped.");
+                    }
 
-                //WScript.StdOut.WriteLine("Checking existence of paintingsArchived table...");
-                //output = ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"select TOP 1 * FROM sys.tables WHERE table = 'paintingsArchived' ORDER BY table\"", true);
-                //if (output.indexOf("paintingsArchived") > -1)
-                {
-                    //WScript.StdOut.WriteLine("paintingsArchived table is found.  Dropping paintingsArchived table...");
-                    ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"DROP TABLE paintingsArchived\"", true);
-                    //WScript.StdOut.WriteLine("paintingsArchived table is dropped.");
+                    //WScript.StdOut.WriteLine("Checking existence of paintingsArchived table...");
+                    //output = ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"select TOP 1 * FROM sys.tables WHERE table = 'paintingsArchived' ORDER BY table\"", true);
+                    //if (output.indexOf("paintingsArchived") > -1)
+                    {
+                        //WScript.StdOut.WriteLine("paintingsArchived table is found.  Dropping paintingsArchived table...");
+                        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"DROP TABLE paintingsArchived\"", true);
+                        //WScript.StdOut.WriteLine("paintingsArchived table is dropped.");
+                    }
                 }
             }
+            catch (e8905)
+            {
+            }
+
+            WScript.StdOut.WriteLine("Begin generating sample paintings table...");
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"CREATE TABLE paintings (paintingID INT, year INT, title CHAR(300), size DOUBLE, pixel LONG, artistID INT, bday DATETIME)\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (11, 1498, 'The Last Supper', 100.45, 374000000, 200, '1/1/1498 10:00:00 AM')\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (12, 1503, 'Mona Lisa', 4.75, 600000000, 200, '1/1/1503 10:00:00 AM')\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (13, 1889, 'The Starry Night', 1.5, 100000000, 201, '1/1/1889 10:00:00 AM')\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (14, 1889, 'Irises', 4.93, 100000000, 201, '1/1/1889 10:00:00 AM')\"", true);
+            WScript.StdOut.WriteLine("Completed generating sample paintings table");
+
+            WScript.StdOut.WriteLine("Begin generating sample artists table...");
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"CREATE TABLE artists (artistID INT, artistName CHAR(300), year INT, birthday DATETIME)\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO artists VALUES (200,  'Leonardo da Vinci', 1452, '4/15/1452 12:00:00 AM')\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO artists VALUES (201,  'Vincent van Gogh', 1853, '3/30/1853 12:00:00 AM')\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO artists VALUES (202,  'Claude Monet', 1840, '11/14/1840 12:00:00 AM')\"", true);
+            WScript.StdOut.WriteLine("Completed generating sample artists table");
+
+            WScript.StdOut.WriteLine("Begin generating sample paintingsArchived table...");
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"CREATE TABLE paintingsArchived (paintingID INT, year INT, title CHAR(300), size DOUBLE, pixel LONG, artistID INT, bday DATETIME)\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintingsArchived VALUES (4, 1866, 'The Woman in the Green Dress', 9.87, 809880000, 202, '1/1/1498 10:00:00 AM')\"", true);
+            ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintingsArchived VALUES (5, 1872, 'Impression, Sunrise', 1.4, 9000000, 202, '1/1/1498 10:00:00 AM')\"", true);
+            WScript.StdOut.WriteLine("Completed generating sample paintingsArchived table");
+
+            WScript.StdOut.WriteLine("Completed generating sample database tables");
         }
-        catch (e8905)
-        {
-        }
-
-        WScript.StdOut.WriteLine("Begin generating sample paintings table...");
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"CREATE TABLE paintings (paintingID INT, year INT, title CHAR(300), size DOUBLE, pixel LONG, artistID INT, bday DATETIME)\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (11, 1498, 'The Last Supper', 100.45, 374000000, 200, '1/1/1498 10:00:00 AM')\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (12, 1503, 'Mona Lisa', 4.75, 600000000, 200, '1/1/1503 10:00:00 AM')\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (13, 1889, 'The Starry Night', 1.5, 100000000, 201, '1/1/1889 10:00:00 AM')\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintings VALUES (14, 1889, 'Irises', 4.93, 100000000, 201, '1/1/1889 10:00:00 AM')\"", true);
-        WScript.StdOut.WriteLine("Completed generating sample paintings table");
-
-        WScript.StdOut.WriteLine("Begin generating sample artists table...");
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"CREATE TABLE artists (artistID INT, artistName CHAR(300), year INT, birthday DATETIME)\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO artists VALUES (200,  'Leonardo da Vinci', 1452, '4/15/1452 12:00:00 AM')\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO artists VALUES (201,  'Vincent van Gogh', 1853, '3/30/1853 12:00:00 AM')\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO artists VALUES (202,  'Claude Monet', 1840, '11/14/1840 12:00:00 AM')\"", true);
-        WScript.StdOut.WriteLine("Completed generating sample artists table");
-
-        WScript.StdOut.WriteLine("Begin generating sample paintingsArchived table...");
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"CREATE TABLE paintingsArchived (paintingID INT, year INT, title CHAR(300), size DOUBLE, pixel LONG, artistID INT, bday DATETIME)\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintingsArchived VALUES (4, 1866, 'The Woman in the Green Dress', 9.87, 809880000, 202, '1/1/1498 10:00:00 AM')\"", true);
-        ExecDSpace("exec RDBMS_QueryAnalyzer.DBCORE \"INSERT INTO paintingsArchived VALUES (5, 1872, 'Impression, Sunrise', 1.4, 9000000, 202, '1/1/1498 10:00:00 AM')\"", true);
-        WScript.StdOut.WriteLine("Completed generating sample paintingsArchived table");
-
-        WScript.StdOut.WriteLine("Completed generating sample database tables");
 
         SystemEnvironmentInstall(installdir);
         WScript.StdOut.WriteLine("Begin cleaning up...");

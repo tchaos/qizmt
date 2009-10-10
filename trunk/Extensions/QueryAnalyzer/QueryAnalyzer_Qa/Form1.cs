@@ -86,7 +86,7 @@ namespace RDBMS_qa
             {
                 //Query all table information.
                 string sxml = "";
-                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("DSpace_DataProvider");
+                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
                 conn = fact.CreateConnection();
                 conn.ConnectionString = connstr;
                 conn.Open();
@@ -124,7 +124,6 @@ namespace RDBMS_qa
 
                         Random rnd = new Random();
 
-                        //INSERT INTO, INSERT VALUES statement
                         {
                             string st = "INSERT INTO " + tname + "\r\nVALUES\r\n(\r\n";
                             for (int ni = 0; ni < columns.Count; ni++)
@@ -141,7 +140,6 @@ namespace RDBMS_qa
                             }
                             st += ")";
                             statements["INSERT INTO"] = st;
-                            statements["INSERT VALUES"] = st;
                         }
 
                         statements["INSERT IMPORT"] = "INSERT INTO " + tname + "\r\nIMPORT 'dfs://data.txt'";
@@ -201,12 +199,10 @@ namespace RDBMS_qa
                             statements["GROUP BY"] = "SELECT TOP 10\r\n" + selstr + " \r\n" + "FROM " + tname + "\r\n" + "GROUP BY " + cnamegby;
                         }
 
-                        //DELETE
                         {
                             string st = "DELETE FROM " + tname + "\r\nWHERE ";                           
                             st += columns[0]["name"].InnerText + " = " + GenerateColumnValue(rnd, columns[0]["type"].InnerText);
                             statements["DELETE FROM"] = st;
-                            statements["DELETE WHERE"] = st;
                         }
 
                         //statements["CREATE TABLE"] = "CREATE TABLE colors\r\n(\r\n" + tab + "color CHAR(50),\r\n" + tab + "red INT,\r\n" + tab + "green INT,\r\n" + tab + "blue INT\r\n)";
@@ -420,6 +416,7 @@ namespace RDBMS_qa
             this.openToolStripMenuItem1.Enabled = enabled;
             this.refreshToolStripMenuItem1.Enabled = enabled;
             searchToolStripMenuItem.Enabled = enabled;
+            browseToolStripMenuItem.Enabled = enabled;
         }
 
         private void newToolStripMenuItem_Click(object sender, EventArgs e)
@@ -509,6 +506,13 @@ namespace RDBMS_qa
             Help helpForm = new Help(cmdNodes, cmdKeys);
             helpForm.Show();
             helpForm.Focus();
+        }
+
+        private void browseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            HelpBrowser helpBrowser = new HelpBrowser(cmdNodes);
+            helpBrowser.Show();
+            helpBrowser.Focus();
         }
     }
 }

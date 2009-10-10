@@ -538,20 +538,17 @@ namespace MySpace.DataMining.AELight
                                         for (int iq = 0; iq < qlines.Length; iq++)
                                         {
                                             string ln = qlines[iq];
-                                            string spidd = "";
-                                            {
-                                                int isp = ln.IndexOf(' ');
-                                                if (-1 != isp)
-                                                {
-                                                    string spid = ln.Substring(0, isp);
-                                                    spidd = spid + " ";
-                                                }
-                                            }
                                             int ippp = ln.IndexOf("+++");
                                             if (-1 != ippp)
                                             {
+                                                string[] settings = ln.Substring(0, ippp).Split(' ');
+                                                string psspid = "0";
+                                                if (settings.Length > 1)
+                                                {
+                                                    psspid = settings[1];
+                                                }
                                                 ln = ln.Substring(ippp + 4);
-                                                Console.WriteLine("  {0}{1}", spidd, ln.Replace("drule", "SYSTEM"));
+                                                Console.WriteLine("  {0} {1}", psspid, ln.Replace("drule", "SYSTEM"));
                                             }
                                         }
                                         break;
@@ -775,7 +772,7 @@ namespace MySpace.DataMining.AELight
                                                             System.IO.File.Delete(fn);
                                                         }
                                                         System.IO.Directory.Delete(dir);
-                                                    }                                                    
+                                                    }
                                                 }
                                                 {
                                                     string dir = driverdir + @"\rput";
@@ -786,7 +783,7 @@ namespace MySpace.DataMining.AELight
                                                             System.IO.File.Delete(fn);
                                                         }
                                                         System.IO.Directory.Delete(dir);
-                                                    }                                                    
+                                                    }
                                                 }
                                             }
                                         }
@@ -872,7 +869,6 @@ namespace MySpace.DataMining.AELight
                                             snowballregexes.Add(rex);
                                         }
                                         {
-                                            // zfoil_cache.n.zf
                                             string srex = Surrogate.WildcardRegexString(GetSnowballFoilSampleFilesWildcard(snowballname));
                                             System.Text.RegularExpressions.Regex rex = new System.Text.RegularExpressions.Regex(srex, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                                             snowballzfoilcacheregexes.Add(rex);
@@ -1106,7 +1102,7 @@ namespace MySpace.DataMining.AELight
                                                 //DeleteAllMatchingFiles(netpath, "zfoil_*.zf", true); // NO! now part of snowball cleanup
                                                 DeleteAllMatchingFiles(netpath, "dbg_*~*_????????-????-????-????-????????????.*", true);
                                                 DeleteOldMatchingFiles(new TimeSpan(10 /* days */ , 0, 0),
-                                                    netpath, "*_????????-????-????-????-????????????_log.txt", true);
+                                                    netpath, "*_????????-????-????-????-????????????*_log.txt", true);
                                                 try
                                                 {
                                                     // Clean ALL of temp dir!
@@ -1120,6 +1116,25 @@ namespace MySpace.DataMining.AELight
                                         }
                                     }
                                 ), hosts, threadcount);
+
+                                try
+                                {
+                                    foreach (string jidfn in System.IO.Directory.GetFiles(
+                                        Surrogate.NetworkPathForHost(Surrogate.MasterHost),
+                                        "*.jid"))
+                                    {
+                                        try
+                                        {
+                                            System.IO.File.Delete(jidfn);
+                                        }
+                                        catch
+                                        {
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                }
 
                                 Console.WriteLine();
                                 Console.WriteLine();

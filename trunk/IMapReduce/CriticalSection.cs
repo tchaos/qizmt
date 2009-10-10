@@ -127,6 +127,10 @@ namespace MySpace.DataMining.DistributedObjects
             }
             catch
             {
+                if (object.ReferenceEquals(this, currentSection))
+                {
+                    currentSection = null;
+                }
                 ntsm.Close();
                 ntsm = null;
                 sock.Close();
@@ -169,6 +173,10 @@ namespace MySpace.DataMining.DistributedObjects
             }
             catch
             {
+                if (object.ReferenceEquals(this, currentSection))
+                {
+                    currentSection = null;
+                }
                 ntsm.Close();
                 ntsm = null;
                 sock.Close();

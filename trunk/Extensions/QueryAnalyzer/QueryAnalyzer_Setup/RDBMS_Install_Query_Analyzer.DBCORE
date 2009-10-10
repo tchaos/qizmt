@@ -117,7 +117,7 @@
 int del = destdir.IndexOf(@"\", 2);
 string destdir_local = destdir.Substring(del + 1).Replace('$', ':');
 
-                DSpace_Log(Shell("cscript.exe " + destdir_local + "\\RDBMS_InstallDataProvider.js \"" +  account + "\" \"" + pwd + "\""));
+                DSpace_Log(Shell("cscript.exe \"" + destdir_local + "\\RDBMS_InstallDataProvider.js\" \"" +  account + "\" \"" + pwd + "\""));
 }
                 
                 _FixSciLexDLL(destdir);

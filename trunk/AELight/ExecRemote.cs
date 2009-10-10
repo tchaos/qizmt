@@ -31,18 +31,23 @@ namespace MySpace.DataMining.AELight
             internal string logname;
             internal SourceCode.Job cfgj;
             internal string DFSWriter; // Note: can be blank for no desired output.
+            internal List<string> DFSWriters;
 
             internal System.Threading.Thread thread;
             internal List<string> dfsinputpaths;
+            internal List<string> dfsinputfilenames;
+            internal List<int> dfsinputnodesoffsets;
             internal bool verbose;
             internal MySpace.DataMining.DistributedObjects5.Remote rem;
             internal long baseoutputfilesize = -1;
             internal int blockcount = -1;
             internal List<string> outputdfsnodes;
+            internal List<List<string>> outputdfsnodeses;
             internal IList<string> outputdfsdirs;
             internal IList<string> slaves;
             internal bool explicithost;
             internal List<long> outputsizes;
+            internal List<List<long>> outputsizeses;
             internal long sampledist;
             internal bool blockfail = true;
 
@@ -50,6 +55,7 @@ namespace MySpace.DataMining.AELight
             internal string SlaveHost;
             internal string SlaveIP;
             internal string[] ExecArgs;
+            internal string Meta;
 
 
             internal void threadproc()
@@ -100,6 +106,7 @@ namespace MySpace.DataMining.AELight
                     }
                     SlaveIP = IPAddressUtil.GetIPv4Address(SlaveHost); // !
 
+                    rem.SetJID(jid);
                     rem.AddBlock(SlaveIP + @"|" + logname + @"|slaveid=0");
 
                     string codectx = (@"
@@ -131,6 +138,8 @@ namespace MySpace.DataMining.AELight
     public const int DSpace_OutputRecordLength = " + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString() + @";
     public const int Qizmt_OutputRecordLength = DSpace_OutputRecordLength;
 
+    public const string Qizmt_Meta = @`" + Meta + @"`;
+
 const string _userlogname = `" + logname + @"`;
 static System.Threading.Mutex _logmutex = new System.Threading.Mutex(false, `distobjlog`);
 
@@ -153,7 +162,13 @@ public static void DSpace_Log(string line)
     {
         return;
     }
-    _logmutex.WaitOne();
+    try
+    {
+        _logmutex.WaitOne();
+    }
+    catch (System.Threading.AbandonedMutexException)
+    {
+    }
     try
     {
         using (System.IO.StreamWriter fstm = System.IO.File.AppendText(_userlogname))
@@ -183,23 +198,23 @@ public static void DSpace_LogResult(string name, bool passed)
 ").Replace('`', '"') + CommonDynamicCsCode;
 
 
-                    string dfsname = DFSWriter;
-                    if (dfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                    List<string> outputbasenames = new List<string>(DFSWriters.Count);                        
+                    foreach (string writer in DFSWriters)
                     {
-                        dfsname = dfsname.Substring(6);
+                        string dfsname = writer;
+                        if (dfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            dfsname = dfsname.Substring(6);
+                        }
+                        outputbasenames.Add(GenerateZdFileDataNodeBaseName(dfsname));
                     }
-                    string outputbasename = GenerateZdFileDataNodeBaseName(dfsname);
-
+                    
                     rem.Open();
 
                     outputsizes = new List<long>();
-                    int noutfiles = rem.RemoteExec(dfsinputpaths, outputdfsdirs, outputbasename, baseoutputfilesize, codectx + cfgj.Remote, cfgj.Usings, outputsizes);
-
-                    outputdfsnodes = new List<string>(noutfiles);
-                    for (int ne = 0; ne < noutfiles; ne++)
-                    {
-                        outputdfsnodes.Add(outputbasename.Replace("%n", ne.ToString()));
-                    }
+                    outputsizeses = new List<List<long>>();
+                    outputdfsnodeses = new List<List<string>>();
+                    rem.RemoteExec(dfsinputpaths, outputdfsdirs, outputbasenames, baseoutputfilesize, codectx + cfgj.Remote, cfgj.Usings, outputsizeses, outputdfsnodeses, dfsinputfilenames, dfsinputnodesoffsets);
 
                     blockfail = false; // !
 
@@ -230,7 +245,7 @@ public static void DSpace_LogResult(string name, bool passed)
                 Console.WriteLine("[{0}]        [Remote: {2}]", System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond, cfgj.NarrativeName);
             }
 
-            string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + "_log.txt";
+            string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + ".j" + sjid + "_log.txt";
 
             //System.Threading.Thread.Sleep(8000);
             /*if (cfgj.IOSettings.DFS_IOs == null || cfgj.IOSettings.DFS_IOs.Length == 0)
@@ -312,7 +327,13 @@ public static void DSpace_LogResult(string name, bool passed)
                     for (int si = 0; si < slaves.Length; si++)
                     {
                         System.Threading.Mutex m = new System.Threading.Mutex(false, "AEL_SC_" + slaves[si]);
-                        m.WaitOne();
+                        try
+                        {
+                            m.WaitOne();
+                        }
+                        catch (System.Threading.AbandonedMutexException)
+                        {
+                        }
                         try
                         {
                             System.IO.File.WriteAllText(NetworkPathForHost(slaves[si]) + @"\slaveconfig.xml", slaveconfigxml);
@@ -359,7 +380,7 @@ public static void DSpace_LogResult(string name, bool passed)
                         hosttypes = 2;
                         bi.SlaveHost = cfgj.IOSettings.DFS_IOs[BlockID].Host;
                         slaveHostID = slaveIDs[bi.SlaveHost.ToUpper()];
-                        bi.explicithost = true;                        
+                        bi.explicithost = true;
                     }
                     bi.ExecArgs = ExecArgs;
                     if (++nextslave >= slaves.Length)
@@ -373,40 +394,73 @@ public static void DSpace_LogResult(string name, bool passed)
                     bi.baseoutputfilesize = dc.DataNodeBaseSize;
                     bi.cfgj = cfgj;
                     bi.DFSWriter = cfgj.IOSettings.DFS_IOs[BlockID].DFSWriter.Trim();
+                    bi.Meta = cfgj.IOSettings.DFS_IOs[BlockID].Meta;
+
+                    List<string> dfswriters = new List<string>();
+                    if (bi.DFSWriter.Length > 0)
                     {
-                        int ic = bi.DFSWriter.IndexOf('@');
-                        if (-1 != ic)
+                        string[] writers = bi.DFSWriter.Split(';');
+                        for (int wi = 0; wi < writers.Length; wi++)
                         {
-                            try
+                            string thiswriter = writers[wi].Trim();
+                            if (thiswriter.Length == 0)
                             {
-                                int reclen = Surrogate.GetRecordSize(bi.DFSWriter.Substring(ic + 1));
-                                if (OutputRecordLength != int.MinValue && OutputRecordLength == reclen)
+                                continue;
+                            }
+                            int ic = thiswriter.IndexOf('@');
+                            int reclen = -1;
+                            if (-1 != ic)
+                            {
+                                try
                                 {
-                                    Console.Error.WriteLine("Error: all remote outputs must have the same record length: {0}", bi.DFSWriter);
+                                    reclen = Surrogate.GetRecordSize(thiswriter.Substring(ic + 1));
+                                    thiswriter = thiswriter.Substring(0, ic);
+                                }
+                                catch (FormatException e)
+                                {
+                                    Console.Error.WriteLine("Error: remote output record length error: {0} ({1})", thiswriter, e.Message);
                                     SetFailure();
                                     return;
                                 }
-                                OutputRecordLength = reclen;
-                                bi.DFSWriter = bi.DFSWriter.Substring(0, ic);
+                                catch (OverflowException e)
+                                {
+                                    Console.Error.WriteLine("Error: remote output record length error: {0} ({1})", thiswriter, e.Message);
+                                    SetFailure();
+                                    return;
+                                }
                             }
-                            catch (FormatException e)
+                            if (OutputRecordLength != int.MinValue && OutputRecordLength != reclen)
                             {
-                                Console.Error.WriteLine("Error: remote output record length error: {0} ({1})", bi.DFSWriter, e.Message);
+                                Console.Error.WriteLine("Error: all remote outputs must have the same record length: {0}", thiswriter);
                                 SetFailure();
                                 return;
                             }
-                            catch (OverflowException e)
+                            OutputRecordLength = reclen;
+
+                            string outfn = thiswriter;
+                            if (outfn.StartsWith(@"dfs://", StringComparison.OrdinalIgnoreCase))
                             {
-                                Console.Error.WriteLine("Error: remote output record length error: {0} ({1})", bi.DFSWriter, e.Message);
-                                SetFailure();
+                                outfn = outfn.Substring(6);
+                            }
+                            string reason = "";
+                            if (dfs.IsBadFilename(outfn, out reason))
+                            {
+                                Console.Error.WriteLine("Invalid output file: {0}", reason);
                                 return;
                             }
-                        }
-                        else if(OutputRecordLength == int.MinValue)
-                        {
-                            OutputRecordLength = -1;
+                            if (null != DfsFindAny(dc, outfn))
+                            {
+                                Console.Error.WriteLine("Error:  output file already exists in DFS: {0}", outfn);
+                                return;
+                            }
+                            dfswriters.Add(thiswriter);
                         }
                     }
+                    else
+                    {
+                        dfswriters.Add("");
+                    }
+                    bi.DFSWriters = dfswriters;                   
                     bi.verbose = verbose;
                     bi.rem = new MySpace.DataMining.DistributedObjects5.Remote(cfgj.NarrativeName + "_remote");
                     bi.rem.CookRetries = dc.slave.CookRetries;
@@ -428,11 +482,17 @@ public static void DSpace_LogResult(string name, bool passed)
                     if (cfgj.Unsafe != null)
                     {
                         bi.rem.AddUnsafe();
-                    }
-
+                    }                    
                     {
-                        List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();
+                        List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();                        
+                        List<string> mapfileswithnodes = null;
+                        List<int> nodesoffsets = null;
                         IList<string> mapfiles = SplitInputPaths(dc, cfgj.IOSettings.DFS_IOs[BlockID].DFSReader);
+                        if (mapfiles.Count > 0)
+                        {
+                            mapfileswithnodes = new List<string>(mapfiles.Count);
+                            nodesoffsets = new List<int>(mapfiles.Count);
+                        }
                         for (int i = 0; i < mapfiles.Count; i++)
                         {
                             string dp = mapfiles[i].Trim();
@@ -450,7 +510,7 @@ public static void DSpace_LogResult(string name, bool passed)
                                         try
                                         {
                                             int reclen = Surrogate.GetRecordSize(dp.Substring(ic + 1));
-                                            if (InputRecordLength != int.MinValue && InputRecordLength == reclen)
+                                            if (InputRecordLength != int.MinValue && InputRecordLength != reclen)
                                             {
                                                 Console.Error.WriteLine("Error: all remote inputs must have the same record length: {0}", dp);
                                                 SetFailure();
@@ -472,7 +532,7 @@ public static void DSpace_LogResult(string name, bool passed)
                                             return;
                                         }
                                     }
-                                    else if(InputRecordLength == int.MinValue)
+                                    else if (InputRecordLength == int.MinValue)
                                     {
                                         InputRecordLength = -1;
                                     }
@@ -498,33 +558,19 @@ public static void DSpace_LogResult(string name, bool passed)
                                     Console.Error.WriteLine("Remote input file not found in DFS: {0}", dp);
                                     return;
                                 }
-                                nodes.AddRange(df.Nodes);
+                                if (df.Nodes.Count > 0)
+                                {
+                                    mapfileswithnodes.Add(dp);
+                                    nodesoffsets.Add(nodes.Count);
+                                }                                
+                                nodes.AddRange(df.Nodes);                                
                             }
                         }
                         bi.dfsinputpaths = new List<string>(nodes.Count);
                         //MapNodesToNetworkPaths(nodes, bi.dfsinputpaths);
                         dfs.MapNodesToNetworkStarPaths(nodes, bi.dfsinputpaths);
-
-                        //if (0 != cfgj.IOSettings.DFS_IOs[BlockID].DFSWriter.Trim().Length) // Allow empty entry where output isn't wanted.
-                        if (0 != bi.DFSWriter.Length) // Allow empty entry where output isn't wanted.
-                        {
-                            string outfn = bi.DFSWriter;
-                            if (outfn.StartsWith(@"dfs://", StringComparison.OrdinalIgnoreCase))
-                            {
-                                outfn = outfn.Substring(6);
-                            }
-                            string reason = "";
-                            if (dfs.IsBadFilename(outfn, out reason))
-                            {
-                                Console.Error.WriteLine("Invalid output file: {0}", reason);
-                                return;
-                            }
-                            if (null != DfsFindAny(dc, cfgj.IOSettings.DFS_IOs[BlockID].DFSWriter))
-                            {
-                                Console.Error.WriteLine("Error:  output file already exists in DFS: {0}", cfgj.IOSettings.DFS_IOs[BlockID].DFSWriter);
-                                return;
-                            }
-                        }
+                        bi.dfsinputfilenames = mapfileswithnodes;
+                        bi.dfsinputnodesoffsets = nodesoffsets;
                     }
 
                     blocks.Add(bi);
@@ -532,7 +578,7 @@ public static void DSpace_LogResult(string name, bool passed)
                     bi.thread = new System.Threading.Thread(new System.Threading.ThreadStart(bi.threadproc));
                 }
                 MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = InputRecordLength;
-                MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength;
+                MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength > 0 ? OutputRecordLength : -1;
                 // Need to start threads separately due to StaticGlobals being updated.
                 for (int BlockID = 0; BlockID < cfgj.IOSettings.DFS_IOs.Length; BlockID++)
                 {
@@ -556,114 +602,122 @@ public static void DSpace_LogResult(string name, bool passed)
                     {
                         string dfspath;
                         string dfspathreplicating;
-                        // Reload DFS config to make sure changes since starting get rolled in, and make sure the output file wasn't created in that time...
-                        using (LockDfsMutex()) // Needed: change between load & save should be atomic.
+                        bool anyoutput = false;
+                        bool nonemptyoutputpath = false;
+                        for(int oi = 0; oi < blocks[BlockID].DFSWriters.Count; oi++)                        
                         {
-                            dc = LoadDfsConfig();
-                            if (null != DfsFind(dc, blocks[BlockID].DFSWriter))
+                            string dfswriter = blocks[BlockID].DFSWriters[oi];
+                            // Reload DFS config to make sure changes since starting get rolled in, and make sure the output file wasn't created in that time...
+                            using (LockDfsMutex()) // Needed: change between load & save should be atomic.
                             {
-                                Console.Error.WriteLine("Error:  output file was created during job");
-                                return;
-                            }
-                            dfspath = blocks[BlockID].DFSWriter; // Init.
-                            bool anyoutput = false;
-                            if (string.IsNullOrEmpty(dfspath))
-                            {
-                                dfspathreplicating = null;
-                                if (blocks[BlockID].outputdfsnodes.Count > 0)
+                                dc = LoadDfsConfig();
+                                if (null != DfsFind(dc, dfswriter))
                                 {
-                                    Console.Error.WriteLine("Output data detected with no DFSWriter specified");
-                                }
-                            }
-                            else
-                            {
-                                dfs.DfsFile df = new dfs.DfsFile();
-                                if (MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength > 0)
-                                {
-                                    df.XFileType = DfsFileTypes.BINARY_RECT + "@" + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString();
-                                }
-                                df.Nodes = new List<dfs.DfsFile.FileNode>();
-                                df.Size = -1; // Preset
-                                if (dfspath.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    dfspath = dfspath.Substring(6);
-                                }
-                                dfspathreplicating = ".$" + dfspath + ".$replicating-" + Guid.NewGuid().ToString();
-                                if (null != dc.FindAny(dfspathreplicating))
-                                {
-                                    Console.Error.WriteLine("Error: file exists: file put into DFS from another location during job: " + dfspathreplicating);
-                                    SetFailure();
+                                    Console.Error.WriteLine("Error:  output file was created during job: {0}", dfswriter);
                                     return;
                                 }
-                                df.Name = dfspathreplicating;
-                                bool anybad = false;
-                                long totalsize = 0;
+                                dfspath = dfswriter; // Init.                                
+                                if (string.IsNullOrEmpty(dfspath))
                                 {
-                                    int i = BlockID;
-                                    for (int j = 0; j < blocks[i].outputdfsnodes.Count; j++)
+                                    dfspathreplicating = null;
+                                    if (blocks[BlockID].outputdfsnodeses[oi].Count > 0)
                                     {
-                                        dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
-                                        fn.Host = blocks[i].slaves[(blocks[i].rem.OutputStartingPoint + j) % blocks[i].slaves.Count];
-                                        fn.Name = blocks[i].outputdfsnodes[j];
-                                        df.Nodes.Add(fn);
-                                        fn.Length = -1; // Preset
-                                        fn.Position = -1; // Preset
-                                        if (anybad)
-                                        {
-                                            continue;
-                                        }
-                                        fn.Length = blocks[i].outputsizes[j];
-                                        fn.Position = totalsize; // Position must be set before totalsize updated!
-                                        if (blocks[i].outputdfsnodes.Count != blocks[i].outputsizes.Count)
-                                        {
-                                            anybad = true;
-                                            continue;
-                                        }
-                                        totalsize += blocks[i].outputsizes[j];
+                                        Console.Error.WriteLine("Output data detected with no DFSWriter specified");
                                     }
                                 }
-                                if (!anybad)
+                                else
                                 {
-                                    df.Size = totalsize;
-                                }
-                                anyoutput = totalsize != 0;
-                                // Always add the file to DFS, even if blank!
-                                {
-                                    dc.Files.Add(df);
-                                    UpdateDfsXml(dc); // !
-                                }
+                                    nonemptyoutputpath = true;
+                                    dfs.DfsFile df = new dfs.DfsFile();
+                                    if (MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength > 0)
+                                    {
+                                        df.XFileType = DfsFileTypes.BINARY_RECT + "@" + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString();
+                                    }
+                                    df.Nodes = new List<dfs.DfsFile.FileNode>();
+                                    df.Size = -1; // Preset
+                                    if (dfspath.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        dfspath = dfspath.Substring(6);
+                                    }
+                                    dfspathreplicating = ".$" + dfspath + ".$replicating-" + Guid.NewGuid().ToString();
+                                    if (null != dc.FindAny(dfspathreplicating))
+                                    {
+                                        Console.Error.WriteLine("Error: file exists: file put into DFS from another location during job: " + dfspathreplicating);
+                                        SetFailure();
+                                        return;
+                                    }
+                                    df.Name = dfspathreplicating;
+                                    bool anybad = false;
+                                    long totalsize = 0;
+                                    {
+                                        int i = BlockID;
+                                        for (int j = 0; j < blocks[i].outputdfsnodeses[oi].Count; j++)
+                                        {
+                                            dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
+                                            fn.Host = blocks[i].slaves[(blocks[i].rem.OutputStartingPoint + j) % blocks[i].slaves.Count];
+                                            fn.Name = blocks[i].outputdfsnodeses[oi][j];
+                                            df.Nodes.Add(fn);
+                                            fn.Length = -1; // Preset
+                                            fn.Position = -1; // Preset
+                                            if (anybad)
+                                            {
+                                                continue;
+                                            }
+                                            fn.Length = blocks[i].outputsizeses[oi][j];
+                                            fn.Position = totalsize; // Position must be set before totalsize updated!
+                                            if (blocks[i].outputdfsnodeses[oi].Count != blocks[i].outputsizeses[oi].Count)
+                                            {
+                                                anybad = true;
+                                                continue;
+                                            }
+                                            totalsize += blocks[i].outputsizeses[oi][j];
+                                        }
+                                    }
+                                    if (!anybad)
+                                    {
+                                        df.Size = totalsize;
+                                    }
+                                    if (totalsize != 0)
+                                    {
+                                        anyoutput = true;
+                                    }
+                                    // Always add the file to DFS, even if blank!
+                                    {
+                                        dc.Files.Add(df);
+                                        UpdateDfsXml(dc); // !
+                                    }
+                                }                               
                             }
-                            if (!anyoutput && verbose && (dfspath.Length != 0))
+                            if (!anyoutput && verbose && nonemptyoutputpath)
                             {
                                 Console.Write(" (no DFS output) ");
                                 ConsoleFlush();
                             }
-                        }
-                        if (verbose)
-                        {
-                            Console.WriteLine(); // Line after output chars.
-                        }
-                        if (null != dfspathreplicating) // If there was an output file specified...
-                        {
-                            ReplicationPhase(dfspathreplicating, verbosereplication, blocks.Count, slaves);
-                            using (LockDfsMutex()) // Needed: change between load & save should be atomic.
+                            if (verbose)
                             {
-                                dc = LoadDfsConfig();
-                                dfs.DfsFile dfu = dc.FindAny(dfspathreplicating);
-                                if (null != dfu)
+                                Console.WriteLine(); // Line after output chars.
+                            }
+                            if (null != dfspathreplicating) // If there was an output file specified...
+                            {
+                                ReplicationPhase(dfspathreplicating, verbosereplication, blocks.Count, slaves);
+                                using (LockDfsMutex()) // Needed: change between load & save should be atomic.
                                 {
-                                    if (null != DfsFindAny(dc, dfspath))
+                                    dc = LoadDfsConfig();
+                                    dfs.DfsFile dfu = dc.FindAny(dfspathreplicating);
+                                    if (null != dfu)
                                     {
-                                        Console.Error.WriteLine("Error: file exists: file put into DFS from another location during job");
-                                        SetFailure();
-                                        return;
+                                        if (null != DfsFindAny(dc, dfspath))
+                                        {
+                                            Console.Error.WriteLine("Error: file exists: file put into DFS from another location during job");
+                                            SetFailure();
+                                            return;
+                                        }
+                                        dfu.Name = dfspath;
+                                        UpdateDfsXml(dc);
                                     }
-                                    dfu.Name = dfspath;
-                                    UpdateDfsXml(dc);
                                 }
                             }
                         }
-
                     }
                 }
 

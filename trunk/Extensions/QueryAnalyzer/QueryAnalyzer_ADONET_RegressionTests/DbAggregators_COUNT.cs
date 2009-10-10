@@ -35,7 +35,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                         while (reader.Read())
                         {
                             int id = reader.GetInt32(0);
-                            int count = reader.GetInt32(1);
+                            int count = (int)reader.GetInt64(1);
                             if (!expected.ContainsKey(id))
                             {
                                 throw new Exception("id returned from count group by is invalid.");
@@ -98,7 +98,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                         while (reader.Read())
                         {
                             string name = reader.GetString(0);
-                            int count = reader.GetInt32(1);
+                            int count = (int)reader.GetInt64(1);
                             if (!expected.ContainsKey(name))
                             {
                                 throw new Exception("name returned from count group by is invalid.");

@@ -40,7 +40,6 @@
             this.iNSERTINTOToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.iNSERTIMPORTToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.iNSERTIMPORTLINESToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.iNSERTVALUESToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.iNSERTINTOSELECTToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.iNSERTBINDToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.uPDATEToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -48,6 +47,8 @@
             this.uPDATEWHEREToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.gROUPBYToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.gROUPBYToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.dELETEToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.dELETEFROMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.cREATEToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.cREATETABLEToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tRUNCATEToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -68,6 +69,9 @@
             this.copyCtrlCToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pasteCtrlvToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.selectAllCtrlAToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.searchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.browseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.toolStripStatusLabel1 = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel2 = new System.Windows.Forms.ToolStripStatusLabel();
@@ -82,11 +86,6 @@
             this.sELECTFROMToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             this.cmsTables = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.createTableToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.searchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.dELETEToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.dELETEFROMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.dELETEWHEREToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.cmsTable.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.statusStrip1.SuspendLayout();
@@ -107,7 +106,7 @@
             this.tRUNCATEToolStripMenuItem,
             this.dROPToolStripMenuItem});
             this.cmsTable.Name = "cmsTable";
-            this.cmsTable.Size = new System.Drawing.Size(153, 202);
+            this.cmsTable.Size = new System.Drawing.Size(140, 180);
             // 
             // sELECTToolStripMenuItem
             // 
@@ -151,7 +150,6 @@
             this.iNSERTINTOToolStripMenuItem,
             this.iNSERTIMPORTToolStripMenuItem,
             this.iNSERTIMPORTLINESToolStripMenuItem,
-            this.iNSERTVALUESToolStripMenuItem,
             this.iNSERTINTOSELECTToolStripMenuItem,
             this.iNSERTBINDToolStripMenuItem});
             this.iNSERTToolStripMenuItem.Name = "iNSERTToolStripMenuItem";
@@ -176,12 +174,6 @@
             this.iNSERTIMPORTLINESToolStripMenuItem.Name = "iNSERTIMPORTLINESToolStripMenuItem";
             this.iNSERTIMPORTLINESToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.iNSERTIMPORTLINESToolStripMenuItem.Text = "INSERT IMPORTLINES";
-            // 
-            // iNSERTVALUESToolStripMenuItem
-            // 
-            this.iNSERTVALUESToolStripMenuItem.Name = "iNSERTVALUESToolStripMenuItem";
-            this.iNSERTVALUESToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.iNSERTVALUESToolStripMenuItem.Text = "INSERT VALUES";
             // 
             // iNSERTINTOSELECTToolStripMenuItem
             // 
@@ -231,6 +223,21 @@
             this.gROUPBYToolStripMenuItem1.Name = "gROUPBYToolStripMenuItem1";
             this.gROUPBYToolStripMenuItem1.Size = new System.Drawing.Size(124, 22);
             this.gROUPBYToolStripMenuItem1.Text = "GROUP BY";
+            // 
+            // dELETEToolStripMenuItem
+            // 
+            this.dELETEToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.dELETEFROMToolStripMenuItem});
+            this.dELETEToolStripMenuItem.Name = "dELETEToolStripMenuItem";
+            this.dELETEToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
+            this.dELETEToolStripMenuItem.Text = "DELETE...";
+            this.dELETEToolStripMenuItem.DropDownItemClicked += new System.Windows.Forms.ToolStripItemClickedEventHandler(this.cmsTable_ItemClicked);
+            // 
+            // dELETEFROMToolStripMenuItem
+            // 
+            this.dELETEFROMToolStripMenuItem.Name = "dELETEFROMToolStripMenuItem";
+            this.dELETEFROMToolStripMenuItem.Size = new System.Drawing.Size(142, 22);
+            this.dELETEFROMToolStripMenuItem.Text = "DELETE FROM";
             // 
             // cREATEToolStripMenuItem
             // 
@@ -400,6 +407,31 @@
             this.selectAllCtrlAToolStripMenuItem.Text = "Select All (Ctrl-A)";
             this.selectAllCtrlAToolStripMenuItem.Click += new System.EventHandler(this.selectAllCtrlAToolStripMenuItem_Click);
             // 
+            // helpToolStripMenuItem
+            // 
+            this.helpToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.searchToolStripMenuItem,
+            this.browseToolStripMenuItem});
+            this.helpToolStripMenuItem.Name = "helpToolStripMenuItem";
+            this.helpToolStripMenuItem.Size = new System.Drawing.Size(40, 20);
+            this.helpToolStripMenuItem.Text = "Help";
+            // 
+            // searchToolStripMenuItem
+            // 
+            this.searchToolStripMenuItem.Enabled = false;
+            this.searchToolStripMenuItem.Name = "searchToolStripMenuItem";
+            this.searchToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.searchToolStripMenuItem.Text = "Search";
+            this.searchToolStripMenuItem.Click += new System.EventHandler(this.searchToolStripMenuItem_Click);
+            // 
+            // browseToolStripMenuItem
+            // 
+            this.browseToolStripMenuItem.Enabled = false;
+            this.browseToolStripMenuItem.Name = "browseToolStripMenuItem";
+            this.browseToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.browseToolStripMenuItem.Text = "Browse";
+            this.browseToolStripMenuItem.Click += new System.EventHandler(this.browseToolStripMenuItem_Click);
+            // 
             // statusStrip1
             // 
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -509,44 +541,6 @@
             this.createTableToolStripMenuItem1.Text = "Create Table";
             this.createTableToolStripMenuItem1.Click += new System.EventHandler(this.createTableToolStripMenuItem1_Click);
             // 
-            // helpToolStripMenuItem
-            // 
-            this.helpToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.searchToolStripMenuItem});
-            this.helpToolStripMenuItem.Name = "helpToolStripMenuItem";
-            this.helpToolStripMenuItem.Size = new System.Drawing.Size(40, 20);
-            this.helpToolStripMenuItem.Text = "Help";
-            // 
-            // searchToolStripMenuItem
-            // 
-            this.searchToolStripMenuItem.Enabled = false;
-            this.searchToolStripMenuItem.Name = "searchToolStripMenuItem";
-            this.searchToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
-            this.searchToolStripMenuItem.Text = "Search";
-            this.searchToolStripMenuItem.Click += new System.EventHandler(this.searchToolStripMenuItem_Click);
-            // 
-            // dELETEToolStripMenuItem
-            // 
-            this.dELETEToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.dELETEFROMToolStripMenuItem,
-            this.dELETEWHEREToolStripMenuItem});
-            this.dELETEToolStripMenuItem.Name = "dELETEToolStripMenuItem";
-            this.dELETEToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
-            this.dELETEToolStripMenuItem.Text = "DELETE...";
-            this.dELETEToolStripMenuItem.DropDownItemClicked += new System.Windows.Forms.ToolStripItemClickedEventHandler(this.cmsTable_ItemClicked);
-            // 
-            // dELETEFROMToolStripMenuItem
-            // 
-            this.dELETEFROMToolStripMenuItem.Name = "dELETEFROMToolStripMenuItem";
-            this.dELETEFROMToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
-            this.dELETEFROMToolStripMenuItem.Text = "DELETE FROM";
-            // 
-            // dELETEWHEREToolStripMenuItem
-            // 
-            this.dELETEWHEREToolStripMenuItem.Name = "dELETEWHEREToolStripMenuItem";
-            this.dELETEWHEREToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
-            this.dELETEWHEREToolStripMenuItem.Text = "DELETE WHERE";
-            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -587,7 +581,6 @@
         private System.Windows.Forms.ToolStripMenuItem cREATEToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem cREATETABLEToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem iNSERTIMPORTLINESToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem iNSERTVALUESToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sELECTWHEREToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sELECTORDERBYToolStripMenuItem;
         private System.Windows.Forms.MenuStrip menuStrip1;
@@ -633,7 +626,7 @@
         private System.Windows.Forms.ToolStripMenuItem searchToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem dELETEToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem dELETEFROMToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem dELETEWHEREToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem browseToolStripMenuItem;
     }
 }
 

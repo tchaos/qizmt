@@ -10,6 +10,27 @@ namespace QueryAnalyzer_ADONET_RegressionTests
         public static void Main(string[] args)
         {
             List<KeyValuePair<string, bool>> AllTests = new List<KeyValuePair<string, bool>>();
+            
+            if (args.Length > 0 && "-connopen" == args[0])
+            {
+                goto connopen;
+            }
+            if (args.Length > 0 && "-selectportion" == args[0])
+            {
+                goto selectportion;
+            }
+            if (args.Length > 0 && "-rselectwhereor" == args[0])
+            {
+                goto rselectwhereor;
+            }
+            if (args.Length > 0 && "-rindex" == args[0])
+            {
+                goto rindex;
+            }
+            if (args.Length > 0 && "-rindexotherdatatypes" == args[0])
+            {
+                goto rindexotherdatatypes;
+            }
            
             if(!(args.Length > 0 && "-skipaggregators" == args[0]))
             {
@@ -308,6 +329,25 @@ namespace QueryAnalyzer_ADONET_RegressionTests
             }
 
             {
+                string testname = "SelectDistinct";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    SelectDistinct();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            rindex:
+            {
                 string testname = "RIndexPin";
                 Console.WriteLine("*** Running test {0}...", testname);
                 try
@@ -361,6 +401,67 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 Console.WriteLine();
             }
 
+            rselectwhereor:
+            {
+                // first: QueryAnalyzer_ADONET_RegressionTests.exe -rselectwhereor SavedTable quitrswo
+                // next:  QueryAnalyzer_ADONET_RegressionTests.exe -rselectwhereor SavedTable NoCreateTable quitrswo
+                // last:  QueryAnalyzer_ADONET_RegressionTests.exe -rselectwhereor NoCreateTable quitrswo
+                string testname = "RSelectWhereOR";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    bool SavedTable = false;
+                    bool NoCreateTable = false;
+                    bool quitrswo = false;
+                    foreach (string arg in args)
+                    {
+                        if (-1 != arg.IndexOf("SavedTable", StringComparison.OrdinalIgnoreCase))
+                        {
+                            SavedTable = true;
+                            Console.WriteLine("SavedTable");
+                        }
+                        if (-1 != arg.IndexOf("NoCreateTable", StringComparison.OrdinalIgnoreCase))
+                        {
+                            NoCreateTable = true;
+                            Console.WriteLine("NoCreateTable");
+                        }
+                        if (-1 != arg.IndexOf("quitrswo", StringComparison.OrdinalIgnoreCase))
+                        {
+                            quitrswo = true;
+                        }
+                    }
+                    if (quitrswo)
+                    {
+                        System.Threading.Thread.Sleep(1000 * 12);
+                    }
+                    try
+                    {
+                        RSelectWhereOR(SavedTable, NoCreateTable);
+                    }
+                    catch
+                    {
+                        if (quitrswo)
+                        {
+                            return;
+                        }
+                        throw;
+                    }
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                    if (quitrswo)
+                    {
+                        return;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
             {
                 string testname = "RSelectLotsOfRows";
                 Console.WriteLine("*** Running test {0}...", testname);
@@ -396,6 +497,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
                 Console.WriteLine();
             }
+            connopen:
             {
                 string testname = "ConnOpen";
                 Console.WriteLine("*** Running test {0}...", testname);
@@ -634,6 +736,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
                 Console.WriteLine();
             }
+            selectportion:
             {
                 string testname = "SelectPortion";
                 Console.WriteLine("*** Running test {0}...", testname);
@@ -667,7 +770,94 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                     AllTests.Add(new KeyValuePair<string, bool>(testname, false));
                 }
                 Console.WriteLine();
-            }           
+            }
+
+            rindexotherdatatypes:
+            {
+                string testname = "RIndexOnLong";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnLong();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOnDateTime";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnDateTime();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOnDouble";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnDouble();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOnInt";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnInt();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOnChar";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnChar();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
 
             // - Display final output -
             Console.WriteLine("--STARTRESULTS--");
@@ -677,7 +867,9 @@ namespace QueryAnalyzer_ADONET_RegressionTests
             }
             Console.WriteLine("--ENDRESULTS--");
 
-            Console.Read();
+#if DEBUG
+            //Console.Read();
+#endif
         }
 
         public static void DSpace_LogResult(string name, bool passed)

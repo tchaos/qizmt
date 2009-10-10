@@ -466,7 +466,9 @@ namespace QueryAnalyzer_RegressionTests
             }
             Console.WriteLine("--ENDRESULTS--");
 
-            Console.ReadKey();
+#if DEBUG
+            //Console.ReadKey();
+#endif
 
         }
 

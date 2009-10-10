@@ -173,7 +173,13 @@ namespace MySpace.DataMining.DistributedObjects
 
                     {
                         System.Threading.Mutex mdc = new System.Threading.Mutex(false, "DynCmp");
-                        mdc.WaitOne();
+                        try
+                        {
+                            mdc.WaitOne();
+                        }
+                        catch (System.Threading.AbandonedMutexException)
+                        {
+                        }
                         try
                         {
                             Dictionary<string, string> providerOptions = new Dictionary<string, string>();

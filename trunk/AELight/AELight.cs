@@ -61,8 +61,11 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("         information for DFS or a DFS file");
             Console.WriteLine("    head <dfspath>[:<host>:<part>] [<count>]   show first few lines of file");
             Console.WriteLine("    put <netpath> [<dfspath>[@<recordlen>]]    put a file into DFS");
+            Console.WriteLine("    fput files|dirs=<item[,item,item]> [pattern=<pattern>]   put files into DFS");
             Console.WriteLine("    putbinary <wildcard> <dfspath>  put binary into DFS");
             Console.WriteLine("    get [parts=<first>[-[<last>]]] <dfspath> <netpath>  get a file from DFS");
+            Console.WriteLine("    fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>]");
+            Console.WriteLine("         get a file from DFS");
             Console.WriteLine("    getbinary <dfspath> <netpath>  get binary from DFS");
             Console.WriteLine("    del <dfspath|wildcard>  delete a DFS file using multiple threads");
             //Console.WriteLine("    delmt <dfspath|wildcard>  delete a DFS file using multiple threads");
@@ -124,6 +127,8 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    maxdglobalsupdate <integer>    update maxDGlobals configuration");
             Console.WriteLine("    recordsize <user-size>         returns bytes of user-friendly size");
             Console.WriteLine("    swap <file1> <file2>           file names to swap");
+            Console.WriteLine("    regressiontest                 regression test " + appname);
+            Console.WriteLine("    kill <JID>                     kill the specified Jobs-ID");
         }
 
 
@@ -479,13 +484,13 @@ namespace MySpace.DataMining.AELight
 
         public static string GenerateZdFileDataNodeName(string dfspath)
         {
-            return dfs.GenerateZdFileDataNodeName(dfspath);
+            return dfs.GenerateZdFileDataNodeName(dfspath, jid);
         }
 
 
         public static string GenerateZdFileDataNodeBaseName(string dfspath)
         {
-            string basefn = GenerateZdFileDataNodeName(dfspath);
+            string basefn = GenerateZdFileDataNodeName(dfspath); // Has JID in it.
             int ipos = basefn.IndexOf('.') + 1;
             return basefn.Substring(0, ipos) + "%n." + basefn.Substring(ipos);
         }
@@ -495,7 +500,7 @@ namespace MySpace.DataMining.AELight
         {
             using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
             {
-                lm.WaitOne();
+                lm.WaitOne(); // Lock also taken by kill.
                 try
                 {
                     string exclfn = AELight_Dir + @"\excl.dat";
@@ -513,7 +518,7 @@ namespace MySpace.DataMining.AELight
         {
             using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
             {
-                lm.WaitOne();
+                lm.WaitOne(); // Lock also taken by kill.
                 try
                 {
                     string exclfn = AELight_Dir + @"\excl.dat";
@@ -547,7 +552,7 @@ namespace MySpace.DataMining.AELight
 #endif
             using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
             {
-                lm.WaitOne();
+                lm.WaitOne(); // Lock also taken by kill.
 
                 string lockfn = AELight_Dir + @"\execlock.dat";
                 if (System.IO.File.Exists(lockfn))
@@ -581,7 +586,7 @@ namespace MySpace.DataMining.AELight
                 string qfnbackup = qfn + "$";
                 if (System.IO.File.Exists(qfn))
                 {
-                    string selflinestart = sthispid + " " + appcookie + " ";
+                    string selflinestart = sthispid + " " + sjid + " ";
                     System.IO.File.Copy(qfn, qfnbackup, true);
                     using (System.IO.StreamReader fsin = new System.IO.StreamReader(qfnbackup))
                     {
@@ -685,6 +690,21 @@ namespace MySpace.DataMining.AELight
             }
         }
 
+        static void _CleanJidFile_unlocked()
+        {
+#if CLIENT_LOG_ALL
+            LogOutputToFile("CLIENT_LOG_ALL: _CleanJidFile_unlocked");
+#endif
+            try
+            {
+                System.IO.File.Delete(jidfilename);
+            }
+            catch (Exception e)
+            {
+                LogOutputToFile(e.ToString());
+            }
+        }
+
 
         static IList<string> ExcludeUnhealthySlaveMachines(IList<string> slaves, List<string> removed, bool verbose, int nthreads)
         {
@@ -783,11 +803,12 @@ namespace MySpace.DataMining.AELight
         }
 
 
-        public static void CleanExecQ(int pid, string cookie)
+        public static bool CleanExecQ(int pidClean, long jidClean)
         {
+            bool result = false;
             using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
             {
-                lm.WaitOne();
+                lm.WaitOne(); // Lock also taken by kill.
 
                 if (IsAdminCmd)
                 {
@@ -805,20 +826,39 @@ namespace MySpace.DataMining.AELight
 
                 _CleanPidFile_unlocked();
 
+                _CleanJidFile_unlocked();
+
                 string fn = AELight_Dir + @"\execq.dat";
-                string fnbackup = fn + "$";
+                string fnNew = fn + "$";
                 if (System.IO.File.Exists(fn))
                 {
-                    string linestart = pid.ToString() + " " + cookie + " ";
-                    System.IO.File.Copy(fn, fnbackup, true);
-                    using (System.IO.StreamReader fsin = new System.IO.StreamReader(fnbackup))
+                    System.Text.RegularExpressions.Regex rex = new System.Text.RegularExpressions.Regex(
+                        @"^\d+ " + jidClean.ToString() + " ",
+                        System.Text.RegularExpressions.RegexOptions.Compiled
+                        | System.Text.RegularExpressions.RegexOptions.Singleline);
+                    using (System.IO.StreamReader fsin = new System.IO.StreamReader(fn))
                     {
-                        using (System.IO.StreamWriter fsout = new System.IO.StreamWriter(fn))
+                        using (System.IO.StreamWriter fsout = new System.IO.StreamWriter(fnNew))
                         {
                             string line;
                             while (null != (line = fsin.ReadLine()))
                             {
-                                if (!line.StartsWith(linestart))
+                                if (rex.IsMatch(line))
+                                {
+                                    if (pidClean >= 1)
+                                    {
+                                        string linestart = pidClean.ToString() + " " + jidClean.ToString() + " ";
+                                        if (line.StartsWith(linestart))
+                                        {
+                                            result = true;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        result = true;
+                                    }
+                                }
+                                else
                                 {
                                     fsout.WriteLine(line);
                                 }
@@ -827,29 +867,46 @@ namespace MySpace.DataMining.AELight
                         }
                         fsin.Close();
                     }
-                    System.IO.File.Delete(fnbackup);
+                    {
+                        System.IO.File.Delete(fn);
+                        System.IO.File.Move(fnNew, fn);
+                    }
                 }
 
                 lm.ReleaseMutex();
             }
+            return result;
         }
 
 
         public static void CleanThisExecQ()
         {
-            CleanExecQ(System.Diagnostics.Process.GetCurrentProcess().Id, appcookie);
+            if (0 == jid)
+            {
+                return;
+            }
+            bool cleaned = CleanExecQ(System.Diagnostics.Process.GetCurrentProcess().Id, jid);
+#if DEBUG
+            if (!cleaned)
+            {
+                throw new Exception("DEBUG:  CleanThisExecQ: (!cleaned)");
+            }
+#endif
         }
 
 
+        // A normal failure occured; not considered abrupt.
+        // e.g. bad user input, expected file not found, etc.
         public static void SetFailure()
         {
-            CleanThisExecQ();
-
-            Environment.Exit(0xf00); // For now.
-
-#if CLIENT_LOG_ALL
-            LogOutputToFile("CLIENT_LOG_ALL: SetFailure() exit");
+#if DEBUG
+            if (System.Threading.Thread.CurrentThread.ManagedThreadId != MainThreadId)
+            {
+                Console.Error.WriteLine("DEBUG:  SetFailure: (System.Threading.Thread.CurrentThread.ManagedThreadId != MainThreadId)");
+                Environment.Exit(0xf00);
+            }
 #endif
+            System.Threading.Thread.CurrentThread.Abort("SetFailure{5653B981-4E2F-4b79-ACB5-8D504644D569}");
         }
 
 
@@ -1223,21 +1280,75 @@ namespace MySpace.DataMining.AELight
         static string douser = null;
         static string dousername = null;
         static string userdomain = null;
-        static string appcookie;
         static System.IO.StreamWriter pidfile = null;
         static string pidfilename;
+        static string jidfilename;
         public static bool DebugSwitch = false;
         public static bool DebugStepSwitch = false;
 
+
+        internal const string jidfn = "jid.dat";
+        internal static string jidfp = "N/A";
+        public static long jid = 0;
+        public static string sjid = "0";
+
+#if DEBUG
+        static int MainThreadId;
+#endif
+
         static void Main(string[] args)
         {
+#if DEBUG
+            MainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+#endif
+            bool success = false;
+            bool setfailure = false;
             try
             {
-                AELightRun(args);
+                try
+                {
+                    AELightRun(args);
+                }
+                catch (System.Threading.ThreadAbortException tae)
+                {
+                    if ((string)tae.ExceptionState == "SetFailure{5653B981-4E2F-4b79-ACB5-8D504644D569}")
+                    {
+                        setfailure = true;
+                        System.Threading.Thread.ResetAbort();
+                    }
+                }
+                CleanThisExecQ();
+                success = true;
             }
             finally
             {
-                CleanThisExecQ();
+                if (!success)
+                {
+                    if (0 == jid)
+                    {
+                        // It wasn't even given a JID yet, so just ignore this.
+                    }
+                    else
+                    {
+                        ConsoleColor oldc = ConsoleColor.Gray;
+                        if (!isdspace)
+                        {
+                            oldc = Console.ForegroundColor;
+                            Console.ForegroundColor = ConsoleColor.Red;
+                        }
+                        Console.Error.WriteLine(Environment.NewLine
+                            + "{0}Job aborted abruptly; to clean up intermediate data and processes, issue command: {3} kill {4} {2}",
+                            (isdspace ? "\u00014" : ""), (isdspace ? "\u00010" : ""), appname, sjid);
+                        if (!isdspace)
+                        {
+                            Console.ForegroundColor = oldc;
+                        }
+                    }
+                }
+            }
+            if (setfailure)
+            {
+                Environment.Exit(0xf00);
             }
 #if CLIENT_LOG_ALL
             LogOutputToFile("CLIENT_LOG_ALL: clean return from Main");
@@ -1246,8 +1357,6 @@ namespace MySpace.DataMining.AELight
 
         static void AELightRun(string[] args)
         {
-            appcookie = Guid.NewGuid().ToString();
-
             //if (Environment.GetEnvironmentVariable("DOSERVICE") != null)
             {
                 Console.OutputEncoding = Encoding.UTF8;
@@ -1301,6 +1410,7 @@ namespace MySpace.DataMining.AELight
             }            
             OriginalUserDir = Environment.CurrentDirectory;
             AELight_Dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            jidfp = AELight_Dir + @"\" + jidfn;
 
             if (args.Length > 0
                 && args[0].StartsWith("-debug"))
@@ -1327,7 +1437,7 @@ namespace MySpace.DataMining.AELight
             {
                 using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
                 {
-                    lm.WaitOne();
+                    lm.WaitOne(); // Lock also taken by kill.
 
                     if (System.IO.File.Exists(AELight_Dir + @"\excl.dat"))
                     {
@@ -1406,10 +1516,33 @@ namespace MySpace.DataMining.AELight
                                 default:
                                     Console.Error.WriteLine("  {0} is currently locked for administrative tasks; please try again later", appname);
                                     SetFailure();
-                                    break;                            
+                                    break;
                             }
                             return; // !
                         }
+                    }
+
+                    {
+                        // Acquire JID.
+                        if (!System.IO.File.Exists(jidfp))
+                        {
+                            jid = 1;
+                            sjid = jid.ToString();
+                        }
+                        else
+                        {
+                            string soldjid = System.IO.File.ReadAllText(jidfp).Trim();
+                            long oldjid = long.Parse(soldjid);
+                            long newjid = unchecked(oldjid + 1);
+                            if (newjid < 1)
+                            {
+                                newjid = 1;
+                                LogOutputToFile(string.Format("Warning: JID overflow: {0} to {1}", soldjid, newjid));
+                            }
+                            jid = newjid;
+                            sjid = jid.ToString();
+                        }
+                        System.IO.File.WriteAllText(jidfp, sjid);
                     }
 
                     try
@@ -1486,7 +1619,7 @@ namespace MySpace.DataMining.AELight
                                 {
                                     System.IO.File.AppendAllText(AELight_Dir + @"\execq.dat",
                                         System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
-                                        + " " + appcookie
+                                        + " " + sjid
                                         + " " + act
                                         + " +++"
                                         + " " + sayuser
@@ -1514,9 +1647,20 @@ namespace MySpace.DataMining.AELight
                             string spid = pid.ToString();
                             pidfilename = AELight_Dir + @"\" + spid + ".aelight.pid";
                             pidfile = new System.IO.StreamWriter(pidfilename);
-                            pidfile.WriteLine(pid);
+                            pidfile.WriteLine(spid);
                             pidfile.WriteLine(System.DateTime.Now);
+                            pidfile.WriteLine("jid={0}", sjid);
                             pidfile.Flush();
+
+                            {
+                                jidfilename = AELight_Dir + @"\" + sjid + ".jid";
+                                System.IO.StreamWriter sw = new System.IO.StreamWriter(jidfilename);
+                                sw.WriteLine(sjid);
+                                sw.WriteLine(System.DateTime.Now);
+                                sw.WriteLine("pid={0}", spid);
+                                //sw.Flush();
+                                sw.Close();
+                            }
                         }
 
                     }
@@ -1561,6 +1705,523 @@ namespace MySpace.DataMining.AELight
             }
             switch (act)
             {
+                case "kill":
+                case "killst":
+                case "killmt":
+                    {
+                        bool singlethreaded = ("killst" == act);
+
+                        if (args.Length > 1)
+                        {
+                            string killsjid = args[1];
+                            long killjid;
+                            try
+                            {
+                                killjid = long.Parse(killsjid);
+                                if (killjid <= 0)
+                                {
+                                    throw new Exception("Must be greater than 0");
+                                }
+                                killsjid = killjid.ToString(); // Normalize.
+                            }
+                            catch (Exception e)
+                            {
+                                Console.Error.WriteLine("Invalid JID '{0}': {1}", killsjid, e.Message);
+                                SetFailure();
+                                return;
+                            }
+                            if (killjid == jid)
+                            {
+                                Console.WriteLine("Process suicide");
+                                return;
+                            }
+
+                            {
+                                bool qverbose = args.Length > 2 && "?" == args[2];
+                                bool dotverbose = args.Length > 2 && "." == args[2];
+                                int killAelightPid = 0;
+                                string killAelightSPid = "0";
+                                bool killjidexists = false;
+                                using (System.Threading.Mutex killmutex = new System.Threading.Mutex(false, "DOkillj" + killsjid))
+                                {
+                                    killmutex.WaitOne(); // Can abandon if kill gets killed, but we should be alerted.
+                                    string killsjidfp = AELight_Dir + @"\" + killsjid + ".jid";
+                                    if (!System.IO.File.Exists(killsjidfp))
+                                    {
+                                        //killjidexists = false;
+                                    }
+                                    else
+                                    {
+                                        killjidexists = true;
+                                        Console.WriteLine("Killing {0}: {1}", killsjid, "");
+                                        dfs dc = LoadDfsConfig();
+                                        string[] slaves = dc.Slaves.SlaveList.Split(';');
+                                        int numthreads = 1;
+                                        if (!singlethreaded)
+                                        {
+                                            numthreads = slaves.Length;
+                                        }
+
+                                        List<System.Threading.Mutex> mutexes = new List<System.Threading.Mutex>();
+                                        bool mutexesNeedSafePoint = true;
+                                        {
+                                            mutexes.Add(new System.Threading.Mutex(false, "AEDFSM"));
+                                            mutexes.Add(new System.Threading.Mutex(false, "DOexeclog"));
+                                            // Also adding compiler mutex so that the frozen aelight being
+                                            // killed doesn't prevent other processes from compiling...
+                                            mutexes.Add(new System.Threading.Mutex(false, "DynCmp"));
+                                        }
+
+                                        string[] jidflines = null;
+                                        try
+                                        {
+                                            jidflines = System.IO.File.ReadAllLines(killsjidfp);
+                                        }
+                                        catch (System.IO.FileNotFoundException)
+                                        {
+                                            // This can happen if the job finishes after the previous file check.
+                                            killjidexists = false;
+                                        }
+                                        if (null != jidflines)
+                                        {
+                                            foreach (string ln in jidflines)
+                                            {
+                                                if (ln.StartsWith("pid="))
+                                                {
+                                                    killAelightSPid = ln.Substring(4);
+                                                    killAelightPid = int.Parse(killAelightSPid);
+                                                    killAelightSPid = killAelightPid.ToString(); // Normalize.
+                                                    try
+                                                    {
+                                                        System.Diagnostics.Process xproc = System.Diagnostics.Process.GetProcessById(killAelightPid);
+                                                        if (mutexesNeedSafePoint)
+                                                        {
+                                                            HogMutexes(true, mutexes);
+                                                        }
+                                                        try
+                                                        {
+                                                            foreach (System.Diagnostics.ProcessThread pt in xproc.Threads)
+                                                            {
+                                                                IntPtr hthd = OpenThread(0x2 /* suspend/resume */, false, (uint)pt.Id);
+                                                                if (IntPtr.Zero == hthd)
+                                                                {
+                                                                    throw new Exception("Insufficient access to thread");
+                                                                }
+                                                                SuspendThread(hthd);
+#if DEBUG
+                                                                if (qverbose)
+                                                                {
+                                                                    lock (slaves)
+                                                                    {
+                                                                        Console.Write("(suspended thread {0})", pt.Id);
+                                                                        ConsoleFlush();
+                                                                    }
+                                                                }
+#endif
+                                                            }
+                                                            mutexesNeedSafePoint = false;
+                                                        }
+                                                        finally
+                                                        {
+                                                            HogMutexes(false, mutexes);
+                                                        }
+                                                        xproc.Close();
+                                                    }
+                                                    catch (Exception exf)
+                                                    {
+                                                        if (qverbose)
+                                                        {
+                                                            lock (slaves)
+                                                            {
+                                                                Console.Write("(Unable to suspend AELight threads: {0})", exf.Message);
+                                                                ConsoleFlush();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            System.Threading.Thread.Sleep(1000); // Allow slaves to initialize.
+                                            {
+                                                //foreach (string slave in slaves)
+                                                MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                                    new Action<string>(
+                                                    delegate(string slave)
+                                                    {
+                                                        string netpath = Surrogate.NetworkPathForHost(slave);
+                                                        foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(netpath))
+                                                            .GetFiles("*.j" + killsjid + ".slave.pid"))
+                                                        {
+                                                            string spidStopRemote = fi.Name.Substring(0, fi.Name.IndexOf('.'));
+                                                            try
+                                                            {
+                                                                System.Net.Sockets.NetworkStream nstm = Surrogate.ConnectService(slave);
+                                                                nstm.WriteByte((byte)'k');
+                                                                XContent.SendXContent(nstm, spidStopRemote);
+                                                                if ('+' != nstm.ReadByte())
+                                                                {
+                                                                    throw new Exception("Remote machine did not report a success during kill operation");
+                                                                }
+                                                                nstm.Close();
+                                                                fi.Delete();
+                                                            }
+                                                            catch (Exception e)
+                                                            {
+                                                                LogOutputToFile("Unable to kill Slave PID " + netpath + "\\" + spidStopRemote + " belonging to JID " + killsjid + ": " + e.Message);
+                                                            }
+                                                        }
+                                                    }), slaves, numthreads);
+                                            }
+                                            System.Threading.Thread.Sleep(1000); // Allow slaves to finalize.
+
+                                            string killjzm = "zmap_*_*.j" + killsjid + ".zm";
+                                            string killjzb = "zblock_*.j" + killsjid + ".zb";
+                                            string killjoblog = "*_????????-????-????-????-????????????.j" + killsjid + "_log.txt";
+                                            string killzf = "zfoil_*.j" + killsjid + ".zf";
+                                            //foreach (string slave in slaves)
+                                            MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                                new Action<string>(
+                                                delegate(string slave)
+                                                {
+                                                    string netpath = Surrogate.NetworkPathForHost(slave);
+                                                    {
+                                                        // Delete leaked chunks only! Have to check with DFS.xml
+                                                        Dictionary<string, bool> dcnodes = new Dictionary<string, bool>(new Surrogate.CaseInsensitiveEqualityComparer());
+                                                        foreach (dfs.DfsFile df in dc.Files)
+                                                        {
+                                                            for (int ifn = 0; ifn < df.Nodes.Count; ifn++)
+                                                            {
+                                                                string nn = df.Nodes[ifn].Name;
+                                                                if (!dcnodes.ContainsKey(nn))
+                                                                {
+                                                                    dcnodes.Add(nn, true);
+                                                                }
+                                                            }
+                                                        }
+                                                        try
+                                                        {
+                                                            string killcheckjzd = "zd.*.*.j" + killsjid + ".zd";
+                                                            foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(netpath)).GetFiles(killcheckjzd))
+                                                            {
+                                                                if (!dcnodes.ContainsKey(fi.Name))
+                                                                {
+                                                                    for (int fiDeletes = 0; ; fiDeletes++)
+                                                                    {
+                                                                        try
+                                                                        {
+                                                                            fi.Delete();
+                                                                            break;
+                                                                        }
+                                                                        catch
+                                                                        {
+                                                                            if (fiDeletes >= 100)
+                                                                            {
+                                                                                throw;
+                                                                            }
+                                                                            System.Threading.Thread.Sleep(100);
+                                                                            continue;
+                                                                        }
+                                                                    }
+                                                                    if (qverbose)
+                                                                    {
+                                                                        lock (slaves)
+                                                                        {
+                                                                            Console.Write("(deleted {0})", fi.FullName);
+                                                                        }
+                                                                    }
+                                                                    if (dotverbose || qverbose)
+                                                                    {
+                                                                        lock (slaves)
+                                                                        {
+                                                                            Console.Write('.');
+                                                                            ConsoleFlush();
+                                                                        }
+                                                                    }
+                                                                    try
+                                                                    {
+                                                                        string fisamplename = fi.FullName + ".zsa";
+                                                                        System.IO.File.Delete(fisamplename);
+                                                                        /*if (dverbose)
+                                                                        {
+                                                                            lock (slaves)
+                                                                            {
+                                                                                Console.Write("(deleted {0})", fisamplename);
+                                                                                //ConsoleFlush();
+                                                                            }
+                                                                        }*/
+                                                                        if (dotverbose || qverbose)
+                                                                        {
+                                                                            lock (slaves)
+                                                                            {
+                                                                                Console.Write('.');
+                                                                                ConsoleFlush();
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    catch
+                                                                    {
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        catch (Exception e)
+                                                        {
+                                                            LogOutput("Unable to delete incomplete MR.DFS data belonging to JID " + killsjid + ": " + e.Message);
+                                                        }
+                                                    }
+                                                    try
+                                                    {
+                                                        foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(netpath)).GetFiles(killjzm))
+                                                        {
+                                                            for (int fiDeletes = 0; ; fiDeletes++)
+                                                            {
+                                                                try
+                                                                {
+                                                                    fi.Delete();
+                                                                    break;
+                                                                }
+                                                                catch
+                                                                {
+                                                                    if (fiDeletes >= 100)
+                                                                    {
+                                                                        throw;
+                                                                    }
+                                                                    System.Threading.Thread.Sleep(100);
+                                                                    continue;
+                                                                }
+                                                            }
+                                                            /*if (dverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write("(deleted {0})", fi.FullName);
+                                                                    //ConsoleFlush();
+                                                                }
+                                                            }*/
+                                                            if (dotverbose || qverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write('.');
+                                                                    ConsoleFlush();
+                                                                }
+                                                            }
+                                                        }
+                                                        foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(netpath)).GetFiles(killjzb))
+                                                        {
+                                                            for (int fiDeletes = 0; ; fiDeletes++)
+                                                            {
+                                                                try
+                                                                {
+                                                                    fi.Delete();
+                                                                    break;
+                                                                }
+                                                                catch
+                                                                {
+                                                                    if (fiDeletes >= 100)
+                                                                    {
+                                                                        throw;
+                                                                    }
+                                                                    System.Threading.Thread.Sleep(100);
+                                                                    continue;
+                                                                }
+                                                            }
+                                                            /*if (dverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write("(deleted {0})", fi.FullName);
+                                                                    //ConsoleFlush();
+                                                                }
+                                                            }*/
+                                                            if (dotverbose || qverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write('.');
+                                                                    ConsoleFlush();
+                                                                }
+                                                            }
+                                                        }
+                                                        foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(netpath)).GetFiles(killzf))
+                                                        {
+                                                            for (int fiDeletes = 0; ; fiDeletes++)
+                                                            {
+                                                                try
+                                                                {
+                                                                    fi.Delete();
+                                                                    break;
+                                                                }
+                                                                catch
+                                                                {
+                                                                    if (fiDeletes >= 100)
+                                                                    {
+                                                                        throw;
+                                                                    }
+                                                                    System.Threading.Thread.Sleep(100);
+                                                                    continue;
+                                                                }
+                                                            }
+                                                            /*if (dverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write("(deleted {0})", fi.FullName);
+                                                                    //ConsoleFlush();
+                                                                }
+                                                            }*/
+                                                            if (dotverbose || qverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write('.');
+                                                                    ConsoleFlush();
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    catch (Exception e)
+                                                    {
+                                                        LogOutput("Unable to delete intermediate data belonging to JID " + killsjid + ": " + e.Message);
+                                                    }
+                                                    try
+                                                    {
+                                                        foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(netpath)).GetFiles(killjoblog))
+                                                        {
+                                                            for (int fiDeletes = 0; ; fiDeletes++)
+                                                            {
+                                                                try
+                                                                {
+                                                                    fi.Delete();
+                                                                    break;
+                                                                }
+                                                                catch
+                                                                {
+                                                                    if (fiDeletes >= 100)
+                                                                    {
+                                                                        throw;
+                                                                    }
+                                                                    System.Threading.Thread.Sleep(100);
+                                                                    continue;
+                                                                }
+                                                            }
+                                                            /*if (dverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write("(deleted {0})", fi.FullName);
+                                                                    //ConsoleFlush();
+                                                                }
+                                                            }*/
+                                                            if (dotverbose || qverbose)
+                                                            {
+                                                                lock (slaves)
+                                                                {
+                                                                    Console.Write('.');
+                                                                    ConsoleFlush();
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    catch (Exception e)
+                                                    {
+                                                        LogOutput("Unable to delete log files belonging to JID " + killsjid + ": " + e.Message);
+                                                    }
+                                                }), slaves, numthreads);
+
+                                        }
+                                        if (0 != killAelightPid)
+                                        {
+                                            try
+                                            {
+                                                System.Diagnostics.Process killproc = System.Diagnostics.Process.GetProcessById(killAelightPid);
+                                                if (mutexesNeedSafePoint)
+                                                {
+                                                    HogMutexes(true, mutexes);
+                                                }
+                                                try
+                                                {
+                                                    killproc.Kill();
+                                                    killproc.WaitForExit(1000 * 1);
+                                                    mutexesNeedSafePoint = false;
+                                                }
+                                                finally
+                                                {
+                                                    HogMutexes(false, mutexes);
+                                                }
+                                                killproc.WaitForExit(1000 * 10); // Can wait longer outside mutexes.
+                                                killproc.Close();
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                LogOutputToFile("Unable to kill Surrogate PID " + killAelightSPid + " belonging to JID " + killsjid + ": " + e.Message);
+                                            }
+                                            try
+                                            {
+                                                System.IO.File.Delete(AELight_Dir + @"\" + killAelightSPid + ".aelight.pid");
+                                            }
+                                            catch
+                                            {
+                                            }
+                                        }
+                                        System.IO.File.Delete(killsjidfp);
+                                    }
+                                    killmutex.ReleaseMutex();
+                                }
+                                if (killjidexists)
+                                {
+                                    if (0 != killAelightPid)
+                                    {
+                                        if (CleanExecQ(killAelightPid, killjid))
+                                        {
+                                            Console.WriteLine("kill success");
+                                        }
+                                        else
+                                        {
+                                            CleanExecQ(0, killjid); // Still clean it from ps.
+                                            Console.WriteLine("kill warning: Surrogate PID mismatch (ps)");
+                                            return;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        CleanExecQ(0, killjid); // Still clean it from ps.
+                                        Console.WriteLine("kill warning: unable to find Surrogate process");
+                                        return;
+                                    }
+                                }
+                                else
+                                {
+                                    if (CleanExecQ(0, killjid))
+                                    {
+                                        // Not running, but was still cleaned from ps.
+                                        Console.WriteLine("kill warning: JID {0} not running", killsjid);
+                                        return;
+                                    }
+                                    else
+                                    {
+                                        Console.Error.WriteLine("kill failure: JID {0} not running", killsjid);
+                                        SetFailure();
+                                        return;
+                                    }
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine("Expected JID to kill");
+                            SetFailure();
+                            return;
+                        }
+                    }
+                    break;
+
+                case "regressiontest":
+                case "regressiontests":
+                    RunRegressionTests(SubArray(args, 1));
+                    break;
+
                 case "recordsize":
                     if (args.Length > 1)
                     {
@@ -1591,13 +2252,21 @@ namespace MySpace.DataMining.AELight
                             int iarg = 1;
                             string ExecOpts = "";
                             List<string> xpaths = null;
+                            bool showjid = false;
 
                             while (iarg < args.Length)
                             {
                                 switch (args[iarg][0])
                                 {
                                     case '-':
-                                        ExecOpts += " " + args[iarg].Substring(1);
+                                        if (0 == string.Compare("-JID", args[iarg], true))
+                                        {
+                                            showjid = true;
+                                        }
+                                        else
+                                        {
+                                            ExecOpts += " " + args[iarg].Substring(1);
+                                        }
                                         iarg++; // Important.
                                         continue;
 
@@ -1611,6 +2280,11 @@ namespace MySpace.DataMining.AELight
                                         continue;
                                 }
                                 break;
+                            }
+
+                            if (showjid)
+                            {
+                                Console.WriteLine("JID={0}", sjid);
                             }
 
                             if (iarg >= args.Length)
@@ -2914,22 +3588,54 @@ namespace MySpace.DataMining.AELight
                                             new Action<dfs.DfsFile.FileNode>(
                                             delegate(dfs.DfsFile.FileNode fn)
                                             {
+                                                if (thisbad)
+                                                {
+                                                    // Only one error per DFS file.
+                                                    return;
+                                                }
                                                 string onhost = null;
                                                 try
                                                 {
-                                                    foreach (string chost in fn.Host.Split(';'))
+                                                    string[] fnHosts = fn.Host.Split(';');
                                                     {
-                                                        onhost = chost;
-                                                        using (System.IO.FileStream fs = new System.IO.FileStream(Surrogate.NetworkPathForHost(chost) + @"\" + fn.Name, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 1)) // bufferSize=1
+                                                        if (0 == string.Compare(df.Type, DfsFileTypes.NORMAL, StringComparison.OrdinalIgnoreCase)
+                                                            || 0 == string.Compare(df.Type, DfsFileTypes.BINARY_RECT, StringComparison.OrdinalIgnoreCase))
                                                         {
-                                                            //if (fn.Length > 0) // Should always be > 0 or it wouldn't be here...
+                                                            if (fnHosts.Length < dc.Replication)
                                                             {
-                                                                // Note: multiple threads writing to 'one' but I don't need it.
-                                                                fs.Read(one, 0, 1);
+                                                                throw new Exception("DFS file '" + df.Name + "' only has " + fnHosts.Length.ToString() + " replicates (chunk '" + fn.Name + "')");
                                                             }
                                                         }
                                                     }
-                                                    onhost = null;
+                                                    {
+                                                        Dictionary<string, bool> hd = new Dictionary<string, bool>(new Surrogate.CaseInsensitiveEqualityComparer());
+                                                        foreach (string chost in fnHosts)
+                                                        {
+                                                            onhost = chost;
+                                                            string xchost = IPAddressUtil.GetName(chost);
+                                                            if (hd.ContainsKey(xchost))
+                                                            {
+                                                                throw new Exception("DFS file '" + df.Name + "' has invalid replicate data: multiple replicates on a single machine");
+                                                            }
+                                                            hd.Add(xchost, true);
+                                                        }
+                                                        onhost = null;
+                                                    }
+                                                    {
+                                                        foreach (string chost in fnHosts)
+                                                        {
+                                                            onhost = chost;
+                                                            using (System.IO.FileStream fs = new System.IO.FileStream(Surrogate.NetworkPathForHost(chost) + @"\" + fn.Name, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 1)) // bufferSize=1
+                                                            {
+                                                                //if (fn.Length > 0) // Should always be > 0 or it wouldn't be here...
+                                                                {
+                                                                    // Note: multiple threads writing to 'one' but I don't need it.
+                                                                    fs.Read(one, 0, 1);
+                                                                }
+                                                            }
+                                                        }
+                                                        onhost = null;
+                                                    }
                                                 }
                                                 catch (Exception e)
                                                 {
@@ -3039,6 +3745,70 @@ namespace MySpace.DataMining.AELight
                         else
                         {
                             Console.WriteLine("Cluster is 100% healthy");
+                        }
+                    }
+                    break;
+
+                case "replicationphase":
+                    if (!ReplicationPhase(null, true, 0, null))
+                    {
+                        Console.WriteLine("Nothing to replicate");
+                    }
+                    break;
+
+                case "replicationfix":
+                    {
+                        dfs dc = LoadDfsConfig();
+                        Dictionary<string, bool> hd = new Dictionary<string, bool>(new Surrogate.CaseInsensitiveEqualityComparer());
+                        StringBuilder sbHosts = new StringBuilder();
+                        bool changedany = false;
+                        foreach (dfs.DfsFile df in dc.Files)
+                        {
+                            bool changedfile = false;
+                            foreach (dfs.DfsFile.FileNode fn in df.Nodes)
+                            {
+                                hd.Clear();
+                                sbHosts.Length = 0;
+                                bool changednode = false;
+                                foreach (string chost in fn.Host.Split(';'))
+                                {
+                                    string xchost = IPAddressUtil.GetName(chost);
+                                    if (hd.ContainsKey(xchost))
+                                    {
+                                        if (!changedfile)
+                                        {
+                                            Console.WriteLine("  Fixing {0}", df.Name);
+                                        }
+                                        changednode = true;
+                                        changedfile = true;
+                                        changedany = true;
+                                    }
+                                    else
+                                    {
+                                        if (0 != sbHosts.Length)
+                                        {
+                                            sbHosts.Append(';');
+                                        }
+                                        sbHosts.Append(chost);
+                                        hd.Add(xchost, true);
+                                    }
+                                }
+                                if (changednode)
+                                {
+                                    fn.Host = sbHosts.ToString();
+                                }
+
+                            }
+                        }
+                        if (changedany)
+                        {
+                            UpdateDfsXml(dc);
+                            Console.WriteLine("Replication error fixed; to perform replication, issue command:");
+                            Console.WriteLine("    {0} replicationphase", appname);
+                        }
+                        else
+                        {
+                            Console.WriteLine("No replication errors to fix");
                         }
                     }
                     break;
@@ -3734,6 +4504,10 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "psstatus":
+                    SafePS(true);
+                    break;
+
                 case "ps":
                     SafePS();
                     if (!dfs.DfsConfigExists(DFSXMLPATH))
@@ -3934,6 +4708,8 @@ namespace MySpace.DataMining.AELight
                 case "bulkput":
                 case "bulkget":
                 case "swap":
+                case "fput":
+                case "fget":
                     {
                         string dfsarg = args[0];
                         Dfs(dfsarg, SubArray(args, 1));
@@ -4426,6 +5202,16 @@ namespace MySpace.DataMining.AELight
                                     {
                                         //string host = hosts[hi];
                                         string netpath = NetworkPathForHost(host);
+
+                                        try
+                                        {
+                                            // Do this before the host check,
+                                            // so it includes a nonparticipating surrogate.
+                                            System.IO.File.Delete(netpath + @"\execq.dat");
+                                        }
+                                        catch
+                                        {
+                                        }
 
                                         if (thishostcheck)
                                         {
@@ -4979,6 +5765,43 @@ namespace MySpace.DataMining.AELight
         }
 
 
+        static void HogMutexes(bool acquire, IList<System.Threading.Mutex> mutexes)
+        {
+            if (acquire)
+            {
+                for (int im = 0; im < mutexes.Count; im++)
+                {
+                    try
+                    {
+                        if (!mutexes[im].WaitOne(1000 * 5, false))
+                        {
+                            // Mutex took too long, undo all and try again.
+                            LogOutputToFile("HogMutexes(" + acquire.ToString() + "): Unable to access job in a timely fashion, trying again (unable to acquire mutexes in time)");
+                            Console.WriteLine("Unable to access job in a timely fashion, trying again...");
+                            for (im--; im >= 0; im--)
+                            {
+                                mutexes[im].ReleaseMutex();
+                            }
+                            System.Diagnostics.Debug.Assert(-1 == im);
+                            System.Threading.Thread.Sleep(1000 * 3);
+                        }
+                    }
+                    catch (System.Threading.AbandonedMutexException)
+                    {
+                    }
+                }
+            }
+            else
+            {
+                for (int im = mutexes.Count - 1; im >= 0; im--)
+                {
+                    mutexes[im].ReleaseMutex();
+                    mutexes[im].Close();
+                }
+            }
+        }
+
+
         // Obsolete, use IPAddressUtil.FindCurrentHost(hosts)
         static string GetSelfHost(IList<string> hosts)
         {
@@ -5488,9 +6311,14 @@ namespace MySpace.DataMining.AELight
 
         public static void SafePS()
         {
+            SafePS(false);
+        }
+
+        public static void SafePS(bool ShowStatus)
+        {
             using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
             {
-                lm.WaitOne();
+                lm.WaitOne(); // Lock also taken by kill.
 
                 string fn = AELight_Dir + @"\execq.dat";
                 if (System.IO.File.Exists(fn))
@@ -5523,8 +6351,69 @@ namespace MySpace.DataMining.AELight
                         int ippp = lines[il].IndexOf("+++");
                         if (-1 != ippp)
                         {
+                            string[] settings = lines[il].Substring(0, ippp).Split(' ');
+                            string pssjid = "0";
+                            if (settings.Length > 1)
+                            {
+                                pssjid = settings[1];
+                            }
                             string ln = lines[il].Substring(ippp + 4);
-                            Console.WriteLine("  {0}", ln.Replace("drule", "SYSTEM"));
+                            Console.Write("  {0} {1}", pssjid, ln.Replace("drule", "SYSTEM"));
+                            if (ShowStatus)
+                            {
+                                bool unk = true;
+                                try
+                                {
+                                    long psjid = long.Parse(pssjid);
+                                    pssjid = psjid.ToString(); // Normalize.
+                                    if (psjid >= 1)
+                                    {
+                                        string[] jflines = System.IO.File.ReadAllLines(AELight_Dir + @"\" + pssjid + ".jid");
+                                        int aelightpid = 0;
+                                        foreach (string jln in jflines)
+                                        {
+                                            if (jln.StartsWith("pid="))
+                                            {
+                                                aelightpid = int.Parse(jln.Substring(4));
+                                                break;
+                                            }
+                                        }
+                                        if (aelightpid >= 1)
+                                        {
+                                            bool running = false;
+                                            if (System.IO.File.Exists(AELight_Dir + @"\" + aelightpid.ToString() + ".aelight.pid"))
+                                            {
+                                                try
+                                                {
+                                                    System.Diagnostics.Process aelightproc = System.Diagnostics.Process.GetProcessById(aelightpid);
+                                                    running = true;
+                                                }
+                                                catch (ArgumentException e)
+                                                {
+                                                    // The process specified by the processId parameter is not running.
+                                                }
+                                            }
+                                            unk = false;
+                                            if (running)
+                                            {
+                                                Console.Write("  {0}[running]{1}", isdspace ? "\u00011" : "", isdspace ? "\u00010" : "");
+                                            }
+                                            else
+                                            {
+                                                Console.Write("  {0}[zombie]{1}", isdspace ? "\u00015" : "", isdspace ? "\u00010" : "");
+                                            }
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                }
+                                if (unk)
+                                {
+                                    Console.Write("  {0}[unknown]{1}", isdspace ? "\u00015" : "", isdspace ? "\u00010" : "");
+                                }
+                            }
+                            Console.WriteLine();
                         }
                     }
                 }
@@ -5712,7 +6601,7 @@ namespace MySpace.DataMining.AELight
 
             using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
             {
-                lm.WaitOne();
+                lm.WaitOne(); // Lock also taken by kill.
 
                 if (!System.IO.File.Exists(fn))
                 {
@@ -5790,6 +6679,13 @@ namespace MySpace.DataMining.AELight
             dt += TimeSpan.FromDays(bn) + TimeSpan.FromSeconds(rv * 2);
             return dt;
         }
+
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        static extern IntPtr OpenThread(uint dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        static extern uint SuspendThread(IntPtr hThread);
 
 
     }

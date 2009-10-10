@@ -33,6 +33,7 @@ namespace RDBMS_DBCORE
                 bool dfsref = -1 != sOptions.IndexOf("DFSREF");
                 bool queryresults = dfstemp || dfsref;
                 bool topdfstemp = -1 != sOptions.IndexOf("TOPTEMP");
+                bool distinct = -1 != sOptions.IndexOf("DISTINCT");
 
                 string SelectWhat = QlArgsUnescape(QlArgsSelectWhat);
                 string[] awhat = null;
@@ -456,6 +457,16 @@ namespace RDBMS_DBCORE
                 if (null != DfsTempInputFile)
                 {
                     Shell("dspace del \"" + DfsTempInputFile + "\"");
+                }
+
+                if (distinct)
+                {
+                    string outtablefn = DfsOutputName + "_out_" + Guid.NewGuid().ToString();
+                    Shell("dspace exec" + " \"//Job[@Name='RDBMS_Distinct']/IOSettings/DFSInput=" + DfsOutputName + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Distinct']/IOSettings/DFSOutput=" + outtablefn + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Distinct']/IOSettings/KeyLength=" + OutputsRowSize + "\" RDBMS_Distinct.DBCORE \"");
+                    string distincttablefn = DfsOutputName + "_distinct_" + Guid.NewGuid().ToString();
+                    Shell("dspace rename \"" + DfsOutputName + "\" \"" + distincttablefn + "\"");
+                    Shell("dspace rename \"" + outtablefn + "\" \"" + DfsOutputName + "\"");
+                    Shell("dspace del \"" + distincttablefn + "\"");                   
                 }
 
                 if (queryresults)

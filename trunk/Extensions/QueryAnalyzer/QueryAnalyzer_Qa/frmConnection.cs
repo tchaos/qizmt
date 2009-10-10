@@ -33,7 +33,7 @@ namespace RDBMS_qa
             reason = "";
             try
             {
-                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("DSpace_DataProvider");
+                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
                 DbConnection conn = fact.CreateConnection();
                 conn.ConnectionString = txtConnStr.Text.Trim();
                 conn.Open();

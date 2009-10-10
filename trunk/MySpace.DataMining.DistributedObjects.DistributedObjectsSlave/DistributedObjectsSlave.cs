@@ -317,8 +317,13 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public static void errorlog(string line, string fn)
         {
-            //lock (typeof(XLog))
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 using (StreamWriter fstm = File.AppendText(fn))
@@ -359,7 +364,13 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public static void failoverlog(string s)
         {
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 if (!_failoverfailed)
@@ -389,8 +400,13 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public static void log(string line, string fn)
         {
-            //lock (typeof(XLog))
-            logmutex.WaitOne();
+            try
+            {
+                logmutex.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
             try
             {
                 using (StreamWriter fstm = File.AppendText(fn))
@@ -550,7 +566,11 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
-        // args: <ipaddr> <portnum> <typechar> <capacity> <logfile>
+        public static long jid;
+        public static string sjid;
+
+
+        // args: <ipaddr> <portnum> <typechar> <capacity> <logfile> <jid>
         static void Main(string[] args)
         {
 #if DEBUG
@@ -573,6 +593,10 @@ namespace MySpace.DataMining.DistributedObjects5
 #endif
 
             XLog.UserLogFile = args[4];
+
+            sjid = args[5];
+            jid = long.Parse(sjid);
+
             try
             {
                 Environment.SetEnvironmentVariable("DOSLAVE", "DO5");
@@ -589,7 +613,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
                 if (XLog.logging)
                 {
-                    XLog.log("New Sub Process: '" + args[0] + "' '" + args[1] + "' '" + args[2] + "' '" + args[3] + "' '" + args[4] + "'");
+                    XLog.log("New Sub Process: '" + args[0] + "' '" + args[1] + "' '" + args[2] + "' '" + args[3] + "' '" + args[4] + "' '" + args[5] + "'");
                 }
 
                 Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -673,15 +697,23 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
 
                 NetworkStream nstm = new XNetworkStream(sock);
-                nstm.WriteByte(1); // New handshake with client(dll).
+                {
+                    // New handshake with client(dll)...
+                    nstm.WriteByte(1);
+                    // ... and the SlavePID:
+                    int SlavePID = System.Diagnostics.Process.GetCurrentProcess().Id;
+                    byte[] bpid = DistObjectBase.ToBytes(SlavePID);
+                    XContent.SendXContent(nstm, bpid);
+                }
 
                 {
                     int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
                     string spid = pid.ToString();
-                    string pidfilename = spid + ".slave.pid";
+                    string pidfilename = spid + ".j" + sjid + ".slave.pid";
                     StreamWriter pidfile = new StreamWriter(pidfilename);
                     pidfile.WriteLine(pid);
                     pidfile.WriteLine(System.DateTime.Now);
+                    pidfile.WriteLine("jid={0}", sjid);
                     pidfile.Flush();
                     for (; ; )
                     {

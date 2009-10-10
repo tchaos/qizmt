@@ -790,17 +790,23 @@ namespace MySpace.DataMining.AELight
             Shell(@`DSpace del ` + fail);
             
             string[] rr = Shell(@`DSpace checksorted ` + fileToCheck).Split('\n');
-            if(rr.Length > 2)
+            bool sorted = false;
+            foreach(string rline in rr)
             {
-                if(rr[2].StartsWith(`Sorted`))
+                if(rline.StartsWith(`Sorted`))
                 {
-                    Shell(@`DSpace put ` + temp + ` ` + pass);
+                    sorted = true;
+                    break;
                 }
-                else
-                {
-                    Shell(@`DSpace put ` + temp + ` ` + fail);
-                }
+            }           
+            if(sorted)
+            {
+                Shell(@`DSpace put ` + temp + ` ` + pass);
             }
+            else
+            {
+                Shell(@`DSpace put ` + temp + ` ` + fail);
+            }            
             
             System.IO.File.Delete(temp);
         }

@@ -78,6 +78,7 @@ namespace RDBMS_DBCORE
                 string TableName = "";
                 string Ops = "*";
                 bool GroupBy = false;
+                bool distinct = false;
                 //string AfterUnion = null; // e.g. '[ALL] SELECT ...' ; can end with ';'
                 for (string op = Qa.NextPart(ref args);
                     0 != op.Length && ";" != op;
@@ -106,6 +107,10 @@ namespace RDBMS_DBCORE
                             throw new Exception("TOP cannot be used with this operation at this time");
                         }
                         TopCount = long.Parse(Qa.NextPart(ref args));
+                    }
+                    else if (0 == string.Compare("DISTINCT", op, true))
+                    {
+                        distinct = true;
                     }
                     else if (0 == string.Compare("FROM", op, true))
                     {
@@ -203,6 +208,13 @@ namespace RDBMS_DBCORE
                                     if (0 == string.Compare("BY", xs, true))
                                     {
                                         GroupBy = true;
+                                    }
+                                }
+                                else if (0 == string.Compare("ORDER", s, true))
+                                {
+                                    if (distinct)
+                                    {
+                                        throw new Exception("ORDER BY is not supported with SELECT DISTINCT");
                                     }
                                 }
                                 sbOps.Append(s);
@@ -341,6 +353,10 @@ namespace RDBMS_DBCORE
                 if (GroupBy)
                 {
                     sOptions += ";GBY";
+                }
+                if (distinct)
+                {
+                    sOptions += ";DISTINCT";
                 }
                 if (0 == sOptions.Length)
                 {

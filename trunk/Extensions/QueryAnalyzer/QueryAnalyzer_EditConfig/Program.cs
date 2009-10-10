@@ -7,9 +7,9 @@ using System.Text;
 namespace QueryAnalyzer_EditConfig
 {
     public class Program
-    {
-        private static string invariant = "DSpace_DataProvider";
+    {  
         private static string thispath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+        private static DataProvider[] dataproviders;
 
         public static void Main(string[] args)
         {
@@ -17,6 +17,15 @@ namespace QueryAnalyzer_EditConfig
             {
                 throw new Exception("No action specified.");
             }
+
+            dataproviders = new DataProvider[2];
+            dataproviders[0] = DataProvider.Prepare("DSpace_DataProvider", "DSpace Data Provider",
+                "Data Provider for DSpace", 
+                "QueryAnalyzer_DataProvider.QaClientFactory, QueryAnalyzer_DataProvider, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7074aee6b0b130c1");
+            dataproviders[1] = DataProvider.Prepare("Qizmt_DataProvider", "Qizmt Data Provider",
+                "Data Provider for Qizmt",
+                "QueryAnalyzer_DataProvider.QaClientFactory, QueryAnalyzer_DataProvider, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7074aee6b0b130c1");
+            
             switch (args[0].ToLower())
             {
                 case "a":
@@ -57,36 +66,34 @@ namespace QueryAnalyzer_EditConfig
         }
 
         private static void SetNode(string cpath)
-        {            
-            string name = "QueryAnalyzer Data Provider";
-            string description = "Data Provider for Query Analyzer";
-            string type = "QueryAnalyzer_DataProvider.QaClientFactory, QueryAnalyzer_DataProvider, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7074aee6b0b130c1";
-
+        {   
             System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
             doc.Load(cpath);
-            System.Xml.XmlNode node = doc.SelectSingleNode("configuration/system.data/DbProviderFactories/add[@invariant=\"" + invariant + "\"]");
-
             Console.WriteLine("Adding to machine.config path: {0}", cpath);
 
-            if (node == null)
+            foreach (DataProvider dp in dataproviders)
             {
-                System.Xml.XmlNode root = doc.SelectSingleNode("configuration/system.data/DbProviderFactories");
-                node = doc.CreateElement("add");
-                System.Xml.XmlAttribute at = doc.CreateAttribute("name");
-                node.Attributes.Append(at);
-                at = doc.CreateAttribute("invariant");
-                node.Attributes.Append(at);
-                at = doc.CreateAttribute("description");
-                node.Attributes.Append(at);
-                at = doc.CreateAttribute("type");
-                node.Attributes.Append(at);
-                root.AppendChild(node);
-            }
-
-            node.Attributes["name"].Value = name;
-            node.Attributes["invariant"].Value = invariant;
-            node.Attributes["description"].Value = description;
-            node.Attributes["type"].Value = type;
+                System.Xml.XmlNode node = doc.SelectSingleNode("configuration/system.data/DbProviderFactories/add[@invariant=\"" + dp.invariant + "\"]");
+                if (node == null)
+                {
+                    System.Xml.XmlNode root = doc.SelectSingleNode("configuration/system.data/DbProviderFactories");
+                    node = doc.CreateElement("add");
+                    System.Xml.XmlAttribute at = doc.CreateAttribute("name");
+                    node.Attributes.Append(at);
+                    at = doc.CreateAttribute("invariant");
+                    node.Attributes.Append(at);
+                    at = doc.CreateAttribute("description");
+                    node.Attributes.Append(at);
+                    at = doc.CreateAttribute("type");
+                    node.Attributes.Append(at);
+                    root.AppendChild(node);
+                }
+                node.Attributes["name"].Value = dp.name;
+                node.Attributes["invariant"].Value = dp.invariant;
+                node.Attributes["description"].Value = dp.description;
+                node.Attributes["type"].Value = dp.type;
+                Console.WriteLine("Added Data Provider node in machine.config.");
+            }            
 
             doc.Save(cpath);
             Console.WriteLine("machine.config saved: {0}", cpath);
@@ -135,17 +142,38 @@ namespace QueryAnalyzer_EditConfig
         {
             System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
             doc.Load(cpath);
-            System.Xml.XmlNode node = doc.SelectSingleNode("configuration/system.data/DbProviderFactories/add[@invariant=\"" + invariant + "\"]");
-
             Console.WriteLine("Removing from machine.config path: {0}", cpath);
 
-            if (node != null)
+            foreach (DataProvider dp in dataproviders)
             {
-                node.ParentNode.RemoveChild(node);
+                System.Xml.XmlNode node = doc.SelectSingleNode("configuration/system.data/DbProviderFactories/add[@invariant=\"" + dp.invariant + "\"]");
+                if (node != null)
+                {
+                    node.ParentNode.RemoveChild(node);
+                    Console.WriteLine("Data provider removed from machine.config.");
+                }
             }
 
             doc.Save(cpath);
             Console.WriteLine("machine.config saved: {0}", cpath);
+        }
+
+        private struct DataProvider
+        {
+            public string invariant;
+            public string name;
+            public string description;
+            public string type;
+
+            public static DataProvider Prepare(string invariant, string name, string description, string type)
+            {
+                DataProvider dp;
+                dp.invariant = invariant;
+                dp.name = name;
+                dp.description = description;
+                dp.type = type;
+                return dp;
+            }
         }
     }
 }
