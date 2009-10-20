@@ -143,7 +143,7 @@ namespace MySpace.DataMining.DistributedObjects5
                 {
                     throw new Exception("ZBlock.CreateZBallFileName: no cache name");
                 }
-                return "zsball_" + cachename + "_" + zblockID.ToString() + "_" + otherinfo + ".j" + sjid + ".zsb";
+                return "zsball_" + cachename + "_" + zblockID.ToString() + "_" + otherinfo + ".zsb";
             }
 
 

@@ -296,7 +296,25 @@ namespace QueryAnalyzer_DataProvider
                                     int result = -2;
                                     int left = 0;
                                     int right = mi.Count - 1;
-                                    result = BSearch(mi, buf, ref left, ref right, keylen);
+                                    if (conn.sysindexes.ContainsKey(indexname))
+                                    {
+                                        QaConnection.Index thisIndex = conn.sysindexes[indexname];
+                                        if (thisIndex.PinHash)
+                                        {
+                                            int shortkey = QaConnection.TwoBytesToInt(buf[1], buf[2]);
+                                            QaConnection.Position thispos = thisIndex.Hash[shortkey];
+                                            left = thispos.Offset;                                           
+                                            right = left + thispos.Length - 1;
+                                            if (left > 0)
+                                            {
+                                                left--;
+                                            }
+                                        }
+                                    }
+                                    if (right >= 0)
+                                    {
+                                        result = BSearch(mi, buf, ref left, ref right, keylen);
+                                    }                                    
                                     if (result == -1)
                                     {
                                         result = left;   //Though not found in master index, but still in range.

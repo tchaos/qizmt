@@ -32,11 +32,13 @@ namespace QueryAnalyzer_Protocol
         {
             public MySpace.DataMining.Binary.LongByteArray Bytes;
             public int RowLength;
+            public Position[] Hash;
 
             public ChunkRowsData(MySpace.DataMining.Binary.LongByteArray Bytes, int RowLength)
             {
                 this.Bytes = Bytes;
                 this.RowLength = RowLength;
+                this.Hash = null;
             }
 
             public long NumberOfRows
@@ -55,6 +57,65 @@ namespace QueryAnalyzer_Protocol
                     rd.Chunk = this;
                     rd.ChunkOffset = index * RowLength;
                     return rd;
+                }
+            }
+
+            public void MakeHash(int keyoffset)
+            {
+                Hash = new Position[256 * 256];
+                long rowscount = NumberOfRows;
+                byte prevbyte1 = 0;
+                byte prevbyte2 = 0;
+                long hoffset = 0;
+                long hlen = 0;
+                for (long ri = 0; ri < rowscount; ri++)
+                {
+                    RowData thisrow = this[ri];
+                    if (ri == 0)
+                    {
+                        prevbyte1 = thisrow[keyoffset + 1];
+                        prevbyte2 = thisrow[keyoffset + 2];
+                    }
+                    else
+                    {
+                        if (prevbyte1 != thisrow[keyoffset + 1] || prevbyte2 != thisrow[keyoffset + 2])
+                        {
+                            int shortkey = TwoBytesToInt(prevbyte1, prevbyte2);
+                            Hash[shortkey].Offset = hoffset;
+                            Hash[shortkey].Length = hlen;
+                            hoffset = ri;
+                            hlen = 0;
+                            prevbyte1 = thisrow[keyoffset + 1];
+                            prevbyte2 = thisrow[keyoffset + 2];
+                        }
+                    }
+
+                    hlen++;
+                }
+                //last flush
+                if (hlen > 0)
+                {
+                    int shortkey = TwoBytesToInt(prevbyte1, prevbyte2);
+                    Hash[shortkey].Offset = hoffset;
+                    Hash[shortkey].Length = hlen;
+                }
+                //fill in the gap
+                long prevoffset = 0;
+                long prevlen = 0;
+                for (int hi = 0; hi < Hash.Length; hi++)
+                {
+                    Position thispos = Hash[hi];
+                    if (thispos.Length == 0)
+                    {
+                        thispos.Length = prevlen;
+                        thispos.Offset = prevoffset;
+                        Hash[hi] = thispos;
+                    }
+                    else
+                    {
+                        prevoffset = thispos.Offset;
+                        prevlen = thispos.Length;
+                    }
                 }
             }
         }
@@ -92,6 +153,12 @@ namespace QueryAnalyzer_Protocol
                     Chunk.Bytes[ChunkOffset + index] = value;
                 }
             }
+        }
+        
+        public struct Position
+        {
+            public long Offset;
+            public long Length;
         }
 
 
@@ -166,6 +233,13 @@ namespace QueryAnalyzer_Protocol
                 stressthd.Abort();
                 stressthd = null;
             }
+        }
+
+        internal static int TwoBytesToInt(byte b0, byte b1)
+        {
+            int x = b0 << 8;
+            x = x | b1;
+            return x;
         }
 
         private void ListenThreadProc()
@@ -499,6 +573,8 @@ namespace QueryAnalyzer_Protocol
 
         private bool BulkInsert(string cmd)
         {
+            string originalcmd = cmd;
+
             if (!BulkInsertEnabled)
             {
                 return false;
@@ -734,7 +810,7 @@ namespace QueryAnalyzer_Protocol
                                     }
                                     if (expectcomma)
                                     {
-                                        throw new Exception("Expected comma in VALUES (...)");
+                                        throw new Exception("Expected comma in VALUES (...).  Query:" + originalcmd);
                                     }
                                     if (nuservals >= uservalues.Length)
                                     {
@@ -1181,7 +1257,7 @@ namespace QueryAnalyzer_Protocol
 
         }
 
-        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn)
+        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn, bool pinmemoryhash)
         {
             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
             using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
@@ -1284,7 +1360,6 @@ namespace QueryAnalyzer_Protocol
                     string htnline = htnlines[ip];
                     int isphtn = htnline.IndexOf(' ');
                     string host = htnline.Substring(0, isphtn);
-                    //host = _IPAddressUtil.GetName(host);
                     string netpath = htnline.Substring(isphtn + 1);
                     HostToNetPath[host] = netpath;
                 }
@@ -1403,6 +1478,9 @@ namespace QueryAnalyzer_Protocol
                 System.Xml.XmlElement xePin = xi.CreateElement("pin");
                 xePin.InnerText = pinmemory ? "1" : "0";
                 xeIndex.AppendChild(xePin);
+                System.Xml.XmlElement xePinHash = xi.CreateElement("pinHash");
+                xePinHash.InnerText = pinmemoryhash ? "1" : "0";
+                xeIndex.AppendChild(xePinHash);
                 System.Xml.XmlElement xeIndTable = xi.CreateElement("table");
                 xeIndex.AppendChild(xeIndTable);
                 System.Xml.XmlElement xeIndTableName = xi.CreateElement("name");
@@ -1459,6 +1537,7 @@ namespace QueryAnalyzer_Protocol
                     }
 
                     bool pinmem = false;
+                    bool pinmemhash = false;
                     string keycolumn = "";
                     for (; ; )
                     {
@@ -1473,6 +1552,11 @@ namespace QueryAnalyzer_Protocol
                                 pinmem = true;
                                 break;
 
+                            case "pinmemoryhash":
+                                pinmemhash = true;
+                                pinmem = true;
+                                break;
+
                             case "on":
                                 {
                                     keycolumn = RDBMS_DBCORE.Qa.NextPart(ref cmd);
@@ -1484,7 +1568,7 @@ namespace QueryAnalyzer_Protocol
                                 break;
                         }
                     }                  
-                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn);
+                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn, pinmemhash);
                     return true;
                 }
                 else

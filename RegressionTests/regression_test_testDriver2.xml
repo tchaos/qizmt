@@ -60,7 +60,8 @@
                 "regression_test_gendata_newsyntax.xml",
                 "regression_test_rbin_mapreduce_2inputs.xml",
                 "regression_test_bulkput.xml",
-                "regression_test_rbin_ionames.xml"
+                "regression_test_rbin_ionames.xml",
+                "regression_test_ExplicitCacheWordCount.xml"
             };
             
             int iarg = 0;
@@ -95,7 +96,8 @@
                 "regression_test_rbin_mapreduce_2inputs.xml",
                 "regression_test_bulkput.xml",
                 "regression_test_rbin_get_small.xml",
-                "regression_test_put_dll.xml"
+                "regression_test_put_dll.xml",
+                "regression_test_ExplicitCacheWordCount.xml"
                 };
             }
             
