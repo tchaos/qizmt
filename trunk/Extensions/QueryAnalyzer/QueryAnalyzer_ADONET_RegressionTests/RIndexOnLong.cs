@@ -76,7 +76,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
             {
                 OneRow row;
                 row.num1 = rnd.Next(min, max);
-                row.num2 = rnd.NextDouble();
+                row.num2 = rnd.Next(min, max);
                 row.num3 = rnd.Next(min, max);
                 row.dt = dtseed.AddDays(rnd.Next(min, max));
                 row.str = words[rnd.Next() % words.Length];
@@ -105,7 +105,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
             const int TESTSIZE = 5;
             OneRow[] testrows = null;
 
-            testrows = RIndexOnDateTime_PrepareSourceTable(tablename, TESTSIZE);
+            testrows = RIndexOnLong_PrepareSourceTable(tablename, TESTSIZE);
 
             System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("DSpace_DataProvider");
 

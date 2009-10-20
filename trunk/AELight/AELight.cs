@@ -61,10 +61,12 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("         information for DFS or a DFS file");
             Console.WriteLine("    head <dfspath>[:<host>:<part>] [<count>]   show first few lines of file");
             Console.WriteLine("    put <netpath> [<dfspath>[@<recordlen>]]    put a file into DFS");
-            Console.WriteLine("    fput files|dirs=<item[,item,item]> [pattern=<pattern>]   put files into DFS");
+            Console.WriteLine("    fput files|dirs=<item[,item,item]>|@<filepath to list> [pattern=<pattern>]");
+            Console.WriteLine("          put files into DFS");
             Console.WriteLine("    putbinary <wildcard> <dfspath>  put binary into DFS");
             Console.WriteLine("    get [parts=<first>[-[<last>]]] <dfspath> <netpath>  get a file from DFS");
-            Console.WriteLine("    fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>]");
+            Console.WriteLine("    fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>] |");
+            Console.WriteLine("         @<filepath to target folder list> [-gz]");
             Console.WriteLine("         get a file from DFS");
             Console.WriteLine("    getbinary <dfspath> <netpath>  get binary from DFS");
             Console.WriteLine("    del <dfspath|wildcard>  delete a DFS file using multiple threads");
@@ -127,8 +129,8 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    maxdglobalsupdate <integer>    update maxDGlobals configuration");
             Console.WriteLine("    recordsize <user-size>         returns bytes of user-friendly size");
             Console.WriteLine("    swap <file1> <file2>           file names to swap");
-            Console.WriteLine("    regressiontest                 regression test " + appname);
-            Console.WriteLine("    kill <JID>                     kill the specified Jobs-ID");
+            Console.WriteLine("    regressiontest basic           basic regression test " + appname);
+            Console.WriteLine("    kill <JobID>                   kill the specified Job Identifier");
         }
 
 
@@ -2252,7 +2254,7 @@ namespace MySpace.DataMining.AELight
                             int iarg = 1;
                             string ExecOpts = "";
                             List<string> xpaths = null;
-                            bool showjid = false;
+                            //bool showjid = false;
 
                             while (iarg < args.Length)
                             {
@@ -2261,7 +2263,7 @@ namespace MySpace.DataMining.AELight
                                     case '-':
                                         if (0 == string.Compare("-JID", args[iarg], true))
                                         {
-                                            showjid = true;
+                                            //showjid = true;
                                         }
                                         else
                                         {
@@ -2282,9 +2284,10 @@ namespace MySpace.DataMining.AELight
                                 break;
                             }
 
-                            if (showjid)
+                            //if (showjid)
                             {
-                                Console.WriteLine("JID={0}", sjid);
+                                //Console.WriteLine("JID={0}", sjid);
+                                Console.WriteLine("Job Identifier: {0}", sjid);
                             }
 
                             if (iarg >= args.Length)

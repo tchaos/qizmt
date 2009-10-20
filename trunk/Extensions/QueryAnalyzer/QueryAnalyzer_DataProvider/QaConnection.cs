@@ -259,6 +259,7 @@ namespace QueryAnalyzer_DataProvider
                         foreach (System.Xml.XmlNode xnIndex in xnIndexes)
                         {
                             string indName = xnIndex["name"].InnerText;
+                            System.Xml.XmlElement xePinHash = xnIndex["pinHash"];  
                             System.Xml.XmlElement xeTable = xnIndex["table"];
                             System.Xml.XmlNodeList xnCols = xeTable.SelectNodes("column");
 
@@ -279,7 +280,8 @@ namespace QueryAnalyzer_DataProvider
                             ind.Name = indName;
                             ind.Ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
                             ind.Table = tab;
-
+                            ind.PinHash = (xePinHash != null && xePinHash.InnerText == "1");
+                            ind.Hash = ind.PinHash ? new Position[256 * 256] : null;
                             sysindexes.Add(indName.ToLower(), ind);
                         }
                     }
@@ -294,10 +296,15 @@ namespace QueryAnalyzer_DataProvider
                     string indexname = XContent.ReceiveXString(netstm, buf).ToLower();
                     List<KeyValuePair<byte[], string>> lines = new List<KeyValuePair<byte[], string>>();
                     int keylen = 9;
+                    bool pinhash = false;
+                    Position[] hash = null;
                     if (sysindexes.ContainsKey(indexname))
                     {
-                        int ordinal = sysindexes[indexname].Ordinal;
-                        keylen = sysindexes[indexname].Table.Columns[ordinal].Bytes;
+                        Index thisindex = sysindexes[indexname];
+                        int ordinal = thisindex.Ordinal;
+                        keylen = thisindex.Table.Columns[ordinal].Bytes;
+                        pinhash = thisindex.PinHash;
+                        hash = thisindex.Hash;
                     }
 
                     byte[] lastkeybuf = new byte[keylen];
@@ -306,6 +313,8 @@ namespace QueryAnalyzer_DataProvider
                     if (filelen > 0)
                     {
                         int pos = 0;
+                        int hoffset = 0;
+                        int hlen = 0;
                         while(pos < filelen)
                         {
                             byte[] keybuf = new byte[keylen];
@@ -327,15 +336,61 @@ namespace QueryAnalyzer_DataProvider
                             int chunknamestartpos = pos;
                             while(buf[pos++] != (byte)'\0')
                             {
-                            }
-
-                            string chunkname = System.Text.Encoding.UTF8.GetString(buf, chunknamestartpos, pos - chunknamestartpos - 1);
+                            }                                                        
 
                             if (!samekey)
                             {
+                                string chunkname = System.Text.Encoding.UTF8.GetString(buf, chunknamestartpos, pos - chunknamestartpos - 1);
+
+                                if (pinhash)
+                                {                                    
+                                    if (lines.Count > 0)
+                                    {
+                                        if (keybuf[1] != lastkeybuf[1] || keybuf[2] != lastkeybuf[2])
+                                        {
+                                            int shortkey = TwoBytesToInt(lastkeybuf[1], lastkeybuf[2]);
+                                            hash[shortkey].Offset = hoffset;
+                                            hash[shortkey].Length = hlen;
+                                            hoffset = lines.Count;
+                                            hlen = 0;
+                                        }
+                                    }
+                                    hlen++;
+                                }
+                                
                                 lines.Add(new KeyValuePair<byte[], string>(keybuf, chunkname));
-                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, keylen);
+                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, keylen);                                
                             }                           
+                        }
+
+                        if (pinhash)
+                        {
+                            //last flush
+                            if (hlen > 0)
+                            {
+                                int shortkey = TwoBytesToInt(lastkeybuf[1], lastkeybuf[2]);
+                                hash[shortkey].Offset = hoffset;
+                                hash[shortkey].Length = hlen;
+                            }
+                            
+                            //fill in the gap
+                            int prevoffset = 0;
+                            int prevlen = 0;
+                            for (int hi = 0; hi < hash.Length; hi++)
+                            {
+                                Position thispos = hash[hi];
+                                if (thispos.Length == 0)
+                                {            
+                                    thispos.Length = prevlen;
+                                    thispos.Offset = prevoffset;
+                                    hash[hi] = thispos;
+                                }
+                                else
+                                {
+                                    prevoffset = thispos.Offset;
+                                    prevlen = thispos.Length;
+                                }
+                            }
                         }
                     }
                     mindexes.Add(indexname, lines);
@@ -352,6 +407,13 @@ namespace QueryAnalyzer_DataProvider
                 Cleanup();
                 throw;
             }
+        }
+
+        internal static int TwoBytesToInt(byte b0, byte b1)
+        {
+            int x = b0 << 8;
+            x = x | b1;
+            return x;
         }
 
         internal bool isRIndexEnabled()
@@ -826,7 +888,15 @@ namespace QueryAnalyzer_DataProvider
         {
             public string Name;
             public int Ordinal;
+            public bool PinHash;
             public Table Table;
+            public Position[] Hash;
+        }
+
+        internal struct Position
+        {
+            public int Offset;
+            public int Length;
         }
     }
 }

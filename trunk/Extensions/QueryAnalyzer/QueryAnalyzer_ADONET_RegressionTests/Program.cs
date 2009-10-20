@@ -26,12 +26,19 @@ namespace QueryAnalyzer_ADONET_RegressionTests
             if (args.Length > 0 && "-rindex" == args[0])
             {
                 goto rindex;
-            }
+            }            
             if (args.Length > 0 && "-rindexotherdatatypes" == args[0])
             {
                 goto rindexotherdatatypes;
             }
-           
+            if (args.Length > 0 && "-rindexpinmemoryhash" == args[0])
+            {
+                goto rindexpinmemoryhash;
+            }
+            if (args.Length > 0 && "-rindexonintpinhash" == args[0])
+            {
+                goto rindexonintpinhash;
+            }            
             if(!(args.Length > 0 && "-skipaggregators" == args[0]))
             {
                 string tablename = DbAggregators_CreateTable();
@@ -847,6 +854,95 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 try
                 {
                     RIndexOnChar();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            rindexpinmemoryhash:
+            {
+                string testname = "RIndexOnLongPinHash";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnLongPinHash();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOnDateTimePinHash";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnDateTimePinHash();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOnDoublePinHash";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnDoublePinHash();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }            
+            {
+                string testname = "RIndexOnCharPinHash";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnCharPinHash();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            rindexonintpinhash:
+            {
+                string testname = "RIndexOnIntPinHash";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOnIntPinHash();
                     Console.WriteLine("[PASSED] - {0}", testname);
                     AllTests.Add(new KeyValuePair<string, bool>(testname, true));
                 }

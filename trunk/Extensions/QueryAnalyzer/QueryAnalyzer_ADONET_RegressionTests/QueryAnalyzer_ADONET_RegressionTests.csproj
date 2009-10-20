@@ -82,10 +82,15 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ConnOpen.cs" />
     <Compile Include="RIndexOnChar.cs" />
+    <Compile Include="RIndexOnCharPinHash.cs" />
     <Compile Include="RIndexOnDateTime.cs" />
+    <Compile Include="RIndexOnDateTimePinHash.cs" />
     <Compile Include="RIndexOnDouble.cs" />
+    <Compile Include="RIndexOnDoublePinHash.cs" />
     <Compile Include="RIndexOnInt.cs" />
+    <Compile Include="RIndexOnIntPinHash.cs" />
     <Compile Include="RIndexOnLong.cs" />
+    <Compile Include="RIndexOnLongPinHash.cs" />
     <Compile Include="RIndexPin.cs" />
     <Compile Include="RIndexPooled.cs" />
     <Compile Include="RSelect.cs" />

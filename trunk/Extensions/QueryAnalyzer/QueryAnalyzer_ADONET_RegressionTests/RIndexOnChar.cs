@@ -171,7 +171,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine}, StringSplitOpti
     </Job>
   </Jobs>
 </SourceCode>";
-                string tempdir = Environment.CurrentDirectory + @"\" + Guid.NewGuid().ToString().Replace("-", "");
+                string tempdir = @"\\" + System.Net.Dns.GetHostName() + @"\" + Environment.CurrentDirectory.Replace(':','$') + @"\" + Guid.NewGuid().ToString().Replace("-", "");
                 if (System.IO.Directory.Exists(tempdir))
                 {
                     System.IO.Directory.Delete(tempdir, true);
@@ -179,7 +179,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine}, StringSplitOpti
                 System.IO.Directory.CreateDirectory(tempdir);
                 string tempjobname = Guid.NewGuid().ToString();
                 System.IO.File.WriteAllText(tempdir + @"\" + tempjobname, job);
-                Exec.Shell(@"Qizmt importdir " + tempdir);
+                Exec.Shell("Qizmt importdir \"" + tempdir + "\"");
 
                 DbConnection conn = fact.CreateConnection();
                 conn.ConnectionString = "Data Source = localhost";

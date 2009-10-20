@@ -76,7 +76,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
             {
                 OneRow row;
                 row.num1 = rnd.Next(min, max);
-                row.num2 = rnd.NextDouble();
+                row.num2 = rnd.Next(min, max);
                 row.num3 = rnd.Next(min, max);
                 row.dt = dtseed.AddDays(rnd.Next(min, max));
                 row.str = words[rnd.Next() % words.Length];
@@ -197,7 +197,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                     List<OneRow> xlist = expected[key];
                     if (xlist.Count != results.Count)
                     {
-                        throw new Exception("Result count: " + results.Count.ToString() + " is different from that of expected: " + xlist.Count.ToString());
+                        throw new Exception("Result count: " + results.Count.ToString() + " is different from that of expected: " + xlist.Count.ToString() + ". Query:" + cmd.CommandText);
                     }
                     foreach (OneRow r in results)
                     {
@@ -212,7 +212,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                         }
                         if (!found)
                         {
-                            throw new Exception("RSelect returned a row which was not located in expected results. num2=" + r.num2.ToString() + " num3=" + r.num3.ToString());
+                            throw new Exception("RSelect returned a row which was not located in expected results. num2=" + r.num2.ToString() + " num3=" + r.num3.ToString() + ". Query:" + cmd.CommandText);
                         }
                     }
                     foreach (OneRow x in xlist)
@@ -228,7 +228,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                         }
                         if (!found)
                         {
-                            throw new Exception("RSelect did not return an expected row. num2=" + x.num2.ToString() + " num3=" + x.num3.ToString());
+                            throw new Exception("RSelect did not return an expected row. num2=" + x.num2.ToString() + " num3=" + x.num3.ToString() + ". Query:" + cmd.CommandText);
                         }
                     }
                 }
@@ -278,7 +278,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                         List<OneRow> xlist = expected[key];
                         if (xlist.Count != results[key].Count)
                         {
-                            throw new Exception("Result count: " + results[key].Count.ToString() + " is different from that of expected: " + xlist.Count.ToString());
+                            throw new Exception("Result count: " + results[key].Count.ToString() + " is different from that of expected: " + xlist.Count.ToString() + ". Key=" + key.ToString() + ".  Query:" + cmd.CommandText);
                         }
                         foreach (OneRow r in results[key])
                         {
@@ -293,7 +293,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                             }
                             if (!found)
                             {
-                                throw new Exception("RSelect returned a row which was not located in expected results. num2=" + r.num2.ToString() + " num3=" + r.num3.ToString());
+                                throw new Exception("RSelect returned a row which was not located in expected results. num2=" + r.num2.ToString() + " num3=" + r.num3.ToString() + ". Key=" + key.ToString() + ".  Query:" + cmd.CommandText);
                             }
                         }
                         foreach (OneRow x in xlist)
@@ -309,7 +309,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                             }
                             if (!found)
                             {
-                                throw new Exception("RSelect did not return an expected row. num2=" + x.num2.ToString() + " num3=" + x.num3.ToString());
+                                throw new Exception("RSelect did not return an expected row. num2=" + x.num2.ToString() + " num3=" + x.num3.ToString() + ". Key=" + key.ToString() + ".  Query:" + cmd.CommandText);
                             }
                         }
                     }

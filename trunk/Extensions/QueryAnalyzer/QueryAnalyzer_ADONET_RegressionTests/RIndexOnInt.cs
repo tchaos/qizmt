@@ -76,7 +76,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
             {
                 OneRow row;
                 row.num1 = rnd.Next(min, max);
-                row.num2 = rnd.NextDouble();
+                row.num2 = rnd.Next(min, max);
                 row.num3 = rnd.Next(min, max); 
                 row.dt = dtseed.AddDays(rnd.Next(min, max));
                 row.str = words[rnd.Next() % words.Length];

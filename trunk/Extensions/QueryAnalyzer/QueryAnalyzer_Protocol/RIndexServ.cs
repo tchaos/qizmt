@@ -276,6 +276,7 @@ namespace QueryAnalyzer_Protocol
                                     string indexname = XContent.ReceiveXString(netstm, buf);
                                     string keydata = XContent.ReceiveXString(netstm, buf);
                                     bool ispin = false;
+                                    bool ispinhash = false;
                                     
                                     string keydatatype = "long";
                                     int keylen = 9;
@@ -295,6 +296,8 @@ namespace QueryAnalyzer_Protocol
                                             if (string.Compare(indexname, xnIndex["name"].InnerText, true) == 0)
                                             {                                               
                                                 int ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
+                                                System.Xml.XmlNode xnPinHash = xnIndex.SelectSingleNode("pinHash");
+                                                ispinhash = (xnPinHash != null && xnPinHash.InnerText == "1");
                                                 System.Xml.XmlNode xnTable = xnIndex.SelectSingleNode("table");
                                                 System.Xml.XmlNodeList xnCols = xnTable.SelectNodes("column");
                                                 columns = new Column[xnCols.Count];
@@ -455,7 +458,7 @@ namespace QueryAnalyzer_Protocol
                                        
                                         if (chunkname.Length > 0)
                                         {
-                                            ChunkRowsData chunkbuf = LoadFileChunk(chunkname, indexname, ispin, true, rowlen);
+                                            ChunkRowsData chunkbuf = LoadFileChunk(chunkname, indexname, ispin, true, rowlen, ispinhash, keyoffset);
                                             if (chunkbuf.NumberOfRows == 0)
                                             {
                                                 throw new Exception("Chunk referenced by a master index is not supposed to be empty: " + chunkname);
@@ -463,7 +466,18 @@ namespace QueryAnalyzer_Protocol
 
                                             long left = 0;
                                             long right = chunkbuf.NumberOfRows - 1;
-                                            long result = BSearch(chunkbuf, keybuf, ref left, ref right, keyoffset);
+                                            if (ispinhash && chunkbuf.Hash != null)
+                                            {
+                                                int shortkey = QueryAnalyzer_Protocol.TwoBytesToInt(keybuf[1], keybuf[2]);
+                                                Position hpos = chunkbuf.Hash[shortkey];
+                                                left = hpos.Offset;
+                                                right = left + hpos.Length - 1;
+                                            }
+                                            long result = -1;
+                                            if (right >= 0)
+                                            {
+                                                result = BSearch(chunkbuf, keybuf, ref left, ref right, keyoffset);
+                                            }                                            
                                             if (result > -1)
                                             {
                                                 long startingrowpos = result;
@@ -550,7 +564,7 @@ namespace QueryAnalyzer_Protocol
                                                     }
                                                     else
                                                     {
-                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen);
+                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen, ispinhash, keyoffset);
                                                         rowpos = -1;
                                                     }
 
@@ -584,7 +598,7 @@ namespace QueryAnalyzer_Protocol
                                                     }
                                                     else
                                                     {
-                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen);
+                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen, ispinhash, keyoffset);
                                                         rowpos = chunkbuf.NumberOfRows;
                                                     }
 
@@ -739,7 +753,7 @@ namespace QueryAnalyzer_Protocol
                 return mi;
             }
 
-            private ChunkRowsData LoadFileChunk(string chunkname, string indexname, bool ispin, bool determinepinornot, int rowlength)
+            private ChunkRowsData LoadFileChunk(string chunkname, string indexname, bool ispin, bool determinepinornot, int rowlength, bool ispinhash, int keyoffset)
             {
                 string _chunkname = chunkname.ToLower();
                 string _indexname = indexname.ToLower();
@@ -807,7 +821,11 @@ namespace QueryAnalyzer_Protocol
                             fbuf.Bytes[xoffset] = xbuf[ir];
                         }
                     }
+                }
 
+                if (ispinhash)
+                {
+                    fbuf.MakeHash(keyoffset);
                 }
 
                 if (determinepinornot)

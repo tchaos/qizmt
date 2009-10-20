@@ -787,25 +787,65 @@ namespace MySpace.DataMining.AELight
 
         static void DfsFPut(string[] args)
         {
-            string[] files = null;
-            string[] dirs = null;
+            List<string> files = null;
+            List<string> dirs = null;
             string pttn = "*.txt";
 
             for (int i = 0; i < args.Length; i++)
             {
-                string _arg = args[i].ToLower();
-                if (_arg.StartsWith("files="))
+                string skey = args[i].ToLower();
+                string sval = "";
+                int del = skey.IndexOf('=');
+                if (del > -1)
                 {
-                    files = args[i].Substring(6).Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    sval = skey.Substring(del + 1);
+                    skey = skey.Substring(0, del);                    
                 }
-                else if (_arg.StartsWith("dirs="))
+                if (sval.Length == 0)
                 {
-                    dirs = args[i].Substring(5).Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    Console.Error.WriteLine("fput error:  Argument {0} expects a value.", skey);
+                    SetFailure();
+                    return;
                 }
-                else if (_arg.StartsWith("pattern="))
+                switch (skey)
                 {
-                    pttn = args[i].Substring(8);
-                }
+                    case "files":
+                        {
+                            files = new List<string>();
+                            if (sval[0] == '@')
+                            {
+                                GetItemsFromFileAppend(sval.Substring(1), files);
+                            }
+                            else
+                            {
+                                files.AddRange(sval.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+                            }        
+                        }
+                        break;
+
+                    case "dirs":
+                        {
+                            dirs = new List<string>();
+                            if (sval[0] == '@')
+                            {
+                                GetItemsFromFileAppend(sval.Substring(1), dirs);
+                            }
+                            else
+                            {
+                                dirs.AddRange(sval.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+                            }  
+                        }
+                        break;
+
+                    case "pattern":                        
+                        pttn = sval;                        
+                        break;
+
+                    default:
+                        Console.Error.WriteLine("fput error:  Invalid argument: {0}", skey);
+                        SetFailure();
+                        return;
+                }                
             }
 
             List<string> fileList = new List<string>();
@@ -820,7 +860,7 @@ namespace MySpace.DataMining.AELight
             }
             if (files != null)
             {
-                for (int i = 0; i < files.Length; i++)
+                for (int i = 0; i < files.Count; i++)
                 {
                     if (System.IO.File.Exists(files[i]))
                     {
@@ -836,7 +876,7 @@ namespace MySpace.DataMining.AELight
 
             if (dirs != null)
             {
-                for (int i = 0; i < dirs.Length; i++)
+                for (int i = 0; i < dirs.Count; i++)
                 {
                     if (System.IO.Directory.Exists(dirs[i]))
                     {
@@ -934,14 +974,56 @@ namespace MySpace.DataMining.AELight
             sb.Append(@"}
                 try 
                 {
-                      System.IO.StreamReader sr = new System.IO.StreamReader(inFile);
-                      string line = """";
-                      while ( (line = sr.ReadLine()) != null )
-                      {
-                          dfsoutput.WriteLine(line);
-                      }
-                      sr.Close();
-                      Qizmt_Log(""uploaded: "" + inFile);
+                    using (System.IO.FileStream _fs = new System.IO.FileStream(inFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                    {
+                        System.IO.Stream fs = null;
+                        const int MAXREAD = 0x400 * 64;
+                        byte[] fbuf = new byte[MAXREAD];
+
+                        if (inFile.EndsWith("".gz"", StringComparison.OrdinalIgnoreCase))
+                        {
+                            fs = new System.IO.Compression.GZipStream(_fs, System.IO.Compression.CompressionMode.Decompress);
+                            fbuf[0] = (byte)fs.ReadByte();
+                            fbuf[1] = (byte)fs.ReadByte();
+                            fbuf[2] = (byte)fs.ReadByte();
+
+                            if (!(fbuf[0] == 0xEF && fbuf[1] == 0xBB && fbuf[2] == 0xBF))
+                            {
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    if (fbuf[i] != -1)
+                                    {
+                                        dfsoutput.WriteByte(fbuf[i]);
+                                    }
+                                }                        
+                            }
+                        }
+                        else
+                        {
+                            fs = _fs;                   	
+                            fs.Read(fbuf, 0, 3);
+
+                            if (!(fbuf[0] == 0xEF && fbuf[1] == 0xBB && fbuf[2] == 0xBF))
+                            {
+                                fs.Position = 0;
+                            }
+                        }
+
+                        int read = 0;
+                        for (; ; )
+                        {
+                            read = fs.Read(fbuf, 0, MAXREAD);
+                            if (read < 1)
+                            {
+                                break;
+                            }
+                            dfsoutput.Write(fbuf, 0, read);
+                        }
+
+                        fs.Close();                
+                    }
+                     
+                    Qizmt_Log(""uploaded: "" + inFile);
                 }
                 catch
                 {
@@ -980,7 +1062,7 @@ namespace MySpace.DataMining.AELight
         {
             if (args.Length < 2)
             {
-                Console.Error.WriteLine("fget error:  {0} fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>]", appname);
+                Console.Error.WriteLine("fget error:  {0} fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>] [-gz]", appname);
                 SetFailure();
                 return;
             }
@@ -1010,7 +1092,7 @@ namespace MySpace.DataMining.AELight
             string[] hosts = null;
             string[] parts = null;
             {
-                dfs.DfsFile df;                
+                dfs.DfsFile df;
                 using (LockDfsMutex())
                 {
                     dfs dc = LoadDfsConfig();
@@ -1033,7 +1115,7 @@ namespace MySpace.DataMining.AELight
                 }
 
                 parts = new string[df.Nodes.Count];
-                for(int i = 0; i < df.Nodes.Count; i++)
+                for (int i = 0; i < df.Nodes.Count; i++)
                 {
                     dfs.DfsFile.FileNode fn = df.Nodes[i];
                     string fnhost = fn.Host.ToLower();
@@ -1042,15 +1124,49 @@ namespace MySpace.DataMining.AELight
                         Console.Error.WriteLine("File node is on an unhealthy machine: {0}:{1}", fnhost, fn.Name);
                         SetFailure();
                         return;
-                    }                    
+                    }
                     parts[i] = netpaths[fnhost] + @"\" + fn.Name;
                 }
             }
 
-            string[] targetdirs = new string[args.Length - 1];
-            for (int i = 1; i < args.Length; i++)
+            List<string> targetdirs = null;
             {
-                targetdirs[i - 1] = args[i];
+                if (args[1][0] == '@')
+                {
+                    targetdirs = new List<string>();
+                    GetItemsFromFileAppend(args[1].Substring(1), targetdirs);
+                }
+                else
+                {
+                    targetdirs = new List<string>(args.Length - 1);
+                    for (int i = 1; i < args.Length; i++)
+                    {
+                        if (args[i][0] != '-')
+                        {
+                            targetdirs.Add(args[i]);     
+                        }                                           
+                    }
+                }
+
+                for (int i = 0; i < targetdirs.Count; i++)
+                {
+                    string _dir = targetdirs[i];
+                    if (_dir.EndsWith(@"\"))
+                    {
+                        _dir = _dir.Substring(0, _dir.Length - 1);
+                        targetdirs[i] = _dir;
+                    }
+                }
+            }
+
+            bool isgz = false;
+            for (int i = 2; i < args.Length; i++)
+            {
+                if (string.Compare(args[i], "-gz", true) == 0)
+                {
+                    isgz = true;
+                    break;
+                }
             }
 
             Random rand = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
@@ -1086,7 +1202,7 @@ namespace MySpace.DataMining.AELight
             {
                 int index = orders[oi];
                 string partnetpath = parts[index];
-                string targetdir = targetdirs[index % targetdirs.Length];
+                string targetdir = targetdirs[index % targetdirs.Count];
                 string meta = partnetpath + '|' + targetdir + '|' + index;
 
                 sb.Append(@"<DFS_IO>
@@ -1108,6 +1224,7 @@ namespace MySpace.DataMining.AELight
             {
                 string dfsfn = """ + dfsfilename + @""";
                 string dfsext = """ + dfsfileext + @""";
+                bool isgz = " + (isgz ? "true" : "false") + @";
                 string[] meta = Qizmt_Meta.Split('|');
                 string srcfilepath = meta[0]; 
                 string targetdir = meta[1];
@@ -1117,14 +1234,27 @@ namespace MySpace.DataMining.AELight
                     System.IO.Directory.CreateDirectory(targetdir);
                 }
                 string tarfilepath = targetdir+ @""\"" + dfsfn + ""_"" + index + dfsext; 
+                if(isgz)
+                {
+                    tarfilepath += "".gz"";
+                }
                 const int FILE_BUFFER_SIZE = 0x1000;
                 const int MAX_SIZE_PER_RECEIVE = 0x400 * 64;
                 byte[] fbuf = new byte[MAX_SIZE_PER_RECEIVE];
 
-                using (System.IO.FileStream fs = new System.IO.FileStream(tarfilepath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                using (System.IO.FileStream _fs = new System.IO.FileStream(tarfilepath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
                 {
                     using (System.IO.Stream fc = new System.IO.FileStream(srcfilepath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
                     {
+                        System.IO.Stream fs = null;
+                        if(isgz)
+                        {
+                            fs = new System.IO.Compression.GZipStream(_fs, System.IO.Compression.CompressionMode.Compress);
+                        }
+                        else
+                        {
+                            fs = _fs;
+                        }
                         {
                             int xread = StreamReadLoop(fc, fbuf, 4);
                             if (4 == xread)
@@ -1194,6 +1324,28 @@ namespace MySpace.DataMining.AELight
             Exec("", LoadConfig(null, jobname), new string[] { }, false, false);
             System.IO.File.Delete(jobname);
             Console.WriteLine("Done");
+        }
+
+        static void GetItemsFromFileAppend(string file, List<string> append)
+        {
+            using (System.IO.StreamReader sr = System.IO.File.OpenText(file))
+            {
+                string s;
+                for (; ; )
+                {
+                    s = sr.ReadLine();
+                    if (null == s)
+                    {
+                        break;
+                    }
+                    s = s.Trim();
+                    if (s.Length < 1 || '#' == s[0])
+                    {
+                        continue;
+                    }
+                    append.AddRange(s.Split(';', ','));
+                }
+            }
         }
 
         static void DfsPut(string[] args, long maxLineSize)
