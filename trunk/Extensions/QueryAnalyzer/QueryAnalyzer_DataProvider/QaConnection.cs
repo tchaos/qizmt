@@ -8,7 +8,7 @@ using System.Text;
 namespace QueryAnalyzer_DataProvider
 {
     public class QaConnection : DbConnection
-    {
+    { 
         internal QaConnectionString connstr;
         private ConnectionState state = ConnectionState.Closed;
         private string sessionID = null;
@@ -282,6 +282,7 @@ namespace QueryAnalyzer_DataProvider
                             ind.Table = tab;
                             ind.PinHash = (xePinHash != null && xePinHash.InnerText == "1");
                             ind.Hash = ind.PinHash ? new Position[256 * 256] : null;
+                            ind.MaxKey = new byte[tab.Columns[ind.Ordinal].Bytes];
                             sysindexes.Add(indName.ToLower(), ind);
                         }
                     }
@@ -298,6 +299,7 @@ namespace QueryAnalyzer_DataProvider
                     int keylen = 9;
                     bool pinhash = false;
                     Position[] hash = null;
+                    byte[] maxkey = null;
                     if (sysindexes.ContainsKey(indexname))
                     {
                         Index thisindex = sysindexes[indexname];
@@ -305,6 +307,11 @@ namespace QueryAnalyzer_DataProvider
                         keylen = thisindex.Table.Columns[ordinal].Bytes;
                         pinhash = thisindex.PinHash;
                         hash = thisindex.Hash;
+                        maxkey = thisindex.MaxKey;
+                    }
+                    else
+                    {
+                        throw new Exception("Index version conflict, need to recreate indexes");
                     }
 
                     byte[] lastkeybuf = new byte[keylen];
@@ -315,7 +322,13 @@ namespace QueryAnalyzer_DataProvider
                         int pos = 0;
                         int hoffset = 0;
                         int hlen = 0;
-                        while(pos < filelen)
+                        
+                        for (int ki = 0; ki < keylen; ki++)
+                        {
+                            maxkey[ki] = buf[pos++];
+                        }                        
+
+                        while (pos < filelen)
                         {
                             byte[] keybuf = new byte[keylen];
                             for (int ki = 0; ki < keylen; ki++)
@@ -334,16 +347,16 @@ namespace QueryAnalyzer_DataProvider
                             }
 
                             int chunknamestartpos = pos;
-                            while(buf[pos++] != (byte)'\0')
+                            while (buf[pos++] != (byte)'\0')
                             {
-                            }                                                        
+                            }
 
                             if (!samekey)
                             {
                                 string chunkname = System.Text.Encoding.UTF8.GetString(buf, chunknamestartpos, pos - chunknamestartpos - 1);
 
                                 if (pinhash)
-                                {                                    
+                                {
                                     if (lines.Count > 0)
                                     {
                                         if (keybuf[1] != lastkeybuf[1] || keybuf[2] != lastkeybuf[2])
@@ -357,10 +370,10 @@ namespace QueryAnalyzer_DataProvider
                                     }
                                     hlen++;
                                 }
-                                
+
                                 lines.Add(new KeyValuePair<byte[], string>(keybuf, chunkname));
-                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, keylen);                                
-                            }                           
+                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, keylen);
+                            }
                         }
 
                         if (pinhash)
@@ -372,7 +385,7 @@ namespace QueryAnalyzer_DataProvider
                                 hash[shortkey].Offset = hoffset;
                                 hash[shortkey].Length = hlen;
                             }
-                            
+
                             //fill in the gap
                             int prevoffset = 0;
                             int prevlen = 0;
@@ -380,7 +393,7 @@ namespace QueryAnalyzer_DataProvider
                             {
                                 Position thispos = hash[hi];
                                 if (thispos.Length == 0)
-                                {            
+                                {
                                     thispos.Length = prevlen;
                                     thispos.Offset = prevoffset;
                                     hash[hi] = thispos;
@@ -891,6 +904,7 @@ namespace QueryAnalyzer_DataProvider
             public bool PinHash;
             public Table Table;
             public Position[] Hash;
+            public byte[] MaxKey;
         }
 
         internal struct Position

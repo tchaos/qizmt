@@ -154,7 +154,7 @@ namespace QueryAnalyzer_Protocol
                 }
             }
         }
-        
+
         public struct Position
         {
             public long Offset;
@@ -1285,7 +1285,7 @@ namespace QueryAnalyzer_Protocol
             if (null == xeTable)
             {
                 throw new Exception("No such table or table cannot have RINDEX applied: " + SourceTable);
-            }           
+            }
 
             string indexfilename = GetIndexFileName(IndexName);
             if (System.IO.File.Exists(indexfilename))
@@ -1297,6 +1297,12 @@ namespace QueryAnalyzer_Protocol
             int keyordinal = -1;
             int keyoffset = 0;
             int keylen = 0;
+            int RowSize = 0;
+            {
+                string sRowSize = xeTable["size"].InnerText;
+                RowSize = int.Parse(sRowSize);
+            }
+
             if (keycolumn.Length > 0)
             {
                 for (int ci = 0; ci < xnColumns.Count; ci++)
@@ -1318,8 +1324,6 @@ namespace QueryAnalyzer_Protocol
             }
             else
             {
-                string sRowSize = xeTable["size"].InnerText;
-                int RowSize = int.Parse(sRowSize);
                 if (RowSize != 9 * 3 || 9 != int.Parse(xnColumns[0]["bytes"].InnerText))
                 {
                     throw new Exception("Table must contain exactly 3 columns of LONG");
@@ -1369,56 +1373,34 @@ namespace QueryAnalyzer_Protocol
             using (System.IO.FileStream mi = new System.IO.FileStream(mifn, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
             {
                 byte[] rowbuf = new byte[keylen];
+                for (int pi = bulkparts.Length - 1; pi >= 0; pi--)
+                {
+                    string line = bulkparts[pi];
+                    long chunksize = 0;
+                    string chunknetpath = null;
+                    using (System.IO.FileStream fs = GetChunkFileStream(line, HostToNetPath, ref rowbuf, out chunksize, out chunknetpath))
+                    {
+                        if (fs == null)
+                        {
+                            continue;
+                        }
+                        fs.Seek((long)(chunksize - RowSize + keyoffset), System.IO.SeekOrigin.Current);                        
+                        StreamReadExact(fs, rowbuf, keylen);
+                        mi.Write(rowbuf, 0, keylen);
+                        fs.Close();
+                    }
+                    break;
+                }
+
                 foreach (string line in bulkparts)
                 {
-                    string[] parts = line.Split(' ');
-                    string[] hosts = parts[0].Split(';');
-                    string chunkname = parts[1];
-                    long chunksize = Int64.Parse(parts[2]);
-                    if (chunksize == 0)
+                    long chunksize = 0;
+                    string chunknetpath = null;
+                    using (System.IO.FileStream fs = GetChunkFileStream(line, HostToNetPath, ref rowbuf, out chunksize, out chunknetpath))
                     {
-                        continue;
-                    }
-                    string host = null;
-                    for (int hi = 0; hi < hosts.Length; hi++)
-                    {
-                        if (HostToNetPath.ContainsKey(hosts[hi]))
+                        if (fs == null)
                         {
-                            host = hosts[hi];
-                            break;
-                        }
-                    }
-                    if (host == null)
-                    {
-                        throw new Exception("Chunk " + chunkname + " is not accessible (not part of this cluster or is down)");
-                    }
-                    using (System.IO.FileStream fs = new System.IO.FileStream(HostToNetPath[host] + @"\" + chunkname, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
-                    {
-                        {
-                            // Skip the dfs-chunk file-header...
-                            int headerlength = 0;
-                            {
-                                if (rowbuf.Length < 4)
-                                {
-                                    rowbuf = new byte[4];
-                                }
-                                if (4 != fs.Read(rowbuf, 0, 4))
-                                {
-                                    continue;
-                                }
-                                {
-                                    headerlength = BytesToInt(rowbuf, 0);
-                                    if (headerlength > 4)
-                                    {
-                                        int hremain = headerlength - 4;
-                                        if (hremain > rowbuf.Length)
-                                        {
-                                            rowbuf = new byte[hremain];
-                                        }
-                                        StreamReadExact(fs, rowbuf, hremain);
-                                    }
-                                }
-                            }
+                            continue;
                         }
                         if (keyoffset > 0)
                         {
@@ -1426,7 +1408,7 @@ namespace QueryAnalyzer_Protocol
                         }
                         StreamReadExact(fs, rowbuf, keylen);
                         mi.Write(rowbuf, 0, keylen);
-                        byte[] chunknamebuf = System.Text.Encoding.UTF8.GetBytes(HostToNetPath[host] + @"\" + chunkname);
+                        byte[] chunknamebuf = System.Text.Encoding.UTF8.GetBytes(chunknetpath);
                         mi.Write(chunknamebuf, 0, chunknamebuf.Length);
                         mi.WriteByte((byte)'\0');
                         fs.Close();
@@ -1461,14 +1443,14 @@ namespace QueryAnalyzer_Protocol
                 System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
                 if (System.IO.File.Exists(sysindexesfilepath))
                 {
-                    xi.Load(sysindexesfilepath);                    
+                    xi.Load(sysindexesfilepath);
                 }
                 else
                 {
                     System.Xml.XmlElement xeIndexes = xi.CreateElement("indexes");
                     xi.AppendChild(xeIndexes);
                 }
-                System.Xml.XmlElement xeIndex = xi.CreateElement("index");                
+                System.Xml.XmlElement xeIndex = xi.CreateElement("index");
                 System.Xml.XmlElement xeIndexName = xi.CreateElement("name");
                 xeIndexName.InnerText = IndexName;
                 xeIndex.AppendChild(xeIndexName);
@@ -1498,7 +1480,7 @@ namespace QueryAnalyzer_Protocol
                     xeCol.AppendChild(xeColType);
                     System.Xml.XmlElement xeColBytes = xi.CreateElement("bytes");
                     xeColBytes.InnerText = xn["bytes"].InnerText;
-                    xeCol.AppendChild(xeColBytes);  
+                    xeCol.AppendChild(xeColBytes);
                 }
                 xi.DocumentElement.AppendChild(xeIndex);
 
@@ -1510,6 +1492,62 @@ namespace QueryAnalyzer_Protocol
                 }
                 System.IO.File.Delete(tempsifn);
             }
+        }
+
+        System.IO.FileStream GetChunkFileStream(string line, Dictionary<string, string> HostToNetPath, ref byte[] rowbuf, out long chunksize, out string chunknetpath)
+        {
+            string[] parts = line.Split(' ');
+            string[] hosts = parts[0].Split(';');
+            string chunkname = parts[1];
+            chunksize = Int64.Parse(parts[2]);
+            chunknetpath = null;
+            if (chunksize == 0)
+            {
+                return null;
+            }
+            string host = null;
+            for (int hi = 0; hi < hosts.Length; hi++)
+            {
+                if (HostToNetPath.ContainsKey(hosts[hi]))
+                {
+                    host = hosts[hi];
+                    break;
+                }
+            }
+            if (host == null)
+            {
+                throw new Exception("Chunk " + chunkname + " is not accessible (not part of this cluster or is down)");
+            }
+
+            chunknetpath = HostToNetPath[host] + @"\" + chunkname;
+            System.IO.FileStream fs = new System.IO.FileStream(chunknetpath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
+            {                
+                // Skip the dfs-chunk file-header...
+                int headerlength = 0;
+                {
+                    if (rowbuf.Length < 4)
+                    {
+                        rowbuf = new byte[4];
+                    }
+                    if (4 != fs.Read(rowbuf, 0, 4))
+                    {
+                        return null;
+                    }
+                    {
+                        headerlength = BytesToInt(rowbuf, 0);
+                        if (headerlength > 4)
+                        {
+                            int hremain = headerlength - 4;
+                            if (hremain > rowbuf.Length)
+                            {
+                                rowbuf = new byte[hremain];
+                            }
+                            StreamReadExact(fs, rowbuf, hremain);
+                        }
+                    }
+                }                
+            }
+            return fs;
         }
 
         string GetIndexFileName(string indexName)
@@ -1536,8 +1574,8 @@ namespace QueryAnalyzer_Protocol
                         throw new Exception("Expected table name for CREATE RINDEX");
                     }
 
-                    bool pinmem = false;
-                    bool pinmemhash = false;
+                    bool pinmem = true;
+                    bool pinmemhash = true;
                     string keycolumn = "";
                     for (; ; )
                     {
@@ -1550,11 +1588,17 @@ namespace QueryAnalyzer_Protocol
                         {
                             case "pinmemory":
                                 pinmem = true;
+                                pinmemhash = false;
                                 break;
 
                             case "pinmemoryhash":
                                 pinmemhash = true;
                                 pinmem = true;
+                                break;
+
+                            case "diskonly":
+                                pinmemhash = false;
+                                pinmem = false;
                                 break;
 
                             case "on":
@@ -1567,7 +1611,7 @@ namespace QueryAnalyzer_Protocol
                                 }
                                 break;
                         }
-                    }                  
+                    }
                     _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn, pinmemhash);
                     return true;
                 }
@@ -1705,7 +1749,7 @@ namespace QueryAnalyzer_Protocol
                 xi.Load(sysindexesfn);
                 System.Xml.XmlNodeList xnIndexes = xi.SelectNodes("/indexes/index");
                 bool found = false;
-                for(int i = 0; i < xnIndexes.Count; i++)
+                for (int i = 0; i < xnIndexes.Count; i++)
                 {
                     System.Xml.XmlNode xnIndex = xnIndexes[i];
                     if (string.Compare(xnIndex["name"].InnerText, indexname, true) == 0)

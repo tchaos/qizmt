@@ -13,9 +13,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
         {
             string tablename = "rselect_test_" + Guid.NewGuid().ToString().Replace("-", "");
             string tablenameSorted = "rselect_test_sorted" + Guid.NewGuid().ToString().Replace("-", "");
-            string indexname = Guid.NewGuid().ToString().Replace("-", "") + "apple";
-            string tablenamedummy = "rselect_test_dummy" + Guid.NewGuid().ToString().Replace("-", "");
-            string indexnamedummy = Guid.NewGuid().ToString().Replace("-", "");
+            string indexname = Guid.NewGuid().ToString().Replace("-", "") + "apple";          
             Dictionary<long, List<KeyValuePair<long, long>>> expected = new Dictionary<long, List<KeyValuePair<long, long>>>();
             Dictionary<long, int> testvalues = new Dictionary<long, int>(5);
             const int TESTSIZE = 5;
@@ -69,15 +67,8 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                     cmd.CommandText = "INSERT INTO " + tablenameSorted + " SELECT * FROM " + tablename + " ORDER BY num1";
                     cmd.ExecuteNonQuery();
                 }
-                ///////! cannot create index here.                
-                {
-                    DbCommand cmd = conn.CreateCommand();
-                    cmd.CommandText = "CREATE TABLE " + tablenamedummy + " (num1 LONG, num2 LONG, num3 LONG)";
-                    cmd.ExecuteNonQuery();
-
-                    cmd.CommandText = "INSERT INTO " + tablenamedummy + " VALUES (1, 1, 1)";
-                    cmd.ExecuteNonQuery();
-                }
+                ///////! cannot create index here.               
+                
                 conn.Close();
                 Console.WriteLine("Data prepared.");
             }
@@ -115,11 +106,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 conn.ConnectionString = "Data Source = localhost";
                 conn.Open();                
                 DbCommand cmd = conn.CreateCommand();
-                cmd.CommandText = "CREATE RINDEX " + indexname + " FROM " + tablenamedummy;
-                cmd.ExecuteNonQuery();
-                cmd.CommandText = "CREATE RINDEX " + indexnamedummy + " FROM " + tablenameSorted;
-                cmd.ExecuteNonQuery();
-                cmd.CommandText = "ALTER RINDEX " + indexnamedummy + " RENAME SWAP " + indexname;
+                cmd.CommandText = "CREATE RINDEX " + indexname + " FROM " + tablenameSorted;
                 cmd.ExecuteNonQuery();
                 conn.Close();
                 Console.WriteLine("RIndexes created.");
@@ -197,11 +184,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 cmd.ExecuteNonQuery();
                 cmd.CommandText = "drop table " + tablenameSorted;
                 cmd.ExecuteNonQuery();
-                cmd.CommandText = "drop table " + tablenamedummy;
-                cmd.ExecuteNonQuery();
                 cmd.CommandText = "drop rindex " + indexname;
-                cmd.ExecuteNonQuery();
-                cmd.CommandText = "drop rindex " + indexnamedummy;
                 cmd.ExecuteNonQuery();
                 conn.Close();
             }

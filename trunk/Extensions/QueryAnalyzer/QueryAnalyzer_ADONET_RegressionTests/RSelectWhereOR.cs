@@ -29,8 +29,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
             string tablename = "rselectwhereor_test_" + uniq;
             string tablenameSorted = "rselectwhereor_test_sorted" + uniq;
             string indexname = uniq + "apple";
-            string tablenamedummy = "rselectwhereor_test_dummy" + uniq;
-            string indexnamedummy = "dummy_" + uniq;
+           
             Dictionary<long, List<KeyValuePair<long, long>>> expected = new Dictionary<long, List<KeyValuePair<long, long>>>();
             Dictionary<long, int> testvalues = new Dictionary<long, int>(5);
             const int TESTSIZE = 5;
@@ -49,11 +48,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                     cmd.ExecuteNonQuery();
                     cmd.CommandText = "drop table " + tablenameSorted;
                     cmd.ExecuteNonQuery();
-                    cmd.CommandText = "drop table " + tablenamedummy;
-                    cmd.ExecuteNonQuery();
                     cmd.CommandText = "drop rindex " + indexname;
-                    cmd.ExecuteNonQuery();
-                    cmd.CommandText = "drop rindex " + indexnamedummy;
                     cmd.ExecuteNonQuery();
                     conn.Close();
                 }
@@ -135,18 +130,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                     cmd.ExecuteNonQuery();
                     cmd.CommandText = "INSERT INTO " + tablenameSorted + " SELECT * FROM " + tablename + " ORDER BY num1";
                     cmd.ExecuteNonQuery();
-                }
-                ///////! cannot create index here.       
-                if(CreateTable)
-                {
-                    DbCommand cmd = conn.CreateCommand();
-                    cmd.CommandText = "CREATE TABLE " + tablenamedummy + " (num1 LONG, num2 LONG, num3 LONG)";
-                    cmd.ExecuteNonQuery();
-
-                    cmd.CommandText = "INSERT INTO " + tablenamedummy + " VALUES (1, 1, 1)";
-                    cmd.ExecuteNonQuery();
                     conn.Close();
-                    Console.WriteLine("Data prepared.");
                 }
             }
 
@@ -157,11 +141,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 conn.ConnectionString = "Data Source = localhost";
                 conn.Open();
                 DbCommand cmd = conn.CreateCommand();
-                cmd.CommandText = "CREATE RINDEX " + indexname + " FROM " + tablenamedummy;
-                cmd.ExecuteNonQuery();
-                cmd.CommandText = "CREATE RINDEX " + indexnamedummy + " FROM " + tablenameSorted;
-                cmd.ExecuteNonQuery();
-                cmd.CommandText = "ALTER RINDEX " + indexnamedummy + " RENAME SWAP " + indexname;
+                cmd.CommandText = "CREATE RINDEX " + indexname + " FROM " + tablenameSorted;
                 cmd.ExecuteNonQuery();
                 conn.Close();
                 Console.WriteLine("RIndexes created.");
@@ -290,11 +270,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 cmd.ExecuteNonQuery();
                 cmd.CommandText = "drop table " + tablenameSorted;
                 cmd.ExecuteNonQuery();
-                cmd.CommandText = "drop table " + tablenamedummy;
-                cmd.ExecuteNonQuery();
                 cmd.CommandText = "drop rindex " + indexname;
-                cmd.ExecuteNonQuery();
-                cmd.CommandText = "drop rindex " + indexnamedummy;
                 cmd.ExecuteNonQuery();
                 conn.Close();
             }

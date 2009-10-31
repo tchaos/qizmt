@@ -6,7 +6,7 @@ using System.Text;
 namespace QueryAnalyzer_Protocol
 {
     partial class QueryAnalyzer_Protocol
-    {
+    {  
 
         public class RIndexServClientHandler
         {
@@ -296,6 +296,8 @@ namespace QueryAnalyzer_Protocol
                                             if (string.Compare(indexname, xnIndex["name"].InnerText, true) == 0)
                                             {                                               
                                                 int ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
+                                                System.Xml.XmlNode xnPin = xnIndex.SelectSingleNode("pin");
+                                                ispin = (xnPin.InnerText == "1");
                                                 System.Xml.XmlNode xnPinHash = xnIndex.SelectSingleNode("pinHash");
                                                 ispinhash = (xnPinHash != null && xnPinHash.InnerText == "1");
                                                 System.Xml.XmlNode xnTable = xnIndex.SelectSingleNode("table");
@@ -458,7 +460,7 @@ namespace QueryAnalyzer_Protocol
                                        
                                         if (chunkname.Length > 0)
                                         {
-                                            ChunkRowsData chunkbuf = LoadFileChunk(chunkname, indexname, ispin, true, rowlen, ispinhash, keyoffset);
+                                            ChunkRowsData chunkbuf = LoadFileChunk(chunkname, indexname, ispin, rowlen, ispinhash, keyoffset);
                                             if (chunkbuf.NumberOfRows == 0)
                                             {
                                                 throw new Exception("Chunk referenced by a master index is not supposed to be empty: " + chunkname);
@@ -536,7 +538,7 @@ namespace QueryAnalyzer_Protocol
                                                 List<KeyValuePair<string, byte[]>> mi = null;
                                                 if (lookforward || lookbackward)
                                                 {
-                                                    mi = LoadMasterIndex(indexname, ref ispin, keylen);
+                                                    mi = LoadMasterIndex(indexname, keylen);
                                                     for (int i = 0; i < mi.Count; i++)
                                                     {
                                                         if (string.Compare(chunkname, mi[i].Key, true) == 0)
@@ -564,7 +566,7 @@ namespace QueryAnalyzer_Protocol
                                                     }
                                                     else
                                                     {
-                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen, ispinhash, keyoffset);
+                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
                                                         rowpos = -1;
                                                     }
 
@@ -598,7 +600,7 @@ namespace QueryAnalyzer_Protocol
                                                     }
                                                     else
                                                     {
-                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, false, rowlen, ispinhash, keyoffset);
+                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
                                                         rowpos = chunkbuf.NumberOfRows;
                                                     }
 
@@ -718,13 +720,16 @@ namespace QueryAnalyzer_Protocol
                 return BSearch(keys, key, ref left, ref right, rowkeyoffset);
             }
 
-            private List<KeyValuePair<string, byte[]>> LoadMasterIndex(string indexName, ref bool isPinMemory, int keylength)
+            private List<KeyValuePair<string, byte[]>> LoadMasterIndex(string indexName, int keylength)
             {
                 string indexfn = CurrentDirNetPath + @"\ind.Index." + indexName + ".ind";
                 List<KeyValuePair<string, byte[]>> mi = new List<KeyValuePair<string, byte[]>>();
 
                 using (System.IO.FileStream fs = new System.IO.FileStream(indexfn, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
                 {
+                    //Skip header                    
+                    fs.Seek((long)keylength, System.IO.SeekOrigin.Current);                    
+
                     for (; ; )
                     {
                         byte[] keybuf = new byte[keylength];
@@ -748,12 +753,10 @@ namespace QueryAnalyzer_Protocol
                     fs.Close();
                 }
 
-                string pinfn = CurrentDirNetPath + @"\ind.Pin." + indexName + ".ind";
-                isPinMemory = System.IO.File.Exists(pinfn);
                 return mi;
             }
 
-            private ChunkRowsData LoadFileChunk(string chunkname, string indexname, bool ispin, bool determinepinornot, int rowlength, bool ispinhash, int keyoffset)
+            private ChunkRowsData LoadFileChunk(string chunkname, string indexname, bool ispin, int rowlength, bool ispinhash, int keyoffset)
             {
                 string _chunkname = chunkname.ToLower();
                 string _indexname = indexname.ToLower();
@@ -827,11 +830,7 @@ namespace QueryAnalyzer_Protocol
                 {
                     fbuf.MakeHash(keyoffset);
                 }
-
-                if (determinepinornot)
-                {
-                    ispin = System.IO.File.Exists(CurrentDirNetPath + @"\ind.Pin." + indexname + ".ind");
-                }
+               
                 if (ispin)
                 {
                     lock (rindexpins)

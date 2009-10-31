@@ -10,7 +10,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
         public static void Main(string[] args)
         {
             List<KeyValuePair<string, bool>> AllTests = new List<KeyValuePair<string, bool>>();
-            
+           
             if (args.Length > 0 && "-connopen" == args[0])
             {
                 goto connopen;
@@ -333,6 +333,24 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
 
                 DbAggregators_DropTable(tablename);
+            }
+
+            {
+                string testname = "ShellCmdLossless";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    ShellCmdLossless();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
             }
 
             {
@@ -767,6 +785,24 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 try
                 {
                     InsertIntoSelectTop();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
+                string testname = "RIndexType";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexType();
                     Console.WriteLine("[PASSED] - {0}", testname);
                     AllTests.Add(new KeyValuePair<string, bool>(testname, true));
                 }

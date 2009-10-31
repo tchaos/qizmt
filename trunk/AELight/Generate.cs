@@ -340,6 +340,45 @@ namespace MySpace.DataMining.AELight
                 DSpace_Log(sbresult.ToString());
 
             }
+            else if(0 == string.Compare(`Sum2`, hashname, true))
+            {
+                ulong lsum = 0;
+                bool prevnl = true;
+                for(;;)
+                {
+                    int ib = dfsinput.ReadByte();
+                    if(ib < 0)
+                    {
+                        if(prevnl)
+                        {
+                            break;
+                        }
+                        prevnl = true;
+                        ib = '\n';
+                    }
+                    if('\r' == ib || '\n' == ib)
+                    {
+                        if(prevnl)
+                        {
+                            continue;
+                        }
+                        prevnl = true;
+                        ib = '\n';
+                    }
+                    else
+                    {
+                        prevnl = false;
+                    }
+                    lsum += (byte)ib;
+                }
+                StringBuilder sbresult = new StringBuilder(32);
+                sbresult.Append(hashname + ` of `);
+                sbresult.Append(@`dfs://" + dfsreader + @"`);
+                sbresult.Append(`:  `);
+                sbresult.Append(lsum);
+                DSpace_Log(sbresult.ToString());
+
+            }
         }
 
         ]]>

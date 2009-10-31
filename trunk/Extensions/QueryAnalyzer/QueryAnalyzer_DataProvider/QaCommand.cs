@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 namespace QueryAnalyzer_DataProvider
 {
     public class QaCommand : DbCommand
-    {
+    { 
         private CommandType cmdType;
         private string cmdText = null;
         private QaParameterCollection parameters = null;
@@ -296,9 +296,12 @@ namespace QueryAnalyzer_DataProvider
                                     int result = -2;
                                     int left = 0;
                                     int right = mi.Count - 1;
+                                    byte[] maxkey = null;
                                     if (conn.sysindexes.ContainsKey(indexname))
                                     {
                                         QaConnection.Index thisIndex = conn.sysindexes[indexname];
+                                        maxkey = thisIndex.MaxKey;
+
                                         if (thisIndex.PinHash)
                                         {
                                             int shortkey = QaConnection.TwoBytesToInt(buf[1], buf[2]);
@@ -319,9 +322,9 @@ namespace QueryAnalyzer_DataProvider
                                     {
                                         result = left;   //Though not found in master index, but still in range.
                                     }
-                                    else if (result == -3)
+                                    else if (result == -3 && CompareBytes(buf, maxkey, keylen) <= 0)
                                     {
-                                        result = right;  //out of range: too big.
+                                        result = right;  //out of range: too big, but still smaller than the maxkey.
                                     }
                                     if (result >= 0)
                                     {

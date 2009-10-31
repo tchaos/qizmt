@@ -149,6 +149,10 @@
       <Project>{51C1DC7F-7F9B-4CA4-9ADA-922421E0AEC7}</Project>
       <Name>RegressionTest</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Scheduler\Scheduler.csproj">
+      <Project>{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}</Project>
+      <Name>Scheduler</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

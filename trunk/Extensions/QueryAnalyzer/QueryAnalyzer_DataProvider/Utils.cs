@@ -8,7 +8,7 @@ namespace QueryAnalyzer_DataProvider
     public class Utils
     {
         public static Int16 BytesToInt16(IList<byte> x, int offset)
-        {
+        { 
             Int16 result = 0;
             result |= (Int16)((UInt16)x[offset + 0] << 8);
             result |= (Int16)(UInt16)x[offset + 1];

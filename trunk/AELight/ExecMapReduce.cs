@@ -84,6 +84,8 @@ namespace MySpace.DataMining.AELight
             internal List<string> mapinputfilenames = null;
             internal List<int> mapinputnodesoffsets = null;
 
+            internal int ZBlockSplitCount = 0;
+
             string codectx, mapctx;
 
             //protected internal bool blockfail = false;
@@ -367,6 +369,9 @@ public void DSpace_LogResult(string name, bool passed)
                             //Console.Write('*');
                             //ConsoleFlush();
                         }
+
+                        ZBlockSplitCount = acl.GetZBlockSplitCount();
+
                     }
                     else
                     {
@@ -1271,6 +1276,23 @@ public void DSpace_LogResult(string name, bool passed)
             MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection = cfgj.IOSettings.OutputDirection;
             MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection_ascending = (0 == string.Compare(cfgj.IOSettings.OutputDirection, "ascending", true));
 
+#if DEBUG
+            if(cfgj.Delta != null
+                && !string.IsNullOrEmpty(cfgj.Delta.Name)
+                && !string.IsNullOrEmpty(cfgj.Delta.DFSInput))
+            {
+                if (cfgj.IOSettings != null && !string.IsNullOrEmpty(cfgj.IOSettings.DFSInput))
+                {
+                    if (0 != SplitInputPaths(LoadDfsConfig(), cfgj.IOSettings.DFSInput).Count)
+                    {
+                        Console.Error.WriteLine("Cannot have both Delta/DFSInput and IOSettings/DFSInput");
+                        SetFailure();
+                        return;
+                    }
+                }
+            }
+#endif
+
             if (cfgj.IsDeltaSpecified)
             {
                 List<dfs.DfsFile> newsnowfiles = new List<dfs.DfsFile>();
@@ -1919,6 +1941,19 @@ public void DSpace_LogResult(string name, bool passed)
                         bi.logname = logname;
                         bi.acl = new MySpace.DataMining.DistributedObjects5.ArrayComboList(cfgj.NarrativeName + "_BlockID" + sblockid, cfgj.IOSettings.KeyLength);
                         bi.acl.SetJID(jid);
+#if DEBUG
+                        //System.Threading.Thread.Sleep(1000 * 8);
+#endif
+                        int IntermediateDataAddressing = cfgj.IntermediateDataAddressing;
+                        if (0 == IntermediateDataAddressing)
+                        {
+                            IntermediateDataAddressing = dc.IntermediateDataAddressing;
+                        }
+                        bi.acl.ValueOffsetSize = IntermediateDataAddressing / 8;
+                        if (bi.acl.ValueOffsetSize <= 0)
+                        {
+                            throw new InvalidOperationException("Invalid value for IntermediateDataAddressing: " + IntermediateDataAddressing.ToString());
+                        }
                         bi.acl.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
                         bi.acl.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
                         bi.acl.CookRetries = dc.slave.CookRetries;
@@ -2211,6 +2246,14 @@ public void DSpace_LogResult(string name, bool passed)
                                 }
                             }
                         }
+                        int TotalZBlockSplits = 0;
+                        checked
+                        {
+                            for (int i = 0; i < blocks.Count; i++)
+                            {
+                                TotalZBlockSplits += blocks[i].ZBlockSplitCount;
+                            }
+                        }
                         for (int i = 0; i < blocks.Count; i++)
                         {
                             blocks[i].acl.StopZMapBlockServer();
@@ -2219,6 +2262,13 @@ public void DSpace_LogResult(string name, bool passed)
                         if (verbose)
                         {
                             Console.WriteLine(); // Separate the 'r's and stuff from following stuff.
+                        }
+                        if (verbose)
+                        {
+                            if (TotalZBlockSplits > 0)
+                            {
+                                Console.WriteLine("{1}Split count: {0}{2}", TotalZBlockSplits, isdspace ? "\u00014" : "", isdspace ? "\u00010" : "");
+                            }
                         }
                         if (null == AddCacheNodes && outputfiles.Count > 0) // If not just caching...
                         {
