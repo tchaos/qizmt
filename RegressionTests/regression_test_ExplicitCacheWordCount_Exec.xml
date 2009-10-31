@@ -1,0 +1,223 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_ExplicitCacheWordCount_Preprocessing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Temp*.txt");
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Input*.txt");
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data" Name="regression_test_ExplicitCacheWordCount_CreateSampleData" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_ExplicitCacheWordCount_Temp01.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine(@"Create a community on MySpace and you can share photos, journals and interests with your growing network of mutual  friends!
+See who knows who, or how you are connected. Find out if you really are six people away from Kevin Bacon.");
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data" Name="regression_test_ExplicitCacheWordCount_CreateSampleData" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_ExplicitCacheWordCount_Temp02.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.               
+                dfsoutput.WriteLine(@"MySpace is for everyone:
+Friends who want to talk Online 
+Single people who want to meet other Singles 
+Matchmakers who want to connect their friends with other friends 
+Families who want to keep in touch--map your Family Tree "); 
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data" Name="regression_test_ExplicitCacheWordCount_CreateSampleData" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_ExplicitCacheWordCount_Temp03.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.               
+                dfsoutput.WriteLine(@"Business people and co-workers interested in networking 
+Classmates and study partners 
+Anyone looking for long lost friends!");             
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data" Name="regression_test_ExplicitCacheWordCount_CreateSampleData" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_ExplicitCacheWordCount_Temp04.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                dfsoutput.WriteLine(@"MySpace makes it easy to express yourself, connect with friends and make new ones, but please remember that what you  post publicly can be read by anyone viewing your profile, so we suggest you consider the following guidelines when  using MySpace: 
+Don't forget that your profile and MySpace forums are public spaces. Don't post anything you wouldn't want the world  to know (e.g., your phone number, address, IM screens name, or specific whereabouts). Avoid posting anything that  would make it easy for a stranger to find you, such as where you hang out every day after school. 
+People aren't always who they say they are. Be careful about adding people you don't know in the physical world to  your friends list. It's fun to connect with new MySpace friends from all over the world, but avoid meeting people in  person whom you do not already know in the physical world. If you decide to meet someone you've met on MySpace, tell  your parents first, do it in a public place and bring a trusted adult. ");        
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data" Name="regression_test_ExplicitCacheWordCount_CreateSampleData" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_ExplicitCacheWordCount_Temp05.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.             
+                dfsoutput.WriteLine(@"Harassment, hate speech and inappropriate content should be reported. If you feel someone's behavior is  inappropriate, react. Talk with a trusted adult, or report it to MySpace or the authorities.
+Don't post anything that would embarrass you later. It's easy to think that only people you know are looking at your  MySpace page, but the truth is that everyone can see it. Think twice before posting a photo or information you  wouldn't want others to see, including potential employers or colleges!
+Do not lie about your age.  Your profile may be deleted and your Membership may be terminated without warning if we  believe that you are under 14 years of age or if we believe you are 14 through 17 years of age and you represent  yourself as 18 or older.       
+Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to try to get your personal  information, such as your username and password, by pretending to be a site you trust.");                
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_ExplicitCacheWordCount_Preprocessing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            
+            //Iteration
+            int i = 1;
+            
+            if(Qizmt_ExecArgs.Length > 0)
+            {
+                i = Int32.Parse(Qizmt_ExecArgs[0]);
+            }
+                
+            if(i > 5)
+            {
+                i = 1;
+            }
+                            
+            //Clean out previous files
+            if(i == 1)
+            {
+                Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Cache");
+            }
+            
+           //Put input files
+            for(int k = 1; k <= i; k++)
+            {
+                Shell(@"Qizmt rename regression_test_ExplicitCacheWordCount_Temp0" + k.ToString() + ".txt regression_test_ExplicitCacheWordCount_Input0" + k.ToString() + ".txt" );
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="ExplicitCacheWordCount" Custodian="" email="">
+      <Delta>
+        <Name>regression_test_ExplicitCacheWordCount_Cache</Name>
+        <DFSInput>dfs://regression_test_ExplicitCacheWordCount_Input*.txt</DFSInput>
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>16</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput>dfs://regression_test_ExplicitCacheWordCount_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                Qizmt_Log("**************************counting words****************************");
+                mstring sLine = mstring.Prepare(line);
+                mstringarray words = sLine.SplitM(' ');
+                mstring value = mstring.Prepare();
+                
+                for(int i=0; i < words.Length; i++)
+                {
+                    mstring word = words[i].TrimM('.').TrimM(',').TrimM('!').TrimM('?').TrimM(':').TrimM(';').TrimM('(').TrimM(')').ToLowerM();
+                    
+                    if(word.Length > 0 && word.Length <= Qizmt_KeyLength) 
+                    {                        
+                        output.Add(word, value); 
+                    }
+                }
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          [ExplicitCache]
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              mstring word = mstring.Prepare(UnpadKey(key));
+              int count = 0;
+              
+              while(values.MoveNext())
+              {               
+                  mstring value = mstring.Prepare(values.Current);
+                  
+                  if(value.Length > 0)
+                  {
+                      count += value.ToInt();
+                  }
+                  else
+                  {
+                      ++count;
+                  }
+              }
+                           
+              mstring sCount = mstring.Prepare(count);
+              
+              output.Cache(word, sCount);           
+             
+              output.Add(word.AppendM(',').AppendM(sCount));  
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>

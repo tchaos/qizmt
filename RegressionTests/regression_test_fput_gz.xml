@@ -1,0 +1,167 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_fput_Preprocessing" Custodian="Cynthia Lok" Email="clok@myspace-inc.com">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_fput_Input*.txt");  
+                Shell(@"Qizmt del regression_test_fput_Input*.gz");  
+               
+                string tempdir1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                string tempdir2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                string tempdir3 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                System.IO.Directory.CreateDirectory(tempdir1);
+                System.IO.Directory.CreateDirectory(tempdir2);
+                System.IO.Directory.CreateDirectory(tempdir3);
+                string tempfile1 = tempdir3 + @"\regression_test_fput_Input1.txt";
+                string tempfile2 = tempdir3 + @"\regression_test_fput_Input2.txt";
+                string tempfile1_gz = tempdir1 + @"\regression_test_fput_Input1.txt.gz";
+                string tempfile2_gz = tempdir2 + @"\regression_test_fput_Input2.txt.gz";
+                
+                Random rnd = new Random();
+                
+                StringBuilder sb = new StringBuilder();
+                
+                using (System.IO.FileStream writer = new System.IO.FileStream(tempfile1, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
+                {
+                    using (System.IO.FileStream _writergz = new System.IO.FileStream(tempfile1_gz, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
+                    {
+                        for (int i = 0; i < 100; i++)
+                        {
+                            sb.Append(rnd.Next().ToString() + Environment.NewLine);
+                        }
+                        
+                        System.IO.Stream writergz = new System.IO.Compression.GZipStream(_writergz, System.IO.Compression.CompressionMode.Compress);
+                        
+                        byte[] buf = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+                        writer.Write(buf, 0, buf.Length);
+                        writergz.Write(buf, 0, buf.Length);
+                        writer.Close();
+                        writergz.Close();
+                    }                    
+                }
+                
+                sb.Length = 0;
+                using (System.IO.FileStream writer = new System.IO.FileStream(tempfile2, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
+                {
+                    using (System.IO.FileStream _writergz = new System.IO.FileStream(tempfile2_gz, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
+                    {
+                        for (int i = 0; i < 100; i++)
+                        {
+                            sb.Append(rnd.Next().ToString() + Environment.NewLine);
+                        }
+                        
+                        System.IO.Stream writergz = new System.IO.Compression.GZipStream(_writergz, System.IO.Compression.CompressionMode.Compress);
+                        
+                        byte[] buf = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+                        writer.Write(buf, 0, buf.Length);
+                        writergz.Write(buf, 0, buf.Length);
+                        writer.Close();
+                        writergz.Close();
+                    }                    
+                }
+                
+                if(RunTest(false, tempfile1, tempfile2, tempdir1, tempdir2, tempfile1_gz, tempfile2_gz) && RunTest(true, tempfile1, tempfile2, tempdir1, tempdir2, tempfile1_gz, tempfile2_gz))
+                {
+                    Shell(@"Qizmt exec regression_test_writePassFail.xml regression_test_fput_gz.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_writePassFail.xml regression_test_fput_gz.xml 0");
+                }                
+                
+                Shell(@"Qizmt del regression_test_fput_Input*.txt");  
+                System.IO.Directory.Delete(tempdir1, true);
+                System.IO.Directory.Delete(tempdir2, true);
+                System.IO.Directory.Delete(tempdir3, true);
+            }
+            
+            private static bool RunTest(bool isList, string tempfile1, string tempfile2, string tempdir1, string tempdir2, string tempfile1_gz, string tempfile2_gz)
+            {
+                if(!isList)
+                {
+                    Shell(@"Qizmt fput files=" + tempfile1_gz + " dirs=" + tempdir2 + " pattern=*.gz");
+                }
+                else
+                {
+                    string listfiles= IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    string listdirs = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    
+                    using(System.IO.StreamWriter writer = new System.IO.StreamWriter(listfiles))
+                    {
+                        writer.WriteLine("#ddd");
+                        writer.WriteLine("#$$$");
+                        writer.WriteLine("");
+                        writer.WriteLine(tempfile1_gz);
+                        writer.WriteLine("");
+                        writer.WriteLine("#$$$");
+                        writer.Close();
+                    }
+                    
+                    using(System.IO.StreamWriter writer = new System.IO.StreamWriter(listdirs))
+                    {
+                        writer.WriteLine("#ddd");
+                        writer.WriteLine("#$$$");
+                        writer.WriteLine("");
+                        writer.WriteLine(tempdir2);
+                        writer.WriteLine("");
+                        writer.WriteLine("#$$$");
+                        writer.Close();
+                    }
+                    Shell(@"Qizmt fput files=@" + listfiles + " dirs=@" + listdirs + " pattern=*.gz");
+                    System.IO.File.Delete(listfiles);
+                    System.IO.File.Delete(listdirs);
+                }
+                
+                string expected1 = tempdir1 + @"\expected1.txt";
+                string expected2 = tempdir1 + @"\expected2.txt";
+                
+                Shell(@"Qizmt get regression_test_fput_Input1.txt.gz " + expected1);
+                Shell(@"Qizmt get regression_test_fput_Input2.txt.gz " + expected2);
+                
+                bool ok = CompareFiles(tempfile1, expected1) && CompareFiles(tempfile2, expected2);
+                System.IO.File.Delete(expected1);
+                System.IO.File.Delete(expected2);
+                Shell(@"Qizmt del regression_test_fput_Input*.txt");  
+                Shell(@"Qizmt del regression_test_fput_Input*.gz");  
+                
+                return ok;
+            }
+            
+            private static bool CompareFiles(string f1, string f2)
+            {
+                System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+                System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+                if (info1.Length != info2.Length)
+                {
+                    return false;
+                }
+
+                System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+                System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+                bool ok = true;
+                for (int i = 0; i < info1.Length; i++)
+                {
+                    int b1 = fs1.ReadByte();
+                    int b2 = fs2.ReadByte();
+                    if (b1 != b2)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+
+                fs1.Close();
+                fs2.Close();
+                return ok;
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
