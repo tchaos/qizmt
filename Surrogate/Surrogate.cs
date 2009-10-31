@@ -246,6 +246,30 @@ namespace MySpace.DataMining.AELight
         }
         public ConfigAccountType AccountType;
 
+        [System.Xml.Serialization.XmlIgnore]
+        private int _IntermediateDataAddressing = 32;
+
+        public int IntermediateDataAddressing
+        {
+            get
+            {
+                return _IntermediateDataAddressing;
+            }
+
+            set
+            {
+                switch (value)
+                {
+                    case 32:
+                    case 64:
+                        _IntermediateDataAddressing = value;
+                        break;
+                    default:
+                        throw new InvalidOperationException("Invalid value for IntermediateDataAddressing: " + value.ToString());
+                }
+            }
+        }
+
         public class DfsFile
         {
             public string Name;
@@ -1956,6 +1980,32 @@ namespace MySpace.DataMining.AELight
             public string ExchangeOrder = "shuffle";
 
 
+            [System.Xml.Serialization.XmlIgnore]
+            private int _IntermediateDataAddressing = 0;
+
+            // Returns 0 if the default value should be used.
+            public int IntermediateDataAddressing
+            {
+                get
+                {
+                    return _IntermediateDataAddressing;
+                }
+
+                set
+                {
+                    switch (value)
+                    {
+                        case 32:
+                        case 64:
+                            _IntermediateDataAddressing = value;
+                            break;
+                        default:
+                            throw new InvalidOperationException("Invalid value for IntermediateDataAddressing: " + value.ToString());
+                    }
+                }
+            }
+
+
             public class ConfigIOSettings
             {
                 public string JobType = "";
@@ -2554,7 +2604,7 @@ namespace MySpace.DataMining.AELight
                 "addmachine", "addnode",
                 "delnode", "deletenode", "removenode", "remnode", "delmachine", "deletemachine", "removemachine", "remmachine",
                 "format", "\u0040format",
-                "removemetamachine", "removemetahost", "removemetanode",
+                "removemetamachine", "removemetahost", "removemetanode", "metaremovemachine",
                 "metadelete", "metadel", "metarm", "removemetafile",
                 "metabackup",
                 "adminlock",

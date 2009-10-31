@@ -71,16 +71,27 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
             int rowcount = 7000;// (1024 * 1024 * 10) / (9 * 3);
             int min = -50;
             int max = 50;
+            double excludedkey = 0.01;
             DateTime dtseed = DateTime.Now;
             for (int i = 0; i < rowcount; i++)
             {
                 OneRow row;
                 row.num1 = rnd.Next(min, max);
-                row.num2 = Math.Round(rnd.NextDouble(), 2);
-                if (rnd.Next() % 2 == 0)
+
+                for (; ; )
                 {
-                    row.num2 = row.num2 * -1d;
+                    double thiskey = Math.Round(rnd.NextDouble(), 2);
+                    if (rnd.Next() % 2 == 0)
+                    {
+                        thiskey = thiskey * -1d;
+                    }
+                    if (thiskey != excludedkey)
+                    {
+                        row.num2 = thiskey;
+                        break;
+                    }
                 }
+
                 row.num3 = rnd.Next(min, max);
                 row.dt = dtseed.AddDays(rnd.Next(min, max));
                 row.str = words[rnd.Next() % words.Length];
@@ -106,8 +117,13 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
             string tablenameSorted = "rselect_test_sorted_" + Guid.NewGuid().ToString().Replace("-", "");
             string indexname = Guid.NewGuid().ToString().Replace("-", "") + "apple";
             string indexname_pin = Guid.NewGuid().ToString().Replace("-", "") + "apple";
-            const int TESTSIZE = 5;
+            const int TESTSIZE = 10;
             OneRow[] testrows = null;
+
+            if (TESTSIZE < 5)
+            {
+                throw new Exception("TESTSIZE must be greater than 5.");
+            }
 
             testrows = RIndexOnDouble_PrepareSourceTable(tablename, TESTSIZE);
 
@@ -267,6 +283,34 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                 }
                 Console.WriteLine("RSelect NOPOOL completed.");
             }
+            
+            {
+                Console.WriteLine("Querying data using RSELECT NOPOOL, where key is out of the upper bound...");
+                DbConnection conn = fact.CreateConnection();
+                conn.ConnectionString = "Data Source = localhost; rindex=nopool";
+                conn.Open();
+                DbCommand cmd = conn.CreateCommand();
+                cmd.CommandText = "rselect * from " + indexname.ToUpper() + " where key = 2000.3";
+                DbDataReader reader = cmd.ExecuteReader();
+                bool found = false;
+                while (reader.Read())
+                {
+                    OneRow r;
+                    r.num1 = reader.GetInt32(0);
+                    r.num2 = reader.GetDouble(1);
+                    r.str = reader.GetString(2);
+                    r.dt = reader.GetDateTime(3);
+                    r.num3 = reader.GetInt64(4);
+                    found = true;
+                }
+                reader.Close();
+                conn.Close();
+                if (found)
+                {
+                    throw new Exception("Rows are returned when no rows are expected.");
+                }
+                Console.WriteLine("RSelect NOPOOL completed.");
+            }
 
             {
                 Console.WriteLine("Querying data using RSELECT POOL/OR");
@@ -351,21 +395,34 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
             }
 
             {
-                Console.WriteLine("Querying data using RSELECT POOL/OR, with a key that is out of the lower bound.");
+                Console.WriteLine("Querying data using RSELECT POOL/OR, with a key that is out of the lower bound, out of the upper bound, and within bound but not in table.");
                 DbConnection conn = fact.CreateConnection();
                 conn.ConnectionString = "Data Source = localhost; rindex=pooled";
                 conn.Open();
                 DbCommand cmd = conn.CreateCommand();
-                string whereor = "";
-                foreach (double key in expected.Keys)
+
+                string whereor = " key = -2000.9 "; //out of lower bound.
+
+                List<double> keys = new List<double>(expected.Keys);
+
+                whereor += " OR key = " + keys[0].ToString() + " ";
+
+                whereor += " OR key = 2000.9  "; //out of upper bound.
+
+                whereor += " OR key = " + keys[1].ToString() + " ";
+
+                whereor += " OR key = 0.01  "; //within bound but not in table.
+
+                whereor += " OR key = -2000.9 "; //out of lower bound.
+
+                whereor += " OR key = -2000.9 "; //out of lower bound.
+
+                whereor += " OR key = " + keys[2].ToString() + " ";
+
+                for (int i = 3; i < keys.Count; i++)
                 {
-                    if (whereor.Length > 0)
-                    {
-                        whereor += " OR ";
-                    }
-                    whereor += " key = " + key.ToString() + " ";
+                    whereor += " OR key = " + keys[i].ToString() + " ";
                 }
-                whereor += " OR key = -2000.9 ";
 
                 {
                     Dictionary<double, List<OneRow>> results = new Dictionary<double, List<OneRow>>();
@@ -393,7 +450,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                         List<OneRow> xlist = expected[key];
                         if (xlist.Count != results[key].Count)
                         {
-                            throw new Exception("Result count: " + results[key].Count.ToString() + " is different from that of expected: " + xlist.Count.ToString());
+                            throw new Exception("Result count: " + results[key].Count.ToString() + " is different from that of expected: " + xlist.Count.ToString() + ". Key=" + key.ToString() + ".  Query:" + cmd.CommandText);
                         }
                         foreach (OneRow r in results[key])
                         {
@@ -408,7 +465,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                             }
                             if (!found)
                             {
-                                throw new Exception("RSelect returned a row which was not located in expected results. num2=" + r.num2.ToString() + " num3=" + r.num3.ToString());
+                                throw new Exception("RSelect returned a row which was not located in expected results. num2=" + r.num2.ToString() + " num3=" + r.num3.ToString() + ". Key=" + key.ToString() + ".  Query:" + cmd.CommandText);
                             }
                         }
                         foreach (OneRow x in xlist)
@@ -424,7 +481,7 @@ taking a break.".Split(new string[] { " ", Environment.NewLine }, StringSplitOpt
                             }
                             if (!found)
                             {
-                                throw new Exception("RSelect did not return an expected row. num2=" + x.num2.ToString() + " num3=" + x.num3.ToString());
+                                throw new Exception("RSelect did not return an expected row. num2=" + x.num2.ToString() + " num3=" + x.num3.ToString() + ". Key=" + key.ToString() + ".  Query:" + cmd.CommandText);
                             }
                         }
                     }

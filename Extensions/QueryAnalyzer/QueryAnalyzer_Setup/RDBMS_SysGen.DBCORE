@@ -74,48 +74,45 @@
                 
                 const int ColLineChars = 200;
                 int ColLineLength = 1 + (ColLineChars * 2);
-                foreach(string _linex in output.Split('\n'))
+                string line = "";
+                char endchar = '\n';
+                foreach(char chr in output)
                 {
-                    string linex = _linex.Trim('\n', '\r');
-                    while(linex.Length > 0)
+                    line += chr;
+                    if(line.Length == ColLineChars || chr == endchar)
                     {
-                        string line;
-                        if(linex.Length > ColLineChars - 1)
-                        {
-                            line = linex.Substring(0, ColLineChars - 1);
-                            linex = linex.Substring(ColLineChars - 1);
-                        }
-                        else
-                        {
-                            line = linex;
-                            linex = "";
-                        }
-                        recordset rs = recordset.Prepare();
-                        rs.PutByte(0); // Nullable byte.
-                        rs.PutString(line);
-                        {
-                            ByteSlice bs = rs.ToByteSlice();
-                            if(bs.Length > ColLineLength)
-                            {
-                                //DSpace_Log("bs.Length = " + bs.Length.ToString());
-                                //DSpace_Log("ColLineLength = " + ColLineLength.ToString());
-                                throw new Exception("Column Line: length is too long: " + line);
-                            }
-                            for(int ibs = 0; ibs < bs.Length; ibs++)
-                            {
-                                dfsoutput.WriteByte(bs[ibs]);
-                            }
-                            for(int ibs = bs.Length; ibs < DSpace_OutputRecordLength; ibs++)
-                            {
-                                dfsoutput.WriteByte(0);
-                            }
-                        }
+                        _OutputLine(line, dfsoutput, ColLineLength);
+                        line = "";
                     }
-
                 }
                 
+                if(line.Length > 0)
+                {
+                    _OutputLine(line, dfsoutput, ColLineLength);
+                }
             }
             
+            void _OutputLine(string line, RemoteOutputStream dfsoutput, int maxByteLength)
+            {
+                recordset rs = recordset.Prepare();
+                rs.PutByte(0); // Nullable byte.
+                rs.PutString(line);
+                {
+                    ByteSlice bs = rs.ToByteSlice();
+                    if(bs.Length > maxByteLength)
+                    {
+                        throw new Exception("Column Line: length is too long: " + line);
+                    }
+                    for(int ibs = 0; ibs < bs.Length; ibs++)
+                    {
+                        dfsoutput.WriteByte(bs[ibs]);
+                    }
+                    for(int ibs = bs.Length; ibs < DSpace_OutputRecordLength; ibs++)
+                    {
+                        dfsoutput.WriteByte(0);
+                    }
+                }
+            }            
             
             void _SysTablesXML(RemoteOutputStream dfsoutput)
             {

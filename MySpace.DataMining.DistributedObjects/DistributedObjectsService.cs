@@ -499,6 +499,58 @@ namespace MySpace.DataMining.DistributedObjects5
                 lthd = new Thread(new ThreadStart(ListenThreadProc));
                 lthd.IsBackground = true; // TEMPORARY, I HOPE HOPE HOPE
                 lthd.Start();
+
+                try
+                {
+                    Thread schedulethd = new Thread(
+                        new ThreadStart(
+                        delegate
+                        {
+                            System.Threading.Thread.Sleep(1000 * 30);
+                            for (; ; )
+                            {
+                                try
+                                {
+                                    MySpace.DataMining.DistributedObjects.Scheduler.RunScheduleService();
+                                }
+                                catch(Exception schedulee)
+                                {
+                                    XLog.errorlog("Exception during schedule service: " + schedulee.ToString());
+                                    System.Threading.Thread.Sleep(1000 * 30);
+                                }
+                            }
+                        }));
+                    schedulethd.Name = "Scheduler_ScheduleService";
+                    schedulethd.IsBackground = true;
+                    schedulethd.Start();
+                    
+                    Thread queuethd = new Thread(
+                        new ThreadStart(
+                        delegate
+                        {
+                            System.Threading.Thread.Sleep(1000 * 30);
+                            for (; ; )
+                            {
+                                try
+                                {
+                                    MySpace.DataMining.DistributedObjects.Scheduler.RunQueueService();
+                                }
+                                catch (Exception queuee)
+                                {
+                                    XLog.errorlog("Exception during queue service: " + queuee.ToString());
+                                    System.Threading.Thread.Sleep(1000 * 30);
+                                }
+                            }
+                        }));
+                    queuethd.Name = "Scheduler_QueueService";
+                    queuethd.IsBackground = true;
+                    queuethd.Start();
+                }
+                catch (Exception e)
+                {
+                    XLog.errorlog("OnStart Scheduler exception: " + e.ToString());
+                }
+
             }
             catch (Exception e)
             {

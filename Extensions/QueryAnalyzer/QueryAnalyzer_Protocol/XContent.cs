@@ -9,7 +9,7 @@ using System.Net;
 using System.Net.Sockets;
 
 namespace QueryAnalyzer_Protocol
-{
+{ 
     public class XContent
     {
 #if CAP_NETWORK_BUFFERS

@@ -93,12 +93,14 @@
     <Compile Include="RIndexOnLongPinHash.cs" />
     <Compile Include="RIndexPin.cs" />
     <Compile Include="RIndexPooled.cs" />
+    <Compile Include="RIndexType.cs" />
     <Compile Include="RSelect.cs" />
     <Compile Include="RSelectLotsOfRows.cs" />
     <Compile Include="RSelectThorough.cs" />
     <Compile Include="RSelectWhereOR.cs" />
     <Compile Include="SelectDistinct.cs" />
     <Compile Include="SelectPortion.cs" />
+    <Compile Include="ShellCmdLossless.cs" />
     <Compile Include="Truncate.cs" />
     <Compile Include="Update.cs" />
     <Compile Include="Utils.cs" />

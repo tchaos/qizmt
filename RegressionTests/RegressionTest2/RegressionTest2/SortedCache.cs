@@ -69,12 +69,12 @@ namespace RegressionTest2
     <Job Name=`CS` Custodian=`Chris Miller` Email=``>
     <Delta>
             <Name>{D7D3A6FE-8472-4320-9144-486E436D4542}CS_cache</Name>
-            <DFSInput>{D7D3A6FE-8472-4320-9144-486E436D4542}a.txt</DFSInput>
+            <DFSInput>{D7D3A6FE-8472-4320-9144-486E436D4542}a.txt;dfs://{D7D3A6FE-8472-4320-9144-486E436D4542}b?.txt</DFSInput>
     </Delta>
       <IOSettings>
         <JobType>mapreduce</JobType>
         <KeyLength>1</KeyLength>
-        <DFSInput>dfs://{D7D3A6FE-8472-4320-9144-486E436D4542}b?.txt</DFSInput>
+        <DFSInput></DFSInput>
         <DFSOutput>dfs://{D7D3A6FE-8472-4320-9144-486E436D4542}CS_Output.txt</DFSOutput>
         <OutputMethod>{9235036E-4A47-4ee5-985F-F19D2F2DE85C}</OutputMethod>
       </IOSettings>
@@ -145,8 +145,8 @@ namespace RegressionTest2
                         Exec.Shell("Qizmt del {D7D3A6FE-8472-4320-9144-486E436D4542}CS_Output.txt");
                         Exec.Shell("Qizmt exec " + jobfn + ".grouped");
                         Exec.Shell("Qizmt rename {D7D3A6FE-8472-4320-9144-486E436D4542}b2.txt {D7D3A6FE-8472-4320-9144-486E436D4542}b2.txt_");
-                        checksum_grouped = DfsSum("{D7D3A6FE-8472-4320-9144-486E436D4542}CS_Output.txt");
-                        Console.WriteLine("    checksum = {0}", checksum_grouped);
+                        checksum_grouped = DfsSum("Sum2", "{D7D3A6FE-8472-4320-9144-486E436D4542}CS_Output.txt");
+                        Console.WriteLine("    checksum2 = {0}", checksum_grouped);
                     }
 
                     string checksum_sorted = "";
@@ -160,8 +160,8 @@ namespace RegressionTest2
                         Exec.Shell("Qizmt del {D7D3A6FE-8472-4320-9144-486E436D4542}CS_Output.txt");
                         Exec.Shell("Qizmt exec " + jobfn + ".sorted");
                         Exec.Shell("Qizmt rename {D7D3A6FE-8472-4320-9144-486E436D4542}b2.txt {D7D3A6FE-8472-4320-9144-486E436D4542}b2.txt_");
-                        checksum_sorted = DfsSum("{D7D3A6FE-8472-4320-9144-486E436D4542}CS_Output.txt");
-                        Console.WriteLine("    checksum = {0}", checksum_sorted);
+                        checksum_sorted = DfsSum("Sum2", "{D7D3A6FE-8472-4320-9144-486E436D4542}CS_Output.txt");
+                        Console.WriteLine("    checksum2 = {0}", checksum_sorted);
                     }
 
                     if (checksum_grouped != checksum_sorted)

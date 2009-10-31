@@ -213,6 +213,12 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSInput>dfs://WordCount_Input.txt</DFSInput>
         <DFSOutput>dfs://WordCount_Output.txt</DFSOutput>
       </IOSettings>
+
+      <!--
+          No limit to intermediate data collisions and allows up to 1GB of keys and values per reduce.
+      -->
+      <IntermediateDataAddressing>64</IntermediateDataAddressing>
+        
       <MapReduce>
         <Map>
           <![CDATA[

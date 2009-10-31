@@ -74,6 +74,10 @@
       <Project>{48178EA9-DBAE-49F7-A8B8-AE34D19B06BF}</Project>
       <Name>MySpace.DataMining.DistributedObjects.DistributedObjectsDLL</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Scheduler\Scheduler.csproj">
+      <Project>{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}</Project>
+      <Name>Scheduler</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Surrogate\Surrogate.csproj">
       <Project>{ED7CFA32-911C-4E41-A4E8-8D7E325DF6E7}</Project>
       <Name>Surrogate</Name>

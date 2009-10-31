@@ -1198,6 +1198,14 @@ namespace MySpace.DataMining.DistributedObjects
         internal int length;
 
 
+        public void GetComponents(out IList<byte> buf, out int offset, out int length)
+        {
+            buf = this.buf;
+            offset = this.offset;
+            length = this.length;
+        }
+
+
         public override string ToString()
         {
             //return Entry.BytesToAscii(buf, offset, length);
@@ -2094,6 +2102,23 @@ namespace MySpace.DataMining.DistributedObjects
             }
             return tempdir;
         }
+
+
+        private static Random _rrt = new Random(unchecked(
+            System.Threading.Thread.CurrentThread.ManagedThreadId
+            + DateTime.Now.Millisecond));
+        public static int RealRetryTimeout(int timeout)
+        {
+            if (timeout <= 3)
+            {
+                return timeout;
+            }
+            lock (_rrt)
+            {
+                return _rrt.Next(timeout - timeout / 2, timeout + 1);
+            }
+        }
+
     }
 
 

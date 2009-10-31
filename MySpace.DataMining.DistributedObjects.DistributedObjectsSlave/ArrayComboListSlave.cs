@@ -23,6 +23,10 @@
 
 //#define COOK_TEST_ZMapStreamToZBlocks
 
+#if DEBUG
+//#define DEBUG_SPLIT_SIZE
+#endif
+
 
 using System;
 using System.Collections.Generic;
@@ -40,24 +44,50 @@ namespace MySpace.DataMining.DistributedObjects5
     {
         public class ZBlock
         {
-            const long ROGUE_ZBLOCK_SIZE = 8589934592 + 1; // > 8 GB
-            const long ZVALUEBLOCK_MAX_BYTES = Int32.MaxValue;
-            public const int ZFILE_MAX_BYTES = 1342177280; // 1.25 GB. Actual limit when writing to zkey/zvalue files.
+
+#if DEBUG_SPLIT_SIZE
+            public const int ZFILE_SPLIT_SIZE = 0x400 * 0x400 * 32; // Testing.
+
+            // Need extra space to account for bytes encoding lengths.
+            public const int MAXKVBUFSIZE = 0x400 * 0x400 * 40; // Testing.
+#else
+            public const int ZFILE_SPLIT_SIZE = 0x400 * 0x400 * 0x400; // 1 GB
+
+            // Need extra space to account for bytes encoding lengths.
+            public const int MAXKVBUFSIZE = 1342177280; // 1.25 GB
+#endif
+
+            public const long ZVALUEBLOCK_LIMIT = int.MaxValue;
 
             ArrayComboListPart parent;
-            int zblockID; // ZBlock ID (0-based n)
+            internal int zblockID; // ZBlock ID (0-based n)
 
             int keyblockbuflen, valueblockbuflen;
             System.IO.FileStream fzkeyblock;
             System.IO.FileStream fzvalueblock;
             string fzkeyblockfilename;
             string fzvalueblockfilename;
-            //int valueaddedbytes = 0; // Does not include length-bytes (the extra 4 for each length).
             long zvalueblocksize = 0;
             long zkeyblocksize = 0;
-            int numadded = 0;
+            long numadded = 0;
             bool addmode = true;
-            bool isrogue = false;
+
+            internal bool splitzkeyfile = false; // Key files need to be split (e.g. for sort).
+            internal bool splitzblocks = false; // Key+values need to be split if both loaded (e.g. for reduce).
+
+            internal BlockInfo<KeyBlockEntry32v> block32;
+            internal BlockInfo<KeyBlockEntry64v> block64;
+
+            internal int TValueOffset_Size;
+
+
+            public bool ZBlockSplit
+            {
+                get
+                {
+                    return splitzkeyfile || splitzblocks;
+                }
+            }
 
 
             public void Close()
@@ -233,6 +263,7 @@ namespace MySpace.DataMining.DistributedObjects5
             {
                 this.parent = parent;
                 this.zblockID = zblockID;
+                this.TValueOffset_Size = parent.TValueOffset_Size;
 
                 this.keyblockbuflen = addkeybuflen;
                 this.valueblockbuflen = addvaluebuflen;
@@ -262,36 +293,38 @@ namespace MySpace.DataMining.DistributedObjects5
 
             public bool Add(byte[] keybuf, int keyoffset, byte[] valuebuf, int valueoffset, int valuelength)
             {
-                long x = (long)(parent.keylen + 4) + (long)valuelength;
-                if (x > ZFILE_MAX_BYTES)
+                long x = (long)(parent.keylen + TValueOffset_Size) + (long)valuelength;
+                if (x >= ZFILE_SPLIT_SIZE)
                 {
                     throw new Exception("Key+Value too big; length=" + x.ToString());
                     //parent.SetError("ZBlock.Add: Key+Value too big; length=" + x.ToString());
                     //return false;
                 }
-
-                if (zvalueblocksize + valuelength > ZFILE_MAX_BYTES)
+                if (zvalueblocksize + valuelength > ZVALUEBLOCK_LIMIT)
                 {
                     if (parent.jobfailover)
                     {
                         XLog.failoverlog("x disk ZBlock too big (values)"); // Don't recover.
                     }
-                    throw new Exception("Insufficient resources for this job on cluster (ZBlock value file size > ZFILE_MAX_BYTES) (consider increasing sub process count)");
-                    //return false;
-                }
-                if (zkeyblocksize + parent.keylen + 4 > ZFILE_MAX_BYTES)
-                {
-                    if (parent.jobfailover)
-                    {
-                        XLog.failoverlog("x disk ZBlock too big (keys)"); // Don't recover.
-                    }
-                    throw new Exception("Insufficient resources for this job on cluster (ZBlock key file size > ZFILE_MAX_BYTES) (consider increasing sub process count)");
+                    throw new Exception("Insufficient resources for this job on cluster (ZBlock value file size > ZVALUEBLOCK_LIMIT) (consider increasing sub process count)");
                     //return false;
                 }
 
+                if (zkeyblocksize + parent.keylen + TValueOffset_Size >= ZFILE_SPLIT_SIZE)
+                {
+                    splitzkeyfile = true;
+                }
+
                 fzkeyblock.Write(keybuf, keyoffset, parent.keylen);
-                Entry.ToBytes((int)zvalueblocksize, parent._smallbuf, 0);
-                fzkeyblock.Write(parent._smallbuf, 0, 4);
+                if (8 == TValueOffset_Size)
+                {
+                    Entry.LongToBytes(zvalueblocksize, parent._smallbuf, 0);
+                }
+                else
+                {
+                    Entry.ToBytes((int)zvalueblocksize, parent._smallbuf, 0);
+                }
+                fzkeyblock.Write(parent._smallbuf, 0, TValueOffset_Size);
 
                 Entry.ToBytes(valuelength, parent._smallbuf, 0);
                 fzvalueblock.Write(parent._smallbuf, 0, 4);
@@ -308,7 +341,7 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
 #endif
 
-                zkeyblocksize += parent.keylen + 4;
+                zkeyblocksize += parent.keylen + TValueOffset_Size;
 #if DEBUG
                 if (zkeyblocksize != fzkeyblock.Length)
                 {
@@ -316,42 +349,49 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
 #endif
 
+                if (zvalueblocksize + zkeyblocksize >= ZFILE_SPLIT_SIZE)
+                {
+                    splitzblocks = true;
+                }
+
                 return true;
             }
 
             public bool Add(IList<byte> keybuf, int keyoffset, IList<byte> valuebuf, int valueoffset, int valuelength)
             {
-                long x = (long)(parent.keylen + 4) + (long)valuelength;
-                if (x > ZFILE_MAX_BYTES)
+                long x = (long)(parent.keylen + TValueOffset_Size) + (long)valuelength;
+                if (x >= ZFILE_SPLIT_SIZE)
                 {
                     throw new Exception("Key+Value too big; length=" + x.ToString());
                     //parent.SetError("ZBlock.Add: Key+Value too big; length=" + x.ToString());
                     //return false;
                 }
-
-                if (zvalueblocksize + valuelength > ZFILE_MAX_BYTES)
+                if (zvalueblocksize + valuelength > ZVALUEBLOCK_LIMIT)
                 {
                     if (parent.jobfailover)
                     {
                         XLog.failoverlog("x disk ZBlock too big (values)"); // Don't recover.
                     }
-                    throw new Exception("Insufficient resources for this job on cluster (ZBlock value file size > ZFILE_MAX_BYTES) (consider increasing sub process count)");
+                    throw new Exception("Insufficient resources for this job on cluster (ZBlock value file size > ZVALUEBLOCK_LIMIT) (consider increasing sub process count)");
                     //return false;
                 }
-                if (zkeyblocksize + parent.keylen + 4 > ZFILE_MAX_BYTES)
+
+                if (zkeyblocksize + parent.keylen + TValueOffset_Size >= ZFILE_SPLIT_SIZE)
                 {
-                    if (parent.jobfailover)
-                    {
-                        XLog.failoverlog("x disk ZBlock too big (keys)"); // Don't recover.
-                    }
-                    throw new Exception("Insufficient resources for this job on cluster (ZBlock key file size > ZFILE_MAX_BYTES) (consider increasing sub process count)");
-                    //return false;
+                    splitzkeyfile = true;
                 }
 
                 //fzkeyblock.Write(keybuf, keyoffset, parent.keylen);
                 parent.StreamWrite(fzkeyblock, keybuf, keyoffset, parent.keylen);
-                Entry.ToBytes((int)zvalueblocksize, parent._smallbuf, 0);
-                fzkeyblock.Write(parent._smallbuf, 0, 4);
+                if (8 == TValueOffset_Size)
+                {
+                    Entry.LongToBytes(zvalueblocksize, parent._smallbuf, 0);
+                }
+                else
+                {
+                    Entry.ToBytes((int)zvalueblocksize, parent._smallbuf, 0);
+                }
+                fzkeyblock.Write(parent._smallbuf, 0, TValueOffset_Size);
 
                 Entry.ToBytes(valuelength, parent._smallbuf, 0);
                 fzvalueblock.Write(parent._smallbuf, 0, 4);
@@ -369,7 +409,7 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
 #endif
 
-                zkeyblocksize += parent.keylen + 4;
+                zkeyblocksize += parent.keylen + TValueOffset_Size;
 #if DEBUG
                 if (zkeyblocksize != fzkeyblock.Length)
                 {
@@ -377,37 +417,24 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
 #endif
 
+                if (zvalueblocksize + zkeyblocksize >= ZFILE_SPLIT_SIZE)
+                {
+                    splitzblocks = true;
+                }
+
                 return true;
             }
 
 
-            void makerogue()
-            {
-                isrogue = true;
-
-                // ... rename zblock files; don't let it auto delete but have batch file delete it.
-            }
-
-
-            void checkrogue()
-            {
-                if (!isrogue)
-                {
-                    //long x = fzkeyblock.Length + fzvalueblock.Length;
-                    long x = zkeyblocksize + zvalueblocksize;
-                    if (x >= ROGUE_ZBLOCK_SIZE)
-                    {
-                        makerogue();
-                    }
-                }
-            }
-
-
-            // buf must be at least 8 bytes.
-            // Truncates zblocks at ROGUE_ZBLOCK_SIZE.
             //--A-------------ADDCOOK------------------
             public void CopyInto(List<byte[]> net, List<Entry> entries, ref byte[] ebuf, ref byte[] evaluesbuf)
             {
+#if DEBUG
+                if (splitzblocks)
+                {
+                    throw new Exception("DEBUG:  CopyInto: cannot load all if splitzblocks");
+                }
+#endif
                 //----------------------------COOKING--------------------------------
                 int cooking_cooksremain = parent.CookRetries;
                 //----------------------------COOKING--------------------------------
@@ -416,20 +443,14 @@ namespace MySpace.DataMining.DistributedObjects5
                     try
                     {
                         ensurefzblock(false);
-                        checkrogue();
 
                         net.Clear();
                         entries.Clear();
 
                         long kflen = fzkeyblock.Length;
-                        int keycount = (int)(kflen / (parent.keylen + 4));
+                        long keycount = numadded;
 
                         long vflen = fzvalueblock.Length;
-
-                        if (vflen > ZVALUEBLOCK_MAX_BYTES)
-                        {
-                            vflen = ZVALUEBLOCK_MAX_BYTES;
-                        }
 
                         //try
                         {
@@ -471,7 +492,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
                             net.Add(buf);
 
-                            int newcap = keycount;
+                            int newcap = (int)keycount;
                             /*if (isfirstlist)
                             {
                                 isfirstlist = false;
@@ -483,7 +504,13 @@ namespace MySpace.DataMining.DistributedObjects5
                             }
 
                             fzvalueblock.Seek(0, System.IO.SeekOrigin.Begin);
-                            fzvalueblock.Read(valuesbuf, 0, (int)vflen); // NOTE: vflen capped to ZVALUEBLOCK_MAX_BYTES for now!
+                            int rd883 = fzvalueblock.Read(valuesbuf, 0, (int)vflen);
+#if DEBUG
+                            if (rd883 != vflen)
+                            {
+                                throw new Exception("DEBUG:  (rd883 != vflen)");
+                            }
+#endif
 
                             // Read from existing unsorted zblock file into buffer.
                             fzkeyblock.Seek(0, System.IO.SeekOrigin.Begin);
@@ -494,9 +521,9 @@ namespace MySpace.DataMining.DistributedObjects5
                             int offset = 0;
                             unchecked
                             {
-                                for (int i = 0; i != keycount; i++)
+                                for (long i = 0; i != keycount; i++)
                                 {
-                                    int morespace = offset + parent.keylen + 4;
+                                    int morespace = offset + parent.keylen + TValueOffset_Size;
                                     if (morespace < offset || morespace > buf.Length)
                                     {
                                         offset = 0;
@@ -509,9 +536,43 @@ namespace MySpace.DataMining.DistributedObjects5
                                     fzkeyblock.Read(buf, offset, parent.keylen);
                                     offset += parent.keylen;
 
-                                    fzkeyblock.Read(parent._smallbuf, 0, 4);
-                                    int valueoffset = Entry.BytesToInt(parent._smallbuf);
+                                    int valueoffset;
+                                    int rd424 = fzkeyblock.Read(parent._smallbuf, 0, TValueOffset_Size);
+#if DEBUG
+                                    if (rd424 != TValueOffset_Size)
+                                    {
+                                        System.Diagnostics.Debugger.Launch();
+                                        throw new Exception("DEBUG:  (rd424 != TValueOffset_Size)");
+                                    }
+#endif
+                                    if (8 == TValueOffset_Size)
+                                    {
+                                        long long_valueoffset = Entry.BytesToLong(parent._smallbuf);
+#if DEBUG
+                                        if (long_valueoffset > int.MaxValue)
+                                        {
+                                            throw new Exception("DEBUG:  (long_valueoffset > int.MaxValue) should split");
+                                        }
+                                        if (long_valueoffset < 0)
+                                        {
+                                            throw new Exception("DEBUG:  (long_valueoffset < 0) invalid offset");
+                                        }
+#endif
+                                        valueoffset = (int)long_valueoffset;
+                                    }
+                                    else
+                                    {
+                                        valueoffset = Entry.BytesToInt(parent._smallbuf);
+                                    }
 
+#if DEBUG
+                                    if (valueoffset > valuesbuf.Length)
+                                    {
+                                        System.Diagnostics.Debugger.Launch();
+                                        throw new Exception("DEBUG:  (valueoffset{" + valueoffset.ToString()
+                                            + "} > valuesbuf.Length{" + valuesbuf.Length.ToString() + "})");
+                                    }
+#endif
                                     Buffer.BlockCopy(valuesbuf, valueoffset, buf, offset, 4);
                                     int valuelen = Entry.BytesToInt(buf, offset);
                                     offset += 4;
@@ -526,31 +587,18 @@ namespace MySpace.DataMining.DistributedObjects5
                                     morespace = offset + valuelen;
                                     if (morespace < offset || morespace > buf.Length)
                                     {
-                                        if (sofar + Int32.MaxValue >= ROGUE_ZBLOCK_SIZE)
-                                        {
-                                            makerogue(); // Should already be set, but just to be sure.
-                                            break;
-                                        }
-                                        else
-                                        {
-                                            offset = 0;
-                                            buf = new byte[Int32.MaxValue]; // Note: could cache; could calculate size needed.
-                                            net.Add(buf);
-                                            ent.NetEntryOffset++;
-                                            i--; // So next iteration does this index again.
-                                            continue;
-                                        }
+                                        offset = 0;
+                                        buf = new byte[Int32.MaxValue]; // Note: could cache; could calculate size needed.
+                                        net.Add(buf);
+                                        ent.NetEntryOffset++;
+                                        i--; // So next iteration does this index again.
+                                        continue;
                                     }
 
                                     Buffer.BlockCopy(valuesbuf, valueoffset + 4, buf, offset, valuelen);
                                     offset += valuelen;
 
                                     sofar += parent.keylen + 4 + valuelen;
-                                    if (sofar >= ROGUE_ZBLOCK_SIZE)
-                                    {
-                                        makerogue(); // Should already be set, but just to be sure.
-                                        break;
-                                    }
 
                                     entries.Add(ent);
                                 }
@@ -588,44 +636,515 @@ namespace MySpace.DataMining.DistributedObjects5
             }
 
 
-            public struct KeyBlockEntry
+            internal struct KvSplit
             {
-                public ByteSlice key;
-                public int valueoffset;
+                internal ByteSlice Key;
+
+                const IList<byte> vbuf_novalue = null;
+                IList<byte> vbuf;
+                uint v1;
+                int v2;
+
+                internal bool IsValueSet
+                {
+                    get
+                    {
+                        return !object.ReferenceEquals(vbuf_novalue, this.vbuf);
+                    }
+                }
+
+                internal uint ValueOffset
+                {
+                    get
+                    {
+                        return this.v1;
+                    }
+
+                    set
+                    {
+                        this.vbuf = vbuf_novalue;
+                        this.v1 = value;
+                    }
+                }
+
+                internal ByteSlice Value
+                {
+                    get
+                    {
+                        return ByteSlice.Prepare(this.vbuf, (int)this.v1, this.v2);
+                    }
+
+                    set
+                    {
+                        int myV1;
+                        value.GetComponents(out this.vbuf, out myV1, out this.v2);
+                        this.v1 = (uint)myV1;
+                        if (this.vbuf == null)
+                        {
+                            throw new Exception("DEBUG:  KvSplit.Value: (this.vbuf == null)");
+                        }
+                    }
+                }
+
+                internal static KvSplit Prepare(ByteSlice key)
+                {
+                    KvSplit result;
+                    result.Key = key;
+                    result.vbuf = vbuf_novalue;
+                    result.v1 = 0;
+                    result.v2 = 0;
+                    return result;
+                }
+
             }
 
 
-            //--B-------------ADDCOOK------------------
-            protected void XCopyInto(string keyblockfilename, List<KeyBlockEntry> kentries, ref byte[] ebuf)
+            internal void _CreateLargeResultFile(string createfilename, List<KvSplit> kvsbuf,
+                ref byte[] ebuf, ref byte[] evaluesbuf)
             {
-                //----------------------------COOKING--------------------------------
-                int cooking_cooksremain = parent.CookRetries;
-                bool cooking_inIO = false;
-                long cooking_seekpos = 0;
-                //----------------------------COOKING--------------------------------
-                for (; ; )
+                using (System.IO.Stream result = new System.IO.FileStream(createfilename,
+                    System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None))
                 {
-                    try
-                    {
-                        cooking_inIO = true;
-                        _justclose();
-                        using (System.IO.Stream stm = new System.IO.FileStream(keyblockfilename, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
-                        {
-                            if (0 != cooking_seekpos)
-                            {
-                                stm.Seek(cooking_cooksremain, System.IO.SeekOrigin.Begin);
-                            }
-                            cooking_inIO = false;
-                            
-                            int kflen = (int)stm.Length;
-                            int keycount = kflen / (parent.keylen + 4);
+                    int avgvaluespace = checked((int)(zvalueblocksize / numadded)); // Includes value header.
+                    //long numavgvalues = zvalueblocksize / avgvaluespace;
+                    int maxkeyspersplit = checked((int)((ZFILE_SPLIT_SIZE / 2) / (parent.keylen + TValueOffset_Size)));
+                    int maxvaluespersplit = checked((int)((ZFILE_SPLIT_SIZE / 2) / (avgvaluespace)));
+                    
+                    int numkeyspersplit = Math.Min(maxkeyspersplit, maxvaluespersplit);
 
-                            //try
+                    ensurefzblock(false);
+
+                    if (evaluesbuf.LongLength < ZFILE_SPLIT_SIZE)
+                    {
+                        evaluesbuf = null;
+                        long lnew = Entry.Round2PowerLong(ZFILE_SPLIT_SIZE);
+                        evaluesbuf = new byte[lnew];
+                    }
+                    byte[] valuesbuf = evaluesbuf;
+
+                    if (ebuf.LongLength < ZFILE_SPLIT_SIZE)
+                    {
+                        try
+                        {
+                            ebuf = null;
+                            long lnew = Entry.Round2PowerLong(ZFILE_SPLIT_SIZE);
+                            if (lnew > Int32.MaxValue)
                             {
-                                if (ebuf.Length < parent.keylen * keycount + 4)
+                                lnew = Int32.MaxValue;
+                            }
+                            ebuf = new byte[lnew];
+                        }
+                        catch (Exception e)
+                        {
+                            unchecked
+                            {
+                                string better_error = e.ToString();
+                                better_error += System.Environment.NewLine;
+                                better_error += "----------------------------------------------------" + System.Environment.NewLine;
+                                better_error += "zblock combined length: " + (ZFILE_SPLIT_SIZE).ToString() + System.Environment.NewLine;
+                                better_error += "ebuf length: " + ebuf.LongLength.ToString() + System.Environment.NewLine;
+                                better_error += "----------------------------------------------------" + System.Environment.NewLine;
+                                throw new Exception(better_error);
+                            }
+                        }
+                    }
+                    byte[] buf = ebuf;
+
+                    int newcap = numkeyspersplit;
+                    /*if (isfirstlist)
+                    {
+                        isfirstlist = false;
+                        newcap *= 2;
+                    }*/
+                    if (newcap > kvsbuf.Capacity)
+                    {
+                        kvsbuf.Capacity = newcap;
+                    }
+
+                    //----------------------------COOKING--------------------------------
+                    int cooking_cooksremain = parent.CookRetries;
+                    bool cooking_inIO = false;
+                    long cooking_seekpos = 0;
+                    //----------------------------COOKING--------------------------------
+
+                    long keyblocksofar = 0;
+                    byte[] xbuf = buf;
+                    int xoffset = 0;
+                    int keylen = parent.keylen;
+
+                    for (; ; )
+                    {
+                        try
+                        {
+
+                            // Read from existing unsorted zblock file into buffer.
+                            cooking_inIO = true;
+                            fzkeyblock.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
+                            cooking_inIO = false;
+
+                            // If cooking, this loop should continue where it left off.
+                            for (;
+                                keyblocksofar < zkeyblocksize;
+                                kvsbuf.Clear(), xoffset = 0, xbuf = buf)
+                            {
+
+                                for (int ik = 0; ik < numkeyspersplit; ik++)
+                                {
+                                    {
+                                        int morespace = xoffset + keylen + TValueOffset_Size;
+                                        if (morespace < xoffset || morespace > xbuf.Length)
+                                        {
+#if DEBUG
+                                            throw new Exception("DEBUG:  _CreateLargeResultFile: buffer not large enough for keys");
+#endif
+                                            xoffset = 0;
+                                            xbuf = new byte[0x400 * 0x400 * 512];
+                                        }
+                                    }
+
+                                    cooking_inIO = true;
+                                    if (0 == fzkeyblock.Read(xbuf, xoffset, keylen + TValueOffset_Size))
+                                    {
+                                        cooking_inIO = false;
+                                        break;
+                                    }
+                                    cooking_inIO = false;
+                                    cooking_seekpos += keylen + TValueOffset_Size;
+
+                                    KvSplit kvs = KvSplit.Prepare(ByteSlice.Prepare(xbuf, xoffset, keylen));
+                                    kvs.ValueOffset = Entry.BytesToUInt32(xbuf, xoffset + keylen);
+#if DEBUG
+                                    if (kvs.ValueOffset >= zvalueblocksize)
+                                    {
+                                        throw new Exception("DEBUG:  _CreateLargeResultFile: (kvs.ValueOffset >= zvalueblocksize)");
+                                    }
+#endif
+                                    xoffset += keylen; // Excluding the +N for value offset.
+                                    keyblocksofar += keylen + TValueOffset_Size;
+                                    kvsbuf.Add(kvs);
+                                }
+                                int kvsbufCount = kvsbuf.Count;
+
+                                // If cooking, this whole loop can be started over.
+                                for (long valueblockoffset = 0; valueblockoffset < zvalueblocksize; )
+                                {
+                                    cooking_inIO = true;
+                                    fzvalueblock.Seek(valueblockoffset, System.IO.SeekOrigin.Begin);
+                                    int read = fzvalueblock.Read(valuesbuf, 0, ZFILE_SPLIT_SIZE);
+                                    cooking_inIO = false;
+                                    uint vstart = (uint)valueblockoffset;
+                                    uint vstop = vstart + (uint)read;
+                                    for (int ik = 0; ik < kvsbufCount; ik++)
+                                    {
+                                        KvSplit kvs = kvsbuf[ik];
+                                        if (!kvs.IsValueSet)
+                                        {
+                                            if (kvs.ValueOffset >= vstart
+                                                && kvs.ValueOffset < vstop)
+                                            {
+                                                int valuesbufoffset = (int)(kvs.ValueOffset - vstart);
+#if DEBUG
+                                                if (valuesbufoffset < 0)
+                                                {
+                                                    throw new Exception("DEBUG:  _CreateLargeResultFile: (valuebufoffset < 0) (uint->int overflow)");
+                                                }
+#endif
+                                                if (valuesbufoffset + 4 > read)
+                                                {
+                                                    // Wasn't even enough in the valuesbuf to get the length.
+                                                    read -= ((valuesbufoffset + 4) - read); // Read it next time.
+                                                }
+                                                else
+                                                {
+                                                    int valuelen = Entry.BytesToInt(valuesbuf, valuesbufoffset);
+                                                    if (valuesbufoffset + 4 + valuelen > read)
+                                                    {
+                                                        // Entire value not in valuesbuf.
+                                                        read -= ((valuesbufoffset + 4 + valuelen) - read); // Read it next time.
+                                                    }
+                                                    else
+                                                    {
+                                                        {
+                                                            int morespace = xoffset + valuelen;
+                                                            if (morespace < xoffset || morespace > xbuf.Length)
+                                                            {
+                                                                xoffset = 0;
+                                                                xbuf = new byte[0x400 * 0x400 * 512];
+                                                            }
+                                                        }
+                                                        Buffer.BlockCopy(valuesbuf, valuesbufoffset, xbuf, xoffset, valuelen);
+                                                        kvs.Value = ByteSlice.Prepare(xbuf, xoffset, valuelen);
+                                                        kvsbuf[ik] = kvs;
+                                                        xoffset += valuelen;
+
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    valueblockoffset += read;
+                                }
+
+                                byte[] rbuf = null;
+                                for (int ik = 0; ik < kvsbufCount; ik++)
+                                {
+                                    KvSplit kvs = kvsbuf[ik];
+                                    if (!kvs.IsValueSet)
+                                    {
+                                        throw new Exception("DEBUG:  _CreateLargeResultFile: (!kvs.IsValueSet) (not all values loaded)");
+                                    }
+                                    IList<byte> rlist;
+                                    int roffset;
+                                    int rlength;
+                                    {
+                                        ByteSlice bs = kvs.Key;
+                                        bs.GetComponents(out rlist, out roffset, out rlength);
+                                        if (!object.ReferenceEquals(rlist, rbuf))
+                                        {
+                                            rbuf = rlist as byte[];
+#if DEBUG
+                                            if (null == rbuf)
+                                            {
+                                                throw new Exception("DEBUG:  _CreateLargeResultFile: (null == rbuf) (expected KvSplit.Key to be byte[])");
+                                            }
+#endif
+                                        }
+                                        result.Write(rbuf, roffset, rlength);
+                                    }
+
+                                    {
+                                        ByteSlice bs = kvs.Value;
+                                        bs.GetComponents(out rlist, out roffset, out rlength);
+                                        if (!object.ReferenceEquals(rlist, rbuf))
+                                        {
+                                            rbuf = rlist as byte[];
+#if DEBUG
+                                            if (null == rbuf)
+                                            {
+                                                throw new Exception("DEBUG:  _CreateLargeResultFile: (null == rbuf) (expected KvSplit.Value to be byte[])");
+                                            }
+#endif
+                                        }
+                                        {
+                                            Entry.ToBytes(rlength, parent._smallbuf, 0);
+                                            result.Write(parent._smallbuf, 0, 4);
+                                        }
+                                        result.Write(rbuf, roffset, rlength);
+                                    }
+
+                                }
+
+                            }
+
+                        }
+                        catch (Exception e)
+                        {
+                            if (!cooking_inIO)
+                            {
+                                throw;
+                            }
+                            //----------------------------COOKING--------------------------------
+                            if (cooking_cooksremain-- <= 0)
+                            {
+                                throw new System.IO.IOException("cooked too many times", e);
+                            }
+                            System.Threading.Thread.Sleep(parent.CookTimeout);
+                            continue;
+                            //----------------------------COOKING--------------------------------
+                        }
+                        break;
+                    }
+
+                }
+
+            }
+
+
+            internal interface IKeyBlockEntry
+            {
+                ByteSlice GetKey();
+                void SetKey(ByteSlice key);
+                int GetValueOffsetSize();
+                int GetValueOffset32();
+                long GetValueOffset64();
+                void SetValueOffset(int x);
+                void SetValueOffset(long x);
+                int SetValueOffsetFromBytes(IList<byte> buf, int offset); // Returns number of bytes.
+                int GetValueOffsetToBytes(byte[] buf, int offset); // Returns number of bytes.
+            }
+
+            internal struct KeyBlockEntry32v : IKeyBlockEntry
+            {
+                public ByteSlice key;
+                public int valueoffset;
+
+                public int GetValueOffsetSize()
+                {
+                    return 4;
+                }
+
+                public ByteSlice GetKey()
+                {
+                    return key;
+                }
+
+                public void SetKey(ByteSlice key)
+                {
+                    this.key = key;
+                }
+
+                public int GetValueOffset32()
+                {
+                    return valueoffset;
+                }
+
+                public long GetValueOffset64()
+                {
+                    return valueoffset;
+                }
+
+                public void SetValueOffset(int x)
+                {
+                    valueoffset = x;
+                }
+
+                public void SetValueOffset(long x)
+                {
+                    valueoffset = checked((int)x);
+                }
+
+                public int SetValueOffsetFromBytes(IList<byte> buf, int offset)
+                {
+                    valueoffset = Entry.BytesToInt(buf, offset);
+                    return 4;
+                }
+
+                public int GetValueOffsetToBytes(byte[] buf, int offset)
+                {
+                    Entry.ToBytes(valueoffset, buf, offset);
+                    return 4;
+                }
+
+            }
+
+            internal struct KeyBlockEntry64v : IKeyBlockEntry
+            {
+                public ByteSlice key;
+                public long valueoffset;
+
+                public int GetValueOffsetSize()
+                {
+                    return 8;
+                }
+
+                public ByteSlice GetKey()
+                {
+                    return key;
+                }
+
+                public void SetKey(ByteSlice key)
+                {
+                    this.key = key;
+                }
+
+                public int GetValueOffset32()
+                {
+                    return checked((int)valueoffset);
+                }
+
+                public long GetValueOffset64()
+                {
+                    return valueoffset;
+                }
+
+                public void SetValueOffset(int x)
+                {
+                    valueoffset = x;
+                }
+
+                public void SetValueOffset(long x)
+                {
+                    valueoffset = x;
+                }
+
+                public int SetValueOffsetFromBytes(IList<byte> buf, int offset)
+                {
+                    valueoffset = Entry.BytesToLong(buf, offset);
+                    return 8;
+                }
+
+                public int GetValueOffsetToBytes(byte[] buf, int offset)
+                {
+                    Entry.LongToBytes(valueoffset, buf, offset);
+                    return 8;
+                }
+
+            }
+
+
+            internal class BlockInfo<TKeyBlockEntry>
+                where TKeyBlockEntry : struct, IKeyBlockEntry
+            {
+
+                ArrayComboListPart acl;
+                ZBlock zblock;
+
+                int TValueOffset_Size;
+
+                internal BlockInfo(ArrayComboListPart acl, ZBlock zblock)
+                {
+                    TValueOffset_Size = default(TKeyBlockEntry).GetValueOffsetSize();
+
+                    this.acl = acl;
+                    this.zblock = zblock;
+                }
+
+
+                // Starts reading from current position in stm.
+                // returns true if limit was hit before EOF (more to read).
+                bool _XCopyLimitInto_needcooking(System.IO.Stream stm, int NumberOfKeysLimit, List<TKeyBlockEntry> kentries, ref byte[] ebuf)
+                {
+                    bool result = false;
+                    int ebufoffset = 0;
+                    kentries.Clear();
+                    //----------------------------COOKING--------------------------------
+                    int cooking_cooksremain = acl.CookRetries;
+                    bool cooking_inIO = false;
+                    long cooking_seekpos = long.MinValue;
+                    //----------------------------COOKING--------------------------------
+                    checked
+                    {
+                        for (; ; )
+                        {
+                            try
+                            {
+                                cooking_inIO = true;
+                                if (long.MinValue == cooking_seekpos)
+                                {
+                                    cooking_seekpos = stm.Position;
+                                }
+                                else
+                                {
+                                    stm.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
+                                }
+                                long kflenremain = stm.Length - cooking_seekpos;
+                                cooking_inIO = false;
+
+                                int keycount;
+                                {
+                                    long _keycount = kflenremain / (acl.keylen + TValueOffset_Size);
+                                    if (_keycount > NumberOfKeysLimit)
+                                    {
+                                        _keycount = NumberOfKeysLimit;
+                                        result = true;
+                                    }
+                                    keycount = (int)_keycount;
+                                }
+
+                                if (ebuf.Length < acl.keylen * keycount + TValueOffset_Size)
                                 {
                                     ebuf = null;
-                                    long lnew = Entry.Round2Power(parent.keylen * keycount + 4);
+                                    long lnew = Entry.Round2Power(acl.keylen * keycount + TValueOffset_Size);
                                     if (lnew > Int32.MaxValue)
                                     {
                                         lnew = Int32.MaxValue;
@@ -633,8 +1152,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                     ebuf = new byte[lnew];
                                 }
                                 byte[] buf = ebuf;
-
-                                kentries.Clear();
 
                                 int newcap = keycount;
                                 /*if (isfirstklist)
@@ -647,100 +1164,680 @@ namespace MySpace.DataMining.DistributedObjects5
                                     kentries.Capacity = newcap;
                                 }
 
-                                // Read from existing unsorted zblock file into buffer.
-                                cooking_inIO = true;
-                                stm.Seek(0, System.IO.SeekOrigin.Begin);
-                                cooking_inIO = false;
-
-                                KeyBlockEntry kent;
+                                int kentreadsize = acl.keylen + TValueOffset_Size;
+                                TKeyBlockEntry kent = default(TKeyBlockEntry);
                                 //kent.key = ByteSlice.Create();
                                 //kent.valueoffset = 0;
-                                int offset = 0;
                                 for (int i = 0; i != keycount; i++)
                                 {
                                     cooking_inIO = true;
-                                    int readsize = parent.keylen + 4;
-                                    stm.Read(buf, offset, readsize);
+                                    int rd3991 = stm.Read(buf, ebufoffset, kentreadsize);
+#if DEBUG
+                                    if (rd3991 != kentreadsize)
+                                    {
+                                        throw new Exception("DEBUG:  (rd3991 != kentreadsize)");
+                                    }
+#endif
                                     cooking_inIO = false;
-                                    cooking_seekpos += readsize;
+                                    cooking_seekpos += kentreadsize;
 
-                                    kent.key = ByteSlice.Create(buf, offset, parent.keylen);
-                                    offset += parent.keylen;
-                                    kent.valueoffset = Entry.BytesToInt(buf, offset);
+                                    kent.SetKey(ByteSlice.Create(buf, ebufoffset, acl.keylen));
+                                    ebufoffset += acl.keylen;
+                                    int sz815 = kent.SetValueOffsetFromBytes(buf, ebufoffset);
+#if DEBUG
+                                    if (sz815 != TValueOffset_Size)
+                                    {
+                                        throw new Exception("DEBUG:  (sz815 != TValueOffset_Size)");
+                                    }
+#endif
                                     kentries.Add(kent);
                                 }
+
                             }
-                            /*catch (Exception e)
+                            catch (Exception e)
                             {
-                                kentries.Clear();
-                                parent.SetError("CopyInfo failure; zblock skipped: " + e.ToString());
-                            }*/
-                            cooking_seekpos = 0;
+                                if (!cooking_inIO)
+                                {
+                                    throw;
+                                }
+                                //----------------------------COOKING--------------------------------
+                                /*if (cooking_cooksremain-- <= 0)
+                                {
+                                    throw new System.IO.IOException("cooked too many times", e);
+                                }
+                                System.Threading.Thread.Sleep(parent.CookTimeout);
+                                continue;
+                                 * */
+                                throw new NeedCookingException(e);
+                                //----------------------------COOKING--------------------------------
+                            }
+                            break;
                         }
                     }
-                    catch(Exception e)
-                    {
-                        if (!cooking_inIO)
-                        {
-                            throw;
-                        }
-                        //----------------------------COOKING--------------------------------
-                        if(cooking_cooksremain-- <= 0)
-                        {
-                            throw new System.IO.IOException("cooked too many times", e);
-                        }
-                        System.Threading.Thread.Sleep(parent.CookTimeout);
-                        continue;
-                        //----------------------------COOKING--------------------------------
-                    }
-                    break;
+                    return result;
+
                 }
-            }
 
 
-            public void CopyInto(List<KeyBlockEntry> kentries, ref byte[] ebuf)
-            {
-                XCopyInto(this.fzkeyblockfilename, kentries, ref ebuf);
-            }
-
-
-            // buf must be at least 8 bytes.
-            public void Sort(List<KeyBlockEntry> kentries, ref byte[] ebuf)
-            {
-                ensurefzblock(false);
-
-                try
+                //--B-------------ADDCOOK------------------
+                protected void XCopyInto(string keyblockfilename, List<TKeyBlockEntry> kentries, ref byte[] ebuf)
                 {
+#if DEBUG
+                    if (zblock.splitzkeyfile)
+                    {
+                        throw new Exception("DEBUG:  XCopyInto: cannot load all if splitzkeyfile");
+                    }
+#endif
+
+                    //----------------------------COOKING--------------------------------
+                    int cooking_cooksremain = acl.CookRetries;
+                    bool cooking_inIO = false;
+                    //----------------------------COOKING--------------------------------
+                    for (; ; )
+                    {
+                        try
+                        {
+                            cooking_inIO = true;
+                            zblock._justclose();
+                            using (System.IO.Stream stm = new System.IO.FileStream(keyblockfilename, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                            {
+                                cooking_inIO = false;
+
+                                _XCopyLimitInto_needcooking(stm, int.MaxValue, kentries, ref ebuf);
+
+                            }
+                        }
+                        catch (NeedCookingException e)
+                        {
+                            //----------------------------COOKING--------------------------------
+                            if (cooking_cooksremain-- <= 0)
+                            {
+                                throw new System.IO.IOException("cooked too many times", e.InnerException); // InnerException!
+                            }
+                            System.Threading.Thread.Sleep(acl.CookTimeout);
+                            continue;
+                            //----------------------------COOKING--------------------------------
+                        }
+                        catch (Exception e)
+                        {
+                            if (!cooking_inIO)
+                            {
+                                throw;
+                            }
+                            //----------------------------COOKING--------------------------------
+                            if (cooking_cooksremain-- <= 0)
+                            {
+                                throw new System.IO.IOException("cooked too many times", e);
+                            }
+                            System.Threading.Thread.Sleep(acl.CookTimeout);
+                            continue;
+                            //----------------------------COOKING--------------------------------
+                        }
+                        break;
+                    }
+                }
+
+
+                public void CopyInto(List<TKeyBlockEntry> kentries, ref byte[] ebuf)
+                {
+                    XCopyInto(zblock.fzkeyblockfilename, kentries, ref ebuf);
+                }
+
+
+                int _kcmp(TKeyBlockEntry x, TKeyBlockEntry y)
+                {
+                    int keylen = acl.keylen;
+                    ByteSlice xkey = x.GetKey();
+                    ByteSlice ykey = y.GetKey();
+                    for (int i = 0; i != keylen; i++)
+                    {
+                        int diff = (int)xkey[i] - (int)ykey[i];
+                        if (0 != diff)
+                        {
+                            return diff;
+                        }
+                    }
+                    return 0;
+                }
+
+
+                public void _NormalSort(List<TKeyBlockEntry> kentries, ref byte[] ebuf)
+                {
+
+#if DEBUG
+                    //System.Threading.Thread.Sleep(1000 * 8);
+                    int ij3j3j3 = 33 + 3;
+#endif
+
+                    zblock.ensurefzblock(false);
+
+#if DEBUG
+                    if (zblock.zkeyblocksize != zblock.fzkeyblock.Length)
+                    {
+                        throw new Exception("DEBUG:  _NormalSort: (zblock.zkeyblocksize != zblock.fzkeyblock.Length) before sort");
+                    }
+#endif
+
                     try
                     {
-                        CopyInto(kentries, ref ebuf);
+                        try
+                        {
+                            if (zblock.splitzkeyfile)
+                            {
+                                throw new NotImplementedException("Cannot normal-sort a split zBlock");
+                            }
+                            else
+                            {
+                                CopyInto(kentries, ref ebuf);
+                            }
+                        }
+                        finally
+                        {
+                            // Delete old (unsorted) file; prepare new (sorted) one.
+                            // Keep these together so that there's always one on file; so cleanup sees it and continues.
+                            zblock._justclose();
+                            System.IO.File.Delete(zblock.fzkeyblockfilename);
+                            zblock.fzkeyblockfilename = CreateZBlockFileName(zblock.zblockID, "key_sorted");
+                            zblock.ensurefzblock(true);
+                        }
+
+                        // Sort the sortbuffer.
+                        kentries.Sort(new System.Comparison<TKeyBlockEntry>(_kcmp));
+
+                        // From (sorted) sortbuffer write into new sorted zblock file.
+                        foreach (TKeyBlockEntry kent in kentries)
+                        {
+                            kent.GetKey().CopyTo(acl._smallbuf);
+                            zblock.fzkeyblock.Write(acl._smallbuf, 0, acl.keylen);
+#if DEBUG
+                            if (kent.GetValueOffset64() >= zblock.zvalueblocksize)
+                            {
+                                throw new Exception("DEBUG:  (kent.GetValueOffset64() >= zblock.zvalueblocksize)");
+                            }
+                            if (kent.GetValueOffset64() < 0)
+                            {
+                                throw new Exception("DEBUG:  (kent.GetValueOffset64() < 0)");
+                            }
+#endif
+                            int sz313 = kent.GetValueOffsetToBytes(acl._smallbuf, 0);
+#if DEBUG
+                            if (sz313 != TValueOffset_Size)
+                            {
+                                throw new Exception("DEBUG:  (sz313 != TValueOffset_Size)");
+                            }
+#endif
+                            zblock.fzkeyblock.Write(acl._smallbuf, 0, TValueOffset_Size);
+                        }
+#if DEBUG
+                        zblock.fzkeyblock.Flush();
+                        if (zblock.zkeyblocksize != zblock.fzkeyblock.Length)
+                        {
+                            throw new Exception("DEBUG:  _NormalSort: (zblock.zkeyblocksize{"
+                                + zblock.zkeyblocksize.ToString() + "} != zblock.fzkeyblock.Length{"
+                                + zblock.fzkeyblock.Length.ToString() + "}) after sort");
+                        }
+#endif
+
                     }
                     finally
                     {
-                        // Delete old (unsorted) file; prepare new (sorted) one.
-                        // Keep these together so that there's always one on file; so cleanup sees it and continues.
-                        _justclose();
-                        System.IO.File.Delete(fzkeyblockfilename);
-                        fzkeyblockfilename = CreateZBlockFileName(zblockID, "key_sorted");
-                        ensurefzblock(true);
-                    }
-
-                    // Sort the sortbuffer.
-                    kentries.Sort(new System.Comparison<KeyBlockEntry>(parent._kcmp));
-
-                    fzkeyblock.Seek(0, System.IO.SeekOrigin.Begin);
-                    // From (sorted) sortbuffer write into new sorted zblock file.
-                    foreach (KeyBlockEntry kent in kentries)
-                    {
-                        kent.key.CopyTo(parent._smallbuf);
-                        fzkeyblock.Write(parent._smallbuf, 0, parent.keylen);
-                        Entry.ToBytes(kent.valueoffset, parent._smallbuf, 0);
-                        fzkeyblock.Write(parent._smallbuf, 0, 4);
+                        zblock._justclose();
                     }
                 }
-                finally
+
+
+                internal void _writezblockpart(string zblockpartbasename, int partnum, List<TKeyBlockEntry> kentries)
                 {
-                    _justclose();
+                    System.IO.Stream outstm;
+                    //----------------------------COOKING--------------------------------
+                    int cooking_cooksremain = acl.CookRetries;
+                    bool cooking_inIO = false;
+                    //----------------------------COOKING--------------------------------
+                    for (; ; )
+                    {
+                        try
+                        {
+                            outstm = new System.IO.FileStream(CreateZBlockFileName(zblock.zblockID, "key_part" + partnum.ToString()),
+                                System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
+                        }
+                        catch (Exception e)
+                        {
+                            if (!cooking_inIO)
+                            {
+                                throw;
+                            }
+                            //----------------------------COOKING--------------------------------
+                            if (cooking_cooksremain-- <= 0)
+                            {
+                                throw new System.IO.IOException("cooked too many times", e);
+                            }
+                            System.Threading.Thread.Sleep(acl.CookTimeout);
+                            continue;
+                            //----------------------------COOKING--------------------------------
+                        }
+                        break;
+                    }
+                    try
+                    {
+                        // From (sorted) sortbuffer write into new sorted zblock file.
+                        foreach (TKeyBlockEntry kent in kentries)
+                        {
+                            kent.GetKey().CopyTo(acl._smallbuf);
+                            outstm.Write(acl._smallbuf, 0, acl.keylen);
+                            int sz8812 = kent.GetValueOffsetToBytes(acl._smallbuf, 0);
+#if DEBUG
+                            if (sz8812 != TValueOffset_Size)
+                            {
+                                throw new Exception("DEBUG:  (sz8812 != TValueOffset_Size)");
+                            }
+#endif
+                            outstm.Write(acl._smallbuf, 0, TValueOffset_Size);
+                        }
+                    }
+                    finally
+                    {
+                        //if (null != outstm)
+                        {
+                            outstm.Close();
+                        }
+                    }
+                }
+
+                internal class _ZBlockPartReader : IEnumerator<byte[]>
+                {
+                    internal _ZBlockPartReader(int zblockID, int partnum, ZBlock parent)
+                    {
+                        this.zbpfn = CreateZBlockFileName(zblockID, "key_part" + partnum.ToString());
+                        this.parent = parent;
+                        this.keylen = parent.parent.keylen;
+                        this.TValueOffset_Size = parent.TValueOffset_Size;
+                    }
+
+                    public void Delete()
+                    {
+#if DEBUG
+                        if (null != stm)
+                        {
+                            throw new System.IO.IOException("DEBUG:  _ZBlockPartReader.Delete: (null != stm)  (must Close before Delete)");
+                        }
+#endif
+                        System.IO.File.Delete(zbpfn);
+                    }
+
+
+                    public void Close()
+                    {
+                        if (null != stm)
+                        {
+                            stm.Close();
+                            stm = null;
+                        }
+                    }
+
+
+                    // Consistently returns null at end-of-file.
+                    // Returns buffer of same memory, overwritten.
+                    public byte[] Current
+                    {
+                        get
+                        {
+                            if (!readany)
+                            {
+                                throw new InvalidOperationException("Must call MoveNext before Current");
+                            }
+                            if (eof)
+                            {
+                                return null;
+                            }
+                            return buf;
+                        }
+                    }
+
+                    object System.Collections.IEnumerator.Current
+                    {
+                        get
+                        {
+                            byte[] result = Current;
+                            return result;
+                        }
+                    }
+
+
+                    public bool MoveNext()
+                    {
+                        {
+                            if (eof)
+                            {
+                                return false;
+                            }
+                            _Read();
+                            if (eof)
+                            {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+
+
+                    public bool EndOfStream
+                    {
+                        get
+                        {
+                            return eof;
+                        }
+                    }
+
+
+                    public void Reset()
+                    {
+                        Close();
+                        readany = false;
+                    }
+
+
+                    void System.IDisposable.Dispose()
+                    {
+                        Close();
+                    }
+
+
+                    //----------------------------COOKING--------------------------------
+                    long cooking_seekpos = 0;
+                    //----------------------------COOKING--------------------------------
+
+                    void _Read()
+                    {
+                        readany = true;
+                        //----------------------------COOKING--------------------------------
+                        int cooking_cooksremain = parent.parent.CookRetries;
+                        bool cooking_inIO = false;
+                        //----------------------------COOKING--------------------------------
+                        for (; ; )
+                        {
+                            try
+                            {
+                                if (null == stm)
+                                {
+                                    buf = new byte[keylen + TValueOffset_Size];
+                                    cooking_inIO = true;
+                                    stm = new System.IO.FileStream(zbpfn, System.IO.FileMode.Open,
+                                        System.IO.FileAccess.Read, System.IO.FileShare.Read);
+                                    if (0 != cooking_seekpos)
+                                    {
+                                        stm.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
+                                    }
+                                    cooking_inIO = false;
+                                }
+
+                                cooking_inIO = true;
+                                bool readwhole = ((keylen + TValueOffset_Size) == StreamReadLoop(stm, buf, keylen + TValueOffset_Size));
+                                cooking_inIO = false;
+                                cooking_seekpos += keylen + TValueOffset_Size;
+                                if (!readwhole)
+                                {
+                                    eof = true;
+                                }
+
+                            }
+                            catch (Exception e)
+                            {
+                                if (!cooking_inIO)
+                                {
+                                    throw;
+                                }
+                                stm = null; // Reopen.
+                                //----------------------------COOKING--------------------------------
+                                if (cooking_cooksremain-- <= 0)
+                                {
+                                    throw new System.IO.IOException("cooked too many times", e);
+                                }
+                                System.Threading.Thread.Sleep(parent.parent.CookTimeout);
+                                continue;
+                                //----------------------------COOKING--------------------------------
+                            }
+                            break;
+                        }
+                    }
+
+                    bool readany = false;
+                    bool eof = false;
+                    string zbpfn;
+                    System.IO.Stream stm = null;
+                    ZBlock parent;
+                    int keylen;
+                    int TValueOffset_Size;
+                    byte[] buf;
+
+
+                    internal static int CompareKeys(byte[] x, byte[] y, int keylen)
+                    {
+                        for (int i = 0; i != keylen; i++)
+                        {
+                            int diff = (int)x[i] - (int)y[i];
+                            if (0 != diff)
+                            {
+                                return diff;
+                            }
+                        }
+                        return 0;
+                    }
+
+
+                }
+
+                public void _SplitSort(List<TKeyBlockEntry> kentries, ref byte[] ebuf)
+                {
+                    zblock.ensurefzblock(false);
+
+                    try
+                    {
+                        {
+
+                            int numsplits;
+                            int keyspersplit;
+                            checked
+                            {
+                                numsplits = (int)(zblock.zkeyblocksize / ZFILE_SPLIT_SIZE);
+                                numsplits++;
+                                {
+                                    long bes = zblock.zkeyblocksize / numsplits;
+                                    if (0 != (zblock.zkeyblocksize % numsplits))
+                                    {
+                                        bes++;
+                                    }
+                                    keyspersplit = (int)(bes / acl.keylen);
+                                    if (0 != (bes % acl.keylen))
+                                    {
+                                        keyspersplit++;
+                                    }
+                                }
+                            }
+
+                            if ((zblock.zkeyblocksize / acl.keylen) > ((long)keyspersplit * (long)numsplits))
+                            {
+                                throw new Exception("Split-sort key count miscalculation");
+                            }
+
+                            if (zblock.splitzkeyfile)
+                            {
+                                //----------------------------COOKING--------------------------------
+                                int cooking_cooksremain = acl.CookRetries;
+                                bool cooking_inIO = false;
+                                long cooking_seekpos = 0;
+                                //----------------------------COOKING--------------------------------
+                                string keyblockfilename = zblock.fzkeyblockfilename;
+                                System.IO.Stream stm = null;
+                                int zbpCount = 0; // zblock part count.
+                                string zblockpartbasename = zblock.fzkeyblockfilename;
+                                for (; ; )
+                                {
+                                    try
+                                    {
+                                        for (bool again = true; again; )
+                                        {
+                                            if (null == stm)
+                                            {
+                                                cooking_inIO = true;
+                                                stm = new System.IO.FileStream(keyblockfilename, System.IO.FileMode.Open,
+                                                    System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
+                                                if (0 != cooking_seekpos)
+                                                {
+                                                    stm.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
+                                                }
+                                                cooking_inIO = false;
+                                            }
+                                            again = _XCopyLimitInto_needcooking(stm, keyspersplit, kentries, ref ebuf);
+                                            cooking_seekpos = stm.Position;
+
+                                            {
+                                                // Sort the sortbuffer.
+                                                kentries.Sort(new System.Comparison<TKeyBlockEntry>(_kcmp));
+                                            }
+
+                                            _writezblockpart(zblockpartbasename, zbpCount++, kentries);
+
+                                        }
+                                        if (null != stm)
+                                        {
+                                            stm.Close();
+                                        }
+                                    }
+                                    catch (NeedCookingException e)
+                                    {
+                                        stm = null; // Reopen.
+                                        //----------------------------COOKING--------------------------------
+                                        if (cooking_cooksremain-- <= 0)
+                                        {
+                                            throw new System.IO.IOException("cooked too many times", e.InnerException); // InnerException!
+                                        }
+                                        System.Threading.Thread.Sleep(acl.CookTimeout);
+                                        continue;
+                                        //----------------------------COOKING--------------------------------
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        if (!cooking_inIO)
+                                        {
+                                            throw;
+                                        }
+                                        stm = null; // Reopen.
+                                        //----------------------------COOKING--------------------------------
+                                        if (cooking_cooksremain-- <= 0)
+                                        {
+                                            throw new System.IO.IOException("cooked too many times", e);
+                                        }
+                                        System.Threading.Thread.Sleep(acl.CookTimeout);
+                                        continue;
+                                        //----------------------------COOKING--------------------------------
+                                    }
+                                    break;
+                                }
+
+                                // Delete old (unsorted) file; prepare new (sorted) one.
+                                // Keep these together so that there's always one on file; so cleanup sees it and continues.
+                                zblock._justclose();
+                                System.IO.File.Delete(zblock.fzkeyblockfilename);
+                                zblock.fzkeyblockfilename = CreateZBlockFileName(zblock.zblockID, "key_sorted");
+                                zblock.ensurefzblock(true);
+                                try
+                                {
+                                    _ZBlockPartReader[] zbparts = new _ZBlockPartReader[zbpCount];
+                                    for (int partnum = 0; partnum < zbpCount; partnum++)
+                                    {
+                                        zbparts[partnum] = new _ZBlockPartReader(zblock.zblockID, partnum, zblock);
+                                        if (!zbparts[partnum].MoveNext()) // Get it ready for first key.
+                                        {
+                                            throw new Exception("Expected at least one key in zblock-part file"
+                                                + " ('" + zblockpartbasename + "' index " + partnum.ToString() + ")");
+                                        }
+                                    }
+                                    {
+                                        List<_ZBlockPartReader> zbpRemain = new List<_ZBlockPartReader>(zbparts);
+                                        int keylen = acl.keylen;
+                                        for (; ; )
+                                        {
+                                            int zbpRemainCount = zbpRemain.Count;
+                                            if (zbpRemainCount <= 0)
+                                            {
+                                                break;
+                                            }
+                                            int lowestindex = 0;
+                                            byte[] lowestbuf = zbpRemain[0].Current;
+                                            for (int pi = 1; pi < zbpRemainCount; pi++)
+                                            {
+                                                byte[] curbuf = zbpRemain[pi].Current;
+                                                if (_ZBlockPartReader.CompareKeys(curbuf, lowestbuf, keylen) < 0)
+                                                {
+                                                    lowestindex = pi;
+                                                    lowestbuf = curbuf;
+                                                }
+                                            }
+                                            {
+                                                zblock.fzkeyblock.Write(lowestbuf, 0, keylen + TValueOffset_Size);
+                                                if (!zbpRemain[lowestindex].MoveNext())
+                                                {
+                                                    zbpRemain.RemoveAt(lowestindex);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    for (int partnum = 0; partnum < zbpCount; partnum++)
+                                    {
+                                        try
+                                        {
+                                            zbparts[partnum].Close();
+                                            zbparts[partnum].Delete();
+                                        }
+                                        catch
+                                        {
+#if DEBUG
+                                            throw;
+#endif
+                                        }
+                                    }
+                                }
+                                finally
+                                {
+                                    zblock._justclose();
+                                }
+
+                            }
+                            else
+                            {
+                                //CopyInto(kentries, ref ebuf);
+                                throw new Exception("DEBUG:  Expected split zkeyblock (zblock)");
+                            }
+
+                        }
+
+                    }
+                    finally
+                    {
+                        zblock._justclose();
+                    }
+                }
+
+                public void Sort(List<TKeyBlockEntry> kentries, ref byte[] ebuf)
+                {
+                    if (zblock.splitzkeyfile)
+                    {
+                        _SplitSort(kentries, ref ebuf);
+                    }
+                    else
+                    {
+                        _NormalSort(kentries, ref ebuf);
+                    }
+                }
+
+            }
+
+
+            internal class NeedCookingException : System.IO.IOException
+            {
+                internal NeedCookingException(Exception innerException)
+                    : base("<Need cooking>", innerException)
+                {
                 }
             }
 
@@ -779,7 +1876,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
 
             // Only valid right after sort!
-            internal bool IntegrateZBall(string cachename, string sBlockID, List<KeyBlockEntry> kentries1, ref byte[] ebuf1, List<KeyBlockEntry> kentries2, ref byte[] ebuf2, ref byte[] evaluesbuf)
+            internal bool IntegrateZBall(string cachename, string sBlockID, ref byte[] evaluesbuf)
             {
                 string zkeyballname = CreateZBallFileName(zblockID, cachename, sBlockID.PadLeft(4, '0') + "key");
                 string zvalueballname = CreateZBallFileName(zblockID, cachename, sBlockID.PadLeft(4, '0') + "value");
@@ -789,105 +1886,321 @@ namespace MySpace.DataMining.DistributedObjects5
                     return true; // Valid case: no cache output to this file.
                 }
 
-                CopyInto(kentries1, ref ebuf1);
-                _justclose();
-                XCopyInto(zkeyballname, kentries2, ref ebuf2);
+                int keylen = parent.keylen;
 
-                // Delete the key block, it'll be rewritten.
+                if (evaluesbuf.Length < 0x400 * 0x400 * 8)
+                {
+                    evaluesbuf = new byte[0x400 * 0x400 * 8];
+                }
+                if (evaluesbuf.Length < (keylen + TValueOffset_Size) * 2)
+                {
+                    evaluesbuf = new byte[Entry.Round2PowerLong((keylen + TValueOffset_Size) * 2)];
+                }
+                byte[] valuesbuf = evaluesbuf;
+
+                _justclose();
+                string deltafilename = CreateZBlockFileName(zblockID, "key_delta");
+                System.IO.File.Move(this.fzkeyblockfilename, deltafilename);
                 try
                 {
-                    System.IO.File.Delete(fzkeyblockfilename);
-                }
-                catch
-                {
-                }
-                zkeyblocksize = 0;
-                ensurefzblock(false, true); // zballing!
-                // Seek to the end of the value block, it'll be appended-to.
-                fzvalueblock.Seek(0, System.IO.SeekOrigin.End);
+                    zkeyblocksize = 0;
+                    numadded = 0;
+                    ensurefzblock(false, true); // zballing!
 
-                long zvalueballsize;
-                using (System.IO.FileStream fzvalueball = new System.IO.FileStream(zvalueballname, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.None, FILE_BUFFER_SIZE))
-                {
-                    zvalueballsize = fzvalueball.Length;
-                    if (zvalueballsize > int.MaxValue)
-                    {
-                        throw new Exception("zvalueballsize too large");
-                    }
-                    if (zvalueballsize > evaluesbuf.Length)
-                    {
-                        evaluesbuf = new byte[Entry.Round2Power((int)zvalueballsize)];
-                    }
 #if DEBUG
-                    for (int i = 0; i < evaluesbuf.Length; i++)
+                    if (zvalueblocksize != fzvalueblock.Length)
                     {
-                        evaluesbuf[i] = 42;
+                        throw new Exception("DEBUG:  IntegrateZBall: (zvalueblocksize != fzvalueblock.Length) before cache integration");
                     }
 #endif
-                    ArrayComboListPart.StreamReadExact(fzvalueball, evaluesbuf, (int)zvalueballsize);
-                }
-                byte[] zballvaluebuf = evaluesbuf;
+                    fzvalueblock.Seek(0, System.IO.SeekOrigin.End);
+                    long oldzvalueblocksize = zvalueblocksize; // zvalueblocksize of just delta, the old size.
 
-                //if (ebuf1.Length < parent.keylen + 4) // Workaround
-                {
-                    ebuf1 = new byte[Entry.Round2Power(parent.keylen + 4)];
-                }
-                byte[] buf1 = ebuf1;
-                //if (ebuf2.Length < parent.keylen + 4) // Workaround
-                {
-                    ebuf2 = new byte[Entry.Round2Power(parent.keylen + 4)];
-                }
-                byte[] buf2 = ebuf2;
-
-                int i1 = 0, i2 = 0;
-                for (; ; )
-                {
-                    int diff;
-                    if(i1 >= kentries1.Count)
                     {
-                        if (i2 >= kentries2.Count)
+
+                        // Cooking for reading from fzvalueball.
+                        //----------------------------COOKING--------------------------------
+                        int cooking_cooksremain = parent.CookRetries;
+                        bool cooking_inIO = false;
+                        long cooking_seekpos = 0;
+                        //----------------------------COOKING--------------------------------
+                        for (; ; )
                         {
-                            break; // Done!
-                        }
-                        diff = 1;
-                    }
-                    else if (i2 >= kentries2.Count)
-                    {
-                        diff = -1;
-                    }
-                    else
-                    {
-                        diff = parent._kcmp(kentries1[i1], kentries2[i2]);
-                    }
-#if DEBUG
-                    if (zkeyblocksize != fzkeyblock.Length)
-                    {
-                        throw new Exception("zkeyblocksize != fzkeyblock.Length");
-                    }
-#endif
-                    zkeyblocksize += parent.keylen + 4;
-                    if (diff < 0)
-                    {
-                        kentries1[i1].key.CopyTo(buf1);
-                        Entry.ToBytes(kentries1[i1].valueoffset, buf1, parent.keylen);
-                        fzkeyblock.Write(buf1, 0, parent.keylen + 4);
-                        i1++;
-                    }
-                    else //if (diff >= 0)
-                    {
-                        kentries2[i2].key.CopyTo(buf2);
-                        Entry.ToBytes((int)zvalueblocksize + kentries2[i2].valueoffset, buf2, parent.keylen);
-                        fzkeyblock.Write(buf2, 0, parent.keylen + 4);
-                        i2++;
-                    }
-                }
-                fzvalueblock.Write(zballvaluebuf, 0, (int)zvalueballsize);
-                zvalueblocksize += zvalueballsize;
+                            try
+                            {
+                                cooking_inIO = true;
+                                using (System.IO.FileStream fzvalueball = new System.IO.FileStream(
+                                    zvalueballname, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                                    System.IO.FileShare.None, FILE_BUFFER_SIZE))
+                                {
+                                    cooking_inIO = false;
+                                    if (0 != cooking_seekpos)
+                                    {
+                                        cooking_inIO = true;
+                                        fzvalueball.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
+                                        cooking_inIO = false;
+                                    }
+                                    long zvalueballsize = fzvalueball.Length;
+                                    if (zvalueblocksize + zvalueballsize > ZVALUEBLOCK_LIMIT)
+                                    {
+                                        throw new Exception("Unable to merge cache with delta: resulting values (zValueBlock) too large ("
+                                            + (zvalueblocksize + zvalueballsize).ToString() + " bytes)");
+                                    }
 
-                _justclose();
+                                    for (long zvbsofar = 0; zvbsofar < zvalueballsize; )
+                                    {
+#if DEBUG
+                                        for (int i = 0; i < valuesbuf.Length; i++)
+                                        {
+                                            valuesbuf[i] = 42;
+                                        }
+#endif
+                                        cooking_inIO = true;
+                                        int zvbread = fzvalueball.Read(valuesbuf, 0, valuesbuf.Length);
+                                        cooking_seekpos += zvbread;
+                                        cooking_inIO = false;
+                                        fzvalueblock.Write(valuesbuf, 0, zvbread);
+                                        zvbsofar += zvbread;
+                                    }
+                                    zvalueblocksize += zvalueballsize;
+
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                if (!cooking_inIO)
+                                {
+                                    throw;
+                                }
+                                //----------------------------COOKING--------------------------------
+                                if (cooking_cooksremain-- <= 0)
+                                {
+                                    throw new System.IO.IOException("cooked too many times", e);
+                                }
+                                System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(parent.CookTimeout));
+                                continue;
+                                //----------------------------COOKING--------------------------------
+                            }
+                            break;
+                        }
+#if DEBUG
+                        if (zvalueblocksize != fzvalueblock.Length)
+                        {
+                            throw new Exception("DEBUG:  IntegrateZBall: (zvalueblocksize != fzvalueblock.Length) after cache integration");
+                        }
+#endif
+                    }
+
+                    if (zvalueblocksize >= ZFILE_SPLIT_SIZE)
+                    {
+                        splitzblocks = true;
+                    }
+
+                    {
+
+                        // Cooking for reading from deltafilename and fzkbCache.
+                        //----------------------------COOKING--------------------------------
+                        int cooking_cooksremain = parent.CookRetries;
+                        bool cooking_inIO = false;
+                        long cooking_seekposDelta = 0;
+                        long cooking_seekposCache = 0;
+                        //----------------------------COOKING--------------------------------
+
+                        const int deltakeyoffset = 0;
+                        int cachekeyoffset = deltakeyoffset + keylen + TValueOffset_Size;
+
+                        for (; ; )
+                        {
+                            try
+                            {
+                                cooking_inIO = true;
+                                using (System.IO.FileStream fzkbDelta = new System.IO.FileStream(
+                                    deltafilename, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                                    System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                                {
+                                    cooking_inIO = false;
+                                    if (0 != cooking_seekposDelta)
+                                    {
+                                        cooking_inIO = true;
+                                        fzkbDelta.Seek(cooking_seekposDelta, System.IO.SeekOrigin.Begin);
+                                        cooking_inIO = false;
+                                    }
+                                    cooking_inIO = true;
+                                    using (System.IO.FileStream fzkbCache = new System.IO.FileStream(
+                                        zkeyballname, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                                        System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                                    {
+                                        cooking_inIO = false;
+                                        if (0 != cooking_seekposCache)
+                                        {
+                                            cooking_inIO = true;
+                                            fzkbCache.Seek(cooking_seekposCache, System.IO.SeekOrigin.Begin);
+                                            cooking_inIO = false;
+                                        }
+
+                                        bool needdelta = true, needcache = true;
+                                        bool eofdelta = false, eofcache = false;
+                                        for (; ; )
+                                        {
+                                            if (needdelta)
+                                            {
+                                                // Note: updating cook pos later when using the value.
+                                                cooking_inIO = true;
+                                                bool gotdelta = (keylen + TValueOffset_Size == fzkbDelta.Read(
+                                                    valuesbuf, deltakeyoffset, keylen + TValueOffset_Size));
+                                                cooking_inIO = false;
+                                                if (!gotdelta)
+                                                {
+                                                    eofdelta = true;
+                                                }
+                                                needdelta = false;
+                                            }
+                                            if (needcache)
+                                            {
+                                                // Note: updating cook pos later when using the value.
+                                                cooking_inIO = true;
+                                                bool gotcache = (keylen + TValueOffset_Size == fzkbCache.Read(
+                                                    valuesbuf, cachekeyoffset, keylen + TValueOffset_Size));
+                                                cooking_inIO = false;
+                                                if (!gotcache)
+                                                {
+                                                    eofcache = true;
+                                                }
+                                                needcache = false;
+                                            }
+
+                                            int which = 0;
+                                            if (eofdelta)
+                                            {
+                                                if (eofcache)
+                                                {
+                                                    break;
+                                                }
+                                                which = 1;
+                                            }
+                                            else if (eofcache)
+                                            {
+                                                which = -1;
+                                            }
+                                            else
+                                            {
+                                                for (int ik = 0; ik < keylen; ik++)
+                                                {
+                                                    which = valuesbuf[deltakeyoffset + ik]
+                                                        - valuesbuf[cachekeyoffset + ik];
+                                                    if (0 != which)
+                                                    {
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            int whichkeyoffset;
+                                            bool needadjustoldvalueoffset;
+                                            if (which <= 0)
+                                            {
+                                                needdelta = true;
+                                                whichkeyoffset = deltakeyoffset;
+                                                needadjustoldvalueoffset = false;
+                                                cooking_seekposDelta += keylen + TValueOffset_Size; // Used value.
+                                            }
+                                            else
+                                            {
+                                                needcache = true;
+                                                whichkeyoffset = cachekeyoffset;
+                                                needadjustoldvalueoffset = true;
+                                                cooking_seekposCache += keylen + TValueOffset_Size; // Used value.
+                                            }
+
+                                            if (needadjustoldvalueoffset)
+                                            {
+                                                if (8 == TValueOffset_Size)
+                                                {
+                                                    long valueoffset = Entry.BytesToLong(valuesbuf, whichkeyoffset + keylen);
+                                                    valueoffset += oldzvalueblocksize;
+#if DEBUG
+                                                    if (valueoffset >= zvalueblocksize)
+                                                    {
+                                                        System.Diagnostics.Debugger.Launch();
+                                                        throw new Exception("DEBUG:  (valueoffset{"
+                                                            + valueoffset.ToString() + "} >= zvalueblocksize{"
+                                                            + zvalueblocksize.ToString() + "})");
+                                                    }
+#endif
+                                                    Entry.LongToBytes(valueoffset, valuesbuf, whichkeyoffset + keylen);
+                                                }
+                                                else
+                                                {
+                                                    uint valueoffset = Entry.BytesToUInt32(valuesbuf, whichkeyoffset + keylen);
+                                                    valueoffset += (uint)oldzvalueblocksize;
+#if DEBUG
+                                                    if ((long)valueoffset >= zvalueblocksize)
+                                                    {
+                                                        System.Diagnostics.Debugger.Launch();
+                                                        throw new Exception("DEBUG:  (valueoffset{"
+                                                            + valueoffset.ToString() + "} >= zvalueblocksize{"
+                                                            + zvalueblocksize.ToString() + "})");
+                                                    }
+#endif
+                                                    Entry.UInt32ToBytes(valueoffset, valuesbuf, whichkeyoffset + keylen);
+                                                }
+                                            }
+                                            fzkeyblock.Write(valuesbuf, whichkeyoffset, keylen + TValueOffset_Size);
+                                            zkeyblocksize += keylen + TValueOffset_Size;
+                                            numadded++;
+
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                if (!cooking_inIO)
+                                {
+                                    throw;
+                                }
+                                //----------------------------COOKING--------------------------------
+                                if (cooking_cooksremain-- <= 0)
+                                {
+                                    throw new System.IO.IOException("cooked too many times", e);
+                                }
+                                System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(parent.CookTimeout));
+                                continue;
+                                //----------------------------COOKING--------------------------------
+                            }
+                            break;
+                        }
+#if DEBUG
+                        if (zkeyblocksize != fzkeyblock.Length)
+                        {
+                            throw new Exception("DEBUG:  IntegrateZBall: (zkeyblocksize != fzkeyblock.Length) after cache integration");
+                        }
+#endif
+
+                    }
+
+                    if (zkeyblocksize >= ZFILE_SPLIT_SIZE)
+                    {
+                        splitzkeyfile = true;
+                    }
+
+                }
+                finally
+                {
+                    try
+                    {
+                        System.IO.File.Delete(deltafilename);
+                    }
+                    catch
+                    {
+                    }
+
+                    _justclose();
+                }
 
                 return true;
+
             }
+
 
         }
 
@@ -906,11 +2219,12 @@ namespace MySpace.DataMining.DistributedObjects5
         // Only valid right after sort!
         bool IntegrateZBalls(string cachename, string sBlockID)
         {
-            List<ZBlock.KeyBlockEntry> kentries2 = new List<ZBlock.KeyBlockEntry>(this.kentries.Capacity);
-            byte[] ebuf2 = new byte[this.ebytes.Length];
+            //List<ZBlock.KeyBlockEntry> kentries2 = new List<ZBlock.KeyBlockEntry>(this.kentries.Capacity);
+            //byte[] ebuf2 = new byte[this.ebytes.Length];
             for (int iz = 0; iz < zblocks.Length; iz++)
             {
-                if (!zblocks[iz].IntegrateZBall(cachename, sBlockID, this.kentries, ref this.ebytes, kentries2, ref ebuf2, ref this.evaluesbuf))
+                //if (!zblocks[iz].IntegrateZBall(cachename, sBlockID, this.kentries, ref this.ebytes, kentries2, ref ebuf2, ref this.evaluesbuf))
+                if (!zblocks[iz].IntegrateZBall(cachename, sBlockID, ref this.evaluesbuf))
                 {
                     return false;
                 }
@@ -919,12 +2233,15 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
+        internal int TValueOffset_Size = 4;
+
         List<byte[]> net;
         internal byte[] ebytes; // Current key/value pairs.
         internal byte[] evaluesbuf; // Whole value-zblock in memory for fast seek.
         List<Entry> entries;
-        List<ZBlock.KeyBlockEntry> kentries;
-        int keylen;
+        List<ZBlock.KeyBlockEntry32v> kentries32;
+        List<ZBlock.KeyBlockEntry64v> kentries64;
+        internal int keylen;
         int modbytes;
         ArrayComboListEnumerator benum = null;
         internal ZBlock[] zblocks;
@@ -1007,19 +2324,18 @@ namespace MySpace.DataMining.DistributedObjects5
             this.keylen = keylength;
             this.modbytes = keylength;
 
-            if (4 + keylength > 4 + 4)
+            if (8 + keylength > 8 + 8)
             {
-                _smallbuf = new byte[4 + keylength];
+                _smallbuf = new byte[8 + keylength];
             }
             else
             {
-                _smallbuf = new byte[4 + 4];
+                _smallbuf = new byte[8 + 8];
             }
 
             net = new List<byte[]>(8);
 
             entries = new List<Entry>(1);
-            kentries = new List<ZBlock.KeyBlockEntry>(1);
 
             ebytes = new byte[count_capacity * estimated_row_capacity];
             //evaluesbuf = // Moved down.
@@ -1181,6 +2497,12 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public bool EAdd(byte[] key, int keyoffset, byte[] value, int valueoffset, int valuelen)
         {
+
+#if DEBUG
+            //System.Threading.Thread.Sleep(1000 * 8);
+            int ij38j3 = 33 + 3;
+#endif
+
             int zbid;
             if (null != distro)
             {
@@ -1197,6 +2519,12 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public bool EAdd(IList<byte> key, int keyoffset, IList<byte> value, int valueoffset, int valuelen)
         {
+
+#if DEBUG
+            //System.Threading.Thread.Sleep(1000 * 8);
+            int ij38j3 = 33 + 3;
+#endif
+
             int zbid;
             if (null != distro)
             {
@@ -2973,6 +4301,21 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     break;
 
+                case 'S': // Stats...
+                    {
+                        int numsplits = 0;
+                        for (int izb = 0; izb < zblocks.Length; izb++)
+                        {
+                            if (zblocks[izb].ZBlockSplit)
+                            {
+                                numsplits++;
+                            }
+                        }
+                        Entry.ToBytes(numsplits, buf, 0);
+                        XContent.SendXContent(nstm, buf, 4); // 4: split count
+                    }
+                    break;
+
                 case 's':
                     try
                     {
@@ -3032,12 +4375,25 @@ namespace MySpace.DataMining.DistributedObjects5
                             zb.LeaveAddMode(readkeybuflen, readvaluebuflen);
                         }
 
-                        foreach (ZBlock zb in zblocks)
+#if DEBUG
+                        System.Threading.Thread.Sleep(1000 * 8);
+#endif
+                        if (8 == TValueOffset_Size)
                         {
-                            zb.Sort(kentries, ref ebytes);
+                            foreach (ZBlock zb in zblocks)
+                            {
+                                zb.block64.Sort(kentries64, ref ebytes);
+                            }
+                            kentries64 = new List<ZBlock.KeyBlockEntry64v>(1);
                         }
-
-                        kentries = new List<ZBlock.KeyBlockEntry>(1); // Non-null, but release larger kentries.
+                        else
+                        {
+                            foreach (ZBlock zb in zblocks)
+                            {
+                                zb.block32.Sort(kentries32, ref ebytes);
+                            }
+                            kentries32 = new List<ZBlock.KeyBlockEntry32v>(1);
+                        }
 
 #if ENABLE_TIMING
                         if(XLog.logging)
@@ -3411,6 +4767,51 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     break;
 
+                case 'b':
+                    {
+#if DEBUG
+                        //System.Threading.Thread.Sleep(1000 * 8);
+#endif
+                        buf = XContent.ReceiveXBytes(nstm, out len, buf);
+                        if (null == zblocks)
+                        {
+                            break;
+                        }
+                        if (len >= 4)
+                        {
+                            int vallensz = Entry.BytesToInt(buf, 0);
+                            if (8 == vallensz)
+                            {
+                                this.TValueOffset_Size = 8;
+                                this.kentries32 = null;
+                                this.kentries64 = new List<ZBlock.KeyBlockEntry64v>(1);
+                                foreach (ZBlock zb in zblocks)
+                                {
+                                    zb.block32 = null;
+                                    zb.block64 = new ZBlock.BlockInfo<ZBlock.KeyBlockEntry64v>(this, zb);
+                                    zb.TValueOffset_Size = 8;
+                                }
+                            }
+                            else if (4 == vallensz)
+                            {
+                                this.TValueOffset_Size = 4;
+                                this.kentries32 = new List<ZBlock.KeyBlockEntry32v>(1);
+                                this.kentries64 = null;
+                                foreach (ZBlock zb in zblocks)
+                                {
+                                    zb.block32 = new ZBlock.BlockInfo<ZBlock.KeyBlockEntry32v>(this, zb);
+                                    zb.block64 = null;
+                                    zb.TValueOffset_Size = 4;
+                                }
+                            }
+                            else
+                            {
+                                throw new Exception("Invalie");
+                            }
+                        }
+                    }
+                    break;
+
                 case '.': // Ping?
                     nstm.WriteByte((byte)','); // Pong!
                     break;
@@ -3448,7 +4849,6 @@ namespace MySpace.DataMining.DistributedObjects5
 
         void ZMapStreamToZBlocks(System.IO.Stream stm, long len, string sfn, int iFILE_BUFFER_SIZE, bool bcompresszmaps)
         {
-            // Relies on _smallbuf being at least keylen+4
             if (len < 0)
             {
                 len = long.MaxValue;
@@ -3609,21 +5009,6 @@ namespace MySpace.DataMining.DistributedObjects5
                     throw;
                 }
             }
-        }
-
-
-        int _kcmp(ZBlock.KeyBlockEntry x, ZBlock.KeyBlockEntry y)
-        {
-            for (int i = 0; i != this.keylen; i++)
-            {
-                int diff = (int)x.key[i] - (int)y.key[i];
-                //Console.WriteLine("Comparing {0} with {1} = {2}", (int)kbuf1[k1 + i], (int)kbuf2[k2 + i], diff);
-                if (0 != diff)
-                {
-                    return diff;
-                }
-            }
-            return 0;
         }
 
 
@@ -3816,16 +5201,242 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
+        System.IO.Stream _largezblockresultfile = null;
+        string _largezblockresultfilename = null;
+        List<ArrayComboListPart.ZBlock.KvSplit> _largekvsbuf = null;
+        ByteSlice _laregezblockprevinfo;
+
+        // Now with zblock splitting, this loads the next virtual zblock, not necessarily physical.
         bool LoadNextZBlock()
         {
-            if (curzblock + 1 >= acl.zblocks.Length)
+            do
             {
-                input.entries.Clear();
-                input.net.Clear();
-                return false;
+                ArrayComboListPart.ZBlock zb;
+                if (null == _largezblockresultfile)
+                {
+#if DEBUG
+                    if (0 != _laregezblockprevinfo.Length)
+                    {
+                        throw new Exception("DEBUG:  LoadNextZBlock: (0 != _laregezblockprevinfo.Length) upon loading next physical zblock");
+                    }
+#endif
+                    if (curzblock + 1 >= acl.zblocks.Length)
+                    {
+                        input.entries.Clear();
+                        input.net.Clear();
+                        return false;
+                    }
+                    curzblock++;
+                    zb = acl.zblocks[curzblock];
+                    if (zb.splitzblocks)
+                    {
+                        _largezblockresultfilename = ArrayComboListPart.ZBlock.CreateZBlockFileName(
+                            zb.zblockID, "LargeResult");
+                        if (null == _largekvsbuf)
+                        {
+                            _largekvsbuf = new List<ArrayComboListPart.ZBlock.KvSplit>();
+                        }
+                        zb._CreateLargeResultFile(_largezblockresultfilename, _largekvsbuf, ref acl.ebytes, ref acl.evaluesbuf);
+                        _largezblockresultfile = new System.IO.FileStream(_largezblockresultfilename,
+                            System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
+                        // Continues down to Reading a large zblock result file...
+                    }
+                    else
+                    {
+                        zb.CopyInto(input.net, input.entries, ref acl.ebytes, ref acl.evaluesbuf);
+                    }
+                }
+                if (null != _largezblockresultfile)
+                {
+                    // Reading a large zblock result file.
+
+                    bool done = false;
+                    {
+
+                        input.entries.Clear();
+                        input.net.Clear();
+
+                        Entry ent;
+                        ent.NetIndex = 0;
+                        ent.NetEntryOffset = 0;
+
+                        int keylen = acl.keylen;
+
+                        if (acl.ebytes.Length < ArrayComboListPart.ZBlock.MAXKVBUFSIZE)
+                        {
+                            acl.ebytes = new byte[ArrayComboListPart.ZBlock.MAXKVBUFSIZE];
+                        }
+                        byte[] buf = acl.ebytes;
+
+                        input.net.Add(buf);
+
+                        //----------------------------COOKING--------------------------------
+                        int cooking_cooksremain = acl.CookRetries;
+                        bool cooking_inIO = false;
+                        long cooking_seekpos = long.MinValue;
+                        //----------------------------COOKING--------------------------------
+
+                        for (; ; )
+                        {
+                            try
+                            {
+
+                                if (long.MinValue == cooking_seekpos)
+                                {
+                                    cooking_inIO = true;
+                                    cooking_seekpos = _largezblockresultfile.Position;
+                                    cooking_inIO = false;
+                                }
+                                else
+                                {
+                                    cooking_inIO = true;
+                                    _largezblockresultfile.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
+                                    cooking_inIO = false;
+                                }
+
+                                bool needread = (0 == _laregezblockprevinfo.Length);
+
+                                cooking_inIO = true;
+                                if (needread
+                                    && (keylen + 4 != _largezblockresultfile.Read(buf, 0, keylen + 4)))
+                                {
+                                    cooking_inIO = false;
+                                    done = true;
+                                }
+                                else
+                                {
+                                    cooking_inIO = false;
+                                    if (needread)
+                                    {
+                                        // Add to seekpos if read this time, otherwise it was added last time.
+                                        cooking_seekpos += keylen + 4;
+                                    }
+                                    else //if (0 != _laregezblockprevinfo.Length)
+                                    {
+#if DEBUG
+                                        if (0 == _laregezblockprevinfo.Length)
+                                        {
+                                            throw new Exception("DEBUG:  LoadNextZBlock: (0 == _laregezblockprevinfo.Length) && (!needread)");
+                                        }
+#endif
+                                        for (int ip = 0; ip < keylen + 4; ip++)
+                                        {
+                                            buf[ip] = _laregezblockprevinfo[ip];
+                                        }
+                                        _laregezblockprevinfo = ByteSlice.Prepare();
+                                    }
+                                    int netbuflen = 0;
+                                    for (; ; )
+                                    {
+                                        int valuelen = Entry.BytesToInt(buf, netbuflen + keylen);
+#if DEBUG
+                                        if (valuelen < 0)
+                                        {
+                                            throw new Exception("DEBUG:  LoadNextZBlock: (valuelen{"
+                                                + valuelen.ToString() + "} < 0) large zblock file");
+                                        }
+                                        if (valuelen >= ArrayComboListPart.ZBlock.ZFILE_SPLIT_SIZE)
+                                        {
+                                            throw new Exception("DEBUG:  LoadNextZBlock: (valuelen{"
+                                                + valuelen.ToString() + "} >= ZFILE_SPLIT_SIZE) large zblock file");
+                                        }
+#endif
+                                        int newnetbuflen = netbuflen + keylen + 4 + valuelen;
+                                        if (newnetbuflen > buf.Length)
+                                        {
+                                            _laregezblockprevinfo = ByteSlice.Prepare(buf, netbuflen, keylen + 4);
+                                            break;
+                                        }
+                                        // Current key is at index 0 of buf; check against it.
+                                        if (netbuflen != 0)
+                                        {
+                                            bool samekey = true;
+                                            for (int ix = 0; ix < keylen; ix++)
+                                            {
+                                                if (buf[ix] != buf[netbuflen + ix])
+                                                {
+                                                    samekey = false;
+                                                    break;
+                                                }
+                                            }
+                                            if (!samekey)
+                                            {
+                                                _laregezblockprevinfo = ByteSlice.Prepare(buf, netbuflen, keylen + 4);
+                                                break;
+                                            }
+                                        }
+
+                                        // Same key (or first) and it fits, so read and add it and keep going...
+                                        cooking_inIO = true;
+                                        _largezblockresultfile.Read(buf, netbuflen + keylen + 4, valuelen);
+                                        cooking_inIO = false;
+                                        cooking_seekpos += valuelen;
+
+                                        ent.NetEntryOffset = netbuflen;
+                                        input.entries.Add(ent);
+                                        netbuflen = newnetbuflen;
+
+                                        // Next key?
+                                        if (netbuflen + keylen + 4 > buf.Length)
+                                        {
+                                            // Doesn't fit!
+                                            break;
+                                        }
+                                        cooking_inIO = true;
+                                        if (keylen + 4 != _largezblockresultfile.Read(buf, netbuflen, keylen + 4))
+                                        {
+                                            cooking_inIO = false;
+                                            done = true;
+                                            break;
+                                        }
+                                        cooking_inIO = false;
+                                        cooking_seekpos += keylen + 4;
+                                        // Read next key, continue loop to handle it.
+
+                                    }
+                                    // All good, go on and return.
+
+                                }
+
+                            }
+                            catch (Exception e)
+                            {
+                                if (!cooking_inIO)
+                                {
+                                    throw;
+                                }
+                                //----------------------------COOKING--------------------------------
+                                if (cooking_cooksremain-- <= 0)
+                                {
+                                    throw new System.IO.IOException("cooked too many times", e);
+                                }
+                                System.Threading.Thread.Sleep(acl.CookTimeout);
+                                continue;
+                                //----------------------------COOKING--------------------------------
+                            }
+                            break;
+                        }
+
+                    }
+                    if (done)
+                    {
+                        try
+                        {
+                            _largezblockresultfile.Close();
+                            System.IO.File.Delete(_largezblockresultfilename);
+                        }
+                        catch(Exception e)
+                        {
+                            XLog.errorlog("Warning with large zblock handling: " + e.ToString());
+                        }
+                        _largezblockresultfile = null;
+                        _largezblockresultfilename = null;
+                        // Likely place where finishing with (0 == input.entries.Count), but not always.
+                    }
+
+                }
             }
-            curzblock++;
-            acl.zblocks[curzblock].CopyInto(input.net, input.entries, ref acl.ebytes, ref acl.evaluesbuf);
+            while (0 == input.entries.Count); // Loop to next zblock if 0 entries.
             if (null != this.ordplugin)
             {
                 this.ordplugin.SetReduceOrd(curzblock);

@@ -47,9 +47,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mrdebugee", "RegressionTest
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MDORedir", "MDORedir\MDORedir.csproj", "{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scheduler", "Scheduler\Scheduler.csproj", "{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}"
+EndProject
 Global
 	GlobalSection(TeamFoundationVersionControl) = preSolution
-		SccNumberOfProjects = 24
+		SccNumberOfProjects = 25
 		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
 		SccTeamFoundationServer = http://tfs:8080/
 		SccLocalPath0 = .
@@ -110,9 +112,6 @@ Global
 		SccProjectUniqueName19 = mrdebug\\mrdebug.csproj
 		SccProjectName19 = mrdebug
 		SccLocalPath19 = mrdebug
-		SccProjectUniqueName23 = MDORedir\\MDORedir.csproj
-		SccProjectName23 = MDORedir
-		SccLocalPath23 = MDORedir
 		SccProjectUniqueName20 = RegressionTests\\RegressionTest\\RegressionTest.csproj
 		SccProjectName20 = RegressionTests/RegressionTest
 		SccLocalPath20 = RegressionTests\\RegressionTest
@@ -122,6 +121,12 @@ Global
 		SccProjectUniqueName22 = RegressionTests\\RegressionTest2\\mrdebugee\\mrdebugee.csproj
 		SccProjectName22 = RegressionTests/RegressionTest2/mrdebugee
 		SccLocalPath22 = RegressionTests\\RegressionTest2\\mrdebugee
+		SccProjectUniqueName23 = MDORedir\\MDORedir.csproj
+		SccProjectName23 = MDORedir
+		SccLocalPath23 = MDORedir
+		SccProjectUniqueName24 = Scheduler\\Scheduler.csproj
+		SccProjectName24 = Scheduler
+		SccLocalPath24 = Scheduler
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -246,12 +251,6 @@ Global
 		{2AA9BB79-EC2E-4340-9032-B96C3310C02E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2AA9BB79-EC2E-4340-9032-B96C3310C02E}.Release|x86.ActiveCfg = Release|x86
 		{2AA9BB79-EC2E-4340-9032-B96C3310C02E}.Release|x86.Build.0 = Release|x86
-		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Release|x86.ActiveCfg = Release|Any CPU
 		{51C1DC7F-7F9B-4CA4-9ADA-922421E0AEC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{51C1DC7F-7F9B-4CA4-9ADA-922421E0AEC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{51C1DC7F-7F9B-4CA4-9ADA-922421E0AEC7}.Debug|x86.ActiveCfg = Debug|Any CPU
@@ -276,6 +275,12 @@ Global
 		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Release|Any CPU.Build.0 = Release|Any CPU
 		{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}.Release|x86.ActiveCfg = Release|Any CPU
+		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

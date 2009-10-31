@@ -91,6 +91,12 @@ namespace MySpace.DataMining.DistributedObjects5
                     XContent.SendXContent(slave.nstm, buf, 4);
                 }
 
+                {
+                    slave.nstm.WriteByte((byte)'b');
+                    Entry.ToBytes(ValueOffsetSize, buf, 0);
+                    XContent.SendXContent(slave.nstm, buf, 4);
+                }
+
                 // Send assembly references if not local compile.
                 if (!LocalCompile)
                 {
@@ -184,6 +190,33 @@ namespace MySpace.DataMining.DistributedObjects5
             }
         }
          * */
+
+
+        public int GetZBlockSplitCount()
+        {
+            ensureopen("ZBlockSplitCount");
+            ensurewassortd("ZBlockSplitCount");
+
+            int result = 0;
+            checked
+            {
+                foreach (SlaveInfo slave in dslaves)
+                {
+                    lock (slave)
+                    {
+                        slave.nstm.WriteByte((byte)'S'); // Get stats.
+                        int len;
+                        buf = XContent.ReceiveXBytes(slave.nstm, out len, buf);
+                        if (len < 4)
+                        {
+                            throw new Exception("Expected at least 4 bytes from distributed process");
+                        }
+                        result += Entry.BytesToInt(buf);
+                    }
+                }
+            }
+            return result;
+        }
 
 
         public void SortBlocks()
@@ -720,6 +753,9 @@ namespace UserLoader
 
         public int InputRecordLength = int.MinValue;
         public int OutputRecordLength = int.MinValue;
+
+
+        public int ValueOffsetSize = 4;
 
 
         void _DoMap(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
@@ -1893,7 +1929,7 @@ namespace MySpace.DataMining.EasyReducer
             System.IO.Stream _outsamps = null;
             long _cursize = 0;
             long _totalsize = 0;
-            byte[] _smallbuf = new byte[4 + 8];
+            byte[] _smallbuf = new byte[8 + 8];
             List<byte> _bytebuf = new List<byte>();
 
             internal RandomAccessReducer rar;
@@ -1937,9 +1973,11 @@ namespace MySpace.DataMining.EasyReducer
             int numzblocks = 139;
             int zblockkeyfilebufsize = " + FILE_BUFFER_SIZE.ToString() + @";
             int zblockvaluefilebufsize = " + FILE_BUFFER_SIZE.ToString() + @";
-            int zballvaluesize = 0;
+            long zballvaluesize = 0;
             byte[] zkeybuf; // + 4 for value offset.
             byte[] zvaluebuf; // + 4 for value length.
+            
+            const int TValueOffset_Size = " + ValueOffsetSize.ToString() + @";
 
 
             static string CreateZBallFileName(int zblockID, string cachename, string otherinfo)
@@ -2116,12 +2154,12 @@ namespace MySpace.DataMining.EasyReducer
 
                     if(null == zkeybuf)
                     {
-                        zkeybuf = new byte[key.Length + 4];
-                        zvaluebuf = new byte[(128 >= value.Length) ? 128 + 4 : Entry.Round2Power(value.Length + 4)];                        
+                        zkeybuf = new byte[key.Length + 8];
+                        zvaluebuf = new byte[(128 >= value.Length) ? 128 + 8 : Entry.Round2Power(value.Length + 8)];                        
                     }
                 }
 
-                if(key.Length > zkeybuf.Length - 4)
+                if(key.Length > zkeybuf.Length - 8)
                 {
                     throw new Exception(`Key length mismatch for Reducer Cache(key, value)`);
                 }
@@ -2137,9 +2175,16 @@ namespace MySpace.DataMining.EasyReducer
                         zkeybuf[i] = (byte)(~key[i]);
                     }                    
                 }
-                Entry.ToBytes(zballvaluesize, zkeybuf, key.Length);
-                fzkeyball.Write(zkeybuf, 0, key.Length + 4);
-                if(value.Length + 4 > zvaluebuf.Length)
+                if(8 == TValueOffset_Size)
+                {
+                    Entry.LongToBytes(zballvaluesize, zkeybuf, key.Length);
+                }
+                else
+                {
+                    Entry.UInt32ToBytes((uint)zballvaluesize, zkeybuf, key.Length);
+                }
+                fzkeyball.Write(zkeybuf, 0, key.Length + TValueOffset_Size);
+                if(value.Length + TValueOffset_Size > zvaluebuf.Length)
                 {
                     zvaluebuf = new byte[Entry.Round2Power(value.Length + 32)];
                 }

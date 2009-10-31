@@ -39,7 +39,8 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine(@"    exec [""</xpath>=<value>""] <jobs.xml>  run the jobs source code XML file");
             Console.WriteLine("    addmachine <host>       add a machine to the cluster");
             Console.WriteLine("    removemachine <host>    remove a machine from the cluster");
-            Console.WriteLine("    ps                      distributed process information");
+            //Console.WriteLine("    ps                      distributed process information");
+            Console.WriteLine("    ps                      distributed processes, schedule and queue info");
             Console.WriteLine("    who                     show who is logged on");
             Console.WriteLine("    history [<count>]       show command history");
             Console.WriteLine("    killall                 kill all jobs, clean any orphaned intermediate data");
@@ -131,6 +132,18 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    swap <file1> <file2>           file names to swap");
             Console.WriteLine("    regressiontest basic           basic regression test " + appname);
             Console.WriteLine("    kill <JobID>                   kill the specified Job Identifier");
+            Console.WriteLine("    enqueue command=<value> [stdout=<netpath>] [stderr=<netpath>]");
+            Console.WriteLine("             adds a command entry to the end of the queue");
+            Console.WriteLine("    queuekill <QueueID>            Removes the specified Queue Identifier");
+            Console.WriteLine("    clearqueue                     Removes all entries from the queue");
+            Console.WriteLine("    schedule command=<value> start=<now|<datetime>> [frequency=<seconds>]");
+            Console.WriteLine("             [texceptions=<datetime-datetime>[,...]] ranges when not to run");
+            Console.WriteLine("             [wexceptions=<weekday>[,...]] weekdays not to run");
+            Console.WriteLine("             adds a command entry to the scheduler");
+            Console.WriteLine("             (datetime format is {0})",
+                MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.TimeSpec.DATE_TIME_FORMAT);
+            Console.WriteLine("    unschedule <ScheduleID>        Removes the specified Schedule Identifier");
+            Console.WriteLine("    clearschedule                  Removes all entries from the scheduler");
         }
 
 
@@ -891,7 +904,7 @@ namespace MySpace.DataMining.AELight
 #if DEBUG
             if (!cleaned)
             {
-                throw new Exception("DEBUG:  CleanThisExecQ: (!cleaned)");
+                Console.Error.WriteLine("DEBUG:  Warning: CleanThisExecQ: (!cleaned)");
             }
 #endif
         }
@@ -1425,6 +1438,15 @@ namespace MySpace.DataMining.AELight
                 args = SubArray(args, 1);
             }
 
+#if DEBUG
+            if (args.Length > 0
+                && "-ddebug" == args[0])
+            {
+                args = SubArray(args, 1);
+                System.Diagnostics.Debugger.Launch();
+            }
+#endif
+
             if (0 == args.Length)
             {
                 ShowUsage();
@@ -1707,6 +1729,135 @@ namespace MySpace.DataMining.AELight
             }
             switch (act)
             {
+
+                case "enqueue":
+                    {
+                        MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.QEntry qe;
+                        try
+                        {
+#if DEBUG
+                            //System.Threading.Thread.Sleep(1000 * 8);
+#endif
+                            qe = MySpace.DataMining.DistributedObjects.Scheduler.Enqueue(SubArray(args, 1), douser);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine(e.Message);
+                            SetFailure();
+                            return;
+                        }
+                        Console.WriteLine("Queue Identifier: {0}", qe.ID);
+                        Console.WriteLine("Enqueued: {0}", qe.Command);
+                        Console.WriteLine("Position: {0}", MySpace.DataMining.DistributedObjects.Scheduler.GetQueueSnapshot().Count);
+                    }
+                    break;
+
+                case "queuekill":
+                    {
+                        if (args.Length <= 1)
+                        {
+                            Console.Error.WriteLine("Error: expected QID");
+                            SetFailure();
+                            return;
+                        }
+                        string sqid = args[1];
+                        long qid;
+                        try
+                        {
+                            qid = long.Parse(sqid);
+                            if (qid <= 0)
+                            {
+                                throw new Exception("Must be greater than 0");
+                            }
+                            //sqid = qid.ToString(); // Normalize.
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Invalid QID '{0}': {1}", sqid, e.Message);
+                            SetFailure();
+                            return;
+                        }
+                        if (!MySpace.DataMining.DistributedObjects.Scheduler.QueueKill(qid))
+                        {
+                            Console.Error.WriteLine("No such QID: {0}", sqid);
+                            SetFailure();
+                            return;
+                        }
+                        Console.WriteLine("Done");
+                    }
+                    break;
+
+                case "clearqueue":
+                    {
+                        MySpace.DataMining.DistributedObjects.Scheduler.ClearQueue();
+                        Console.WriteLine("Queue cleared");
+                    }
+                    break;
+
+                case "schedule":
+                    {
+#if DEBUG
+                        //System.Threading.Thread.Sleep(1000 * 8);
+#endif
+                        MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry se;
+                        try
+                        {
+                            se = MySpace.DataMining.DistributedObjects.Scheduler.Schedule(SubArray(args, 1), douser);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine(e.Message);
+                            SetFailure();
+                            return;
+                        }
+                        Console.WriteLine("Schedule Identifier: {0}", se.ID);
+                        Console.WriteLine("Scheduled: {0}", se.Command);
+                        Console.WriteLine("First Run: {0}", se.NextRun);
+                    }
+                    break;
+
+                case "unschedule":
+                    {
+                        if (args.Length <= 1)
+                        {
+                            Console.Error.WriteLine("Error: expected SID");
+                            SetFailure();
+                            return;
+                        }
+                        string ssid = args[1];
+                        long sid;
+                        try
+                        {
+                            sid = long.Parse(ssid);
+                            if (sid <= 0)
+                            {
+                                throw new Exception("Must be greater than 0");
+                            }
+                            //ssid = sid.ToString(); // Normalize.
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Invalid SID '{0}': {1}", ssid, e.Message);
+                            SetFailure();
+                            return;
+                        }
+                        if (!MySpace.DataMining.DistributedObjects.Scheduler.Unschedule(sid))
+                        {
+                            Console.Error.WriteLine("No such SID: {0}", ssid);
+                            SetFailure();
+                            return;
+                        }
+                        Console.WriteLine("Done");
+                    }
+                    break;
+
+                case "clearschedule":
+                    {
+                        MySpace.DataMining.DistributedObjects.Scheduler.ClearSchedule();
+                        Console.WriteLine("Schedule cleared");
+                    }
+                    break;
+
                 case "kill":
                 case "killst":
                 case "killmt":
@@ -2465,6 +2616,14 @@ namespace MySpace.DataMining.AELight
                             newmetabackuppath = args[iarg++];
                         }
 
+                        if (!string.IsNullOrEmpty(newmetabackuppath))
+                        {
+                            if (!System.IO.Directory.Exists(newmetabackuppath))
+                            {
+                                System.IO.Directory.CreateDirectory(newmetabackuppath);
+                            }
+                        }
+
                         string metabackupdfsxmlpath;
                         if (System.IO.Directory.Exists(metabackuplocation))
                         {
@@ -2612,6 +2771,29 @@ namespace MySpace.DataMining.AELight
                                 System.IO.File.Copy(zdfi.FullName, targetdspacepath + @"\" + zdfi.Name, true);
                             }
 
+                            try
+                            {
+                                string schedulerbackuplocation = newmetabackuppath;
+                                if (string.IsNullOrEmpty(schedulerbackuplocation))
+                                {
+                                    schedulerbackuplocation = null;
+                                }
+                                if (MySpace.DataMining.DistributedObjects.Scheduler.BackupRestore(
+                                    metabackuplocation, targetdspacepath, schedulerbackuplocation))
+                                {
+                                    //Console.WriteLine("Restored scheduled and queued tasks");
+                                }
+                                else
+                                {
+                                    //Console.WriteLine("No scheduled or queued tasks to restore");
+                                }
+                            }
+                            catch (System.IO.FileNotFoundException e)
+                            {
+                                Console.WriteLine("Warning: unable to restore scheduled and queued tasks, perhaps it was never backed up from before this feature.");
+                                Console.WriteLine("Message: {0}", e.Message);
+                            }
+
                             mbdc.MetaBackup = newmetabackuppath;
                             if (!string.IsNullOrEmpty(newmetabackuppath))
                             {
@@ -2683,6 +2865,16 @@ namespace MySpace.DataMining.AELight
                                                 System.IO.File.Delete(sdfp);
                                                 System.IO.File.Move(sdfpnew, sdfp);
                                             }
+                                            else
+                                            {
+                                                // If it doesn't exist, write out a new one, but not if it is surrogate.
+                                                if (0 != string.Compare(IPAddressUtil.GetName(newmaster),
+                                                    IPAddressUtil.GetName(slave), StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    System.IO.File.WriteAllText(sdfp, "master=" + newmaster
+                                                        + Environment.NewLine);
+                                                }
+                                            }
                                         }
                                         catch (Exception e)
                                         {
@@ -2693,8 +2885,24 @@ namespace MySpace.DataMining.AELight
                                         }
                                     }), slaves, threadcount);
                             }
+                            {
+                                // Fix old surrogate jobs-files references.
+                                foreach (dfs.DfsFile df in mbdc.Files)
+                                {
+                                    if (0 == string.Compare(df.Type, DfsFileTypes.JOB, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        foreach (dfs.DfsFile.FileNode fn in df.Nodes)
+                                        {
+                                            fn.Host = newmaster;
+                                        }
+
+                                    }
+
+                                }
+                            }
                             // Write new dfs.xml...
-                            UpdateDfsXml(mbdc, targetdspacepath + @"\" + dfs.DFSXMLNAME, mbdc.GetMetaBackupLocation()); // Needed for new metabackup.
+                            UpdateDfsXml(mbdc, targetdspacepath + @"\" + dfs.DFSXMLNAME, mbdc.GetMetaBackupLocation());
+
                         }
 
                         if (stop)
@@ -2785,6 +2993,10 @@ namespace MySpace.DataMining.AELight
                                             }
                                         }), dc.Files, 15);
                                 Console.WriteLine("Backed up {0} jobs files", njobs);
+                                {
+                                    MySpace.DataMining.DistributedObjects.Scheduler.SetBackupLocation(metabackupdir);
+                                    Console.WriteLine("Backed up schedule and queue tasks");
+                                }
                             }
                             else if ("-" == args[1])
                             {
@@ -2792,6 +3004,9 @@ namespace MySpace.DataMining.AELight
                                 dc.MetaBackup = null;
                                 {
                                     UpdateDfsXml(dc);
+                                    {
+                                        MySpace.DataMining.DistributedObjects.Scheduler.SetBackupLocation(null);
+                                    }
                                     Console.WriteLine("Setting updated successfully");
                                     Console.WriteLine("Backups will no longer be saved");
                                     Console.WriteLine("Existing backups are still located at: {0}", oldmetabackup);
@@ -2813,6 +3028,9 @@ namespace MySpace.DataMining.AELight
                                         System.IO.File.Delete(fn);
                                     }
                                     UpdateDfsXml(dc); // Only if EnsureMetaBackupLocation was successful!
+                                    {
+                                        MySpace.DataMining.DistributedObjects.Scheduler.SetBackupLocation(dc.GetMetaBackupLocation());
+                                    }
                                     Console.WriteLine("Setting updated successfully");
                                     Console.WriteLine("Type the following to backup the current meta-data:");
                                     Console.WriteLine("    {0} metabackup -backup-now", appname);
@@ -2850,6 +3068,7 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "metaremovemachine":
                 case "removemetamachine":
                 case "removemetahost":
                 case "removemetanode":
@@ -4652,6 +4871,20 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "sum2":
+                case "checksum2":
+                    if (args.Length > 1)
+                    {
+                        GenerateHash("Sum2", args[1]);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("DFS file name expected");
+                        SetFailure();
+                        return;
+                    }
+                    break;
+
                 case "sorted":
                 case "checksorted":
                 case "issorted":
@@ -6349,6 +6582,8 @@ namespace MySpace.DataMining.AELight
                             }
                         }
                     }
+
+                    //Console.WriteLine("Running:");
                     for (int il = 0; il < lines.Length; il++)
                     {
                         int ippp = lines[il].IndexOf("+++");
@@ -6419,6 +6654,47 @@ namespace MySpace.DataMining.AELight
                             Console.WriteLine();
                         }
                     }
+
+                    {
+                        Console.WriteLine("Queued:");
+                        IList<MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.QEntry> qs
+                            = MySpace.DataMining.DistributedObjects.Scheduler.GetQueueSnapshot();
+                        int qsCount = qs.Count;
+                        if (qsCount > 0)
+                        {
+                            for (int i = 0; i < qs.Count; i++)
+                            {
+                                Console.WriteLine("  {0} {1} [{2}] {3} (Position: {4})",
+                                    qs[i].ID, qs[i].UserAdded, qs[i].TimeAdded.ToString(),
+                                    qs[i].Command, i + 1);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("  None");
+                        }
+                    }
+
+                    {
+                        Console.WriteLine("Scheduled:");
+                        IList<MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry> ss
+                            = MySpace.DataMining.DistributedObjects.Scheduler.GetScheduleSnapshot();
+                        int ssCount = ss.Count;
+                        if (ssCount > 0)
+                        {
+                            for (int i = 0; i < ss.Count; i++)
+                            {
+                                Console.WriteLine("  {0} {1} [{2}] {3} (Next Run: {4})",
+                                    ss[i].ID, ss[i].UserAdded, ss[i].TimeAdded.ToString(),
+                                    ss[i].Command, ss[i].NextRun.ToString());
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("  None");
+                        }
+                    }
+
                 }
 
                 lm.ReleaseMutex();

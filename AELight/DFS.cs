@@ -4680,6 +4680,21 @@ namespace MySpace.DataMining.AELight
                                     return;
                                 }
 
+                                {
+                                    Dictionary<string, bool> alls = new Dictionary<string, bool>(slavelist.Length);
+                                    foreach (string ss in slavelist)
+                                    {
+                                        string coolss = IPAddressUtil.GetName(ss);
+                                        if (alls.ContainsKey(coolss))
+                                        {
+                                            Console.Error.WriteLine("host in there twice {0} lol", ss);
+                                            SetFailure();
+                                            return;
+                                        }
+                                        alls.Add(coolss, true);
+                                    }
+                                }
+
                                 if (verify)
                                 {
                                     string[] sl = new string[1];
@@ -4710,61 +4725,22 @@ namespace MySpace.DataMining.AELight
                                 if (dfs.DfsConfigExists(DFSXMLPATH, 1))
                                 {
                                     Console.WriteLine("DFS exists; reformatting...");
+                                    Console.WriteLine("Consider running killall after format");
+                                    if (!metaonly)
                                     {
-                                        if (!metaonly)
-                                        {
-                                            // Don't need to lock access to DFS here; only reading the names and letting DfsDelete handle the xml updates.
-                                            try
-                                            {
-                                                dfs dc = LoadDfsConfig();
 
-                                                if (!mt)
-                                                {
-                                                    for (int i = 0; i < dc.Files.Count; i++)
-                                                    {
-                                                        try
-                                                        {
-                                                            DfsDelete(dc.Files[i].Name, false);
-                                                        }
-                                                        catch (Exception e)
-                                                        {
-                                                            LogOutputToFile(e.ToString());
-                                                            Console.Error.WriteLine("    Error deleting DFS file '{0}'", dc.Files[i].Name);
-                                                        }
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    try
-                                                    {
-                                                        DfsDelete(dc.Files, false);
-                                                    }
-                                                    catch (Exception e)
-                                                    {
-                                                        LogOutputToFile(e.ToString());
-                                                        Console.Error.WriteLine("    Error deleting DFS files '{0}'", e.Message);
-                                                    }
-                                                }
-                                            }
-                                            catch (Exception e)
-                                            {
-                                                LogOutputToFile(e.ToString());
-                                                Console.Error.WriteLine("    Error deleting DFS files");
-                                            }
-                                        }
-                                        
-                                        try
-                                        {
-                                            System.IO.File.Delete(DFSXMLPATH);
-                                        }
-                                        catch
-                                        {
-                                        }
                                     }
                                 }
                                 else
                                 {
-                                    //Console.WriteLine("Formatting new DFS");
+                                }
+
+                                try
+                                {
+                                    System.IO.File.Delete(DFSXMLPATH);
+                                }
+                                catch
+                                {
                                 }
 
                                 {
@@ -4909,7 +4885,7 @@ namespace MySpace.DataMining.AELight
                                             }
                                         }
                                     }
-                                    catch(Exception e)
+                                    catch (Exception e)
                                     {
                                         LogOutputToFile(e.ToString());
                                         Console.Error.WriteLine(e.Message);
