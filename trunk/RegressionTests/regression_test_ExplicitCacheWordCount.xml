@@ -1,0 +1,140 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_ExplicitCacheWordCount_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Temp*.txt");
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Input*.txt");
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Output*.txt");
+            
+                Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Cache");
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_ExplicitCacheWordCount</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"qizmt exec regression_test_ExplicitCacheWordCount_Exec.xml 1");
+            Shell(@"qizmt exec regression_test_ExplicitCacheWordCount_Exec.xml 2");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_ExplicitCacheWordCount_OutputExpected.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("a,1");
+                dfsoutput.WriteLine("and,2");
+                dfsoutput.WriteLine("are,2");
+                dfsoutput.WriteLine("away,1");
+                dfsoutput.WriteLine("bacon,1");
+                dfsoutput.WriteLine("can,1");
+                dfsoutput.WriteLine("community,1");
+                dfsoutput.WriteLine("connect,1");
+                dfsoutput.WriteLine("connected,1");
+                dfsoutput.WriteLine("create,1");
+                dfsoutput.WriteLine("everyone,1");
+                dfsoutput.WriteLine("families,1");
+                dfsoutput.WriteLine("family,1");
+                dfsoutput.WriteLine("find,1");
+                dfsoutput.WriteLine("for,1");
+                dfsoutput.WriteLine("friends,4");
+                dfsoutput.WriteLine("from,1");
+                dfsoutput.WriteLine("growing,1");
+                dfsoutput.WriteLine("how,1");
+                dfsoutput.WriteLine("if,1");
+                dfsoutput.WriteLine("in,1");
+                dfsoutput.WriteLine("interests,1");
+                dfsoutput.WriteLine("is,1");
+                dfsoutput.WriteLine("journals,1");
+                dfsoutput.WriteLine("keep,1");
+                dfsoutput.WriteLine("kevin,1");
+                dfsoutput.WriteLine("knows,1");
+                dfsoutput.WriteLine("matchmakers,1");
+                dfsoutput.WriteLine("meet,1");
+                dfsoutput.WriteLine("mutual,1");
+                dfsoutput.WriteLine("myspace,2");
+                dfsoutput.WriteLine("network,1");
+                dfsoutput.WriteLine("of,1");
+                dfsoutput.WriteLine("on,1");
+                dfsoutput.WriteLine("online,1");
+                dfsoutput.WriteLine("or,1");
+                dfsoutput.WriteLine("other,2");
+                dfsoutput.WriteLine("out,1");
+                dfsoutput.WriteLine("people,2");
+                dfsoutput.WriteLine("photos,1");
+                dfsoutput.WriteLine("really,1");
+                dfsoutput.WriteLine("see,1");
+                dfsoutput.WriteLine("share,1");
+                dfsoutput.WriteLine("single,1");
+                dfsoutput.WriteLine("singles,1");
+                dfsoutput.WriteLine("six,1");
+                dfsoutput.WriteLine("talk,1");
+                dfsoutput.WriteLine("their,1");
+                dfsoutput.WriteLine("to,4");
+                dfsoutput.WriteLine("touch--map,1");
+                dfsoutput.WriteLine("tree,1");
+                dfsoutput.WriteLine("want,4");
+                dfsoutput.WriteLine("who,6");
+                dfsoutput.WriteLine("with,2");
+                dfsoutput.WriteLine("you,3");
+                dfsoutput.WriteLine("your,2");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_ExplicitCacheWordCount_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_ExplicitCacheWordCount_OutputExpected.txt regression_test_ExplicitCacheWordCount_Output.txt regression_test_ExplicitCacheWordCount.xml");  
+            
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Temp*.txt");
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Input*.txt");
+            Shell(@"Qizmt del regression_test_ExplicitCacheWordCount_Output*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
