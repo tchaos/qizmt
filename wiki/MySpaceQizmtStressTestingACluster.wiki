@@ -1,0 +1,14 @@
+#summary Qizmt Quick-Start Tutorial: Stress Testing a Cluster
+#labels Qizmt,Walkthrough,Tutorial
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Stress Testing a Cluster =
+The Qizmt stresstests command may be used to generate a series of mapreduce jobs to stress test the capabilities of a cluster. The larger the cluster, the larger and faster stress tests are handled.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_StressTests.png" alt="StressTests" />
+
