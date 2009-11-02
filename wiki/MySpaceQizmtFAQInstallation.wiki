@@ -15,4 +15,4 @@ Are there any errors when issue the command {{{health –a}}}?
 
 Are there any firewalls between the machines of the cluster? Qizmt clusters should not have any firewall between the machines of the cluster.
 
-Qizmt needs to be installed with an account that has sufficient read/write access to \\<host>\<drive>$\<installdir>\ from every machine in the cluster to every other machine in the cluster.
+Qizmt needs to be installed with an account that has sufficient read/write access to {{{\\<host>\<drive>$\<installdir>\}}} from every machine in the cluster to every other machine in the cluster.
