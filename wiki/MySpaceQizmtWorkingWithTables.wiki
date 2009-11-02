@@ -1,0 +1,44 @@
+#summary Qizmt Quick-Start Tutorial: Working with Tables
+#labels Qizmt,Walkthrough,Tutorial
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Working with Tables =
+Sometimes it is advantageous to store recordsets directly in MR.DFS table files rather than manually tokenizing the data into a text format. By convention, it is suggested to store recordsets in MR.DFS files using the `<file>.tbl` naming convention. If reading a table into a mapreducer job from MR.DFS, the DFSInput must contain `<filename>@<row size>` showing the number of bytes in each row. If writing a table to a mapreducer job from MR.DFS, the DFSOutput must contain `<filename>@<row size>` showing the number of bytes in each row.
+
+
+== Writing data from Mapreducer out to a Table ==
+A recordset may be directly written out to a MR.DFS file from a reducer as follows.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ReduceTableOutput.png" alt="ReduceTableOutput" />
+
+
+== Reading a Table data into a Mapreducer ==
+A line of data may be read directly into a recordset only if it was written out as a recordset in the reducer of another mapreducer job.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapTableInput.png" alt="MapTableInput" />
+
+
+== Walkthrough: Loading and Processing Rectangular Binary Data ==
+ # Generate rectangular binary data with *gensort* or other means consisting of 100 bytes per row
+ # Put the binary data into MR.DFS with: *Qizmt put \\MACHINEA\D$\binarydata.tbl@100*
+ # The rectangular binary data consisting of 100 bytes per row may now be input to a mapreducer
+ # Edit a mapreducer and add *`<DFSInput>dfs://binarydata.tbl@100</DFSInput>`* for the input
+ # To read each 100 byte row from the binary table into a recordset use: <br /> *recordset rline = recordset.PrepareRow(line);*
+
+
+== Walkthrough: Storing Mapreducer Results into a Table ==
+ # Modify the DFSOutput to include the size of recordset that will be output. If the recordsets change in size or are heterogeneous, then set the size to the largest possible size supported. E.g. *`<DFSOutput>dfs://SomeOutput.tbl@1024</DFSOutput>`*
+ # In reducer output a recordset directly:
+ <pre>
+              recordset rout = recordset.Prepare();
+              rout.PutInt(uid);
+              rout.PutDouble(total);
+              output.Add(rout);
+ </pre>
+   Note: the table row size may be larger than the recordset, but if smaller an exception will be thrown.
+
