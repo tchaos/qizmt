@@ -1,4 +1,4 @@
-#summary Qizmt Reference Memory Management
+#summary Qizmt Reference mstringarray Properties
 #labels Qizmt,Reference,Memory,Management,mstringarray,Properties
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
