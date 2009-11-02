@@ -5,8 +5,26 @@
 
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
- * [MySpaceQizmtReferenceBinaryAPI Binary API]
- * [MySpaceQizmtReferenceMemoryManagement Mapreducer-aware Memory Management]
+ * Binary API
+  * [MySpaceQizmtReferenceCharacterEncoding  Character Encoding]
+  * [MySpaceQizmtReferenceByteSliceMethods ByteSlice Methods]
+  * [MySpaceQizmtReferenceByteSliceStaticMethods ByteSlice Static Methods]
+  * [MySpaceQizmtReferenceEntryStaticMethods Entry Static Methods]
+  * [MySpaceQizmtReferenceQizmtConstants Qizmt_* Constants]
+  * [MySpaceQizmtReferenceQizmtMethods Qizmt_* Methods]
+  * [MySpaceQizmtReferenceMapOutputMethods MapOutput Methods]
+  * [MySpaceQizmtReferenceReduceOutputMethods ReduceOutput Methods]
+  * [MySpaceQizmtReferenceByteSliceListProperties ByteSliceList Properties]
+  * [MySpaceQizmtReferenceByteSliceListMethods ByteSliceList Methods]
+  * [MySpaceQizmtReferenceReduceEntryProperties ReduceEntry Properties]
+  * [MySpaceQizmtReferenceReduceEntryMethods ReduceEntry Methods]
+ * Mapreducer-aware Memory Management
+  * [MySpaceQizmtReferenceMStringStaticMethods mstring Static Methods]
+  * [MySpaceQizmtReferenceMStringMethods mstring Methods]
+  * [MySpaceQizmtReferenceMStringArrayStaticMethods mstringarray Static Methods]
+  * [MySpaceQizmtReferenceMStringArrayProperties mstringarray Properties]
+  * [MySpaceQizmtReferenceRecordsetStaticMethods recordset Static Methods]
+  * [MySpaceQizmtReferenceRecordsetMethods recordset Methods]
  * [MySpaceQizmtReferenceSystemLinqSupport System.Linq Support]
  * [MySpaceQizmtReferenceUnsafeCode Unsafe Code]
  * [MySpaceQizmtReferenceSortOrderOfKeys Sort Order of Keys]    
