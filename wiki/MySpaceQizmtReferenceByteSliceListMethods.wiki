@@ -1,0 +1,67 @@
+#summary Qizmt Reference ByteSliceList Methods
+#labels Qizmt,Reference,Binary,API,ByteSliceList,Methods
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference]
+
+<wiki:toc max_depth="2" />
+
+=Methods of `ByteSliceList`=
+
+
+
+==`MoveNext`==
+{{{public bool MoveNext()}}}
+
+Moves the current position to the next value ByteSlice.  If there is no more value ByteSlice left, it returns false.
+
+====Example==== 
+{{{
+public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+{
+    mstring sKey = mstring.Prepare(UnpadKey(key));
+    mstring sValue = mstring.Prepare();
+
+    while (values.MoveNext())
+    {
+        sValue.AppendM(',');
+        sValue.AppendM(mstring.Prepare(values.Current()));
+    }
+
+    output.Add(sValue);
+} 
+}}}
+----
+
+
+
+==`Reset`==
+{{{public void Reset()}}}
+
+Moves the current position to the first value ByteSlice. 
+
+====Example==== 
+{{{
+public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+{
+    mstring sKey = mstring.Prepare(UnpadKey(key));
+    mstring sValue = mstring.Prepare();
+
+    while (values.MoveNext())
+    {
+        sValue.AppendM(',');
+        sValue.AppendM(mstring.Prepare(values.Current()));
+    }
+
+    values.Reset();
+
+    while (values.MoveNext())
+    {
+        sValue.AppendM('-');
+        sValue.AppendM(mstring.Prepare(values.Current()));
+    }
+
+    output.Add(sValue);
+} 
+}}}
