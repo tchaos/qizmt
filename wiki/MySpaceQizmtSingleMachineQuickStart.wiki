@@ -1,5 +1,5 @@
 #summary Qizmt Quick-Start Tutorial: Single Machine Qick-Start
-#labels Qizmt,Quick,Start,Tutorial,Walkthrough
+#labels Qizmt,Quick,Start,Tutorial,Walkthrough,Examples,Samples
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
 
