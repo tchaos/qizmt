@@ -51,7 +51,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
 == Qizmt Command Line Usage ==
 
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CommandLine.png" alt="CommandLine" />
+[MySpaceQizmtCommandLine Qizmt Command Line]
 
 
 == Borrow Machines from another Cluster ==
