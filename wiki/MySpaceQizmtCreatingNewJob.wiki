@@ -1,0 +1,19 @@
+#summary Qizmt Quick-Start Tutorial: Creating New Job
+#labels Qizmt,Walkthrough,Tutorial
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Creating New Job =
+
+ # RDP into any machine in the cluster
+ # Issue command: *Qizmt edit <_new stored SourceCode name_>*
+ # Edit stored SourceCode
+ # The Qizmt editor comes complete with: Auto-complete, Smart tabs and Auto-syntax Coloring 
+ # Click OK
+ # Test stored SourceCode with: *Qizmt exec <_new stored SourceCode name_>*
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_NewJobsFile.png" alt="NewJobsFile" />
+
