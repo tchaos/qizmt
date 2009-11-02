@@ -1,4 +1,4 @@
-#summary Qizmt FAQ - Troubleshoot
+#summary Qizmt FAQ - Installation
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
 
@@ -6,15 +6,13 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / <wiki:comment>Link:
 
 <wiki:toc/>
 
-= Qizmt FAQ - Troubleshoot =
+= Qizmt FAQ - Installation =
 
-==When I try to open a text file in MR.DFS with  "qizmt edit WordCount_Output.txt" I get an error.==
+==After I install Qizmt and run the format command from one of the machines in the cluster, I am still unable to run any mapreducers jobs.==
 ----
-Currently only support editing job files (the green ones)
-But the top of the file can be viewed with the *head* command.<br/>
-e.g.<br/>
-{{{qizmt head WordCount_Output.txt}}}<br/>
-{{{qizmt head WordCount_Output.txt 100}}}   (to view 100 lines etc.)
-<br/><br/>
-Also, can pull the file out of mr.dfs and view it:<br/><br/>
-{{{qizmt get WordCount_Output.txt \\<hostname>\D$\folder\WordCount_Output.txt && notepad \\<hostname>\D$\folder\WordCount_Output.txt}}}
+
+Are there any errors when issue the command {{{health –a}}}?
+
+Are there any firewalls between the machines of the cluster? Qizmt clusters should not have any firewall between the machines of the cluster.
+
+Qizmt needs to be installed with an account that has sufficient read/write access to \\<host>\<drive>$\<installdir>\ from every machine in the cluster to every other machine in the cluster.
