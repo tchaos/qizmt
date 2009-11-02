@@ -1,0 +1,55 @@
+#summary Qizmt Quick-Start Tutorial: Single Machine Qick-Start
+#labels Qizmt,Quick,Start,Tutorial,Walkthrough
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Single Machine Qick-Start =
+
+== Run MSI to install driver on development machine ==
+
+ * Download and run:
+  * MySpace.DataMining.Qizmt.msi
+   # Click next and go with all defaults
+   # Enter `<windows login>` when prompted
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_InstallerFile.png" alt="InstallerFile" />
+<br />
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SetupWizard.png" alt="SetupWizard" />
+
+
+== Formatting MR.DFS ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_FormatMRDFS.png" alt="FormatMRDFS" />
+
+
+== Generate Stored Job Examples ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_GenerateExamples.png" alt="GenerateExamples" />
+
+
+== View Stored job examples in cluster ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_DirExamples.png" alt="DirExamples" />
+
+
+== Execute wordcount job ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExecWordCount.png" alt="ExecWordCount" />
+
+
+== View wordcount inputs and outputs ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewWordCountIO.png" alt="ViewWordCountIO" />
+
+
+== View/Edit the wordcount example ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ViewEditWordCount.png" alt="ViewEditWordCount" />
+
+
+== Word Count Logic Form ==
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_WordCountLogicForm.png" alt="WordCountLogicForm" />
