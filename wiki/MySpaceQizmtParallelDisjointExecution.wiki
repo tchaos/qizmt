@@ -1,0 +1,69 @@
+#summary Qizmt Quick-Start Tutorial: Parallel Disjoint Execution
+#labels Qizmt,Walkthrough,Tutorial
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Parallel Disjoint Execution =
+
+Sometimes it is beneficial to stream the same MR.DFS file through every machine or a process on every core in the cluster. Parallel disjoint execution is typically useful when data is small enough to stream all data through one or more machines and perform hash based logic when this approach is more cost-effective them mapreduce.
+
+
+== Remote Job Multiple Hosts ==
+A remote job may be run on multiple explicitly specified hosts and even process a different MR.DFS file on each host. The `<Host>` tag is optional, if not specified, the remote jobs will live round robin across the cluster.
+
+<table><tr valign="top"><td>
+{{{
+    <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO>
+          <DFSReader>dfs://Input1.txt</DFSReader>
+          <DFSWriter>dfs://Output1.txt</DFSWriter>
+          <Host>Machine0</Host>
+        </DFS_IO>       
+        <DFS_IO>
+          <DFSReader>dfs://Input2.txt</DFSReader>
+          <DFSWriter>dfs://Output2.txt</DFSWriter>
+           <Host>Machine1</Host>
+        </DFS_IO>
+      </IOSettings>
+}}}
+</td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RemoteMultipleHosts.png" alt="RemoteMultipleHosts" /> </td></tr></table>
+
+
+== Remote Job All Machines ==
+A remote job may be run on one core per machine; each remote sub process will get an identical copy of the same document streamed in from MR.DFS. The # wildcard will be replaced with a numeric DPID unique across the cluster.
+
+<table><tr valign="top"><td>
+{{{
+      <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO_Multi>
+          <DFSReader>dfs://Input.txt</DFSReader>
+          <DFSWriter>dfs://Output####.txt</DFSWriter>
+          <Mode>ALL MACHINES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+}}}
+</td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RemoteAllMachines.png" alt="RemoteAllMachines" /> </td></tr></table>
+
+
+== Remote Job All Cores ==
+A remote job may be run on every core in the cluster without explicitly specifying host names, each remote will get an identical copy of the same document streamed from MR.DFS. The # wildcard will be replaced with a numeric DPID unique across the cluster.
+
+<table><tr valign="top"><td>
+{{{
+     <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO_Multi>
+          <DFSReader>dfs://Input.txt</DFSReader>
+          <DFSWriter>dfs://Output####.txt</DFSWriter>
+          <Mode>ALL CORES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+}}}
+</td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_RemoteAllCores.png" alt="RemoteAllCores" /> </td></tr></table>
+
