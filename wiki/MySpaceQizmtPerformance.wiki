@@ -6,20 +6,22 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / <wiki:comment>Link:
 
 <wiki:toc/>
 
-= Qizmt FAQ - Installation =
+= Qizmt FAQ - Performance Tuning =
 
-==After adding more machines to my cluster the exchange phase is not speeding up.==
+==After adding more machines to my cluster mapreduce exuction is not speeding up for me.==
 ----
 
 This is usually caused by adding more servers without adding more non-blocking IO. We recommend at least 1Gb/s of non blocking IO per machine in the cluster of 8-core machines and 2Gb/s non blocking IO per machine in a cluster of 16-core machines. Every machine in the cluster should be able to max out its network card’s bandwidth concurrently between all machines in the cluster.
 
-==After adding more machines to my cluster the map phase is not speeding up.==
+==For some jobs the map phase is slower then the reduce phase.==
 ----
 
-This is usualy the case when the data is so small that one or only a few cores have work to do and there is processing intensive computation being done in the mapper.
+The most common scenario that this occurs is when the data is very small and there is processing intensive logic in the mapper. MR.DFS files are broken up into 64MB parts by default when they are put into MR.DFS. If the input data contains only one or a few 64MB parts then only a few mapper will execute on the data. The easiest remedy for this is to re-spread the data by running it through a mapreducer using the values only and assigning a random Int64 to the key. Then once the data is re-spread, run the resulting MR.DFS file into the mapreducer with processing intensive mapper logic.
 
-If during map, the qizmt perfmon cputime shows just one or a few cores are doing all the work, then it is likely that there aren’t enough parts in the input file for all cores to have to have work to do.
+==For some jobs the reduce phase is slower then the map phase.==
+----
 
-If during the reduce, the qizmt perfmon cputime shows that just one core is doing all the work, then it is likely that all the mapper output the same key.
-
-One common workaround is to respread the data accross the cluster by simply passing it through a grouped-mapreducer job which keys on a random Int64. Then once the data is spread, run the job on the now spread data. The qizmt dir and qizmt info commands can be used to view the number and size of parts in MR.DFS files.
+This is usually the case when the mapper is sending the same key for each tuple of input data. All like-keys will go to the same reducer. The more data is divided up across unique keys, the more the computation can be parallelized in a single mapreducer. This may also occur if:
+ * there is processing intensive logic in the reducer which executes only for a particular key/value.
+ * the reducer expands the key value pairs into combinations or otherwise makes the data larger.
+ * the business logic in the reducer is more computationally expensive then the map logic.
