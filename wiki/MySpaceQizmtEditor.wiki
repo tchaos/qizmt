@@ -1,0 +1,88 @@
+#summary Qizmt Quick-Start Tutorial: Qizmt Editor
+#labels Qizmt,Walkthrough,Tutorial
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Qizmt Editor =
+
+== Smart C# Syntax Coloring ==
+
+Qizmt editor automatically colors C# syntax as it is typed or when code is pasted into the editor.
+
+<table>
+<tr><td> *Concept* </td><td> *Color* </td><td> *Examples* </td></tr>
+
+<tr>
+<td> Keywords </td><td> Blue </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorKeywords.png" alt="SyntaxColorKeywords" /> </td>
+</tr>
+
+<tr>
+<td> Comments </td><td> Green </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorComments.png" alt="SyntaxColorComments" /> </td>
+</tr>
+
+<tr>
+<td> Strings </td><td> Brown </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorStrings.png" alt="SyntaxColorStrings" />
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorChars.png" alt="SyntaxColorChars" /> </td>
+</tr>
+
+<tr>
+<td> XML </td><td> GreyPurple </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorXML.png" alt="SyntaxColorXML" /> </td>
+</tr>
+
+<tr>
+<td> Other text </td><td> Black </td><td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorOtherText1.png" alt="SyntaxColorOtherText1" />   <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorOtherText2.png" alt="SyntaxColorOtherText2" />   <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorOtherText3.png" alt="SyntaxColorOtherText3" />  </td>
+</tr>
+
+<tr>
+<td> Heap Allocations </td> <td> Red </td> <td> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_SyntaxColorHeapAllocs.png" alt="SyntaxColorHeapAllocs" />
+ </td>
+</tr>
+
+</table>
+
+
+== C# Auto Complete ==
+
+Activated when ‘.’ Key is pressed. When available, displays list of member functions on an object:
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorAutoComplete.png" alt="EditorAutoComplete" />
+
+
+== Go to Line Number ==
+*Ctrl+G* or *Edit -> Go to...*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorGoto.png" alt="EditorGoto" />
+
+
+== Code Search ==
+*Ctrl+F* or *Edit->Find…/Find Next/Replace*
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorFindReplace.png" alt="EditorFindReplace" />
+
+
+== Built-In Debugger == 
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorDebugger.png" alt="EditorDebugger" />
+
+<table>
+<tr><td> *Debug Command* </td><td> *Hot Key* </td><td> *Action* </td></tr>
+<tr><td> Resume Debugging </td><td> F5 </td><td> Execute to next breakpoint. </td></tr>
+<tr><td> Stop Debugging </td><td> F12 </td><td> Stop debug mode to continue editing mapreducer. </td></tr>
+<tr><td> Step Into </td><td> F11 </td><td> Step into a function on call stack. </td></tr>
+<tr><td> Step Over </td><td> F10 </td><td> Step over a function on call stack. </td></tr>
+<tr><td> Step Out </td><td> Shift-F11 </td><td> Step out of a function on call stack. </td></tr>
+<tr><td> Toggle Breakpoint </td><td> F9 </td><td> Add or remove a breakpoint. </td></tr>
+<tr><td> Skip to Reduce </td><td> Shift-F12 </td><td> Start reduce phase at end of current map cycle. </td></tr>
+</table>
+
+
+== Debugging Thrown Errors from Mapreduce Jobs ==
+
+ # Write a mapreducer that contains an error: <br /> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorSyntaxError.png" alt="EditorSyntaxError" />
+ # Run mapreducer: <br /> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExecSyntaxError.png" alt="ExecSyntaxError" />
+ # View executed code of last error from machine on which it occurred; use Ctrl-G to go to the line number of the error. In this example The error occurred on line *1307* and glyph 33:  <br />  *`Qizmt edit *errors*`* <br /><wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditErrors.png" alt="EditErrors" />
+
