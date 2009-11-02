@@ -1,0 +1,21 @@
+#summary Qizmt Quick-Start Tutorial: Top-Down Collaborative Filtering
+#labels Qizmt,Tutorial,Walkthrough,Examples,Samples,CollaborativeFiltering
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Top-Down Collaborative Filtering =
+
+<table>
+<tr><td> *Obtain Code* </td><td> Qizmt examples </td></tr>
+<tr><td> *View/Edit Code* </td><td> Qizmt edit Qizmt-CollaborativeFiltering.xml </td></tr>
+<tr><td> *Execute Code* </td><td> Qizmt exec Qizmt-CollaborativeFiltering.xml </td></tr>
+</table>
+
+In this example, remote jobs are used to copy a MR.DFS document to every node in the MR.DFS and then perform Top-Down Collaborative Filtering on such that each core in the cluster does a subset of the work. The resulting scores are then redistributed back out into the MR.DFS. 
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CollaborativeFilteringExample.png" alt="CollaborativeFilteringExample" />
+
