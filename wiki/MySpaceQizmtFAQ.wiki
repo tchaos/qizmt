@@ -7,6 +7,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
 = Qizmt FAQ =
 
+ * [MySpaceQizmtFAQInstallation Installation]
  * [MySpaceQizmtFAQTroubleshoot Troubleshooting]
  * [MySpaceQizmtFAQCSharpCode C# Code]
  * [MySpaceQizmtFAQBinaryAPI Binary API]
