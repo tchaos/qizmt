@@ -1,0 +1,103 @@
+#summary Qizmt Quick-Start Tutorial: Advanced Optimizations
+#labels Qizmt,Tutorial,Walkthrough,Examples,Samples
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Advanced Optimizations =
+
+<table cellspacing="4">
+<tr><td> *Description* </td><td> *XPath in Job file (Qizmt edit `<myjob>`)* </td><td> *Value Range* </td></tr>
+
+<tr>
+<td width="45%" valign="top">
+=== `OutputMethod` ===
+*Default:* sorted
+
+By default the OutputMethod is *sorted* however it may be explicitly changed to *grouped* when fully sorted results are not required because grouped is a cheaper operation then fully sorted. Typically a series of mapreducer pipelines may be significantly optimized by using grouped for the intermediate outputs and sorted for the final mapreducer output:
+ :<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_MapReduceGroupedIntermediate.png" alt="MapReduceGroupedIntermediate" />
+</td>
+<td width="40%" valign="top">
+<br />
+ * SourceCode/Jobs/Job/IOSettings/OutputMethod
+
+*Examples:*
+
+ {{{<OutputMethod>sorted</OutputMethod>}}}
+
+ {{{<OutputMethod>grouped</OutputMethod>}}}
+</td>
+<td width="15%" valign="top">
+<br />
+grouped | sorted
+</td>
+</tr>
+
+<tr>
+<td width="45%" valign="top">
+=== `KeyMajor` ===
+*Default:* Entire Key Length
+
+Change KeyMajor to set how many bytes of the key to consider during machine exchange. By default the entire key is considered to ensure even distribution of data, however, significant performance gains can be achieved by using only a subset of the key during exchange. Generally random and less uniform keys may benefit from a reduction in KeyMajor without skewing the distribution.
+</td>
+<td width="40%" valign="top">
+<br />
+ * SourceCode/Jobs/Job/IOSettings/KeyMajor
+
+*Examples:*
+
+ {{{<KeyMajor>16</KeyMajor>}}}
+
+ {{{<KeyMajor>100</KeyMajor>}}}
+</td>
+<td width="15%" valign="top">
+<br />
+1 - <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_Infinity.png" alt="Infinity" />
+</td>
+</tr>
+
+<tr>
+<td width="45%" valign="top">
+=== `Delta` ===
+*Default:* disabled
+
+When a delta node is added to a mapreducer job, the intermediate files of the mapreduce operation are cached automatically. Subsequent executions of the same mapreduce job will only exchange files which have not been cached by the mapreducer.
+
+==== Explicit Caching ====
+Sometimes automatic caching may have the effect of overly expanding the data. For example, if the delta contains random samples which can be redundant, these random samples will cause the cache to expand to fast if automatic caching is used. When delta is enabled, the reducer code may override the automatic caching by explicitly identifying which key/value pairs to cache after the exchange phase, e.g.
+{{{
+   ... void Reduce(...
+      
+            output.Cache(key, value);
+}}} 
+</td>
+<td width="40%" valign="top">
+<br />
+ * SourceCode/Jobs/Job/Delta/Name
+ * SourceCode/Jobs/Job/Delta/DFSInput
+
+*Examples:*
+{{{
+      <Delta>
+        <Name>mydata_cacheA</Name>
+        <DFSInput>dfs://mydataA*.txt</DFSInput>
+      </Delta>
+}}}
+{{{
+      <Delta>
+        <Name>mydata_cacheB</Name>
+        <DFSInput>dfs://mydataB*.txt</DFSInput>
+      </Delta>
+}}}
+</td>
+<td width="15%" valign="top">
+<br />
+Any valid windows file name.
+</td>
+</tr>
+
+</table>
+
