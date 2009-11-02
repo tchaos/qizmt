@@ -1,0 +1,13 @@
+#summary Qizmt Quick-Start Tutorial: Manual Memory Management
+#labels Qizmt,Walkthrough,Tutorial
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] or <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
+<wiki:toc />
+
+
+= Manual Memory Management in Mapreducers =
+It is sometimes advantageous to use C-style pointers in C# mapreducers. Unsafe for a mapreducer may be enabled by adding an unsafe tag to a mapreducer job. For more on when unsafe should be enabled, see the MSDN documentation for unsafe C#.
+{{{ <Unsafe/> }}}
+
