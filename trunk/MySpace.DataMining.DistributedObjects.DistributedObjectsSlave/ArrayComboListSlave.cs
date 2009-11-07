@@ -241,11 +241,37 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     catch (Exception e)
                     {
+                        bool firstcook = cooking_cooksremain == parent.CookRetries;
                         if (cooking_cooksremain-- <= 0)
                         {
-                            throw new System.IO.IOException("cooked too many times", e);
+                            string ns = " (unable to get connection count)";
+                            try
+                            {
+                                ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                    + " total connections on this machine)";
+                            }
+                            catch
+                            {
+                            }
+                            throw new System.IO.IOException("cooked too many times (retries="
+                                + parent.CookRetries.ToString()
+                                + "; timeout=" + parent.CookTimeout.ToString()
+                                + ") on " + System.Net.Dns.GetHostName() + ns, e);
                         }
                         System.Threading.Thread.Sleep(parent.CookTimeout);
+                        if (firstcook)
+                        {
+                            try
+                            {
+                                XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
+                                    + "; timeout=" + parent.CookTimeout.ToString()
+                                    + ") on " + System.Net.Dns.GetHostName()
+                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                            }
+                            catch
+                            {
+                            }
+                        }
                         continue; // !
                     }
                     break;
@@ -616,9 +642,22 @@ namespace MySpace.DataMining.DistributedObjects5
                     catch(Exception e)
                     {
                         //----------------------------COOKING--------------------------------
+                        bool firstcook = cooking_cooksremain == parent.CookRetries;
                         if (cooking_cooksremain-- <= 0)
                         {
-                            throw new System.IO.IOException("cooked too many times", e);
+                            string ns = " (unable to get connection count)";
+                            try
+                            {
+                                ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                    + " total connections on this machine)";
+                            }
+                            catch
+                            {
+                            }
+                            throw new System.IO.IOException("cooked too many times (retries="
+                                + parent.CookRetries.ToString()
+                                + "; timeout=" + parent.CookTimeout.ToString()
+                                + ") on " + System.Net.Dns.GetHostName() + ns, e);
                         }
                         try
                         {
@@ -628,6 +667,19 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                         }
                         System.Threading.Thread.Sleep(parent.CookTimeout);
+                        if (firstcook)
+                        {
+                            try
+                            {
+                                XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
+                                    + "; timeout=" + parent.CookTimeout.ToString()
+                                    + ") on " + System.Net.Dns.GetHostName()
+                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                            }
+                            catch
+                            {
+                            }
+                        }
                         continue;
                         //----------------------------COOKING--------------------------------
                     }
@@ -944,11 +996,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                 throw;
                             }
                             //----------------------------COOKING--------------------------------
+                            bool firstcook = cooking_cooksremain == parent.CookRetries;
                             if (cooking_cooksremain-- <= 0)
                             {
-                                throw new System.IO.IOException("cooked too many times", e);
+                                string ns = " (unable to get connection count)";
+                                try
+                                {
+                                    ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                        + " total connections on this machine)";
+                                }
+                                catch
+                                {
+                                }
+                                throw new System.IO.IOException("cooked too many times (retries="
+                                    + parent.CookRetries.ToString()
+                                    + "; timeout=" + parent.CookTimeout.ToString()
+                                    + ") on " + System.Net.Dns.GetHostName() + ns, e);
                             }
                             System.Threading.Thread.Sleep(parent.CookTimeout);
+                            if (firstcook)
+                            {
+                                try
+                                {
+                                    XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
+                                        + "; timeout=" + parent.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName()
+                                        + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                }
+                                catch
+                                {
+                                }
+                            }
                             continue;
                             //----------------------------COOKING--------------------------------
                         }
@@ -1201,13 +1279,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                     throw;
                                 }
                                 //----------------------------COOKING--------------------------------
-                                /*if (cooking_cooksremain-- <= 0)
-                                {
-                                    throw new System.IO.IOException("cooked too many times", e);
-                                }
-                                System.Threading.Thread.Sleep(parent.CookTimeout);
-                                continue;
-                                 * */
                                 throw new NeedCookingException(e);
                                 //----------------------------COOKING--------------------------------
                             }
@@ -1250,11 +1321,37 @@ namespace MySpace.DataMining.DistributedObjects5
                         catch (NeedCookingException e)
                         {
                             //----------------------------COOKING--------------------------------
+                            bool firstcook = cooking_cooksremain == acl.CookRetries;
                             if (cooking_cooksremain-- <= 0)
                             {
-                                throw new System.IO.IOException("cooked too many times", e.InnerException); // InnerException!
+                                string ns = " (unable to get connection count)";
+                                try
+                                {
+                                    ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                        + " total connections on this machine)";
+                                }
+                                catch
+                                {
+                                }
+                                throw new System.IO.IOException("cooked too many times (retries="
+                                    + acl.CookRetries.ToString()
+                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                    + ") on " + System.Net.Dns.GetHostName() + ns, e.InnerException); // InnerException!
                             }
                             System.Threading.Thread.Sleep(acl.CookTimeout);
+                            if (firstcook)
+                            {
+                                try
+                                {
+                                    XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
+                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName()
+                                        + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                }
+                                catch
+                                {
+                                }
+                            }
                             continue;
                             //----------------------------COOKING--------------------------------
                         }
@@ -1265,11 +1362,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                 throw;
                             }
                             //----------------------------COOKING--------------------------------
+                            bool firstcook = cooking_cooksremain == acl.CookRetries;
                             if (cooking_cooksremain-- <= 0)
                             {
-                                throw new System.IO.IOException("cooked too many times", e);
+                                string ns = " (unable to get connection count)";
+                                try
+                                {
+                                    ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                        + " total connections on this machine)";
+                                }
+                                catch
+                                {
+                                }
+                                throw new System.IO.IOException("cooked too many times (retries="
+                                    + acl.CookRetries.ToString()
+                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                    + ") on " + System.Net.Dns.GetHostName() + ns, e);
                             }
                             System.Threading.Thread.Sleep(acl.CookTimeout);
+                            if (firstcook)
+                            {
+                                try
+                                {
+                                    XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
+                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName()
+                                        + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                }
+                                catch
+                                {
+                                }
+                            }
                             continue;
                             //----------------------------COOKING--------------------------------
                         }
@@ -1407,11 +1530,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                 throw;
                             }
                             //----------------------------COOKING--------------------------------
+                            bool firstcook = cooking_cooksremain == acl.CookRetries;
                             if (cooking_cooksremain-- <= 0)
                             {
-                                throw new System.IO.IOException("cooked too many times", e);
+                                string ns = " (unable to get connection count)";
+                                try
+                                {
+                                    ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                        + " total connections on this machine)";
+                                }
+                                catch
+                                {
+                                }
+                                throw new System.IO.IOException("cooked too many times (retries="
+                                    + acl.CookRetries.ToString()
+                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                    + ") on " + System.Net.Dns.GetHostName() + ns, e);
                             }
                             System.Threading.Thread.Sleep(acl.CookTimeout);
+                            if (firstcook)
+                            {
+                                try
+                                {
+                                    XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
+                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName()
+                                        + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                }
+                                catch
+                                {
+                                }
+                            }
                             continue;
                             //----------------------------COOKING--------------------------------
                         }
@@ -1588,11 +1737,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                 }
                                 stm = null; // Reopen.
                                 //----------------------------COOKING--------------------------------
+                                bool firstcook = cooking_cooksremain == parent.parent.CookRetries;
                                 if (cooking_cooksremain-- <= 0)
                                 {
-                                    throw new System.IO.IOException("cooked too many times", e);
+                                    string ns = " (unable to get connection count)";
+                                    try
+                                    {
+                                        ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                            + " total connections on this machine)";
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    throw new System.IO.IOException("cooked too many times (retries="
+                                        + parent.parent.CookRetries.ToString()
+                                        + "; timeout=" + parent.parent.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                 }
                                 System.Threading.Thread.Sleep(parent.parent.CookTimeout);
+                                if (firstcook)
+                                {
+                                    try
+                                    {
+                                        XLog.errorlog("cooking started (retries=" + parent.parent.CookRetries.ToString()
+                                            + "; timeout=" + parent.parent.CookTimeout.ToString()
+                                            + ") on " + System.Net.Dns.GetHostName()
+                                            + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
                                 continue;
                                 //----------------------------COOKING--------------------------------
                             }
@@ -1707,11 +1882,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                     {
                                         stm = null; // Reopen.
                                         //----------------------------COOKING--------------------------------
+                                        bool firstcook = cooking_cooksremain == acl.CookRetries;
                                         if (cooking_cooksremain-- <= 0)
                                         {
-                                            throw new System.IO.IOException("cooked too many times", e.InnerException); // InnerException!
+                                            string ns = " (unable to get connection count)";
+                                            try
+                                            {
+                                                ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                                    + " total connections on this machine)";
+                                            }
+                                            catch
+                                            {
+                                            }
+                                            throw new System.IO.IOException("cooked too many times (retries="
+                                                + acl.CookRetries.ToString()
+                                                + "; timeout=" + acl.CookTimeout.ToString()
+                                                + ") on " + System.Net.Dns.GetHostName() + ns, e.InnerException); // InnerException!
                                         }
                                         System.Threading.Thread.Sleep(acl.CookTimeout);
+                                        if (firstcook)
+                                        {
+                                            try
+                                            {
+                                                XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
+                                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                                    + ") on " + System.Net.Dns.GetHostName()
+                                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                            }
+                                            catch
+                                            {
+                                            }
+                                        }
                                         continue;
                                         //----------------------------COOKING--------------------------------
                                     }
@@ -1723,11 +1924,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                         }
                                         stm = null; // Reopen.
                                         //----------------------------COOKING--------------------------------
+                                        bool firstcook = cooking_cooksremain == acl.CookRetries;
                                         if (cooking_cooksremain-- <= 0)
                                         {
-                                            throw new System.IO.IOException("cooked too many times", e);
+                                            string ns = " (unable to get connection count)";
+                                            try
+                                            {
+                                                ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                                    + " total connections on this machine)";
+                                            }
+                                            catch
+                                            {
+                                            }
+                                            throw new System.IO.IOException("cooked too many times (retries="
+                                                + acl.CookRetries.ToString()
+                                                + "; timeout=" + acl.CookTimeout.ToString()
+                                                + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                         }
                                         System.Threading.Thread.Sleep(acl.CookTimeout);
+                                        if (firstcook)
+                                        {
+                                            try
+                                            {
+                                                XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
+                                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                                    + ") on " + System.Net.Dns.GetHostName()
+                                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                            }
+                                            catch
+                                            {
+                                            }
+                                        }
                                         continue;
                                         //----------------------------COOKING--------------------------------
                                     }
@@ -1973,11 +2200,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                     throw;
                                 }
                                 //----------------------------COOKING--------------------------------
+                                bool firstcook = cooking_cooksremain == parent.CookRetries;
                                 if (cooking_cooksremain-- <= 0)
                                 {
-                                    throw new System.IO.IOException("cooked too many times", e);
+                                    string ns = " (unable to get connection count)";
+                                    try
+                                    {
+                                        ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                            + " total connections on this machine)";
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    throw new System.IO.IOException("cooked too many times (retries="
+                                        + parent.CookRetries.ToString()
+                                        + "; timeout=" + parent.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                 }
                                 System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(parent.CookTimeout));
+                                if (firstcook)
+                                {
+                                    try
+                                    {
+                                        XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
+                                            + "; timeout=" + parent.CookTimeout.ToString()
+                                            + ") on " + System.Net.Dns.GetHostName()
+                                            + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
                                 continue;
                                 //----------------------------COOKING--------------------------------
                             }
@@ -2159,11 +2412,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                     throw;
                                 }
                                 //----------------------------COOKING--------------------------------
+                                bool firstcook = cooking_cooksremain == parent.CookRetries;
                                 if (cooking_cooksremain-- <= 0)
                                 {
-                                    throw new System.IO.IOException("cooked too many times", e);
+                                    string ns = " (unable to get connection count)";
+                                    try
+                                    {
+                                        ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                            + " total connections on this machine)";
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    throw new System.IO.IOException("cooked too many times (retries="
+                                        + parent.CookRetries.ToString()
+                                        + "; timeout=" + parent.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                 }
                                 System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(parent.CookTimeout));
+                                if (firstcook)
+                                {
+                                    try
+                                    {
+                                        XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
+                                            + "; timeout=" + parent.CookTimeout.ToString()
+                                            + ") on " + System.Net.Dns.GetHostName()
+                                            + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
                                 continue;
                                 //----------------------------COOKING--------------------------------
                             }
@@ -3063,11 +3342,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                     throw;
                                 }
                                 {
+                                    bool firstcook = cooking_cooksremain == CookRetries;
                                     if (cooking_cooksremain-- <= 0)
                                     {
-                                        throw new System.IO.IOException("cooked too many times", e);
+                                        string ns = " (unable to get connection count)";
+                                        try
+                                        {
+                                            ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                                + " total connections on this machine)";
+                                        }
+                                        catch
+                                        {
+                                        }
+                                        throw new System.IO.IOException("cooked too many times (retries="
+                                            + CookRetries.ToString()
+                                            + "; timeout=" + CookTimeout.ToString()
+                                            + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                     }
                                     System.Threading.Thread.Sleep(CookTimeout);
+                                    if (firstcook)
+                                    {
+                                        try
+                                        {
+                                            XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
+                                                + "; timeout=" + CookTimeout.ToString()
+                                                + ") on " + System.Net.Dns.GetHostName()
+                                                + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                        }
+                                        catch
+                                        {
+                                        }
+                                    }
                                     continue; // !
                                 }
                             }
@@ -3546,9 +3851,22 @@ namespace MySpace.DataMining.DistributedObjects5
 #if DEBUG
                         //System.Threading.Thread.Sleep(1000 * 8);
 #endif
+                        bool firstcook = cooking_cooksremain == acl.CookRetries;
                         if (cooking_cooksremain-- <= 0)
                         {
-                            throw new System.IO.IOException("cooked too many times", e);
+                            string ns = " (unable to get connection count)";
+                            try
+                            {
+                                ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                    + " total connections on this machine)";
+                            }
+                            catch
+                            {
+                            }
+                            throw new System.IO.IOException("cooked too many times (retries="
+                                + acl.CookRetries.ToString()
+                                + "; timeout=" + acl.CookTimeout.ToString()
+                                + ") on " + System.Net.Dns.GetHostName() + ns, e);
                         }
                         if (cooking_stream_is_open)
                         {
@@ -3557,6 +3875,19 @@ namespace MySpace.DataMining.DistributedObjects5
                             cooking_stream_is_open = false;
                         }
                         System.Threading.Thread.Sleep(acl.CookTimeout);
+                        if (firstcook)
+                        {
+                            try
+                            {
+                                XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
+                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                    + ") on " + System.Net.Dns.GetHostName()
+                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                            }
+                            catch
+                            {
+                            }
+                        }
                         continue; // !
                     }
                     break;
@@ -4681,15 +5012,41 @@ namespace MySpace.DataMining.DistributedObjects5
                                                     }
                                                     catch (Exception e)
                                                     {
+                                                        bool firstcook = cooking_cooksremain == CookRetries;
                                                         if (cooking_cooksremain-- <= 0)
                                                         {
-                                                            throw new System.IO.IOException("cooked too many times", e);
+                                                            string ns = " (unable to get connection count)";
+                                                            try
+                                                            {
+                                                                ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                                                    + " total connections on this machine)";
+                                                            }
+                                                            catch
+                                                            {
+                                                            }
+                                                            throw new System.IO.IOException("cooked too many times (retries="
+                                                                + CookRetries.ToString()
+                                                                + "; timeout=" + CookTimeout.ToString()
+                                                                + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                                         }
                                                         if (cooking_stream_is_open)
                                                         {
                                                             throw;
                                                         }
                                                         System.Threading.Thread.Sleep(CookTimeout);
+                                                        if (firstcook)
+                                                        {
+                                                            try
+                                                            {
+                                                                XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
+                                                                    + "; timeout=" + CookTimeout.ToString()
+                                                                    + ") on " + System.Net.Dns.GetHostName()
+                                                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                                            }
+                                                            catch
+                                                            {
+                                                            }
+                                                        }
                                                         continue; // !
                                                     }
                                                     break;
@@ -4874,7 +5231,6 @@ namespace MySpace.DataMining.DistributedObjects5
                     if (cooking_is_cooked)
                     {
                         cooking_is_cooked = false;
-                        System.Threading.Thread.Sleep(CookTimeout);
                         stm.Close();
                         stm = new System.IO.FileStream(sfn, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, iFILE_BUFFER_SIZE);
                         {
@@ -4919,9 +5275,36 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         throw;
                     }
+                    bool firstcook = cooking_cooksremain == CookRetries;
                     if (cooking_cooksremain-- <= 0)
                     {
-                        throw new System.IO.IOException("cooked too many times", e);
+                        string ns = " (unable to get connection count)";
+                        try
+                        {
+                            ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                + " total connections on this machine)";
+                        }
+                        catch
+                        {
+                        }
+                        throw new System.IO.IOException("cooked too many times (retries="
+                            + CookRetries.ToString()
+                            + "; timeout=" + CookTimeout.ToString()
+                            + ") on " + System.Net.Dns.GetHostName() + ns, e);
+                    }
+                    System.Threading.Thread.Sleep(CookTimeout);
+                    if (firstcook)
+                    {
+                        try
+                        {
+                            XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
+                                + "; timeout=" + CookTimeout.ToString()
+                                + ") on " + System.Net.Dns.GetHostName()
+                                + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                        }
+                        catch
+                        {
+                        }
                     }
                     cooking_is_cooked = true;
                     continue;
@@ -5406,11 +5789,37 @@ namespace MySpace.DataMining.DistributedObjects5
                                     throw;
                                 }
                                 //----------------------------COOKING--------------------------------
+                                bool firstcook = cooking_cooksremain == acl.CookRetries;
                                 if (cooking_cooksremain-- <= 0)
                                 {
-                                    throw new System.IO.IOException("cooked too many times", e);
+                                    string ns = " (unable to get connection count)";
+                                    try
+                                    {
+                                        ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                            + " total connections on this machine)";
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    throw new System.IO.IOException("cooked too many times (retries="
+                                        + acl.CookRetries.ToString()
+                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                        + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                 }
                                 System.Threading.Thread.Sleep(acl.CookTimeout);
+                                if (firstcook)
+                                {
+                                    try
+                                    {
+                                        XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
+                                            + "; timeout=" + acl.CookTimeout.ToString()
+                                            + ") on " + System.Net.Dns.GetHostName()
+                                            + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
                                 continue;
                                 //----------------------------COOKING--------------------------------
                             }

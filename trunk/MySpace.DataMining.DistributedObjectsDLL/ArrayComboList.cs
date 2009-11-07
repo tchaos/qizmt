@@ -924,7 +924,6 @@ namespace UserMapper
                             if(cooking_is_cooked)
                             {
                                 cooking_is_cooked = false;
-                                System.Threading.Thread.Sleep(_CookTimeout);
                                 input.Reopen(cooking_pos);
                             }
                             //----------------------------COOKING--------------------------------
@@ -1015,9 +1014,36 @@ namespace UserMapper
                     {
                         throw;
                     }
+                    bool firstcook = cooking_cooksremain == _CookRetries;
                     if(cooking_cooksremain-- <= 0)
                     {
-                        throw new System.IO.IOException(`cooked too many times`, e);
+                            string ns = ` (unable to get connection count)`;
+                            try
+                            {
+                                ns = ` (` + NetUtils.GetActiveConnections().Length.ToString()
+                                    + ` total connections on this machine)`;
+                            }
+                            catch
+                            {
+                            }
+                        throw new System.IO.IOException(`cooked too many times (retries=`
+                            + _CookRetries.ToString()
+                            + `; timeout=` + _CookTimeout.ToString()
+                            + `) on ` + System.Net.Dns.GetHostName() + ns, e);
+                    }
+                    System.Threading.Thread.Sleep(_CookTimeout);
+                    if (firstcook)
+                    {
+                        try
+                        {
+                            Qizmt_Log(`cooking started (retries=` + _CookRetries.ToString()
+                                + `; timeout=` + _CookTimeout.ToString()
+                                + `) on ` + System.Net.Dns.GetHostName()
+                                + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                        }
+                        catch
+                        {
+                        }
                     }
                     cooking_is_cooked = true;
                     continue;

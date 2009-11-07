@@ -2333,7 +2333,7 @@ public void DSpace_LogResult(string name, bool passed)
                                                 fn.Position = totalsize; // Position must be set before totalsize updated!
                                                 if (j >= sizes.Count)
                                                 {
-                                                    Console.Error.WriteLine("Warning: size not provided for data node chunk");
+                                                    Console.Error.WriteLine("Warning: size not provided for data node chunk from host " + fn.Host);
                                                     anybad = true;
                                                     continue;
                                                 }
@@ -2342,7 +2342,7 @@ public void DSpace_LogResult(string name, bool passed)
                                                     if (!foundzero)
                                                     {
                                                         foundzero = true;
-                                                        Console.Error.WriteLine("Warning: zero-size data node chunk encountered");
+                                                        Console.Error.WriteLine("Warning: zero-size data node chunk encountered from host " + fn.Host);
                                                     }
                                                 }
                                                 fn.Length = sizes[j];

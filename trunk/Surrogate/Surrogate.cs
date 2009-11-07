@@ -2135,7 +2135,15 @@ namespace MySpace.DataMining.AELight
                     {
                         string name = Settings[i].name; // SettingOverride.name fixes user-friendly xpath.
                         result[i * 2 + 0] = name;
-                        result[i * 2 + 1] = Settings[i].value;
+                        string value = Settings[i].value;
+                        if (value == "NearPrime2XCoreCount")
+                        {
+                            dfs thisdfs = Surrogate.ReadMasterDfsConfig();
+                            int machinecount = thisdfs.Slaves.SlaveList.Split(';').Length;
+                            int corecount = Surrogate.NumberOfProcessors;
+                            value = Surrogate.NearestPrimeLE(machinecount * corecount * 2).ToString();
+                        }
+                        result[i * 2 + 1] = value;
                     }
                     return result;
                 }
@@ -2486,6 +2494,41 @@ namespace MySpace.DataMining.AELight
                 }
                 return _ncpus;
             }
+        }
+
+        public static bool IsPrime(int x)
+        {
+            if (x <= 1)
+            {
+                return false;
+            }
+            for (int y = 2; y < x; y++)
+            {
+                if (0 == (x % y))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static int NearestPrimeLE(int x)
+        {
+            if (x > 2)
+            {
+                if (IsPrime(x))
+                {
+                    return x;
+                }
+                for (int w = x - 1; w >= 2; w--)
+                {
+                    if (IsPrime(w))
+                    {
+                        return w;
+                    }
+                }
+            }
+            return 2;
         }
 
 

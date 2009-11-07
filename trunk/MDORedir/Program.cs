@@ -55,6 +55,7 @@ namespace MDORedir
 
             System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(exedir + @"\dspace.exe", sargs);
             psi.UseShellExecute = false;
+            psi.EnvironmentVariables.Add("MDORedir", System.Diagnostics.Process.GetCurrentProcess().Id.ToString());
             System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
             proc.WaitForExit();
             proc.Close();

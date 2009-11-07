@@ -29,6 +29,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Linq;
 
 
 namespace MySpace.DataMining.DistributedObjects5
@@ -617,6 +618,48 @@ namespace MySpace.DataMining.DistributedObjects5
                                     stoplog.WriteLine("            ERROR (see errorlog)");
                                 }
                             }
+                            System.Threading.Thread.Sleep(1000);
+                        }
+                        {
+                            int[] invincibles;
+                            {
+                                try
+                                {
+                                    string invfp = "invincible.dat";
+                                    string[] sinvs = System.IO.File.ReadAllLines(invfp);
+                                    invincibles = new int[sinvs.Length];
+                                    for (int i = 0; i < sinvs.Length; i++)
+                                    {
+                                        int.TryParse(sinvs[i], out invincibles[i]);
+                                    }
+                                    System.IO.File.Delete(invfp);
+                                }
+                                catch
+                                {
+                                    invincibles = new int[0];
+                                }
+                            }
+                            List<System.Diagnostics.Process> procs = new List<Process>();
+                            procs.AddRange(System.Diagnostics.Process.GetProcessesByName("aelight"));
+                            procs.AddRange(System.Diagnostics.Process.GetProcessesByName("dspace"));
+                            procs.AddRange(System.Diagnostics.Process.GetProcessesByName("qizmt"));
+                            procs.AddRange(System.Diagnostics.Process.GetProcessesByName("mrdebug"));
+                            foreach (System.Diagnostics.Process proc in procs)
+                            {
+                                if (invincibles.Contains(proc.Id))
+                                {
+                                    continue;
+                                }
+                                try
+                                {
+                                    proc.Kill();
+                                    proc.WaitForExit(500);
+                                }
+                                catch (Exception e)
+                                {
+                                    XLog.errorlog("Error killing process during service OnStop: " + e.ToString());
+                                }
+                            }
                         }
                     }
 
@@ -1194,11 +1237,28 @@ namespace MySpace.DataMining.DistributedObjects5
                                                 }
                                                 catch (Exception e)
                                                 {
+                                                    bool firstcook = cooking_cooksremain == CookRetries;
                                                     if (cooking_cooksremain-- <= 0)
                                                     {
-                                                        throw new System.IO.IOException("cooked too many times (CookRetries=" + CookRetries.ToString() + ")", e);
+                                                        throw new System.IO.IOException("cooked too many times (retries="
+                                                            + CookRetries.ToString()
+                                                            + "; timeout=" + CookTimeout.ToString()
+                                                            + ") on " + System.Net.Dns.GetHostName(), e);
                                                     }
                                                     System.Threading.Thread.Sleep(CookTimeout);
+                                                    if (firstcook)
+                                                    {
+                                                        try
+                                                        {
+                                                            XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
+                                                                + "; timeout=" + CookTimeout.ToString()
+                                                                + ") on " + System.Net.Dns.GetHostName()
+                                                                + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                                        }
+                                                        catch
+                                                        {
+                                                        }
+                                                    }
                                                     continue; // !
                                                 }
                                                 break;

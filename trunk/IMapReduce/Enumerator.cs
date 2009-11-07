@@ -2122,6 +2122,141 @@ namespace MySpace.DataMining.DistributedObjects
     }
 
 
+    public class NetUtils
+    {
+
+        public class ActiveConnection
+        {
+            public string Protocol;
+            public string LocalAddress;
+            public int LocalPort;
+            public string ForeignAddress;
+            public int ForeignPort;
+            public string State;
+
+            public override string ToString()
+            {
+                string slp = "";
+                if (LocalPort >= 0)
+                {
+                    slp = ":" + LocalPort;
+                }
+                string sfp = "";
+                if (ForeignPort >= 0)
+                {
+                    sfp = ":" + ForeignPort;
+                }
+                return Protocol
+                    + "\t" + LocalAddress + slp
+                    + "\t" + ForeignAddress + sfp
+                    + "\t" + State;
+            }
+
+            public override int GetHashCode()
+            {
+                return unchecked(Protocol.GetHashCode()
+                    + LocalAddress.GetHashCode()
+                    + LocalPort.GetHashCode()
+                    + ForeignAddress.GetHashCode()
+                    + ForeignPort.GetHashCode()
+                    + State.GetHashCode());
+
+            }
+
+            public override bool Equals(object obj)
+            {
+                ActiveConnection ac = obj as ActiveConnection;
+                if (null == ac)
+                {
+                    return false;
+                }
+                return Equals(ac);
+            }
+
+            public bool Equals(ActiveConnection that)
+            {
+                return this.Protocol == that.Protocol
+                    && this.LocalAddress == that.LocalAddress
+                    && this.LocalPort == that.LocalPort
+                    && this.ForeignAddress == that.ForeignAddress
+                    && this.ForeignPort == that.ForeignPort
+                    && this.State == that.State;
+            }
+
+        }
+
+        public static ActiveConnection[] GetActiveConnections()
+        {
+            List<ActiveConnection> results = new List<ActiveConnection>();
+            string[] lines = Exec.Shell("netstat -n").Split(new char[] { '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            char[] sp = new char[] { ' ', '\t' };
+            bool StartedActiveConnections = false;
+            bool StartedProtoHeader = false;
+            foreach (string line in lines)
+            {
+                if (!StartedActiveConnections)
+                {
+                    if (line.StartsWith("Active Connections"))
+                    {
+                        StartedActiveConnections = true;
+                    }
+                }
+                else if(!StartedProtoHeader)
+                {
+                    string tline = line.Trim();
+                    if (tline.StartsWith("Proto"))
+                    {
+                        StartedProtoHeader = true;
+                    }
+                }
+                else
+                {
+                    if (0 == line.Length
+                        || (' ' != line[0] && '\t' != line[0]))
+                    {
+                        break;
+                    }
+                    string[] parts = line.Split(sp, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 4)
+                    {
+                        break;
+                    }
+                    ActiveConnection ac = new ActiveConnection();
+                    ac.Protocol = parts[0];
+                    GetAddressParts(parts[1], out ac.LocalAddress, out ac.LocalPort);
+                    GetAddressParts(parts[2], out ac.ForeignAddress, out ac.ForeignPort);
+                    ac.State = parts[3];
+                    results.Add(ac);
+                }
+
+            }
+            return results.ToArray();
+        }
+
+
+        public static void GetAddressParts(string input, out string host, out int port)
+        {
+            int ilc = input.LastIndexOf(':');
+            string sport = "";
+            if (-1 != ilc)
+            {
+                host = input.Substring(0, ilc);
+                sport = input.Substring(ilc + 1);
+            }
+            else
+            {
+                host = input;
+            }
+            if (!int.TryParse(sport, out port))
+            {
+                port = -1;
+            }
+        }
+
+    }
+
+
     public class MemoryUtils
     {
         static int _deffbsz = 0;
