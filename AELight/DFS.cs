@@ -790,6 +790,9 @@ namespace MySpace.DataMining.AELight
             List<string> files = null;
             List<string> dirs = null;
             string pttn = "*.txt";
+            string dfsfilename = "";
+            string mode = "";
+            const string contimode = "continuous";
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -799,7 +802,7 @@ namespace MySpace.DataMining.AELight
                 if (del > -1)
                 {
                     sval = skey.Substring(del + 1);
-                    skey = skey.Substring(0, del);                    
+                    skey = skey.Substring(0, del);
                 }
                 if (sval.Length == 0)
                 {
@@ -819,7 +822,7 @@ namespace MySpace.DataMining.AELight
                             else
                             {
                                 files.AddRange(sval.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
-                            }        
+                            }
                         }
                         break;
 
@@ -833,24 +836,43 @@ namespace MySpace.DataMining.AELight
                             else
                             {
                                 dirs.AddRange(sval.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
-                            }  
+                            }
                         }
                         break;
 
-                    case "pattern":                        
-                        pttn = sval;                        
+                    case "pattern":
+                        pttn = sval;
+                        break;
+
+                    case "dfsfilename":
+                        dfsfilename = sval;
+                        if (dfsfilename.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            dfsfilename = dfsfilename.Substring(6);
+                        }
+                        break;
+
+                    case "mode":
+                        mode = sval;
                         break;
 
                     default:
                         Console.Error.WriteLine("fput error:  Invalid argument: {0}", skey);
                         SetFailure();
                         return;
-                }                
+                }
+            }
+
+            if (mode == contimode && dfsfilename.Length == 0)
+            {
+                Console.Error.WriteLine("fput error:  Must provide dfsfilename when mode is {0}.", contimode);
+                SetFailure();
+                return;
             }
 
             List<string> fileList = new List<string>();
             List<string> nonExist = new List<string>();
-            List<string> srcHost = new List<string>();
+            Dictionary<string, int> uniqueSrcHosts = new Dictionary<string, int>();
 
             if (files == null && dirs == null)
             {
@@ -865,7 +887,11 @@ namespace MySpace.DataMining.AELight
                     if (System.IO.File.Exists(files[i]))
                     {
                         fileList.Add(files[i]);
-                        srcHost.Add(GetHostName(files[i]));
+                        string thissrchost = GetHostName(files[i]).ToUpper();
+                        if (!uniqueSrcHosts.ContainsKey(thissrchost))
+                        {
+                            uniqueSrcHosts.Add(thissrchost, 0);
+                        }
                     }
                     else
                     {
@@ -883,7 +909,11 @@ namespace MySpace.DataMining.AELight
                         string[] matched = System.IO.Directory.GetFiles(dirs[i], pttn);
                         if (matched.Length > 0)
                         {
-                            srcHost.Add(GetHostName(dirs[i]));
+                            string thissrchost = GetHostName(dirs[i]).ToUpper();
+                            if (!uniqueSrcHosts.ContainsKey(thissrchost))
+                            {
+                                uniqueSrcHosts.Add(thissrchost, 0);
+                            }
                         }
                         for (int j = 0; j < matched.Length; j++)
                         {
@@ -909,9 +939,13 @@ namespace MySpace.DataMining.AELight
             }
 
             string[] hosts = null;
+            int cooktimeout = -1;
+            int cookretries = -1;
             {
                 dfs dc = LoadDfsConfig();               
                 hosts = dc.Slaves.SlaveList.Split(';');
+                cooktimeout = dc.slave.CookTimeout;
+                cookretries = dc.slave.CookRetries;
             }
 
             Random rand = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
@@ -923,129 +957,473 @@ namespace MySpace.DataMining.AELight
                 hosts[i] = str;
             }
 
-            StringBuilder sb = new StringBuilder();
-            sb.Append(@"<SourceCode>
-                <Jobs>
-                <Job Name="""" Custodian="""" Email="""" Description="""">
-                   <IOSettings>        
-                          <JobType>remote</JobType>");
-
-            List<string> nFileList = new List<string>();
-            int cnt = 0;
-            while (fileList.Count > 0)
+            if (mode != contimode)
             {
                 for (int i = 0; i < fileList.Count; i++)
                 {
-                    if (fileList[i].Contains(srcHost[cnt % srcHost.Count]))
+                    int r = rand.Next() % fileList.Count;
+                    string str = fileList[r];
+                    fileList[r] = fileList[i];
+                    fileList[i] = str;
+                }
+
+                int batchsize = Math.Min(uniqueSrcHosts.Count, hosts.Length) * 8;
+                int curfile = 0;
+                int curhost = 0;
+                for (; ; )
+                {
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append(@"<SourceCode>
+                <Jobs>
+                <Job Name=`` Custodian=`` Email=`` Description=``>
+                   <IOSettings>        
+                          <JobType>remote</JobType>");
+
+                    int batched = 0;
+                    while (batched < batchsize && curfile < fileList.Count)
                     {
-                        System.IO.FileInfo fInfo = new System.IO.FileInfo(fileList[i]);
+                        if (curhost >= hosts.Length)
+                        {
+                            curhost = 0;
+                        }
+
+                        System.IO.FileInfo fInfo = new System.IO.FileInfo(fileList[curfile]);
                         sb.Append(@"<DFS_IO>
-                                <DFSReader></DFSReader>          
-                                <DFSWriter>");
+                        <DFSReader></DFSReader>          
+                        <DFSWriter>");
                         sb.Append(fInfo.Name);
                         sb.Append(@"</DFSWriter>
-                                <Host>");
-                        sb.Append(hosts[cnt % hosts.Length]);
-                        sb.Append(@"</Host>
-                                </DFS_IO>");
-                        nFileList.Add(fileList[i]);
-                        fileList.RemoveAt(i);
-                        break;
-                    }
-                }
-                cnt++;
-            }
+                        <Host>");
+                        sb.Append(hosts[curhost]);
+                        sb.Append(@"</Host><Meta>");
+                        sb.Append(fileList[curfile]);
+                        sb.Append(@"</Meta>
+                        </DFS_IO>");
 
-            sb.Append(@"      </IOSettings>
+                        batched++;
+                        curfile++;
+                        curhost++;
+                    }
+
+                    sb.Append(@"      </IOSettings>
       <Remote>
         <![CDATA[
             public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
             {
-                string inFile = """";
-                switch ( Qizmt_ProcessID ) 
-                {");
+                string inFile = Qizmt_Meta;
+                bool isgz = inFile.EndsWith(`.gz`, StringComparison.OrdinalIgnoreCase);
 
-            for (int i = 0; i < nFileList.Count; i++)
-            {
-                sb.Append("\n  case " + i);
-                sb.Append(":\n      inFile = @\"" + nFileList[i]);
-                sb.Append("\";\n      break;\n");
-            }
-            sb.Append(@"}
-                try 
+                //----------------------------COOKING--------------------------------
+                int cooktimeout = ");
+                    sb.Append(cooktimeout);
+                    sb.Append(@";
+                int cookretries = ");
+                    sb.Append(cookretries);
+                    sb.Append(@";
+                bool cooking_is_cooked = false;
+                int cooking_cooksremain = cookretries;
+                bool cooking_is_read = false;
+                long cooking_pos = 0;
+                //----------------------------COOKING--------------------------------
+
+                System.IO.Stream fs = null;
+                const int MAXREAD = 0x400 * 64;
+                byte[] fbuf = new byte[MAXREAD];
+                bool bomdone = false;
+
+                while (true)
                 {
-                    using (System.IO.FileStream _fs = new System.IO.FileStream(inFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                    try
                     {
-                        System.IO.Stream fs = null;
-                        const int MAXREAD = 0x400 * 64;
-                        byte[] fbuf = new byte[MAXREAD];
+                        //----------------------------COOKING--------------------------------
+                        cooking_is_read = true;
 
-                        if (inFile.EndsWith("".gz"", StringComparison.OrdinalIgnoreCase))
+                        if (cooking_is_cooked)
                         {
-                            fs = new System.IO.Compression.GZipStream(_fs, System.IO.Compression.CompressionMode.Decompress);
-                            fbuf[0] = (byte)fs.ReadByte();
-                            fbuf[1] = (byte)fs.ReadByte();
-                            fbuf[2] = (byte)fs.ReadByte();
+                            cooking_is_cooked = false;
+                            System.Threading.Thread.Sleep(cooktimeout);
+                            if (fs != null)
+                            {
+                                fs.Close();
+                            }                        
+                            fs = new System.IO.FileStream(inFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);                        
+                            if (isgz)
+                            {
+                                fs = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionMode.Decompress);
+                            }                        
+                            fs.Seek(cooking_pos, System.IO.SeekOrigin.Begin);
+                        }
+                        //----------------------------COOKING--------------------------------
 
+                        if (fs == null)
+                        {
+                            fs = new System.IO.FileStream(inFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
+                            if (isgz)
+                            {
+                                fs = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionMode.Decompress);
+                            }
+                        }
+
+                        if (!bomdone)
+                        {                        
+                            int bomread = fs.Read(fbuf, 0, 3);
+                            bomdone = true;
+                            //----------------------------COOKING--------------------------------
+                            cooking_pos = bomread;
+                            cooking_is_read = false;
+                            //----------------------------COOKING--------------------------------
                             if (!(fbuf[0] == 0xEF && fbuf[1] == 0xBB && fbuf[2] == 0xBF))
                             {
-                                for (int i = 0; i < 3; i++)
+                                for (int i = 0; i < bomread; i++)
                                 {
-                                    if (fbuf[i] != -1)
-                                    {
-                                        dfsoutput.WriteByte(fbuf[i]);
-                                    }
-                                }                        
-                            }
+                                    dfsoutput.WriteByte(fbuf[i]);
+                                }
+                            }                  
                         }
-                        else
+
+                        cooking_is_read = true;
+                        int read = fs.Read(fbuf, 0, MAXREAD);
+                        if (read < 1)
                         {
-                            fs = _fs;                   	
-                            fs.Read(fbuf, 0, 3);
-
-                            if (!(fbuf[0] == 0xEF && fbuf[1] == 0xBB && fbuf[2] == 0xBF))
-                            {
-                                fs.Position = 0;
-                            }
+                            break;
                         }
-
-                        int read = 0;
-                        for (; ; )
-                        {
-                            read = fs.Read(fbuf, 0, MAXREAD);
-                            if (read < 1)
-                            {
-                                break;
-                            }
-                            dfsoutput.Write(fbuf, 0, read);
-                        }
-
-                        fs.Close();                
+                        //----------------------------COOKING--------------------------------
+                        cooking_pos += read;
+                        cooking_is_read = false;
+                        //----------------------------COOKING--------------------------------
+                        dfsoutput.Write(fbuf, 0, read);   
                     }
-                     
-                    Qizmt_Log(""uploaded: "" + inFile);
+                    catch (Exception e)
+                    {
+                        //----------------------------COOKING--------------------------------
+                        if (!cooking_is_read)
+                        {
+                            Qizmt_Log(`Error occurred when putting :` + inFile + `. Error: ` + e.ToString());
+                            break;
+                        }
+                        if (cooking_cooksremain-- <= 0)
+                        {
+                            Qizmt_Log(`Error occurred when putting :` + inFile + `. Cooked too many times: ` + e.ToString());
+                            break;
+                        }
+                        cooking_is_cooked = true;
+                        continue;
+                        //----------------------------COOKING--------------------------------
+                    }
                 }
-                catch
+                if (fs != null)
                 {
-                      Qizmt_Log(""error occurred during putting :"" + inFile);
-                }
+                    fs.Close();
+                }           
+                Qizmt_Log(`Uploaded: ` + inFile);
             }
         $^$>
               </Remote>
     </Job>
     </Jobs>
-</SourceCode>").Replace("$^$", "]]");
+</SourceCode>").Replace("$^$", "]]").Replace('`', '"');
 
-            string tmpJobFile = @"fput_" + Guid.NewGuid().ToString();
-            using (System.IO.StreamWriter writer = new System.IO.StreamWriter(tmpJobFile))
-            {
-                writer.Write(sb.ToString());
-                writer.Close();
+                    string tmpJobFile = @"fput_" + Guid.NewGuid().ToString();
+                    using (System.IO.StreamWriter writer = new System.IO.StreamWriter(tmpJobFile))
+                    {
+                        writer.Write(sb.ToString());
+                        writer.Close();
+                    }
+                    Console.WriteLine("Putting files in batch...");
+                    Exec("", LoadConfig(null, tmpJobFile), new string[] { }, false, false);
+                    System.IO.File.Delete(tmpJobFile);
+
+                    if (curfile >= fileList.Count)
+                    {
+                        break;
+                    }
+                }
+                Console.WriteLine("All done");
             }
-            Console.WriteLine("Putting files...");
-            Exec("", LoadConfig(null, tmpJobFile), new string[] { }, false, false);
-            System.IO.File.Delete(tmpJobFile);
-            Console.WriteLine("Done");
+            else
+            {
+                //continuous mode.
+                Dictionary<string, List<string>> srchostfiles = new Dictionary<string, List<string>>(fileList.Count);
+                Dictionary<string, List<string>> workerfiles = new Dictionary<string, List<string>>(fileList.Count);
+
+                foreach (string srcfile in fileList)
+                {
+                    string srchost = GetHostName(srcfile).ToLower();
+                    if (!srchostfiles.ContainsKey(srchost))
+                    {
+                        srchostfiles.Add(srchost, new List<string>());
+                    }
+                    srchostfiles[srchost].Add(srcfile);
+                }
+
+                {
+                    int iw = 0;
+                    foreach (string srchost in srchostfiles.Keys)
+                    {
+                        List<string> srcfiles = srchostfiles[srchost];
+                        for (int i = 0; i < srcfiles.Count; i++)
+                        {
+                            int r = rand.Next() % srcfiles.Count;
+                            string str = srcfiles[r];
+                            srcfiles[r] = srcfiles[i];
+                            srcfiles[i] = str;
+                        }
+
+                        string worker = hosts[iw];
+                        if (!workerfiles.ContainsKey(worker))
+                        {
+                            workerfiles.Add(worker, new List<string>());
+                        }
+                        workerfiles[worker].AddRange(srcfiles);
+
+                        if (++iw >= hosts.Length)
+                        {
+                            iw = 0;
+                        }
+                    }
+                }
+
+                StringBuilder sb = new StringBuilder();
+                sb.Append(@"<SourceCode>
+                <Jobs>
+                <Job Name=`` Custodian=`` Email=`` Description=``>
+                   <IOSettings>        
+                          <JobType>remote</JobType>");
+
+                StringBuilder sbList = new StringBuilder();
+                StringBuilder sbCase = new StringBuilder();
+                string tempoutfilename = Guid.NewGuid().ToString();
+
+                {
+                    int wi = 0;                    
+                    int tempoutfileindex = 0;
+                    foreach (string worker in workerfiles.Keys)
+                    {
+                        for (int io = 0; io < 8; io++)
+                        {
+                            sb.Append(@"<DFS_IO>
+<DFSReader></DFSReader>");
+                            sb.Append("<DFSWriter>");
+                            sb.Append(tempoutfilename);
+                            sb.Append("_");
+                            sb.Append(tempoutfileindex++);
+                            sb.Append("</DFSWriter>");
+                            sb.Append("<Host>");
+                            sb.Append(worker);
+                            sb.Append(@"</Host>
+<Meta>");
+                            sb.Append(wi);
+                            sb.Append("|");
+                            sb.Append(io);
+                            sb.Append(@"</Meta>
+</DFS_IO>");
+                        }                        
+
+                        List<string> srcfiles = workerfiles[worker];
+                        string arrayname = "srcfiles_" + wi.ToString();                        
+                        sbList.Append("string[] ");
+                        sbList.Append(arrayname);
+                        sbList.Append(" = new string[");
+                        sbList.Append(srcfiles.Count);
+                        sbList.Append("];");
+                        sbList.Append(Environment.NewLine);
+                        for (int fi = 0; fi < srcfiles.Count; fi++)
+                        {                            
+                            sbList.Append(arrayname);
+                            sbList.Append("[");
+                            sbList.Append(fi);
+                            sbList.Append("] = @`");
+                            sbList.Append(srcfiles[fi]);
+                            sbList.Append("`;");
+                            sbList.Append(Environment.NewLine);
+                        }
+                                                
+                        sbCase.Append("case ");
+                        sbCase.Append(wi);
+                        sbCase.Append(@":
+srcFiles = ");
+                        sbCase.Append(arrayname);
+                        sbCase.Append(@";
+break;");
+                        sbCase.Append(Environment.NewLine);
+
+                        wi++;
+                    }
+                }
+
+                sb.Append(@"</IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                int workerindex = 0;
+                int processid = 0;
+                {
+                    int del = Qizmt_Meta.IndexOf(`|`);
+                    workerindex = Int32.Parse(Qizmt_Meta.Substring(0, del));
+                    processid = Int32.Parse(Qizmt_Meta.Substring(del + 1));
+                }
+                string[] srcFiles = null;");
+
+                sb.Append(sbList.ToString());
+
+                sb.Append(@"
+switch(workerindex)
+{");
+                sb.Append(sbCase.ToString());
+                sb.Append(@"
+}
+               
+
+                for(int fi = 0; fi < srcFiles.Length; fi++)
+                {
+                    if(fi % 8 != processid)
+                    {
+                        continue;
+                    }
+
+                    string inFile = srcFiles[fi];
+                    bool isgz = inFile.EndsWith(`.gz`, StringComparison.OrdinalIgnoreCase);
+
+                    //----------------------------COOKING--------------------------------
+                    int cooktimeout = ");
+                    sb.Append(cooktimeout);
+                    sb.Append(@";
+                    int cookretries = ");
+                    sb.Append(cookretries);
+                    sb.Append(@";
+                    bool cooking_is_cooked = false;
+                    int cooking_cooksremain = cookretries;
+                    bool cooking_is_read = false;
+                    long cooking_pos = 0;
+                    //----------------------------COOKING--------------------------------
+
+                    System.IO.Stream fs = null;
+                    const int MAXREAD = 0x400 * 64;
+                    byte[] fbuf = new byte[MAXREAD];
+                    bool bomdone = false;
+
+                    while (true)
+                    {
+                        try
+                        {
+                            //----------------------------COOKING--------------------------------
+                            cooking_is_read = true;
+
+                            if (cooking_is_cooked)
+                            {
+                                cooking_is_cooked = false;
+                                System.Threading.Thread.Sleep(cooktimeout);
+                                if (fs != null)
+                                {
+                                    fs.Close();
+                                }                        
+                                fs = new System.IO.FileStream(inFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);                        
+                                if (isgz)
+                                {
+                                    fs = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionMode.Decompress);
+                                }                        
+                                fs.Seek(cooking_pos, System.IO.SeekOrigin.Begin);
+                            }
+                            //----------------------------COOKING--------------------------------
+
+                            if (fs == null)
+                            {
+                                fs = new System.IO.FileStream(inFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
+                                if (isgz)
+                                {
+                                    fs = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionMode.Decompress);
+                                }
+                            }
+
+                            if (!bomdone)
+                            {                        
+                                int bomread = fs.Read(fbuf, 0, 3);
+                                bomdone = true;
+                                //----------------------------COOKING--------------------------------
+                                cooking_pos = bomread;
+                                cooking_is_read = false;
+                                //----------------------------COOKING--------------------------------
+                                if (!(fbuf[0] == 0xEF && fbuf[1] == 0xBB && fbuf[2] == 0xBF))
+                                {
+                                    for (int i = 0; i < bomread; i++)
+                                    {
+                                        dfsoutput.WriteByte(fbuf[i]);
+                                    }
+                                }                  
+                            }
+
+                            cooking_is_read = true;
+                            int read = fs.Read(fbuf, 0, MAXREAD);
+                            if (read < 1)
+                            {
+                                break;
+                            }
+                            //----------------------------COOKING--------------------------------
+                            cooking_pos += read;
+                            cooking_is_read = false;
+                            //----------------------------COOKING--------------------------------
+                            dfsoutput.Write(fbuf, 0, read);   
+                        }
+                        catch (Exception e)
+                        {
+                            //----------------------------COOKING--------------------------------
+                            if (!cooking_is_read)
+                            {
+                                Qizmt_Log(`Error occurred when putting :` + inFile + `. Error: ` + e.ToString());
+                                break;
+                            }
+                            if (cooking_cooksremain-- <= 0)
+                            {
+                                Qizmt_Log(`Error occurred when putting :` + inFile + `. Cooked too many times: ` + e.ToString());
+                                break;
+                            }
+                            cooking_is_cooked = true;
+                            continue;
+                            //----------------------------COOKING--------------------------------
+                        }
+                    }
+                    if (fs != null)
+                    {
+                        fs.Close();
+                    }           
+                    Qizmt_Log(`Uploaded: ` + inFile);
+                }
+            }
+        $^$>
+              </Remote>
+    </Job>
+    <Job Name=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt combine ");
+                sb.Append(tempoutfilename);
+                sb.Append("_* +");
+                sb.Append(dfsfilename);                
+                sb.Append(@"`);
+            }
+        ]]>
+      </Local>
+    </Job>
+    </Jobs>
+</SourceCode>").Replace("$^$", "]]").Replace('`', '"');
+
+                    string tmpJobFile = @"fput_" + Guid.NewGuid().ToString();
+                    using (System.IO.StreamWriter writer = new System.IO.StreamWriter(tmpJobFile))
+                    {
+                        writer.Write(sb.ToString());
+                        writer.Close();
+                    }
+                    Console.WriteLine("Putting files ...");
+                    Exec("", LoadConfig(null, tmpJobFile), new string[] { }, false, false);
+                    System.IO.File.Delete(tmpJobFile);
+                    Console.Write("All done");
+            }
         }
 
         static string GetHostName(string networkpath)
@@ -1062,7 +1440,7 @@ namespace MySpace.DataMining.AELight
         {
             if (args.Length < 2)
             {
-                Console.Error.WriteLine("fget error:  {0} fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>] [-gz]", appname);
+                Console.Error.WriteLine("fget error:  {0} fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>] [-gz] [-md5]", appname);
                 SetFailure();
                 return;
             }
@@ -1091,6 +1469,8 @@ namespace MySpace.DataMining.AELight
             Dictionary<string, string> netpaths = new Dictionary<string, string>();
             string[] hosts = null;
             string[] parts = null;
+            int cooktimeout = -1;
+            int cookretries = -1;
             {
                 dfs.DfsFile df;
                 using (LockDfsMutex())
@@ -1104,6 +1484,8 @@ namespace MySpace.DataMining.AELight
                         return;
                     }
                     hosts = dc.Slaves.SlaveList.Split(';');
+                    cooktimeout = dc.slave.CookTimeout;
+                    cookretries = dc.slave.CookRetries;
                 }
 
                 foreach (string host in hosts)
@@ -1130,6 +1512,7 @@ namespace MySpace.DataMining.AELight
             }
 
             List<string> targetdirs = null;
+            Dictionary<string, int> uniqueTargetHosts = new Dictionary<string, int>();
             {
                 if (args[1][0] == '@')
                 {
@@ -1143,8 +1526,8 @@ namespace MySpace.DataMining.AELight
                     {
                         if (args[i][0] != '-')
                         {
-                            targetdirs.Add(args[i]);     
-                        }                                           
+                            targetdirs.Add(args[i]);
+                        }
                     }
                 }
 
@@ -1156,17 +1539,30 @@ namespace MySpace.DataMining.AELight
                         _dir = _dir.Substring(0, _dir.Length - 1);
                         targetdirs[i] = _dir;
                     }
+
+                    string thistargethost = GetHostName(targetdirs[i]).ToUpper();
+                    if (!uniqueTargetHosts.ContainsKey(thistargethost))
+                    {
+                        uniqueTargetHosts.Add(thistargethost, 0);
+                    }
                 }
             }
 
             bool isgz = false;
+            bool ismd5 = false;
             for (int i = 2; i < args.Length; i++)
             {
-                if (string.Compare(args[i], "-gz", true) == 0)
+                string thisarg = args[i].ToLower();
+                switch(thisarg)
                 {
-                    isgz = true;
-                    break;
-                }
+                    case "-gz":
+                        isgz = true;
+                        break;
+
+                    case "-md5":
+                        ismd5 = true;
+                        break;
+                }               
             }
 
             Random rand = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
@@ -1191,92 +1587,192 @@ namespace MySpace.DataMining.AELight
                 orders[i] = num;
             }
 
-            StringBuilder sb = new StringBuilder();
-            sb.Append(@"<SourceCode>
+            int batchsize = Math.Min(uniqueTargetHosts.Count, hosts.Length) * 8;
+            {
+                int curorder = 0;
+                int curhost = 0;
+                for (; ; )
+                {
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append(@"<SourceCode>
                 <Jobs>
                 <Job Name="""">
                    <IOSettings>        
                           <JobType>remote</JobType>");
 
-            for (int oi = 0; oi < orders.Length; oi++)
-            {
-                int index = orders[oi];
-                string partnetpath = parts[index];
-                string targetdir = targetdirs[index % targetdirs.Count];
-                string meta = partnetpath + '|' + targetdir + '|' + index;
+                    int batched = 0;
+                    while (batched < batchsize && curorder < orders.Length)
+                    {
+                        if (curhost >= hosts.Length)
+                        {
+                            curhost = 0;
+                        }
+                      
+                        int index = orders[curorder];
+                        string partnetpath = parts[index];
+                        string targetdir = targetdirs[index % targetdirs.Count];
+                        string meta = partnetpath + '|' + targetdir + '|' + index;
 
-                sb.Append(@"<DFS_IO>
+                        sb.Append(@"<DFS_IO>
                     <DFSReader></DFSReader>          
                     <DFSWriter></DFSWriter>
                     <Host>");
-                sb.Append(hosts[oi % hosts.Length]);
-                sb.Append(@"</Host>
+                        sb.Append(hosts[curhost]);
+                        sb.Append(@"</Host>
                     <Meta>");
-                sb.Append(meta);
-                sb.Append(@"</Meta>
+                        sb.Append(meta);
+                        sb.Append(@"</Meta>
                     </DFS_IO>");
-            }
 
-            sb.Append(@"      </IOSettings>
+                        batched++;
+                        curorder++;
+                        curhost++;
+                    }
+
+                    sb.Append(@"      </IOSettings>
       <Remote>
         <![CDATA[
             public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
             {
-                string dfsfn = """ + dfsfilename + @""";
-                string dfsext = """ + dfsfileext + @""";
+                string dfsfn = `" + dfsfilename + @"`;
+                string dfsext = `" + dfsfileext + @"`;
                 bool isgz = " + (isgz ? "true" : "false") + @";
+                bool ismd5 = " + (ismd5 ? "true" : "false") + @";
                 string[] meta = Qizmt_Meta.Split('|');
-                string srcfilepath = meta[0]; 
+                string srcfilepath = meta[0];
                 string targetdir = meta[1];
                 string index = meta[2];
-                if(!System.IO.Directory.Exists(targetdir))
+                if (!System.IO.Directory.Exists(targetdir))
                 {
                     System.IO.Directory.CreateDirectory(targetdir);
                 }
-                string tarfilepath = targetdir+ @""\"" + dfsfn + ""_"" + index + dfsext; 
-                if(isgz)
+                string tarfilepath = targetdir + @`\` + dfsfn + `_` + index + dfsext;
+                string tarfilepathmd5 = tarfilepath + `.hd`;
+                if (isgz)
                 {
-                    tarfilepath += "".gz"";
+                    tarfilepath += `.gz`;
                 }
+               
+                //----------------------------COOKING--------------------------------
+                int cooktimeout = ");
+                    sb.Append(cooktimeout);
+                    sb.Append(@";
+                int cookretries = ");
+                    sb.Append(cookretries);
+                    sb.Append(@";
+                bool cooking_is_cooked = false;
+                int cooking_cooksremain = cookretries;
+                bool cooking_is_read = false;
+                long cooking_pos = 0;
+                //----------------------------COOKING--------------------------------
+
                 const int FILE_BUFFER_SIZE = 0x1000;
                 const int MAX_SIZE_PER_RECEIVE = 0x400 * 64;
                 byte[] fbuf = new byte[MAX_SIZE_PER_RECEIVE];
-
-                using (System.IO.FileStream _fs = new System.IO.FileStream(tarfilepath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                System.IO.Stream fsrc = null;
+                bool headdone = false;
+                int headerlen = 0;
+                System.IO.Stream ftar = null;
                 {
-                    using (System.IO.Stream fc = new System.IO.FileStream(srcfilepath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                    System.IO.FileStream _ftar = new System.IO.FileStream(tarfilepath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
+                    if (isgz)
                     {
-                        System.IO.Stream fs = null;
-                        if(isgz)
+                        ftar = new System.IO.Compression.GZipStream(_ftar, System.IO.Compression.CompressionMode.Compress);
+                    }
+                    else
+                    {
+                        ftar = _ftar;
+                    }
+                }           
+
+                while (true)
+                {
+                    try
+                    {
+                        //----------------------------COOKING--------------------------------
+                        cooking_is_read = true;
+
+                        if (cooking_is_cooked)
                         {
-                            fs = new System.IO.Compression.GZipStream(_fs, System.IO.Compression.CompressionMode.Compress);
+                            cooking_is_cooked = false;
+                            System.Threading.Thread.Sleep(cooktimeout);
+                            if (fsrc != null)
+                            {
+                                fsrc.Close();
+                            }
+                            fsrc = new System.IO.FileStream(srcfilepath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
+                            fsrc.Seek(cooking_pos, System.IO.SeekOrigin.Begin);
                         }
-                        else
+                        //----------------------------COOKING--------------------------------
+
+                        if (fsrc == null)
                         {
-                            fs = _fs;
+                            fsrc = new System.IO.FileStream(srcfilepath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
                         }
+
+                        if (!headdone)
                         {
-                            int xread = StreamReadLoop(fc, fbuf, 4);
+                            int xread = StreamReadLoop(fsrc, fbuf, 4);
                             if (4 == xread)
                             {
                                 int hlen = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(fbuf);
-                                StreamReadExact(fc, fbuf, hlen - 4);
+                                StreamReadExact(fsrc, fbuf, hlen - 4);
+                                xread = hlen;
                             }
+                            headdone = true;
+                            headerlen = xread;
+                            //----------------------------COOKING--------------------------------
+                            cooking_pos = xread;
+                            cooking_is_read = false;
+                            //----------------------------COOKING--------------------------------
                         }
 
-                        for (; ; )
                         {
-                            int xread = fc.Read(fbuf, 0, MAX_SIZE_PER_RECEIVE);
+                            cooking_is_read = true;
+                            int xread = fsrc.Read(fbuf, 0, MAX_SIZE_PER_RECEIVE);
                             if (xread <= 0)
                             {
                                 break;
                             }
-                            fs.Write(fbuf, 0, xread);
+                            //----------------------------COOKING--------------------------------
+                            cooking_pos += xread;
+                            cooking_is_read = false;
+                            //----------------------------COOKING--------------------------------
+                            ftar.Write(fbuf, 0, xread);
                         }
-                        fc.Close();
-                        fs.Close();
+                    }
+                    catch (Exception e)
+                    {
+                        //----------------------------COOKING--------------------------------
+                        if (!cooking_is_read)
+                        {
+                            throw;
+                        }
+                        if (cooking_cooksremain-- <= 0)
+                        {
+                            throw new System.IO.IOException(`Cooked too many times: ` + e.ToString());
+                        }
+                        cooking_is_cooked = true;
+                        continue;
+                        //----------------------------COOKING--------------------------------
                     }
                 }
+
+                if(ismd5)
+                {
+                    System.Security.Cryptography.MD5 md5 = new System.Security.Cryptography.MD5CryptoServiceProvider();
+                    fsrc.Seek(headerlen, System.IO.SeekOrigin.Begin);
+                    byte[] hashresult = md5.ComputeHash(fsrc);
+                    StringBuilder sbresult = new StringBuilder(32);   
+                    foreach(byte hb in hashresult)
+                    {
+                        sbresult.Append(hb.ToString(`x2`));
+                    }
+                    System.IO.File.WriteAllText(tarfilepathmd5, sbresult.ToString());
+                }
+                
+                fsrc.Close();
+                ftar.Close();
             }
             
             static int StreamReadLoop(System.IO.Stream stm, byte[] buf, int len)
@@ -1297,7 +1793,7 @@ namespace MySpace.DataMining.AELight
                 }
                 catch (ArgumentException e)
                 {
-                    throw new ArgumentException(""StreamRead* Requested "" + len.ToString() + "" bytes; "" + e.Message, e);
+                    throw new ArgumentException(`StreamRead* Requested ` + len.ToString() + ` bytes; ` + e.Message, e);
                 }
             }
 
@@ -1305,25 +1801,32 @@ namespace MySpace.DataMining.AELight
             {
                 if (len != StreamReadLoop(stm, buf, len))
                 {
-                    throw new System.IO.IOException(""Unable to read from stream"");
+                    throw new System.IO.IOException(`Unable to read from stream`);
                 }
             }
         $^$>
               </Remote>
     </Job>
     </Jobs>
-</SourceCode>").Replace("$^$", "]]");
+</SourceCode>").Replace("$^$", "]]").Replace('`', '"');
 
-            string jobname = "fget_" + Guid.NewGuid().ToString();
-            using (System.IO.StreamWriter sw = System.IO.File.CreateText(jobname))
-            {
-                sw.Write(sb.ToString());
-                sw.Close();
-            }
-            Console.WriteLine("Getting files...");
-            Exec("", LoadConfig(null, jobname), new string[] { }, false, false);
-            System.IO.File.Delete(jobname);
-            Console.WriteLine("Done");
+                    string jobname = "fget_" + Guid.NewGuid().ToString();
+                    using (System.IO.StreamWriter sw = System.IO.File.CreateText(jobname))
+                    {
+                        sw.Write(sb.ToString());
+                        sw.Close();
+                    }
+                    Console.WriteLine("Getting files in batch...");
+                    Exec("", LoadConfig(null, jobname), new string[] { }, false, false);
+                    System.IO.File.Delete(jobname);
+
+                    if (curorder >= orders.Length)
+                    {
+                        break;
+                    }
+                }
+            }            
+            Console.WriteLine("All done");
         }
 
         static void GetItemsFromFileAppend(string file, List<string> append)

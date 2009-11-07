@@ -481,6 +481,7 @@ namespace RDBMS_Admin
         <DFSInput>dfs://RDBMS_Table_tblGraphProcessingInt@nInt,nInt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-GraphProcessing-Int_Output.txt</DFSOutput>
         <OutputMethod>grouped</OutputMethod>
+        <Setting name=`Subprocess_TotalPrime` value=`NearPrime2XCoreCount` />
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Add Reference=`System.Data.dll` Type=`system`/>
@@ -897,6 +898,7 @@ namespace RDBMS_Admin
         <DFSInput>dfs://RDBMS_Table_tblGraphProcessingDouble@nDouble,nDouble</DFSInput>
         <DFSOutput>dfs://QizmtSQL-GraphProcessing-Double_Output.txt</DFSOutput>
         <OutputMethod>grouped</OutputMethod>
+        <Setting name=`Subprocess_TotalPrime` value=`NearPrime2XCoreCount` />
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Add Reference=`System.Data.dll` Type=`system`/>
@@ -1320,6 +1322,7 @@ namespace RDBMS_Admin
         <DFSInput>dfs://RDBMS_Table_tblGraphProcessingChar@nChar(200),nChar(200)</DFSInput>
         <DFSOutput>dfs://QizmtSQL-GraphProcessing-Char_Output.txt</DFSOutput>
         <OutputMethod>grouped</OutputMethod>
+        <Setting name=`Subprocess_TotalPrime` value=`NearPrime2XCoreCount` />
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Add Reference=`System.Data.dll` Type=`system`/>

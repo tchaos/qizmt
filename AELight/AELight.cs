@@ -32,7 +32,9 @@ namespace MySpace.DataMining.AELight
         static void ShowUsage()
         {
             Console.WriteLine("Usage:");
-            Console.WriteLine("    {0} <action> [<arguments>]", appname);
+            Console.WriteLine("    {0} <action> [<logging>] [<arguments>]", appname);
+            Console.WriteLine("Logging:");
+            Console.WriteLine("    retrylogmd5 <logfile>   writes all output to the logfile");
             Console.WriteLine("Actions:");
             Console.WriteLine("    edit <jobs.xml>         edit the specified jobs source code XML file");
             //Console.WriteLine("    exec <jobs.xml>         run the specified jobs source code XML file");
@@ -63,11 +65,12 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    head <dfspath>[:<host>:<part>] [<count>]   show first few lines of file");
             Console.WriteLine("    put <netpath> [<dfspath>[@<recordlen>]]    put a file into DFS");
             Console.WriteLine("    fput files|dirs=<item[,item,item]>|@<filepath to list> [pattern=<pattern>]");
-            Console.WriteLine("          put files into DFS");
+            Console.WriteLine("         [mode=continuous] [dfsfilename=<targetfilename>]");
+            Console.WriteLine("         put files into DFS");
             Console.WriteLine("    putbinary <wildcard> <dfspath>  put binary into DFS");
             Console.WriteLine("    get [parts=<first>[-[<last>]]] <dfspath> <netpath>  get a file from DFS");
             Console.WriteLine("    fget <dfspath> <targetFolder>[ <targetFolder> <targetFolder>] |");
-            Console.WriteLine("         @<filepath to target folder list> [-gz]");
+            Console.WriteLine("         @<filepath to target folder list> [-gz] [-md5]");
             Console.WriteLine("         get a file from DFS");
             Console.WriteLine("    getbinary <dfspath> <netpath>  get binary from DFS");
             Console.WriteLine("    del <dfspath|wildcard>  delete a DFS file using multiple threads");
@@ -132,8 +135,7 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    swap <file1> <file2>           file names to swap");
             Console.WriteLine("    regressiontest basic           basic regression test " + appname);
             Console.WriteLine("    kill <JobID>                   kill the specified Job Identifier");
-            Console.WriteLine("    enqueue command=<value> [stdout=<netpath>] [stderr=<netpath>]");
-            Console.WriteLine("             adds a command entry to the end of the queue");
+            Console.WriteLine("    enqueue command=<value>        Adds a command to the end of the queue");
             Console.WriteLine("    queuekill <QueueID>            Removes the specified Queue Identifier");
             Console.WriteLine("    clearqueue                     Removes all entries from the queue");
             Console.WriteLine("    schedule command=<value> start=<now|<datetime>> [frequency=<seconds>]");
