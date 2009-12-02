@@ -9,11 +9,11 @@
         </DFS_IO>
         <Setting name="//MaxUserLogs" value="1000000" />
       </IOSettings>
-      <!--<Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
-      <Using>RDBMS_DBCORE</Using>-->
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
       <Remote>
         <![CDATA[
-        
+            
             struct ColInfo
             {
                 public string Name;
@@ -28,7 +28,7 @@
             {
                 for(int i = 0; i < s.Length; i++)
                 {
-                    if(':' == s[i])
+                    if('.' == s[i])
                     {
                         return s.Substring(i + 1);
                     }
@@ -44,7 +44,7 @@
             {
                 cols = new List<ColInfo>();
                 int curoffset = 0;
-                string[] rr = RowInfo.Split(',');
+                string[] rr = RowInfo.Split('\0');
                 string[] dd = DisplayInfo.Split(',');
                 for(int ix = 0; ix < rr.Length; ix++)
                 {
@@ -52,13 +52,13 @@
                     string d = dd[ix];
                     ColInfo ci;
                     {
-                        int ieq = r.IndexOf('=');
+                        int ieq = r.LastIndexOf('=');
                         ci.Name = r.Substring(0, ieq);
                         ci.Size = int.Parse(r.Substring(ieq + 1));
                     }
                     ci.StartOffset = curoffset;
                     {
-                        int ieq = d.IndexOf('=');
+                        int ieq = d.LastIndexOf('=');
                         ci.Type = d.Substring(0, ieq);
                         ci.DisplayWidth = int.Parse(d.Substring(ieq + 1));
                     }
@@ -71,7 +71,7 @@
             {
                 string TableName = DSpace_ExecArgs[0];
                 string DfsOutputName = DSpace_ExecArgs[1]; // Actually the input of this job.
-                string RowInfo = DSpace_ExecArgs[2];
+                string RowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[2]);
                 string DisplayInfo = DSpace_ExecArgs[3];
                 long TopCount = long.Parse(DSpace_ExecArgs[4]);
                 

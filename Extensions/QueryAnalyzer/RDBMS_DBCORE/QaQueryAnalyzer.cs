@@ -78,8 +78,12 @@ namespace RDBMS_DBCORE
                 string TableName = "";
                 string Ops = "*";
                 bool GroupBy = false;
+                bool OrderBy = false;
                 bool distinct = false;
                 //string AfterUnion = null; // e.g. '[ALL] SELECT ...' ; can end with ';'
+#if DEBUG
+                //System.Diagnostics.Debugger.Launch();
+#endif
                 for (string op = Qa.NextPart(ref args);
                     0 != op.Length && ";" != op;
                     op = Qa.NextPart(ref args))
@@ -212,9 +216,15 @@ namespace RDBMS_DBCORE
                                 }
                                 else if (0 == string.Compare("ORDER", s, true))
                                 {
-                                    if (distinct)
+                                    string x = args;
+                                    string xs = Qa.NextPart(ref x);
+                                    if (0 == string.Compare("BY", xs, true))
                                     {
-                                        throw new Exception("ORDER BY is not supported with SELECT DISTINCT");
+                                        if (distinct)
+                                        {
+                                            throw new Exception("ORDER BY is not supported with SELECT DISTINCT");
+                                        }
+                                        OrderBy = true;
                                     }
                                 }
                                 sbOps.Append(s);
@@ -231,6 +241,10 @@ namespace RDBMS_DBCORE
                     }
                     else
                     {
+                        if ("-" == op || "+" == op)
+                        {
+                            op += Qa.NextPart(ref args);
+                        }
                         if (null != SelectWhat)
                         {
                             throw new Exception("Unexpected: " + op);
@@ -245,6 +259,10 @@ namespace RDBMS_DBCORE
                             {
                                 args = xargs; // Keep.
                                 string swx = Qa.NextPart(ref args);
+                                if ("-" == swx || "+" == swx)
+                                {
+                                    swx += Qa.NextPart(ref args);
+                                }
                                 if (0 == swx.Length)
                                 {
                                     throw new Exception("Unexpected ,");
@@ -256,6 +274,7 @@ namespace RDBMS_DBCORE
                             {
                                 args = xargs; // Keep.
                                 swsb.Append('(');
+                                bool prevident = false;
                                 int nparens = 1;
                                 for (; ; )
                                 {
@@ -264,6 +283,11 @@ namespace RDBMS_DBCORE
                                     {
                                         throw new Exception("Expected )");
                                     }
+                                    if (prevident)
+                                    {
+                                        swsb.Append(' ');
+                                    }
+                                    prevident = (char.IsLetter(slp[0]) || '_' == slp[0]);
                                     swsb.Append(slp);
                                     if (")" == slp)
                                     {
@@ -353,6 +377,10 @@ namespace RDBMS_DBCORE
                 if (GroupBy)
                 {
                     sOptions += ";GBY";
+                }
+                if (OrderBy)
+                {
+                    sOptions += ";OBY";
                 }
                 if (distinct)
                 {

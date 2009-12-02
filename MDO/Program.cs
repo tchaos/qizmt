@@ -51,8 +51,26 @@ namespace MySpace.DataMining.AELight
         public static bool DebugSwitch = false;
         public static bool DebugStepSwitch = false;
 
+#if DEBUG
+        static bool _jobdebug = false;
+        static string _jobdebug_cmdline = null;
+        static DateTime _jobdebug_starttime;
+        static List<string> _jobdebug_output = null;
+        static int _jobdebug_exitcode = -999;
+#endif
+
         static void Main(string[] args)
         {
+#if DEBUG
+            _jobdebug = System.IO.File.Exists("jobdebug.txt");
+            if (_jobdebug)
+            {
+                _jobdebug_cmdline = Environment.CommandLine;
+                _jobdebug_starttime = DateTime.Now;
+                _jobdebug_output = new List<string>(1000);
+            }
+#endif
+
             int ex = 0;
             try
             {
@@ -1571,6 +1589,53 @@ namespace MySpace.DataMining.AELight
                     }
                 }
 
+#if DEBUG
+                if (_jobdebug)
+                {
+                    System.Threading.Mutex _jobdebug_m = new System.Threading.Mutex(false, "distobjlog");
+                    try
+                    {
+                        _jobdebug_m.WaitOne();
+                    }
+                    catch (System.Threading.AbandonedMutexException)
+                    {
+                    }
+                    try
+                    {
+                        if (System.IO.File.Exists("jobdebug.txt"))
+                        {
+                            DateTime _jobdebug_endtime = DateTime.Now;
+                            using (System.IO.StreamWriter _jobdebu_sw = new System.IO.StreamWriter("jobdebug.txt", true))
+                            {
+                                _jobdebu_sw.WriteLine();
+                                _jobdebu_sw.WriteLine("--------------------------------------------------------------------------------");
+                                _jobdebu_sw.WriteLine();
+                                _jobdebu_sw.WriteLine(" - Command:   {0}", _jobdebug_cmdline);
+                                _jobdebu_sw.WriteLine(" - Started:   {0}", _jobdebug_starttime);
+                                _jobdebu_sw.WriteLine(" - Finished:  {0}", _jobdebug_endtime);
+                                _jobdebu_sw.WriteLine(" - Duration:  {0}", _jobdebug_endtime - _jobdebug_starttime);
+                                _jobdebu_sw.WriteLine(" - Exit Code: {0}", _jobdebug_exitcode);
+                                _jobdebu_sw.WriteLine();
+                                foreach (string _jobdebug_ln in _jobdebug_output)
+                                {
+                                    _jobdebu_sw.Write(_jobdebug_ln);
+                                }
+                                _jobdebu_sw.WriteLine();
+                                _jobdebu_sw.WriteLine("--------------------------------------------------------------------------------");
+                                _jobdebu_sw.WriteLine();
+                            }
+                        }
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        _jobdebug_m.ReleaseMutex();
+                    }
+                }
+#endif
+
             }
 
             Environment.Exit(ex);
@@ -2332,6 +2397,12 @@ namespace MySpace.DataMining.AELight
                                 string outstr = XContent.ReceiveXString(nstm, buf);
                                 ConsoleWriteColorful(outstr);
                                 Log(StripColor(outstr));
+#if DEBUG
+                                if (_jobdebug)
+                                {
+                                    _jobdebug_output.Add(StripColor(outstr));
+                                }
+#endif
                             }
                             break;
 
@@ -2339,6 +2410,12 @@ namespace MySpace.DataMining.AELight
                             string eStr = XContent.ReceiveXString(nstm, buf);
                             Console.Error.Write(eStr);
                             Log(eStr);
+#if DEBUG
+                            if (_jobdebug)
+                            {
+                                _jobdebug_output.Add(eStr);
+                            }
+#endif
                             break;
 
                         case 'r': // return
@@ -2379,6 +2456,12 @@ namespace MySpace.DataMining.AELight
                 LogOutputToFile(ioex.ToString());
                 result = 44;
             }
+#if DEBUG
+            if (_jobdebug)
+            {
+                _jobdebug_exitcode = result;
+            }
+#endif
             return result;
         }
 

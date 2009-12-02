@@ -13,7 +13,9 @@
         
         public virtual void Local()
         {
-            
+            #if DEBUG
+            //RDBMS_DBCORE.Qa._ShouldDebugShellExec = _ShouldDebugShellExec;
+            #endif
             RDBMS_DBCORE.Qa.QueryAnalyzer qalocal = new RDBMS_DBCORE.Qa.QueryAnalyzer();
             DSpace_Log(qalocal.Exec(DSpace_ExecArgs));
             

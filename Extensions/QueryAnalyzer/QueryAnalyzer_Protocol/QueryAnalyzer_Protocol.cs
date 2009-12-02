@@ -1257,7 +1257,7 @@ namespace QueryAnalyzer_Protocol
 
         }
 
-        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn, bool pinmemoryhash)
+        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn, bool pinmemoryhash, bool keepvalueorder)
         {
             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
             using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
@@ -1463,6 +1463,9 @@ namespace QueryAnalyzer_Protocol
                 System.Xml.XmlElement xePinHash = xi.CreateElement("pinHash");
                 xePinHash.InnerText = pinmemoryhash ? "1" : "0";
                 xeIndex.AppendChild(xePinHash);
+                System.Xml.XmlElement xeKeepValueOrder = xi.CreateElement("keepValueOrder");
+                xeKeepValueOrder.InnerText = keepvalueorder ? "1" : "0";
+                xeIndex.AppendChild(xeKeepValueOrder);
                 System.Xml.XmlElement xeIndTable = xi.CreateElement("table");
                 xeIndex.AppendChild(xeIndTable);
                 System.Xml.XmlElement xeIndTableName = xi.CreateElement("name");
@@ -1576,6 +1579,7 @@ namespace QueryAnalyzer_Protocol
 
                     bool pinmem = true;
                     bool pinmemhash = true;
+                    bool keepvalueorder = false;
                     string keycolumn = "";
                     for (; ; )
                     {
@@ -1610,9 +1614,13 @@ namespace QueryAnalyzer_Protocol
                                     }
                                 }
                                 break;
+
+                            case "keepvalueorder":
+                                keepvalueorder = true;
+                                break;
                         }
                     }
-                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn, pinmemhash);
+                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn, pinmemhash, keepvalueorder);
                     return true;
                 }
                 else

@@ -250,7 +250,7 @@
             {
                 cols = new List<DbColumn>();
                 int curoffset = 0;
-                string[] rr = RowInfo.Split(',');
+                string[] rr = RowInfo.Split('\0');
                 string[] dd = DisplayInfo.Split(',');
                 for(int ix = 0; ix < rr.Length; ix++)
                 {
@@ -260,13 +260,13 @@
                     string tname;
                     int tsize;
                     {
-                        int ieq = r.IndexOf('=');
+                        int ieq = r.LastIndexOf('=');
                         ci.ColumnName = r.Substring(0, ieq);
                         tsize = int.Parse(r.Substring(ieq + 1));
                     }
                     ci.RowOffset = curoffset;
                     {
-                        int ieq = d.IndexOf('=');
+                        int ieq = d.LastIndexOf('=');
                         tname = d.Substring(0, ieq);
                         //ci.DisplayWidth = int.Parse(d.Substring(ieq + 1));
                     }
@@ -280,7 +280,7 @@
             {
                 OutputColumnSizes = new List<int>();
                 int curoffset = 0;
-                string[] orr = OutputRowInfo.Split(',');
+                string[] orr = OutputRowInfo.Split('\0');
                 //string[] odd = OutputDisplayInfo.Split(',');
                 for(int ix = 0; ix < orr.Length; ix++)
                 {
@@ -288,9 +288,15 @@
                     string tname;
                     int tsize;
                     {
-                        int ieq = r.IndexOf('=');
+                        int ieq = r.LastIndexOf('=');
                         //tname = r.Substring(0, ieq);
-                        tsize = int.Parse(r.Substring(ieq + 1));
+                        {
+                            string stsize = r.Substring(ieq + 1);
+                            if(!int.TryParse(stsize, out tsize))
+                            {
+                                throw new FormatException("Input string was not in a correct format: " + stsize);
+                            }
+                        }
                         //.Add(tname);
                         OutputColumnSizes.Add(tsize);
                     }
@@ -317,10 +323,10 @@
                 {
                     aOps = Ops.Split('\0');
                 }
-                string RowInfo = DSpace_ExecArgs[5];
+                string RowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[5]);
                 string DisplayInfo = DSpace_ExecArgs[6];
                 InitColTypeInfos(RowInfo, DisplayInfo);
-                string OutputRowInfo = DSpace_ExecArgs[7];
+                string OutputRowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[7]);
                 InitOutputColTypeInfos(OutputRowInfo);
                 sOptions = (DSpace_ExecArgs.Length > 8) ? DSpace_ExecArgs[8] : "-";
                 
@@ -442,7 +448,9 @@
                                             {
                                                 break;
                                             }
-                                            throw new Exception("Unexpected after ORDER BY ...: " + op);
+                                            //throw new Exception("Unexpected after ORDER BY ...: " + op);
+                                            iop--;
+                                            break;
                                         }
                                     }
                                     if(0 == xorder.Count)
@@ -454,8 +462,7 @@
                                         // GROUP BY happens at earlier phase than ORDER BY,
                                         // so if GROUP BY, ignore ORDER BY and use GROUP BY.
                                         // KeyOn will be set to the GroupBy stuff.
-                                        // Not supported yet, so...
-                                        throw new Exception("Cannot ORDER BY with GROUP BY"); //////////.........
+                                        throw new Exception("Unexpected use of ORDER BY with GROUP BY");
                                     }
                                     else
                                     {
@@ -495,7 +502,9 @@
                                             {
                                                 break;
                                             }
-                                            throw new Exception("Unexpected after GROUP BY ...: " + op);
+                                            //throw new Exception("Unexpected after GROUP BY ...: " + op);
+                                            iop--;
+                                            break;
                                         }
                                     }
                                     if(0 == xGROUP.Count)
@@ -526,6 +535,7 @@
           
           List<byte> updatebuf = new List<byte>();
           List<byte> newfieldsbuf = new List<byte>(); // For when selecting other than *, but not if WhatFunctions
+          DbFunctionTools ftools = null; // null until first needed.
           public virtual void Map(ByteSlice row, MapOutput output)
           {
               
@@ -636,9 +646,21 @@
                       int wi = Whats[iww];
                       if(-1 == wi)
                       {
+                          DbTypeID ltype;
+                          if(null == ftools)
+                          {
+                              ftools = new DbFunctionTools();
+                          }
+                          List<byte> lbuf = ftools.AllocBuffer();
+                          ByteSlice cval = Types.LiteralToValueBuffer(awhat[iww], out ltype, lbuf);
+                          int Size = cval.Length;
                           #if DEBUG
-                          throw new Exception("DEBUG:  (null != Whats && !WhatFunctions) (-1 == wi)");
+                          if(Size != OutputColumnSizes[iww])
+                          {
+                              throw new Exception("DEBUG:  (Size != OutputColumnSizes[iww])");
+                          }
                           #endif
+                          cval.AppendTo(newfieldsbuf);
                       }
                       else
                       {
@@ -725,7 +747,7 @@
                 {
                     cols = new List<DbColumn>();
                     int curoffset = 0;
-                    string[] rr = RowInfo.Split(',');
+                    string[] rr = RowInfo.Split('\0');
                     string[] dd = DisplayInfo.Split(',');
                     for(int ix = 0; ix < rr.Length; ix++)
                     {
@@ -735,13 +757,13 @@
                         string tname;
                         int tsize;
                         {
-                            int ieq = r.IndexOf('=');
+                            int ieq = r.LastIndexOf('=');
                             ci.ColumnName = r.Substring(0, ieq);
                             tsize = int.Parse(r.Substring(ieq + 1));
                         }
                         ci.RowOffset = curoffset;
                         {
-                            int ieq = d.IndexOf('=');
+                            int ieq = d.LastIndexOf('=');
                             tname = d.Substring(0, ieq);
                             //ci.DisplayWidth = int.Parse(d.Substring(ieq + 1));
                         }
@@ -756,7 +778,7 @@
                     //outputcols = new List<DbColumn>();
                     OutputColumnSizes = new List<int>();
                     int curoffset = 0;
-                    string[] orr = OutputRowInfo.Split(',');
+                    string[] orr = OutputRowInfo.Split('\0');
                     //string[] odd = OutputDisplayInfo.Split(',');
                     int totsize = 0;
                     for(int ix = 0; ix < orr.Length; ix++)
@@ -765,7 +787,7 @@
                         string tname;
                         int tsize;
                         {
-                            int ieq = r.IndexOf('=');
+                            int ieq = r.LastIndexOf('=');
                             //tname = r.Substring(0, ieq);
                             tsize = int.Parse(r.Substring(ieq + 1));
                             //.Add(tname);
@@ -789,10 +811,10 @@
                     {
                         awhat = SelectWhat.Split('\0');
                     }
-                    string RowInfo = DSpace_ExecArgs[5];
+                    string RowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[5]);
                     string DisplayInfo = DSpace_ExecArgs[6];
                     InitColTypeInfos(RowInfo, DisplayInfo);
-                    string OutputRowInfo = DSpace_ExecArgs[7];
+                    string OutputRowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[7]);
                     InitOutputColTypeInfos(OutputRowInfo, awhat);
                     
                     //sOptions = ... already done.
@@ -809,10 +831,12 @@
                 }
                 
                 
-                List<DbFunctionArguments> agfargs = null;
-                List<List<DbValue>> agvaluelists;
+                List<DbFunctionArguments> ffargs = null;
+                List<List<DbValue>> fvaluelists;
                 DbFunctionTools agtools;
                 List<List<byte>> outvalues = new List<List<byte>>();
+                List<ByteSlice> rows = new List<ByteSlice>();
+                List<SelectClause> sclauses = null;
                 
                 public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
                 {
@@ -878,191 +902,89 @@
                             agtools = new DbFunctionTools();
                         }
                         
-                        int outvalueslen = 0;
-                        {
-                            outvalues.Clear();
-                            values.Reset();
-                            while(values.MoveNext())
-                            {
-                                ByteSlice row = values.Current;
-                                #if DEBUG
-                                if(null == outvalues)
-                                {
-                                    throw new Exception("DEBUG:  (null == outvalues)");
-                                }
-                                if(null == agtools)
-                                {
-                                    throw new Exception("DEBUG:  (null == agtools)");
-                                }
-                                if(null == agtools.AllocBuffer())
-                                {
-                                    throw new Exception("DEBUG:  (null == agtools.AllocBuffer())");
-                                }
-                                #endif
-                                outvalues.Add(agtools.AllocBuffer(row.Length > 256 ? Entry.Round2Power(row.Length) : 256));
-                                List<byte> newfieldsbuf = outvalues[outvalueslen++];
-                                newfieldsbuf.Clear();
-                                  for(int iww = 0; iww < Whats.Count; iww++)
-                                  {
-                                      int wi = Whats[iww];
-                                      if(-1 == wi)
-                                      {
-                                          int Size = OutputColumnSizes[iww];
-                                          for(int i = 0; i < Size; i++)
-                                          {
-                                              newfieldsbuf.Add(0xCD);
-                                          }
-                                      }
-                                      else
-                                      {
-                                          DbColumn ci = cols[wi];
-                                          int StartOffset = ci.RowOffset;
-                                          int Size = ci.Type.Size;
-                                          #if DEBUG
-                                          if(Size != OutputColumnSizes[iww])
-                                          {
-                                              throw new Exception("DEBUG:  (Size != OutputColumnSizes[iww])");
-                                          }
-                                          #endif
-                                          ByteSlice cval = ByteSlice.Prepare(row, StartOffset, Size);
-                                          cval.AppendTo(newfieldsbuf);
-                                      }
-                                  }
-                                if(GroupBy)
-                                {
-                                    break;
-                                }
-                            }
-                        }
-                        
                         bool GettingFieldTypeStrings = null == FieldTypeStrings;
                         if(GettingFieldTypeStrings)
                         {
                             FieldTypeStrings = new List<string>();
                         }
-                        int CurOffset = 0;
+                        
+                        rows.Clear();
+                        outvalues.Clear();
+                        values.Reset();
+                        while(values.MoveNext())
+                        {
+                            ByteSlice row = values.Current;
+                            rows.Add(row);
+                            outvalues.Add(agtools.AllocBuffer(row.Length > 256 ? Entry.Round2Power(row.Length) : 256));
+                        }
+                        
+                        //List<SelectClause> sclauses
+                        bool NewSelectClauses = null == sclauses;
+                        if(NewSelectClauses)
+                        {
+                            sclauses = new List<SelectClause>(Whats.Count);
+                        }
                         for(int iww = 0; iww < Whats.Count; iww++)
                         {
                             int wi = Whats[iww];
                             string Source = awhat[iww];
-                            //if(-1 != Source.IndexOf('('))
-                            if(-1 == wi)
+                            string calls = null;
+                            if(NewSelectClauses)
                             {
-                                // Function (scalar or aggregate)!
-                                int Size = OutputColumnSizes[iww];
-                                string ffuncname; // Function name (aggregate or scalar).
-                                string ffuncargs; // Function arguments, without outer ().
-                                {
-                                    int ip = Source.IndexOf('(');
-                                    if(-1 == ip || !Source.EndsWith(")"))
-                                    {
-                                        throw new Exception("Function expected: " + Source);
-                                    }
-                                    ffuncname = Source.Substring(0, ip).Trim();
-                                    ffuncargs = Source.Substring(ip + 1, Source.Length - ip - 1 - 1).Trim();
-                                }
-                                if(null == agfargs)
-                                {
-                                    agfargs = new List<DbFunctionArguments>(values.Length > 32 ? Entry.Round2Power(values.Length) : 32);
-                                    agvaluelists = new List<List<DbValue>>(agfargs.Count);
-                                }
-                                int ifarg = 0; // Current index in agfargs.
-                                int ivl = 0; // Current index in agvaluelists.
-                                {
-                                    values.Reset();
-                                    while(values.MoveNext())
-                                    {
-                                        ByteSlice row = values.Current;
-                                        {
-                                            if(ivl == agvaluelists.Count)
-                                            {
-                                                agvaluelists.Add(new List<DbValue>());
-                                            }
-                                            List<DbValue> pl = agvaluelists[ivl++];
-                                            pl.Clear();
-                                            {//foreach arg... (1 for now)
-                                                int aic = IndexOfCol_ensure(ffuncargs);
-                                                if(-1 == aic)
-                                                {
-                                                    throw new Exception("Argument to function must be exactly the name of a column, not: " + ffuncargs);
-                                                }
-                                                DbColumn ac = cols[aic];
-                                                ByteSlice avbs = ByteSlice.Prepare(row, ac.RowOffset, ac.Type.Size);
-                                                DbValue av = agtools.AllocValue(avbs, ac.Type);
-                                                pl.Add(av);
-                                            }
-                                            
-                                            if(ifarg == agfargs.Count)
-                                            {
-                                                agfargs.Add(new DbFunctionArguments());
-                                            }
-                                            DbFunctionArguments fargs = agfargs[ifarg];
-                                            agfargs[ifarg] = new DbFunctionArguments(pl);
-                                            ifarg++;
-                                            
-                                        }
-                                        
-                                    }
-                                    
-                                    DbAggregatorArguments aggargs = new DbAggregatorArguments(agfargs, 0, ifarg);
-                                    
-                                    DbValue ffuncresult = DbExec.ExecDbAggregator(ffuncname, agtools, aggargs);
-                                    // TO-DO: check return type? implicit conversions (int->long)?
-                                    DbType ffuncresulttype;
-                                    ByteSlice ffuncresultbs = ffuncresult.Eval(out ffuncresulttype);
-                                    if(ffuncresultbs.Length > Size)
-                                    {
-                                        throw new Exception("Value length too long returned from function " + ffuncname);
-                                    }
-                                    if(GettingFieldTypeStrings)
-                                    {
-                                        FieldTypeStrings.Add(ffuncresulttype.Name);
-                                    }
-                                    
-                                    for(int iv = 0; iv < outvalueslen; iv++)
-                                    {
-                                        List<byte> v = outvalues[iv];
-                                        ByteSlice resultbuf = ByteSlice.Prepare(v, CurOffset, Size);
-                                        for(int ir = 0; ir < ffuncresultbs.Length; ir++)
-                                        {
-                                            resultbuf[ir] = ffuncresultbs[ir];
-                                        }
-                                        for(int ir = ffuncresultbs.Length; ir < resultbuf.Length; ir++)
-                                        {
-                                            resultbuf[ir] = 0;
-                                        }
-                                        if(GroupBy)
-                                        {
-                                            break;
-                                        }
-                                    }
-                                    
-                                }
-                                CurOffset += Size;
+                                sclauses.Add(new SelectClause(agtools, cols));
+                                calls = Source;
                             }
-                            else
+                            SelectClause sclause = sclauses[iww];
+                            List<DbValue> results = sclause.ProcessSelectPart(calls, rows);
+                            #if DEBUG
+                            if(1 != results.Count && results.Count != outvalues.Count)
                             {
-                                DbColumn ci = cols[wi];
-                                int Size = ci.Type.Size;
-                                CurOffset += Size;
-                                if(GettingFieldTypeStrings)
+                                throw new Exception("DEBUG:  (WhatFunctions) && (1 != results.Count && results.Count != outvalues.Count)");
+                            }
+                            #endif
+                            
+                            int outvaluesCount = outvalues.Count;
+                            DbType rtype = DbType.PrepareNull(); // Just for init.
+                            bool JustOneResult = 1 == results.Count;
+                            bool DifferentSize = false;
+                            for(int ir = 0; ir < outvaluesCount; ir++)
+                            {
+                                ByteSlice bs;
+                                int ix = ir;
+                                if(JustOneResult)
                                 {
-                                    FieldTypeStrings.Add(ci.Type.Name);
+                                    ix = 0;
+                                }
+                                bs = results[ix].Eval(out rtype);
+                                bs.AppendTo(outvalues[ir]);
+                                for(int vdiff = OutputColumnSizes[iww] - bs.Length; vdiff > 0; vdiff--)
+                                {
+                                    DifferentSize = true;
+                                    outvalues[ir].Add(0);
                                 }
                             }
+                            
+                            if(GettingFieldTypeStrings)
+                            {
+                                if(DifferentSize)
+                                {
+                                    rtype = DbType.Prepare(OutputColumnSizes[iww], rtype.ID);
+                                }
+                                FieldTypeStrings.Add(rtype.Name);
+                            }
+                            
                         }
                         
                         {
-                            for(int iv = 0; iv < outvalueslen; iv++)
+                            int outvaluesCount = outvalues.Count;
+                            for(int iv = 0; iv < outvaluesCount; iv++)
                             {
                                 output.Add(ByteSlice.Prepare(outvalues[iv]));
+                                if(GroupBy)
+                                {
+                                    break;
+                                }
                             }
-                            #if DEBUG
-                            if(GroupBy && outvalueslen > 1)
-                            {
-                                throw new Exception("DEBUG:  (GroupBy && outvalueslen > 1)");
-                            }
-                            #endif
                         }
                         
                         //if(null != agtools)
@@ -1110,7 +1032,7 @@
                                 {
                                     if(fti > 0)
                                     {
-                                        sbtypes.Append(',');
+                                        sbtypes.Append("{264E73F6-E3C9-43de-A3FD-9AC36F905087}");
                                     }
                                     sbtypes.Append(FieldTypeStrings[fti]);
                                 }

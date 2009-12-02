@@ -277,6 +277,7 @@ namespace QueryAnalyzer_Protocol
                                     string keydata = XContent.ReceiveXString(netstm, buf);
                                     bool ispin = false;
                                     bool ispinhash = false;
+                                    bool keepvalueorder = false;
                                     
                                     string keydatatype = "long";
                                     int keylen = 9;
@@ -300,6 +301,7 @@ namespace QueryAnalyzer_Protocol
                                                 ispin = (xnPin.InnerText == "1");
                                                 System.Xml.XmlNode xnPinHash = xnIndex.SelectSingleNode("pinHash");
                                                 ispinhash = (xnPinHash != null && xnPinHash.InnerText == "1");
+                                                keepvalueorder = (xnIndex["keepValueOrder"].InnerText == "1");
                                                 System.Xml.XmlNode xnTable = xnIndex.SelectSingleNode("table");
                                                 System.Xml.XmlNodeList xnCols = xnTable.SelectNodes("column");
                                                 columns = new Column[xnCols.Count];
@@ -394,8 +396,9 @@ namespace QueryAnalyzer_Protocol
                                         XContent.SendXContent(netstm, buf, 4);
                                     }                                                                     
 
-                                    //return rows.
-                                    List<byte> allrowsbuf = new List<byte>(1024 * 1024 * 1);
+                                    //return rows.    
+                                    byte[] recordbuf = new byte[rowlen + (0x400 * 0x400 * 20)];
+                                    int recordbufpos = 0;
                                     byte[] keybuf = new byte[keylen];
 
                                     string[] xparts = keydata.Split('\0');
@@ -457,7 +460,7 @@ namespace QueryAnalyzer_Protocol
                                                 }
                                                 break;
                                         }
-                                       
+                                        
                                         if (chunkname.Length > 0)
                                         {
                                             ChunkRowsData chunkbuf = LoadFileChunk(chunkname, indexname, ispin, rowlen, ispinhash, keyoffset);
@@ -479,97 +482,23 @@ namespace QueryAnalyzer_Protocol
                                             if (right >= 0)
                                             {
                                                 result = BSearch(chunkbuf, keybuf, ref left, ref right, keyoffset);
-                                            }                                            
+                                            }
                                             if (result > -1)
-                                            {
-                                                long startingrowpos = result;
-
-                                                //begin a row       
-                                                for (int ci = 0; ci < rowlen; ci++)
+                                            {       
+                                                #region keepvalueorderIsfalse
+                                                if (!keepvalueorder)
                                                 {
-                                                    allrowsbuf.Add(chunkbuf[result][ci]);
-                                                }
+                                                    long startingrowpos = result;
 
-                                                bool lookforward = true;
-                                                long rowpos = startingrowpos;
-                                                for (; ; )
-                                                {
-                                                    if (++rowpos > chunkbuf.NumberOfRows - 1)
+                                                    //begin a row      
+                                                    CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                    for (int ci = 0; ci < rowlen; ci++)
                                                     {
-                                                        break;
-                                                    }
-                                                    if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
-                                                    {
-                                                        for (int ci = 0; ci < rowlen; ci++)
-                                                        {
-                                                            allrowsbuf.Add(chunkbuf[rowpos][ci]);
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        lookforward = false;
-                                                        break;
-                                                    }
-                                                }
-
-                                                bool lookbackward = true;
-                                                rowpos = startingrowpos;
-                                                for (; ; )
-                                                {
-                                                    if (--rowpos < 0)
-                                                    {
-                                                        break;
-                                                    }
-                                                    if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
-                                                    {
-                                                        for (int ci = 0; ci < rowlen; ci++)
-                                                        {
-                                                            allrowsbuf.Add(chunkbuf[rowpos][ci]);
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        lookbackward = false;
-                                                        break;
-                                                    }
-                                                }
-
-                                                int startingchunkpos = -1;
-                                                List<KeyValuePair<string, byte[]>> mi = null;
-                                                if (lookforward || lookbackward)
-                                                {
-                                                    mi = LoadMasterIndex(indexname, keylen);
-                                                    for (int i = 0; i < mi.Count; i++)
-                                                    {
-                                                        if (string.Compare(chunkname, mi[i].Key, true) == 0)
-                                                        {
-                                                            startingchunkpos = i;
-                                                            break;
-                                                        }
-                                                    }
-                                                    if (startingchunkpos == -1)
-                                                    {
-                                                        throw new Exception("Chunk file name " + chunkname + " is not found in master index: " + indexname);
-                                                    }
-                                                }
-
-                                                int chunkpos = startingchunkpos;
-                                                while (lookforward)
-                                                {
-                                                    if (++chunkpos > mi.Count - 1)
-                                                    {
-                                                        break;
-                                                    }
-                                                    else if (CompareBytes(mi[chunkpos].Value, keybuf, keylen) != 0)
-                                                    {
-                                                        break;
-                                                    }
-                                                    else
-                                                    {
-                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
-                                                        rowpos = -1;
+                                                        recordbuf[recordbufpos++] = chunkbuf[result][ci];
                                                     }
 
+                                                    bool lookforward = true;
+                                                    long rowpos = startingrowpos;
                                                     for (; ; )
                                                     {
                                                         if (++rowpos > chunkbuf.NumberOfRows - 1)
@@ -578,9 +507,10 @@ namespace QueryAnalyzer_Protocol
                                                         }
                                                         if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
                                                         {
+                                                            CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
                                                             for (int ci = 0; ci < rowlen; ci++)
                                                             {
-                                                                allrowsbuf.Add(chunkbuf[rowpos][ci]);
+                                                                recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
                                                             }
                                                         }
                                                         else
@@ -589,21 +519,9 @@ namespace QueryAnalyzer_Protocol
                                                             break;
                                                         }
                                                     }
-                                                }
 
-                                                chunkpos = startingchunkpos;
-                                                while (lookbackward)
-                                                {
-                                                    if (--chunkpos < 0)
-                                                    {
-                                                        break;
-                                                    }
-                                                    else
-                                                    {
-                                                        chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
-                                                        rowpos = chunkbuf.NumberOfRows;
-                                                    }
-
+                                                    bool lookbackward = true;
+                                                    rowpos = startingrowpos;
                                                     for (; ; )
                                                     {
                                                         if (--rowpos < 0)
@@ -612,9 +530,10 @@ namespace QueryAnalyzer_Protocol
                                                         }
                                                         if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
                                                         {
+                                                            CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
                                                             for (int ci = 0; ci < rowlen; ci++)
                                                             {
-                                                                allrowsbuf.Add(chunkbuf[rowpos][ci]);
+                                                                recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
                                                             }
                                                         }
                                                         else
@@ -623,11 +542,263 @@ namespace QueryAnalyzer_Protocol
                                                             break;
                                                         }
                                                     }
+
+                                                    int startingchunkpos = -1;
+                                                    List<KeyValuePair<string, byte[]>> mi = null;
+                                                    if (lookforward || lookbackward)
+                                                    {
+                                                        mi = LoadMasterIndex(indexname, keylen);
+                                                        for (int i = 0; i < mi.Count; i++)
+                                                        {
+                                                            if (string.Compare(chunkname, mi[i].Key, true) == 0)
+                                                            {
+                                                                startingchunkpos = i;
+                                                                break;
+                                                            }
+                                                        }
+                                                        if (startingchunkpos == -1)
+                                                        {
+                                                            throw new Exception("Chunk file name " + chunkname + " is not found in master index: " + indexname);
+                                                        }
+                                                    }
+
+                                                    int chunkpos = startingchunkpos;
+                                                    while (lookforward)
+                                                    {
+                                                        if (++chunkpos > mi.Count - 1)
+                                                        {
+                                                            break;
+                                                        }
+                                                        else if (CompareBytes(mi[chunkpos].Value, keybuf, keylen) != 0)
+                                                        {
+                                                            break;
+                                                        }
+                                                        else
+                                                        {
+                                                            chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
+                                                            rowpos = -1;
+                                                        }
+
+                                                        for (; ; )
+                                                        {
+                                                            if (++rowpos > chunkbuf.NumberOfRows - 1)
+                                                            {
+                                                                break;
+                                                            }
+                                                            if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                            {
+                                                                CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                for (int ci = 0; ci < rowlen; ci++)
+                                                                {
+                                                                    recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                lookforward = false;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    chunkpos = startingchunkpos;
+                                                    while (lookbackward)
+                                                    {
+                                                        if (--chunkpos < 0)
+                                                        {
+                                                            break;
+                                                        }
+                                                        else
+                                                        {
+                                                            chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
+                                                            rowpos = chunkbuf.NumberOfRows;
+                                                        }
+
+                                                        for (; ; )
+                                                        {
+                                                            if (--rowpos < 0)
+                                                            {
+                                                                break;
+                                                            }
+                                                            if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                            {
+                                                                CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                for (int ci = 0; ci < rowlen; ci++)
+                                                                {
+                                                                    recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                lookbackward = false;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
                                                 }
+                                                #endregion
+                                                #region keepvalueorder
+                                                else
+                                                {
+                                                    long startingrowpos = result;
+
+                                                    long firstrowindex = startingrowpos;
+                                                    bool lookbackward = true;
+                                                    long rowpos = startingrowpos;
+                                                    for (; ; )
+                                                    {
+                                                        if (--rowpos < 0)
+                                                        {
+                                                            break;
+                                                        }
+                                                        if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                        {
+                                                            firstrowindex = rowpos;
+                                                        }
+                                                        else
+                                                        {
+                                                            lookbackward = false;
+                                                            break;
+                                                        }
+                                                    }
+
+                                                    List<KeyValuePair<string, byte[]>> mi = null;
+                                                    int startingchunkpos = -1;
+                                                    if (lookbackward)
+                                                    {
+                                                        mi = LoadMasterIndex(indexname, keylen);
+                                                        startingchunkpos = FindChunkIndexFromMasterIndex(chunkname, mi);
+                                                        
+                                                        if (startingchunkpos > 0)
+                                                        {
+                                                            ChunkRowsData prevchunkbuf = LoadFileChunk(mi[startingchunkpos - 1].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
+                                                            rowpos = prevchunkbuf.NumberOfRows;
+                                                            long prevchunkfirstrowindex = -1;
+                                                            for (; ; )
+                                                            {
+                                                                if (--rowpos < 0)
+                                                                {
+                                                                    break;
+                                                                }
+                                                                if (CompareBytes(keybuf, prevchunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                                {
+                                                                    prevchunkfirstrowindex = rowpos;
+                                                                }
+                                                                else
+                                                                {
+                                                                    lookbackward = false;
+                                                                    break;
+                                                                }
+                                                            }
+
+                                                            if (prevchunkfirstrowindex > -1)
+                                                            {
+                                                                //Begin first row.
+                                                                for (long ri = prevchunkfirstrowindex; ri < prevchunkbuf.NumberOfRows; ri++)
+                                                                {
+                                                                    CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                    for (int ci = 0; ci < rowlen; ci++)
+                                                                    {
+                                                                        recordbuf[recordbufpos++] = prevchunkbuf[ri][ci];
+                                                                    }
+                                                                } 
+                                                            }
+                                                        }
+                                                    }
+
+                                                    for (long ri = firstrowindex; ri <= startingrowpos; ri++)
+                                                    {
+                                                        CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                        for (int ci = 0; ci < rowlen; ci++)
+                                                        {
+                                                            recordbuf[recordbufpos++] = chunkbuf[ri][ci];
+                                                        }
+                                                    }
+
+                                                    bool lookforward = true;
+                                                    rowpos = startingrowpos;
+                                                    for (; ; )
+                                                    {
+                                                        if (++rowpos > chunkbuf.NumberOfRows - 1)
+                                                        {
+                                                            break;
+                                                        }
+                                                        if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                        {
+                                                            CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                            for (int ci = 0; ci < rowlen; ci++)
+                                                            {
+                                                                recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            lookforward = false;
+                                                            break;
+                                                        }
+                                                    }
+
+                                                    if (lookforward)
+                                                    {
+                                                        if (startingchunkpos == -1)
+                                                        {
+                                                            mi = LoadMasterIndex(indexname, keylen);
+                                                            startingchunkpos = FindChunkIndexFromMasterIndex(chunkname, mi);
+                                                        }
+
+                                                        int chunkpos = startingchunkpos;
+                                                        while (lookforward)
+                                                        {
+                                                            if (++chunkpos > mi.Count - 1)
+                                                            {
+                                                                break;
+                                                            }
+                                                            else if (CompareBytes(mi[chunkpos].Value, keybuf, keylen) != 0)
+                                                            {
+                                                                break;
+                                                            }
+                                                            else
+                                                            {
+                                                                chunkbuf = LoadFileChunk(mi[chunkpos].Key, indexname, ispin, rowlen, ispinhash, keyoffset);
+                                                                rowpos = -1;
+                                                            }
+
+                                                            for (; ; )
+                                                            {
+                                                                if (++rowpos > chunkbuf.NumberOfRows - 1)
+                                                                {
+                                                                    break;
+                                                                }
+                                                                if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
+                                                                {
+                                                                    CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                    for (int ci = 0; ci < rowlen; ci++)
+                                                                    {
+                                                                        recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    lookforward = false;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                #endregion                                                
                                             }
                                         }
                                     }
-                                    XContent.SendXContent(netstm, allrowsbuf.ToArray());
+
+                                    if (recordbufpos > 0)
+                                    {
+                                        netstm.WriteByte((byte)'+');
+                                        XContent.SendXContent(netstm, recordbuf, 0, recordbufpos);
+                                        recordbufpos = 0;
+                                    }
+
+                                    netstm.WriteByte((byte)'.');
                                     //end all rows.
                                 }
                                 break;
@@ -653,6 +824,16 @@ namespace QueryAnalyzer_Protocol
                     clientsock.Close();
                     clientsock = null;
                 }
+            }
+
+            private void CheckBatchCapacity(ref int recordbufpos, byte[] recordbuf, int rowlength)
+            {
+                if (recordbufpos + rowlength > recordbuf.Length)
+                {
+                    netstm.WriteByte((byte)'+');
+                    XContent.SendXContent(netstm, recordbuf, 0, recordbufpos);
+                    recordbufpos = 0;
+                }                
             }
 
             private int CompareBytes(byte[] x, byte[] y, int length)
@@ -847,6 +1028,18 @@ namespace QueryAnalyzer_Protocol
                 }
 
                 return fbuf;
+            }
+
+            private int FindChunkIndexFromMasterIndex(string chunkname, List<KeyValuePair<string, byte[]>> mi)
+            {
+                for (int i = 0; i < mi.Count; i++)
+                {
+                    if (string.Compare(chunkname, mi[i].Key, true) == 0)
+                    {
+                        return i;
+                    }
+                }                
+                throw new Exception("Chunk file name " + chunkname + " is not found in master index");                
             }
 
             internal struct Column

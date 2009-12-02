@@ -274,6 +274,7 @@ namespace MySpace.DataMining.AELight
             EnableAutoComplete(config.AutoComplete);
             EnableSyntaxColor(config.SyntaxColor);
             EnableDebugProxy(config.DebugByProxyEnabled);
+            EnableMapInputScrollControl(config.MapInputScrollControl);
 
             if (DebugSwitch)
             {
@@ -2449,6 +2450,31 @@ namespace MySpace.DataMining.AELight
         }
 
 
+        void EnableMapInputScrollControl(bool x)
+        {
+            mapInputScrollControlToolStripMenuItem.Checked = x;
+            if (null != dbg)
+            {
+                lock (dbg.DebuggerSyncLock)
+                {
+                    if (x)
+                    {
+                        if (dbg.IsPaused
+                            && dbg.DebugExecutionContext == MySpace.DataMining.DistributedObjects.ExecutionContextType.MAP)
+                        {
+                            dbg._createinputscroller_unlocked();
+                            dbg._showinputscroller_unlocked();
+                        }
+                    }
+                    else
+                    {
+                        dbg._destroyinputscroller_unlocked();
+                    }
+                }
+            }
+        }
+
+
         void EnableAutoComplete(bool x)
         {
             autoCompleteToolStripMenuItem.Checked = x;
@@ -2536,6 +2562,15 @@ namespace MySpace.DataMining.AELight
         }
 
 
+        public bool MapInputScrollControlEnabled
+        {
+            get
+            {
+                return config.MapInputScrollControl;
+            }
+        }
+
+
         private void autoCompleteToolStripMenuItem_Click(object sender, EventArgs e)
         {
             config.AutoComplete = !autoCompleteToolStripMenuItem.Checked;
@@ -2619,10 +2654,15 @@ namespace MySpace.DataMining.AELight
 
             foreach (ToolStripItem ts in toolStrip1.Items)
             {
-                if ("DbgOnly_1ff9" == (ts.Tag as string))
+                string stsTag = (ts.Tag as string);
+                if ("DbgOnly_1ff9" == stsTag)
                 {
                     ts.Enabled = true;
                     ts.Visible = true;
+                }
+                else if ("DbgOffOnly_1ff9" == stsTag)
+                {
+                    ts.Visible = false;
                 }
             }
             DebugSkipToReduceStripButton.Enabled = false;
@@ -2654,7 +2694,8 @@ namespace MySpace.DataMining.AELight
                 // Disable all debug toolbar buttons except Stop.
                 foreach (ToolStripItem ts in toolStrip1.Items)
                 {
-                    if ("DbgOnly_1ff9" == (ts.Tag as string))
+                    string stsTag = (ts.Tag as string);
+                    if ("DbgOnly_1ff9" == stsTag)
                     {
                         ts.Enabled = false;
                     }
@@ -2671,9 +2712,15 @@ namespace MySpace.DataMining.AELight
             {
                 foreach (ToolStripItem ts in toolStrip1.Items)
                 {
-                    if ("DbgOnly_1ff9" == (ts.Tag as string))
+                    string stsTag = (ts.Tag as string);
+                    if ("DbgOnly_1ff9" == stsTag)
                     {
                         ts.Visible = false;
+                    }
+                    else if ("DbgOffOnly_1ff9" == stsTag)
+                    {
+                        ts.Enabled = true;
+                        ts.Visible = true;
                     }
                 }
                 EnableToolbar(config.ToolbarEnabledEditor);
@@ -2803,6 +2850,40 @@ namespace MySpace.DataMining.AELight
             }
 
 
+            internal void ParseAll()
+            {
+                //try
+                {
+                    for (int dj = 0; dj < cfg.Jobs.Length; dj++)
+                    {
+                        if (0 != dj)
+                        {
+                            //System.Threading.Thread.Sleep(200);
+                        }
+                        if (!ParseJob(dj))
+                        {
+                            break;
+                        }
+                    }
+                    _TSafe_SetStatus("Parsed", 1000);
+                    //_TSafe_LeaveDebugMode();
+                }
+                /*catch (Exception e)
+                {
+
+#if DEBUGdd
+                    if (!System.Diagnostics.Debugger.IsAttached)
+                    {
+                        System.Diagnostics.Debugger.Launch();
+                    }
+#endif
+
+                    _TSafeLockedUiCall(new Action(delegate() { Outer._ParseError_unlocked(e); }));
+                    //_TSafe_LeaveDebugMode(); // Need to let them read the error..
+                }*/
+            }
+
+
             System.Threading.Thread thread; // Main thread for debugging and writing debugger commands.
             System.IO.StreamWriter din;
             System.IO.StreamReader dout;
@@ -2822,6 +2903,709 @@ namespace MySpace.DataMining.AELight
 
             public bool IsPaused; // Only valid if debugging.
             public bool _stepping = false;
+            public MySpace.DataMining.DistributedObjects.ExecutionContextType DebugExecutionContext;
+
+            public List<dfs.DfsFile.FileNode> dbgmapinputdfsnodes;
+
+            public string dbgmapinputscroll = null;
+            public long dbgmapinputscrollsize;
+#if DEBUG
+            public const int dbgmapinputscrollsize_upperbound = 0x400 * 0x400 * 88;
+#else
+            public const int dbgmapinputscrollsize_upperbound = int.MaxValue - 1;
+#endif
+            Form inputscrollform = null;
+            InputScrollControl inputscrollcontrol = null;
+            int inputscrollcontrol_prevvalue;
+            long inputscrollcontrol_partindex;
+            long inputscrollcontrol_partposition;
+
+            // Must be done from UI thread!
+            internal void _createinputscroller_unlocked()
+            {
+                if (null == inputscrollform)
+                {
+                    inputscrollcontrol_prevvalue = 0;
+                    inputscrollform = new Form();
+                    inputscrollform.FormClosing += new FormClosingEventHandler(_inputscrollform_FormClosing);
+                    inputscrollform.Text = "Map: " + cfg.Jobs[dbgjobindex].NarrativeName;
+                    inputscrollform.ShowInTaskbar = false;
+                    inputscrollform.MinimizeBox = false;
+                    inputscrollform.MaximizeBox = false;
+                    inputscrollform.FormBorderStyle = FormBorderStyle.SizableToolWindow;
+                    inputscrollform.StartPosition = FormStartPosition.Manual;
+                    inputscrollcontrol = new InputScrollControl();
+                    {
+                        dbgmapinputscrollsize = 0;
+                        foreach (dfs.DfsFile.FileNode fn in dbgmapinputdfsnodes)
+                        {
+                            dbgmapinputscrollsize += fn.Length;
+                        }
+                    }
+                    if (dbgmapinputscrollsize > dbgmapinputscrollsize_upperbound)
+                    {
+                        inputscrollcontrol.InputScroll.Maximum = dbgmapinputscrollsize_upperbound;
+                    }
+                    else
+                    {
+                        inputscrollcontrol.InputScroll.Maximum = (int)dbgmapinputscrollsize;
+                    }
+                    /*if (dbgmapinputscrollsize > 0x400 * 0x400 * 64)
+                    {
+                        inputscrollcontrol.InputScroll.LargeChange = 0x400 * 0x400 * 64;
+                    }
+                    if (inputscrollcontrol.InputScroll.Maximum > 1000)
+                    {
+                        inputscrollcontrol.InputScroll.SmallChange = inputscrollcontrol.InputScroll.Maximum / 100;
+                    }
+                    else if (inputscrollcontrol.InputScroll.Maximum > 10)
+                    {
+                        inputscrollcontrol.InputScroll.SmallChange = inputscrollcontrol.InputScroll.Maximum / 10;
+                    }*/
+                    inputscrollcontrol.Enabled = false;
+                    inputscrollcontrol.Parent = inputscrollform;
+                    inputscrollform.ClientSize = inputscrollcontrol.Size;
+                    inputscrollcontrol.Dock = DockStyle.Fill;
+                    inputscrollform.Location =
+                        new Point(Outer.Right - inputscrollform.Width - 32,
+                            Outer.Top + (Outer.Height / 2 - inputscrollform.Height / 2));
+                    inputscrollform.Owner = Outer;
+
+                    for(int idmisr = 20; ; idmisr--)
+                    {
+                        try
+                        {
+                            // <partindex><newline><partposition><newline>
+                            System.IO.File.WriteAllText(dbgmapinputscroll, "-1\r\n-1\r\n");
+                            break;
+                        }
+                        catch
+                        {
+                            if (idmisr < 0)
+                            {
+                                throw;
+                            }
+                            System.Threading.Thread.Sleep(200);
+                            continue;
+                        }
+                    }
+
+                    inputscrollcontrol.InputScroll.Scroll += new ScrollEventHandler(_InputScroll_Scroll);
+                    inputscrollcontrol.NudgeBack.Click += new EventHandler(NudgeBack_Click);
+                    inputscrollcontrol.NudgeForward.Click += new EventHandler(NudgeForward_Click);
+
+                }
+
+            }
+
+            internal int _getscrolltopartposinputscrollcontrol(long partindex, long partposition)
+            {
+                long sizetopart = 0;
+                for (int ifn = 0; ifn < partindex; ifn++)
+                {
+                    dfs.DfsFile.FileNode fn = dbgmapinputdfsnodes[ifn];
+                    sizetopart += fn.Length;
+                }
+
+                long newpos = sizetopart + partposition;
+                if (dbgmapinputscrollsize > dbgmapinputscrollsize_upperbound)
+                {
+                    newpos = (long)((double)dbgmapinputscrollsize_upperbound * (double)newpos / (double)dbgmapinputscrollsize);
+                }
+                if (newpos < 0 || newpos > dbgmapinputscrollsize)
+                {
+                    throw new Exception("DEBUG:  invalid calculated scroll position: "
+                        + newpos + " (" + dbgmapinputscrollsize + " input size)");
+                }
+                return (int)newpos;
+            }
+
+            // Must be done from UI thread!
+            internal void _scrolltopartposinputscrollcontrol(long partindex, long partposition)
+            {
+                int newvalue = _getscrolltopartposinputscrollcontrol(partindex, partposition);
+                inputscrollcontrol_prevvalue = newvalue;
+                inputscrollcontrol.InputScroll.Value = newvalue;
+                inputscrollcontrol_partindex = partindex;
+                inputscrollcontrol_partposition = partposition;
+            }
+
+            // Must be done from UI thread!
+            internal void _updatetextinputscrollcontrol(long partindex, long partposition)
+            {
+                try
+                {
+                    if (partindex < 0 || partindex >= dbgmapinputdfsnodes.Count)
+                    {
+                        throw new IndexOutOfRangeException("_updatetextinputscrollcontrol: partindex");
+                    }
+                    // Since this is reading the chunk directly, need to skip the header.
+                    dfs.DfsFile.FileNode fn = dbgmapinputdfsnodes[(int)partindex];
+                    using (DfsFileNodeStream stm = new DfsFileNodeStream(fn, true,
+                        System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x400 * 4))
+                    {
+                        byte[] buf = new byte[32];
+                        int headersize;
+                        {
+                            StreamReadExact(stm, buf, 4);
+                            int hlen = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(buf);
+                            headersize = hlen;
+                            if (hlen > 4)
+                            {
+                                int hremain = hlen - 4;
+                                if (hremain > buf.Length)
+                                {
+                                    buf = new byte[hremain];
+                                }
+                                StreamReadExact(stm, buf, hremain);
+                            }
+                        }
+                        if (0 != partposition)
+                        {
+                            stm.Position = (long)headersize + partposition;
+                        }
+                        string newtext;
+                        if (-1 == MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength)
+                        {
+                            System.IO.StreamReader sr = new System.IO.StreamReader(stm);
+                            StringBuilder sbnewtext = new StringBuilder();
+                            string s = sr.ReadLine();
+                            if (null == s)
+                            {
+                                throw new Exception("Unable to read line; end of input file");
+                            }
+                            for (int i = 0; i < s.Length; i++)
+                            {
+                                char ch = s[i];
+                                if (ch < ' ' || char.IsControl(ch))
+                                {
+                                    sbnewtext.Append("<" + (int)ch + ">");
+                                }
+                                else
+                                {
+                                    sbnewtext.Append(ch);
+                                }
+                            }
+                            newtext = sbnewtext.ToString();
+                        }
+                        else
+                        {
+                            StringBuilder sbnewtext = new StringBuilder();
+                            for (int i = 0;
+                                i < MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
+                                i++)
+                            {
+                                int ich = stm.ReadByte();
+                                if (-1 == ich)
+                                {
+                                    throw new Exception("_updatetextinputscrollcontrol: Hit EOF too early while reading record");
+                                }
+                                if (ich >= 127 || ich < ' ')
+                                {
+                                    sbnewtext.Append("<" + ich + ">");
+                                }
+                                else
+                                {
+                                    sbnewtext.Append((char)ich);
+                                }
+                            }
+                            newtext = sbnewtext.ToString();
+                        }
+                        inputscrollcontrol.CurrentInputBox.Text = newtext;
+                    }
+                }
+                catch
+                {
+#if DEBUG
+                    System.Diagnostics.Debugger.Launch();
+#endif
+                    inputscrollcontrol.CurrentInputBox.Text = "?";
+                }
+            }
+
+            long _getpartlength(dfs.DfsFile.FileNode fn)
+            {
+                using (DfsFileNodeStream stm = new DfsFileNodeStream(fn, true,
+                       System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x400 * 4))
+                {
+                    byte[] buf = new byte[32];
+                    int headersize;
+                    {
+                        StreamReadExact(stm, buf, 4);
+                        int hlen = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(buf);
+                        headersize = hlen;
+                        if (hlen > 4)
+                        {
+                            int hremain = hlen - 4;
+                            if (hremain > buf.Length)
+                            {
+                                buf = new byte[hremain];
+                            }
+                            StreamReadExact(stm, buf, hremain);
+                        }
+                    }
+                    return stm.Length - headersize;
+                }
+            }
+
+            // If findnextline==true, it will return -1 instead of a newline that's at the end of the file.
+            long _findnewline(dfs.DfsFile.FileNode fn, long position, bool backward, bool findnextline)
+            {
+                using (DfsFileNodeStream stm = new DfsFileNodeStream(fn, true,
+                    System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x400 * 4))
+                {
+                    byte[] buf = new byte[32];
+                    int headersize;
+                    {
+                        StreamReadExact(stm, buf, 4);
+                        int hlen = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(buf);
+                        headersize = hlen;
+                        if (hlen > 4)
+                        {
+                            int hremain = hlen - 4;
+                            if (hremain > buf.Length)
+                            {
+                                buf = new byte[hremain];
+                            }
+                            StreamReadExact(stm, buf, hremain);
+                        }
+                    }
+                    if (position < 0)
+                    {
+                        position = stm.Length - headersize - (-(position + 1));
+                    }
+                    if (0 != position)
+                    {
+                        stm.Position = (long)headersize + position;
+                    }
+                    if (backward)
+                    {
+                        for (; ; )
+                        {
+                            int iby = stm.ReadByte();
+                            if (-1 == iby)
+                            {
+                                return -1;
+                            }
+                            if ('\n' == iby)
+                            {
+                                //if (0 == numskip--)
+                                {
+                                    return position;
+                                }
+                            }
+                            if (0 == position)
+                            {
+                                return -1;
+                            }
+                            stm.Seek(-2, System.IO.SeekOrigin.Current);
+                            position--;
+                        }
+                    }
+                    else // forward:
+                    {
+                        for (; ; )
+                        {
+                            int iby = stm.ReadByte();
+                            if (-1 == iby)
+                            {
+                                return -1;
+                            }
+                            if ('\n' == iby)
+                            {
+                                //if (0 == numskip--)
+                                {
+                                    if (findnextline)
+                                    {
+                                        if (-1 == stm.ReadByte())
+                                        {
+                                            return -1;
+                                        }
+                                    }
+                                    return position;
+                                }
+                            }
+                            position++;
+                        }
+                    }
+                }
+            }
+
+            void _nudged()
+            {
+                for (int idmisr = 20; ; idmisr--)
+                {
+                    try
+                    {
+                        // <partindex><newline><partposition><newline>
+                        System.IO.File.WriteAllText(dbgmapinputscroll,
+                            inputscrollcontrol_partindex + "\r\n" + inputscrollcontrol_partposition + "\r\n");
+                        break;
+                    }
+                    catch
+                    {
+                        if (idmisr < 0)
+                        {
+                            throw;
+                        }
+                        System.Threading.Thread.Sleep(200);
+                        continue;
+                    }
+                }
+                _updatetextinputscrollcontrol(inputscrollcontrol_partindex, inputscrollcontrol_partposition);
+                _scrolltopartposinputscrollcontrol(inputscrollcontrol_partindex, inputscrollcontrol_partposition);
+            }
+
+            // Note: in the context of the UI thread!
+            void NudgeBack_Click(object sender, EventArgs e)
+            {
+                if (-1 == MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength)
+                {
+                    if (inputscrollcontrol_partposition <= 1)
+                    {
+                        if (inputscrollcontrol_partindex > 0)
+                        {
+                            inputscrollcontrol_partindex--;
+                            long pos = _findnewline(dbgmapinputdfsnodes[(int)inputscrollcontrol_partindex],
+                                -3, true, false); // -1 is end of file; -2 is the \n, and -3 is part of the previous line.
+                            if (-1 == pos)
+                            {
+                                pos = 0;
+                            }
+                            else
+                            {
+                                pos++;
+                            }
+                            inputscrollcontrol_partposition = pos;
+                            _nudged();
+                        }
+                        else
+                        {
+                            // Don't update.
+                        }
+                    }
+                    else
+                    {
+                        // Start 2 back: one back is on the newline, 2 back is in the previous line.
+                        long pos = _findnewline(dbgmapinputdfsnodes[(int)inputscrollcontrol_partindex],
+                            inputscrollcontrol_partposition - 2, true, false);
+                        if (-1 == pos)
+                        {
+                            pos = 0;
+                        }
+                        else
+                        {
+                            pos++;
+                        }
+                        inputscrollcontrol_partposition = pos;
+                        _nudged();
+                    }
+                }
+                else
+                {
+                    if (inputscrollcontrol_partposition - MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength < 0)
+                    {
+                        if (0 == inputscrollcontrol_partindex)
+                        {
+                            // Don't update.
+                        }
+                        else
+                        {
+                            inputscrollcontrol_partindex--;
+                            long partlength = _getpartlength(dbgmapinputdfsnodes[(int)inputscrollcontrol_partindex]);
+                            inputscrollcontrol_partposition = partlength - MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
+                            if (inputscrollcontrol_partposition < 0)
+                            {
+                                inputscrollcontrol_partposition = 0;
+                            }
+                            _nudged();
+                        }
+                    }
+                    else
+                    {
+                        inputscrollcontrol_partposition -= MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
+                        _nudged();
+                    }
+                }
+            }
+
+            // Note: in the context of the UI thread!
+            void NudgeForward_Click(object sender, EventArgs e)
+            {
+                if (-1 == MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength)
+                {
+                    long pos = _findnewline(dbgmapinputdfsnodes[(int)inputscrollcontrol_partindex],
+                        inputscrollcontrol_partposition, false, true);
+                    if (-1 == pos)
+                    {
+                        inputscrollcontrol_partindex++;
+                        if (inputscrollcontrol_partindex >= dbgmapinputdfsnodes.Count)
+                        {
+                            inputscrollcontrol_partindex = dbgmapinputdfsnodes.Count - 1;
+                            // Don't update.
+                        }
+                        else
+                        {
+                            inputscrollcontrol_partposition = 0;
+                            _nudged();
+                        }
+                    }
+                    else
+                    {
+                        inputscrollcontrol_partposition = pos + 1;
+                        _nudged();
+                    }
+                }
+                else
+                {
+                    long partlength = _getpartlength(dbgmapinputdfsnodes[(int)inputscrollcontrol_partindex]);
+                    if (inputscrollcontrol_partposition + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength >= partlength)
+                    {
+                        inputscrollcontrol_partindex++;
+                        if (inputscrollcontrol_partindex >= dbgmapinputdfsnodes.Count)
+                        {
+                            inputscrollcontrol_partindex = dbgmapinputdfsnodes.Count - 1;
+                            // Don't update.
+                        }
+                        else
+                        {
+                            inputscrollcontrol_partposition = 0;
+                            _nudged();
+                        }
+                    }
+                    else
+                    {
+                        inputscrollcontrol_partposition += MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
+                        _nudged();
+                    }
+                }
+            }
+
+            // Note: in the context of the UI thread!
+            void _InputScroll_Scroll(object sender, ScrollEventArgs eventargs)
+            {
+                if (eventargs.NewValue == inputscrollcontrol_prevvalue)
+                {
+                    return;
+                }
+
+                long newpos = eventargs.NewValue;
+                if (dbgmapinputscrollsize > dbgmapinputscrollsize_upperbound)
+                {
+                    newpos = (long)((double)dbgmapinputscrollsize * (double)newpos / (double)dbgmapinputscrollsize_upperbound);
+                }
+
+                long partindex = 0;
+                long partposition = 0;
+                if (dbgmapinputdfsnodes.Count > 0)
+                {
+                    long posremain = newpos;
+                    foreach (dfs.DfsFile.FileNode fn in dbgmapinputdfsnodes)
+                    {
+                        if (posremain < fn.Length)
+                        {
+                            partposition = posremain;
+                            break;
+                        }
+                        posremain -= fn.Length;
+                        partindex++;
+                    }
+                    if (partindex == dbgmapinputdfsnodes.Count)
+                    {
+                        // At the very end of the last one, otherwise would be the beginning of another part.
+                        partindex--;
+                        partposition = dbgmapinputdfsnodes[dbgmapinputdfsnodes.Count - 1].Length;
+                    }
+                }
+
+                // Snap to whole chunks.
+                if (partposition > 0)
+                {
+                    if (eventargs.NewValue > inputscrollcontrol_prevvalue)
+                    {
+                        if (partindex + 1 == dbgmapinputdfsnodes.Count)
+                        {
+                            // Don't snap-up if there's no more parts after this.
+                            eventargs.NewValue = inputscrollcontrol_prevvalue;
+                            return;
+                        }
+                        else
+                        {
+                            partindex++;
+                            partposition = 0;
+                        }
+                    }
+                    else
+                    {
+                        partposition = 0;
+                    }
+                    {
+                        int eanewvalue = _getscrolltopartposinputscrollcontrol(partindex, partposition);
+                        try
+                        {
+                            eventargs.NewValue = eanewvalue;
+                        }
+                        catch (Exception e)
+                        {
+                            throw new InvalidOperationException("DEBUG:  error while snapping input scroll to part boundary (invalid value: " + eanewvalue + ")", e);
+                        }
+                    }
+                }
+
+                for (int idmisr = 20; ; idmisr--)
+                {
+                    try
+                    {
+                        // <partindex><newline><partposition><newline>
+                        System.IO.File.WriteAllText(dbgmapinputscroll,
+                            partindex.ToString() + "\r\n"
+                            + partposition.ToString() + "\r\n");
+                        break;
+                    }
+                    catch
+                    {
+                        if (idmisr < 0)
+                        {
+                            throw;
+                        }
+                        System.Threading.Thread.Sleep(200);
+                        continue;
+                    }
+                }
+
+                inputscrollcontrol_prevvalue = eventargs.NewValue;
+
+                _updatetextinputscrollcontrol(partindex, partposition);
+                inputscrollcontrol_partindex = partindex;
+                inputscrollcontrol_partposition = partposition;
+
+            }
+
+            void _inputscrollform_FormClosing(object sender, FormClosingEventArgs e)
+            {
+                e.Cancel = true;
+                (sender as Form).Hide();
+            }
+
+            // Must be done from UI thread!
+            internal void _showinputscroller_unlocked()
+            {
+#if DEBUG
+                if (null == inputscrollform)
+                {
+                    throw new Exception("DEBUG:  _showinputscroller_unlocked: (null == inputscrollform)");
+                }
+#endif
+                if (null != inputscrollform)
+                {
+                    if (!inputscrollform.Visible)
+                    {
+                        //_updatetextinputscrollcontrol(inputscrollcontrol_partindex, inputscrollcontrol_partposition);
+                        inputscrollform.Show();
+                    }
+                }
+            }
+
+            // Must be done from UI thread!
+            internal void _destroyinputscroller_unlocked()
+            {
+                if (null != inputscrollform)
+                {
+                    inputscrollform.Close();
+                    inputscrollform.Dispose();
+                    inputscrollform = null;
+                    inputscrollcontrol = null;
+                }
+
+                try
+                {
+                    System.IO.File.Delete(dbgmapinputscroll);
+                }
+                catch
+                {
+                }
+
+            }
+
+            // Called when breakpoint hit and after a step finishes.
+            void _Paused()
+            {
+                //Console.WriteLine(" *** PAUSED IN {0}", DebugExecutionContext);
+
+                if (DebugExecutionContext == MySpace.DataMining.DistributedObjects.ExecutionContextType.MAP)
+                {
+                    if (Outer.MapInputScrollControlEnabled)
+                    {
+                        _TSafeLockedUiCall(
+                            new Action(
+                            delegate
+                            {
+                                _createinputscroller_unlocked();
+                                inputscrollcontrol.Enabled = true;
+                                _showinputscroller_unlocked();
+                                _updatetextinputscrollcontrol(inputscrollcontrol_partindex, inputscrollcontrol_partposition);
+                                Outer.Activate();
+                            }));
+                    }
+                }
+                else
+                {
+                    if (null != inputscrollform)
+                    {
+                        _TSafeLockedUiCall(
+                            new Action(
+                            delegate
+                            {
+                                _destroyinputscroller_unlocked();
+                            }));
+                    }
+                }
+            }
+
+            // Called when resuming execution, not when stepping.
+            // Note: not called when debugging has stopped; e.g. user cancels debug session.
+            void _Unpaused()
+            {
+                //Console.WriteLine(" *** UN-PAUSED IN {0}", DebugExecutionContext);
+
+                if (null != inputscrollform)
+                {
+                    _TSafeLockedUiCall(
+                        new Action(
+                        delegate
+                        {
+                            //_destroyinputscroller_unlocked();
+                            inputscrollcontrol.Enabled = false;
+                            inputscrollcontrol.CurrentInputBox.Clear();
+                        }));
+                }
+            }
+
+            void _DebugSessionStopped()
+            {
+                if (null != inputscrollform)
+                {
+                    _TSafeLockedUiCall(
+                        new Action(
+                        delegate
+                        {
+                            _destroyinputscroller_unlocked();
+                        }));
+                }
+            }
+
+            void _DebugOneJobFinished()
+            {
+                if (null != inputscrollform)
+                {
+                    _TSafeLockedUiCall(
+                        new Action(
+                        delegate
+                        {
+                            _destroyinputscroller_unlocked();
+                        }));
+                }
+            }
 
 
             void _TSafeLockedUiCall(Action act)
@@ -2858,6 +3642,7 @@ namespace MySpace.DataMining.AELight
                     _stepping = false;
                     _rawcmd_unlocked("cont");
                     IsPaused = false;
+                    _Unpaused();
                 }
             }
 
@@ -2904,6 +3689,7 @@ namespace MySpace.DataMining.AELight
             public void Stop()
             {
                 _stopone();
+                _DebugSessionStopped();
             }
 
 
@@ -3265,6 +4051,41 @@ namespace MySpace.DataMining.AELight
                             System.Threading.Thread.Sleep(200);
                         }
                     }
+                    else if (dln.StartsWith("{B5AB3BA8-7AAB-4c6f-9387-FDCD958C9E94}")) // Now reducing.
+                    {
+                        DebugExecutionContext = MySpace.DataMining.DistributedObjects.ExecutionContextType.REDUCE;
+                    }
+                    else if (dln.StartsWith("{D46AA97E-0315-4b14-B6B0-3347A597C6EF}")) // <partindex>@<partposition>
+                    {
+                        if (Outer.MapInputScrollControlEnabled)
+                        {
+                            string s = dln.Substring(38);
+                            int iat = s.IndexOf('@');
+                            inputscrollcontrol_partindex = long.Parse(s.Substring(0, iat));
+                            inputscrollcontrol_partposition = long.Parse(s.Substring(iat + 1));
+                            //if (inputscroll_partindex >= 0)
+                            {
+                                if (inputscrollcontrol_partposition < 0)
+                                {
+                                    inputscrollcontrol_partposition = 0;
+                                }
+                                if (null != inputscrollform)
+                                {
+                                    _TSafeLockedUiCall(
+                                        new Action(
+                                        delegate
+                                        {
+                                            //_createinputscroller_unlocked();
+                                            _scrolltopartposinputscrollcontrol(inputscrollcontrol_partindex, inputscrollcontrol_partposition);
+                                            if (IsPaused)
+                                            {
+                                                _updatetextinputscrollcontrol(inputscrollcontrol_partindex, inputscrollcontrol_partposition);
+                                            }
+                                        }));
+                                }
+                            }
+                        }
+                    }
                     else
                     {
 
@@ -3485,6 +4306,8 @@ namespace MySpace.DataMining.AELight
                                 else
                                 {
                                     _inwhere = false;
+
+                                    _Paused();
                                 }
                             }
 
@@ -3674,7 +4497,17 @@ namespace MySpace.DataMining.AELight
 
             string jobfilename;
 
+            bool ParseJob(int jobindex)
+            {
+                return _ProcessJob(jobindex, false);
+            }
+
             bool DebugJob(int jobindex)
+            {
+                return _ProcessJob(jobindex, true);
+            }
+
+            bool _ProcessJob(int jobindex, bool exec)
             {
 #if DEBUG
                 try
@@ -3694,9 +4527,15 @@ namespace MySpace.DataMining.AELight
 
                 dbgjobindex = jobindex;
 
+                bool debugging = exec;
+                bool localcompile = !debugging || !Outer.DebuggerProxyEnabled;
+
                 if (null == cfg || jobindex < 0 || jobindex >= cfg.Jobs.Length)
                 {
-                    _TSafe_LeaveDebugMode();
+                    if (debugging)
+                    {
+                        _TSafe_LeaveDebugMode();
+                    }
                     return false;
                 }
 
@@ -3718,8 +4557,20 @@ namespace MySpace.DataMining.AELight
                 jobfilename = Environment.CurrentDirectory + @"\dbg_" + Surrogate.SafeTextPath(JobsEdit.RealUserName) + "~jobs_" + outputguid + ".ds"; // !
                 System.IO.File.WriteAllText(jobfilename, doctext);
 
-                _TSafe_SetStatus("Debugging job " + cfgj.NarrativeName + "...", 10000);
-                //_TSafe_SetStatus("Debugging job " + cfgj.NarrativeName + "..." + (Outer.DebuggerProxyEnabled ? "    [Debug by Proxy]" : ""), 10000);
+                if (debugging)
+                {
+                    _TSafe_SetStatus("Debugging job " + cfgj.NarrativeName + "...", 10000);
+                    //_TSafe_SetStatus("Debugging job " + cfgj.NarrativeName + "..." + (Outer.DebuggerProxyEnabled ? "    [Debug by Proxy]" : ""), 10000);
+                }
+                else
+                {
+                    _TSafeLockedUiCall(new Action(
+                        delegate
+                        {
+                            Outer.SetStatus("Parsing job " + cfgj.NarrativeName + "...", 2000);
+                            Outer.Update();
+                        }));
+                }
 
                 IList<string> JobOutputFiles = null;
 
@@ -3727,13 +4578,18 @@ namespace MySpace.DataMining.AELight
                 DateTime starttime = DateTime.Now;
                 if (0 == string.Compare("mapreduce", cfgj.IOSettings.JobType, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (Outer.DebugSwitch)
+                    if (debugging)
                     {
-                        Console.WriteLine("[{0}]        [MapReduce: {1}]", starttime.ToString(), cfgj.NarrativeName);
+                        DebugExecutionContext = MySpace.DataMining.DistributedObjects.ExecutionContextType.MAP;
+                        if (Outer.DebugSwitch)
+                        {
+                            Console.WriteLine("[{0}]        [MapReduce: {1}]", starttime.ToString(), cfgj.NarrativeName);
+                        }
                     }
-                    int OutputRecordLength = int.MinValue;
-                    JobOutputFiles = new string[] { cfgj.IOSettings.DFSOutput };                    
+                    JobOutputFiles = new string[] { cfgj.IOSettings.DFSOutput };
                     List<string> prettyfilenames = new List<string>();
+                    List<int> outputrecordlengths = new List<int>();
+                    if (debugging)
                     {
                         if (cfgj.IOSettings.DFSOutput.Trim().Length > 0)
                         {
@@ -3765,37 +4621,42 @@ namespace MySpace.DataMining.AELight
                                     catch (OverflowException e)
                                     {
                                         throw new Exception(string.Format("Error: mapreduce output file record length error: {0} ({1})", dfsoutput, e.Message));
-                                    }                                    
-                                }
-                                if (OutputRecordLength != int.MinValue && OutputRecordLength != reclen)
-                                {
-                                    throw new Exception(string.Format("Error: all map outputs must have the same record length: {0}", dfsoutput));
+                                    }
                                 }
                                 string reason = "";
                                 if (dfs.IsBadFilename(dfsoutput, out reason))
                                 {
                                     throw new Exception("Invalid output file: " + reason);
                                 }
-                                OutputRecordLength = reclen;
                                 prettyfilenames.Add(dfsoutput);
+                                outputrecordlengths.Add(reclen);
                             }
                         }
                         else
                         {
                             prettyfilenames.Add("");
-                        }                        
+                            outputrecordlengths.Add(-1);
+                        }
                     }
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength > 0 ? OutputRecordLength : -1;
-                    
+                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = outputrecordlengths.Count > 0 ? outputrecordlengths[0] : -1;
+
                     dfs dc = LoadDfsConfig();
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_MaxDGlobals = dc.MaxDGlobals;
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection = cfgj.IOSettings.OutputDirection;
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection_ascending = (0 == string.Compare(cfgj.IOSettings.OutputDirection, "ascending", true));
+                    if (debugging)
+                    {
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_MaxDGlobals = dc.MaxDGlobals;
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection = cfgj.IOSettings.OutputDirection;
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection_ascending = (0 == string.Compare(cfgj.IOSettings.OutputDirection, "ascending", true));
+                    }
+                    else
+                    {
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = new string[] { "localhost" };
+                    }
                     int InputRecordLength = int.MinValue;
-                    List<string> dfsinputpaths;
+                    List<string> dfsinputpaths = new List<string>();
                     List<string> inputfileswithnodes = new List<string>();
                     List<int> inputnodesoffsets = new List<int>();
+                    if (debugging)
                     {
                         List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();
                         List<string> mapfiles = new List<string>();
@@ -3970,12 +4831,15 @@ namespace MySpace.DataMining.AELight
                             }
                         }
 
-                        dfsinputpaths = new List<string>(nodes.Count);
                         dfs.MapNodesToNetworkPaths(nodes, dfsinputpaths);
+
+                        dbgmapinputdfsnodes = nodes;
 
                     }
 
                     string outputfilebase = outputguid + ".mapreduce.remote";
+                    
+                    dbgmapinputscroll = "dbg_" + Surrogate.SafeTextPath(JobsEdit.RealUserName) + "~inputscroll_" + outputfilebase + ".mis";
 
                     string reduceinitcode, reducecode, reducefinalcode;
 
@@ -4010,6 +4874,18 @@ public void ReduceFinalize() { }
 ";
                     }
 
+                    StringBuilder csvoutputrecordlengths = new StringBuilder();
+                    {
+                        for (int li = 0; li < outputrecordlengths.Count; li++)
+                        {
+                            if (0 != li)
+                            {
+                                csvoutputrecordlengths.Append(",");
+                            }
+                            csvoutputrecordlengths.Append(outputrecordlengths[li]);
+                        }
+                    }
+
                     string mrrcode =
 MySpace.DataMining.DistributedObjects.CommonCs.CommonDynamicCsCode
 + (@"
@@ -4041,7 +4917,7 @@ MySpace.DataMining.DistributedObjects.CommonCs.CommonDynamicCsCode
     public const int DSpace_InputRecordLength = " + InputRecordLength.ToString() + @";
     public const int Qizmt_InputRecordLength = DSpace_InputRecordLength;
 
-    public const int DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
+    public const int DSpace_OutputRecordLength = " + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString() + @";
     public const int Qizmt_OutputRecordLength = DSpace_OutputRecordLength;
 
 
@@ -4282,7 +5158,12 @@ internal class MRRReducerBase
         public System.IO.Stream _outstm;
         internal RandomAccessOutput[] parentlist = null;
 
-        const int OutputRecordLength = " + OutputRecordLength.ToString() + @";
+        int OutputRecordLength = -1;
+
+        public RandomAccessOutput(int outputrecordlength)
+        {
+            this.OutputRecordLength = outputrecordlength;
+        }
         
 	    public void Cache(ByteSlice key, ByteSlice value) { /* drop! */ }
 
@@ -4431,7 +5312,7 @@ class MRRReducer: MRRReducerBase
       + reduceinitcode
       + reducecode
       + reducefinalcode
-      + @"
+      + (@"
 #line default
 }
 
@@ -4467,13 +5348,21 @@ static int MRRCountSameKeys(List<MRRKV> mrrentries, int offset)
 }
 
 const int InputRecordLength = " + InputRecordLength.ToString() + @";
+const string dbgmapinputscroll = `" + dbgmapinputscroll + @"`;
+const bool mapinputscrolling_enabledatstartup = " + (Outer.MapInputScrollControlEnabled ? "true" : "false") + @";
 
 public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
 {
+    //Console.WriteLine(`{FE4877BA-99A2-498b-835C-25860FE90094}{0}`, dfsinput.NumberOfParts);
+    
     MRRMapper.MRRMapOutput mapout = new MRRMapper.MRRMapOutput();
     MRRMapper mapper = new  MRRMapper();
     List<byte> curinput = new List<byte>(1000);
+    long curinputpartpos = 0; // Position in current part where curinput started.
+    long curinputpartindex = 0; // Part index for curinputpartpos.
     List<byte> nextinput = new List<byte>(1000);
+    long nextinputpartpos = 0; // Same ideas as curinputpartpos but for nextinput.
+    long nextinputpartindex = 0; // Part index for nextinputpartpos.
     string curinputfn = null;
     string nextinputfn = null;
     bool hascur = false;
@@ -4496,10 +5385,83 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             }
             break;
         }
+
+        bool neednextinput = (StaticGlobals.MapIteration == 0);
+
+        bool dbgmapinputscroll_exists = System.IO.File.Exists(dbgmapinputscroll);
+        bool mapinputscrolling = mapinputscrolling_enabledatstartup || dbgmapinputscroll_exists;
+        if(dbgmapinputscroll_exists)
+        {
+            mapinputscrolling = true;
+            string[] lines;
+            for(int idmisr = 20; ; idmisr--)
+            {
+                try
+                {
+                    // <partindex><newline><partposition><newline>
+                    lines = System.IO.File.ReadAllLines(dbgmapinputscroll);
+                    break;
+                }
+                catch
+                {
+                    if (idmisr < 0)
+                    {
+                        throw;
+                    }
+                    System.Threading.Thread.Sleep(200);
+                    continue;
+                }
+            }
+            for(int idmisr = 20; ; idmisr--)
+            {
+                try
+                {
+                    // <partindex><newline><partposition><newline>
+                    System.IO.File.WriteAllText(dbgmapinputscroll, `-1\r\n-1\r\n`);
+                    break;
+                }
+                catch
+                {
+                    if (idmisr < 0)
+                    {
+                        throw;
+                    }
+                    System.Threading.Thread.Sleep(200);
+                    continue;
+                }
+            }
+            if(lines.Length > 0)
+            {
+                long partindex;
+                if(long.TryParse(lines[0], out partindex)
+                    && partindex >= 0)
+                {
+
+                    long partposition = 0;
+                    if(lines.Length > 1)
+                    {
+                        if(long.TryParse(lines[1], out partposition)
+                            && partposition >= 0)
+                        {
+                        }
+                        else
+                        {
+                            partposition = 0;
+                        }
+                    }
+
+                    dfsinput.SeekToPart(partindex, partposition);
+                    neednextinput = true;
+
+                }
+            }
+        }
         
         curinput.Clear();
-        if(StaticGlobals.MapIteration == 0)
+        if(neednextinput)
         {
+            long xpartindex = dfsinput.CurrentPart;
+            curinputpartpos = dfsinput.CurrentPartPosition;
             if(InputRecordLength > 0)
             {
                 hascur = dfsinput.ReadRecordAppend(curinput);                
@@ -4507,6 +5469,11 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             else
             {
                 hascur = dfsinput.ReadLineAppend(curinput);
+            }
+            curinputpartindex = dfsinput.CurrentPart;
+            if(xpartindex != curinputpartindex)
+            {
+                curinputpartpos = 0;
             }
             curinputfn = StaticGlobals.DSpace_InputFileName;
         }
@@ -4520,22 +5487,38 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
                     curinput.Add(nb);
                 }
             }
+            curinputpartpos = nextinputpartpos;
         }
         if(!hascur)
         {
             break;
-        }       
-
-        nextinput.Clear();
-        if(InputRecordLength > 0)
-        {
-            hasnext = dfsinput.ReadRecordAppend(nextinput);
         }
-        else
+
+        if(mapinputscrolling)
         {
-            hasnext = dfsinput.ReadLineAppend(nextinput);
-        }     
-        nextinputfn = StaticGlobals.DSpace_InputFileName;  
+            Console.WriteLine(`{{D46AA97E-0315-4b14-B6B0-3347A597C6EF}}{0}@{1}`, curinputpartindex, curinputpartpos);
+            //Console.WriteLine(`{{4FF139F0-C5AA-40b3-8694-E2A305E508AD}}{0}`, Convert.ToBase64String(curinput.ToArray()));
+        }
+
+        {
+            nextinput.Clear();
+            long xpartindex = dfsinput.CurrentPart;
+            nextinputpartpos = dfsinput.CurrentPartPosition;
+            if(InputRecordLength > 0)
+            {
+                hasnext = dfsinput.ReadRecordAppend(nextinput);
+            }
+            else
+            {
+                hasnext = dfsinput.ReadLineAppend(nextinput);
+            }
+            nextinputpartindex = dfsinput.CurrentPart;
+            if(xpartindex != nextinputpartindex)
+            {
+                nextinputpartpos = 0;
+            }
+            nextinputfn = StaticGlobals.DSpace_InputFileName;
+        }
 
         if(!hasnext)
         {
@@ -4565,14 +5548,16 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
     rae.mrrentries = mapout.mrrentries;
     int nreduceouts = " + prettyfilenames.Count.ToString() + @";
     MRRReducer.RandomAccessOutput[] reduceouts = new MRRReducer.RandomAccessOutput[nreduceouts];
+    int[] outputrecordlengths = new int[] {" + csvoutputrecordlengths.ToString() + @"};
     for(int oi = 0; oi < nreduceouts; oi++)
     {
-        reduceouts[oi] = new MRRReducer.RandomAccessOutput();
+        reduceouts[oi] = new MRRReducer.RandomAccessOutput(outputrecordlengths[oi]);
         reduceouts[oi]._outstm = dfsoutput.GetOutputByIndex(oi);
         reduceouts[oi].parentlist = reduceouts;
     }
     MRRReducer.RandomAccessOutput reduceout = reduceouts[0];   
     StaticGlobals.ExecutionContext = ExecutionContextType.REDUCE; // !
+    Console.WriteLine(`{B5AB3BA8-7AAB-4c6f-9387-FDCD958C9E94}`); // DebugExecutionContext = REDUCE;
     reducer.ReduceInitialize(); // !
     StaticGlobals.DSpace_Last = false;
     {
@@ -4622,7 +5607,7 @@ static void Main(string[] args)
     }
     MySpace.DataMining.DistributedObjects.IRemote A4BED95814AD446eB0C5B7B4154907A9 = new {E43B0DD7-EE4B-4665-873B-A385F98957C3}(); A4BED95814AD446eB0C5B7B4154907A9.OnRemote();
 }
-";
+").Replace('`', '"');
                     string[] outputfilenames = new string[prettyfilenames.Count];
                     for (int oi = 0; oi < prettyfilenames.Count; oi++)
                     {
@@ -4638,10 +5623,16 @@ static void Main(string[] args)
                         dobj.AddUnsafe();
                     }*/
                     dobj.InputRecordLength = InputRecordLength;
-                    dobj.OutputRecordLength = OutputRecordLength;
-                    dobj.LocalCompile = !Outer.DebuggerProxyEnabled;
+                    
+                    dobj.LocalCompile = localcompile;
+                    dobj.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
+                    dobj.OutputRecordLengths = outputrecordlengths;
+                    
                     dobj.DfsSampleDistance = 0;
-                    dobj.CompressFileOutput = dc.slave.CompressDfsChunks;
+                    if (debugging)
+                    {
+                        dobj.CompressFileOutput = dc.slave.CompressDfsChunks;
+                    }
                     dobj.OutputStartingPoint = 0;
                     if (cfgj.AssemblyReferencesCount > 0)
                     {
@@ -4654,7 +5645,7 @@ static void Main(string[] args)
                         outputfilenames,
                         0,
                         mrrcode,
-                        cfgj.Usings, 
+                        cfgj.Usings,
                         inputfileswithnodes,
                         inputnodesoffsets);
 
@@ -4668,7 +5659,7 @@ static void Main(string[] args)
                     try
                     {
                         // CompileSource uses a different file name, so the debugger won't step into it.
-                        if (Outer.DebuggerProxyEnabled)
+                        if (!localcompile)
                         {
                             dobj.Open();
 
@@ -4693,55 +5684,68 @@ static void Main(string[] args)
                     }
                     // dobj.RemoteClassName is of type IRemote
 
-                    dbgskiptoreduce = outputfilebase + ".str";
-                    _TSafeLockedUiCall(new Action(delegate()
-                        {
-                            Outer.skipToReduceToolStripMenuItem.Enabled = true;
-                            Outer.DebugSkipToReduceStripButton.Enabled = true;
-                        }));
-                    try
+                    if (debugging)
                     {
-                        if (!_RunDebugger())
-                        {
-                            return false;
-                        }
-
-                        for(int oi = 0; oi < outputfilenames.Length; oi++)
-                        {
-                            string zdfn = "/"; // "/" is "none"
-                            if (System.IO.File.Exists(outputfilenames[oi]))
-                            {
-                                zdfn = outputfilenames[oi];
-                            }
-                            if (prettyfilenames[oi].Length > 0)
-                            {
-                                string filetype = DfsFileTypes.NORMAL;
-                                if (MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength > 0)
-                                {
-                                    filetype = DfsFileTypes.BINARY_RECT + "@" + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString();
-                                }
-                                Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
-                                "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
-                                ));
-                            }
-                        }
-                    }
-                    finally
-                    {
+                        dbgskiptoreduce = outputfilebase + ".str";
                         _TSafeLockedUiCall(new Action(delegate()
-                        {
-                            Outer.skipToReduceToolStripMenuItem.Enabled = false;
-                            Outer.DebugSkipToReduceStripButton.Enabled = false;
-                        }));
-                        string str = dbgskiptoreduce;
-                        dbgskiptoreduce = null;
+                            {
+                                Outer.skipToReduceToolStripMenuItem.Enabled = true;
+                                Outer.DebugSkipToReduceStripButton.Enabled = true;
+                            }));
                         try
                         {
-                            System.IO.File.Delete(str);
+                            if (!_RunDebugger())
+                            {
+                                return false;
+                            }
+
+                            for (int oi = 0; oi < outputfilenames.Length; oi++)
+                            {
+                                string zdfn = "/"; // "/" is "none"
+                                if (System.IO.File.Exists(outputfilenames[oi]))
+                                {
+                                    zdfn = outputfilenames[oi];
+                                }
+                                if (prettyfilenames[oi].Length > 0)
+                                {
+                                    string filetype = DfsFileTypes.NORMAL;
+                                    if (outputrecordlengths[oi] > 0)
+                                    {
+                                        filetype = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[oi].ToString();
+                                    }
+                                    Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
+                                    "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
+                                    ));
+                                }
+                            }
                         }
-                        catch
+                        finally
                         {
+                            _TSafeLockedUiCall(new Action(delegate()
+                            {
+                                Outer.skipToReduceToolStripMenuItem.Enabled = false;
+                                Outer.DebugSkipToReduceStripButton.Enabled = false;
+                            }));
+                            string str = dbgskiptoreduce;
+                            dbgskiptoreduce = null;
+                            try
+                            {
+                                System.IO.File.Delete(str);
+                            }
+                            catch
+                            {
+                            }
+                            string str2 = dbgmapinputscroll;
+                            dbgmapinputscroll = null;
+                            try
+                            {
+                                System.IO.File.Delete(str2);
+                            }
+                            catch
+                            {
+                            }
                         }
+
                     }
 
                     if (0 == Outer.cdataspermapreduce)
@@ -4752,95 +5756,110 @@ static void Main(string[] args)
                 }
                 else if (0 == string.Compare("remote", cfgj.IOSettings.JobType, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (Outer.DebugSwitch)
+                    if (debugging)
                     {
-                        Console.WriteLine("[{0}]        [Remote: {1}]", starttime.ToString(), cfgj.NarrativeName);
+                        DebugExecutionContext = MySpace.DataMining.DistributedObjects.ExecutionContextType.REMOTE;
+                        if (Outer.DebugSwitch)
+                        {
+                            Console.WriteLine("[{0}]        [Remote: {1}]", starttime.ToString(), cfgj.NarrativeName);
+                        }
                     }
                     dfs dc = LoadDfsConfig();
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_MaxDGlobals = dc.MaxDGlobals;
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection = cfgj.IOSettings.OutputDirection;
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection_ascending = (0 == string.Compare(cfgj.IOSettings.OutputDirection, "ascending", true));
-                    if (cfgj.IOSettings.DFS_IO_Multis != null)
+                    if (debugging)
                     {
-                        cfgj.ExpandDFSIOMultis(dc.Slaves.SlaveList.Split(',', ';').Length, MySpace.DataMining.DistributedObjects.MemoryUtils.NumberOfProcessors);
-                    }
-                    if (cfgj.IOSettings.DFS_IOs.Length > 1)
-                    {
-                        if (DialogResult.OK != MessageBox.Show("The Remote section specifies mutliple DFS_IO sections; only the first will be debugged", "Debug", MessageBoxButtons.OKCancel, MessageBoxIcon.Information))
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_MaxDGlobals = dc.MaxDGlobals;
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection = cfgj.IOSettings.OutputDirection;
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputDirection_ascending = (0 == string.Compare(cfgj.IOSettings.OutputDirection, "ascending", true));
+                        if (cfgj.IOSettings.DFS_IO_Multis != null)
                         {
-                            _TSafe_LeaveDebugMode(); // ...
-                            return false;
+                            cfgj.ExpandDFSIOMultis(dc.Slaves.SlaveList.Split(',', ';').Length, MySpace.DataMining.DistributedObjects.MemoryUtils.NumberOfProcessors);
                         }
+                        if (cfgj.IOSettings.DFS_IOs.Length > 1)
+                        {
+                            if (DialogResult.OK != MessageBox.Show("The Remote section specifies mutliple DFS_IO sections; only the first will be debugged", "Debug", MessageBoxButtons.OKCancel, MessageBoxIcon.Information))
+                            {
+                                _TSafe_LeaveDebugMode(); // ...
+                                return false;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = new string[] { "localhost" };
                     }
                     string DFSWriter = "";
                     string DFSReader = "";
                     List<string> prettyfilenames = new List<string>();
-                    if (cfgj.IOSettings.DFS_IOs.Length != 0)
+                    List<int> outputrecordlengths = new List<int>();
+                    if (debugging)
                     {
-                        JobOutputFiles = new string[] { cfgj.IOSettings.DFS_IOs[0].DFSWriter };
-                        DFSWriter = cfgj.IOSettings.DFS_IOs[0].DFSWriter.Trim();
-                        if (!DFSWriter.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                        if (cfgj.IOSettings.DFS_IOs.Length != 0)
                         {
-                            DFSWriter = "dfs://" + DFSWriter;
+                            JobOutputFiles = new string[] { cfgj.IOSettings.DFS_IOs[0].DFSWriter };
+                            DFSWriter = cfgj.IOSettings.DFS_IOs[0].DFSWriter.Trim();
+                            if (!DFSWriter.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                            {
+                                DFSWriter = "dfs://" + DFSWriter;
+                            }
+                            DFSReader = cfgj.IOSettings.DFS_IOs[0].DFSReader;
                         }
-                        DFSReader = cfgj.IOSettings.DFS_IOs[0].DFSReader;
-                    }
-                    int OutputRecordLength = int.MinValue;
-                    if (DFSWriter.Length > 0)
-                    {
-                        string[] dfswriters = DFSWriter.Split(';');
-                        for (int oi = 0; oi < dfswriters.Length; oi++)
+                        if (DFSWriter.Length > 0)
                         {
-                            string dfswriter = dfswriters[oi].Trim();                            
-                            if (dfswriter.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                            string[] dfswriters = DFSWriter.Split(';');
+                            for (int oi = 0; oi < dfswriters.Length; oi++)
                             {
-                                dfswriter = dfswriter.Substring(6);
-                            }
-                            if (dfswriter.Length == 0)
-                            {
-                                continue;
-                            }
-                            int reclen = -1;
-                            int ic = dfswriter.IndexOf('@');
-                            if (-1 != ic)
-                            {
-                                try
+                                string dfswriter = dfswriters[oi].Trim();
+                                if (dfswriter.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    reclen = Surrogate.GetRecordSize(dfswriter.Substring(ic + 1));
-                                    dfswriter = dfswriter.Substring(0, ic);
+                                    dfswriter = dfswriter.Substring(6);
                                 }
-                                catch (FormatException e)
+                                if (dfswriter.Length == 0)
                                 {
-                                    throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", dfswriter, e.Message));
+                                    continue;
                                 }
-                                catch (OverflowException e)
+                                int reclen = -1;
+                                int ic = dfswriter.IndexOf('@');
+                                if (-1 != ic)
                                 {
-                                    throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", dfswriter, e.Message));
+                                    try
+                                    {
+                                        reclen = Surrogate.GetRecordSize(dfswriter.Substring(ic + 1));
+                                        dfswriter = dfswriter.Substring(0, ic);
+                                    }
+                                    catch (FormatException e)
+                                    {
+                                        throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", dfswriter, e.Message));
+                                    }
+                                    catch (OverflowException e)
+                                    {
+                                        throw new Exception(string.Format("Error: remote output record length error: {0} ({1})", dfswriter, e.Message));
+                                    }
                                 }
+
+                                string reason = "";
+                                if (dfs.IsBadFilename(dfswriter, out reason))
+                                {
+                                    throw new Exception("Invalid remote output file: " + reason);
+                                }
+                                
+                                prettyfilenames.Add(dfswriter);
+                                outputrecordlengths.Add(reclen);
                             }
-                            if (OutputRecordLength != int.MinValue && OutputRecordLength != reclen)
-                            {
-                                throw new Exception(string.Format("Error: all remote outputs must have the same record length: {0}", dfswriter));
-                            }
-                            string reason = "";
-                            if (dfs.IsBadFilename(dfswriter, out reason))
-                            {
-                                throw new Exception("Invalid remote output file: " + reason);
-                            }
-                            OutputRecordLength = reclen;
-                            prettyfilenames.Add(dfswriter);
+                            
                         }
                     }
                     if (prettyfilenames.Count == 0)
                     {
                         prettyfilenames.Add("");
+                        outputrecordlengths.Add(-1);
                     }
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = OutputRecordLength > 0 ? OutputRecordLength : -1;
+                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = outputrecordlengths.Count > 0 ? outputrecordlengths[0] : -1;
                     int InputRecordLength = int.MinValue;
-                    List<string> dfsinputpaths;
+                    List<string> dfsinputpaths = new List<string>();
                     List<string> inputfileswithnodes = new List<string>();
                     List<int> inputnodesoffsets = new List<int>();
+                    if (debugging)
                     {
                         List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();                        
                         IList<string> mapfiles = dc.SplitInputPaths(DFSReader);
@@ -4908,7 +5927,7 @@ static void Main(string[] args)
                                 nodes.AddRange(df.Nodes);
                             }
                         }
-                        dfsinputpaths = new List<string>(nodes.Count);
+
                         dfs.MapNodesToNetworkPaths(nodes, dfsinputpaths);
                     }
                     MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = InputRecordLength;                    
@@ -4929,10 +5948,16 @@ static void Main(string[] args)
                         dobj.AddUnsafe();
                     }*/
                     dobj.InputRecordLength = InputRecordLength;
-                    dobj.OutputRecordLength = OutputRecordLength;
-                    dobj.LocalCompile = !Outer.DebuggerProxyEnabled;
+                    
+                    dobj.LocalCompile = localcompile;
+                    dobj.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
+                    dobj.OutputRecordLengths = outputrecordlengths;
+                    
                     dobj.DfsSampleDistance = 0;
-                    dobj.CompressFileOutput = dc.slave.CompressDfsChunks;
+                    if (debugging)
+                    {
+                        dobj.CompressFileOutput = dc.slave.CompressDfsChunks;
+                    }
                     dobj.OutputStartingPoint = 0;
                     string outputfilebase = outputguid + ".remote";
                     if (cfgj.AssemblyReferencesCount > 0)
@@ -4966,7 +5991,7 @@ static void Main(string[] args)
     public const int DSpace_InputRecordLength = " + InputRecordLength.ToString() + @";
     public const int Qizmt_InputRecordLength = DSpace_InputRecordLength;
 
-    public const int DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
+    public const int DSpace_OutputRecordLength = " + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString() + @";
     public const int Qizmt_OutputRecordLength = DSpace_OutputRecordLength;
 
     public const string Qizmt_Meta = @`" + cfgj.IOSettings.DFS_IOs[0].Meta + @"`;
@@ -5044,7 +6069,7 @@ static void Main(string[] args)
                     try
                     {
                         // CompileSource uses a different file name, so the debugger won't step into it.
-                        if (Outer.DebuggerProxyEnabled)
+                        if (!localcompile)
                         {
                             dobj.Open();
 
@@ -5069,30 +6094,34 @@ static void Main(string[] args)
                     }
                     // dobj.RemoteClassName is of type IRemote
 
-                    if (!_RunDebugger())
+                    if (debugging)
                     {
-                        return false;
-                    }
-
-                    for(int oi = 0; oi < outputfilenames.Length; oi++)
-                    {
-                        string zdfn = "/"; // "/" is "none"
-                        if (System.IO.File.Exists(outputfilenames[oi]))
+                        if (!_RunDebugger())
                         {
-                            zdfn = outputfilenames[oi];
+                            return false;
                         }
 
-                        if (prettyfilenames[oi].Length > 0)
+                        for (int oi = 0; oi < outputfilenames.Length; oi++)
                         {
-                            string filetype = DfsFileTypes.NORMAL;
-                            if (OutputRecordLength > 0)
+                            string zdfn = "/"; // "/" is "none"
+                            if (System.IO.File.Exists(outputfilenames[oi]))
                             {
-                                filetype = DfsFileTypes.BINARY_RECT + "@" + OutputRecordLength.ToString();
+                                zdfn = outputfilenames[oi];
                             }
-                            Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
-                           "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
-                           ));
+
+                            if (prettyfilenames[oi].Length > 0)
+                            {
+                                string filetype = DfsFileTypes.NORMAL;
+                                if (outputrecordlengths[oi] > 0)
+                                {
+                                   filetype = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[oi].ToString();
+                                }
+                                Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
+                               "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
+                               ));
+                            }
                         }
+
                     }
 
                     curcdata++;
@@ -5100,16 +6129,27 @@ static void Main(string[] args)
                 else if (0 == string.Compare("local", cfgj.IOSettings.JobType, StringComparison.OrdinalIgnoreCase))
                 {
                     ShouldSuppressDefaultStandardOutput = cfgj.SuppressDefaultOutput != null;
-                    if (Outer.DebugSwitch)
+                    if (debugging)
                     {
-                        if (!ShouldSuppressDefaultStandardOutput)
+                        DebugExecutionContext = MySpace.DataMining.DistributedObjects.ExecutionContextType.LOCAL;
+                        if (Outer.DebugSwitch)
                         {
-                            Console.WriteLine("[{0}]        [Local: {1}]", starttime.ToString(), cfgj.NarrativeName);
+                            if (!ShouldSuppressDefaultStandardOutput)
+                            {
+                                Console.WriteLine("[{0}]        [Local: {1}]", starttime.ToString(), cfgj.NarrativeName);
+                            }
                         }
                     }
                     dfs dc = LoadDfsConfig();
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_MaxDGlobals = dc.MaxDGlobals;
+                    if (debugging)
+                    {
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_MaxDGlobals = dc.MaxDGlobals;
+                    }
+                    else
+                    {
+                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = new string[] { "localhost" };
+                    }
                     string outputfilename = outputguid + ".local";
                     DebugRemote dobj = new DebugRemote(cfgj.NarrativeName + "_local");
                     if (cfgj.OpenCVExtension != null)
@@ -5120,7 +6160,7 @@ static void Main(string[] args)
                     {
                         dobj.AddUnsafe();
                     }*/
-                    dobj.LocalCompile = !Outer.DebuggerProxyEnabled;
+                    dobj.LocalCompile = localcompile;
                     if (cfgj.AssemblyReferencesCount > 0)
                     {
                         cfgj.AddAssemblyReferences(dobj.CompilerAssemblyReferences, Surrogate.NetworkPathForHost(dc.Slaves.GetFirstSlave()));
@@ -5214,7 +6254,7 @@ static void Main(string[] args)
                     try
                     {
                         // CompileSource uses a different file name, so the debugger won't step into it.
-                        if (Outer.DebuggerProxyEnabled)
+                        if (!localcompile)
                         {
                             dobj.Open();
 
@@ -5239,27 +6279,35 @@ static void Main(string[] args)
                     }
                     // dobj.RemoteClassName is of type IRemote
 
-                    if (!_RunDebugger())
+                    if (debugging)
                     {
-                        return false;
+                        if (!_RunDebugger())
+                        {
+                            return false;
+                        }
                     }
+
                     MySpace.DataMining.DistributedObjects.DGlobalsM.ResetCache();
                     curcdata++;
                 }
-                if (Outer.DebugSwitch)
+                if (debugging)
                 {
-                    if (!ShouldSuppressDefaultStandardOutput)
+                    if (Outer.DebugSwitch)
                     {
-                        Console.WriteLine("[{0}]        Done", starttime.ToString());
-                        if (JobOutputFiles != null)
+                        if (!ShouldSuppressDefaultStandardOutput)
                         {
-                            foreach (string outfile in JobOutputFiles)
+                            Console.WriteLine("[{0}]        Done", starttime.ToString());
+                            if (JobOutputFiles != null)
                             {
-                                Console.WriteLine("Output:   {0}", outfile);
+                                foreach (string outfile in JobOutputFiles)
+                                {
+                                    Console.WriteLine("Output:   {0}", outfile);
+                                }
                             }
+                            Console.WriteLine("Duration: {0}", DurationString((int)(DateTime.Now - starttime).TotalSeconds));
                         }
-                        Console.WriteLine("Duration: {0}", DurationString((int)(DateTime.Now - starttime).TotalSeconds));
                     }
+                    _DebugOneJobFinished();
                 }
 
                 return true;
@@ -5564,9 +6612,20 @@ static void Main(string[] args)
 
         void DebugDoc()
         {
+            _ProcessDoc(true);
+        }
+
+        void ParseDoc()
+        {
+            _ProcessDoc(false);
+        }
+
+        void _ProcessDoc(bool exec)
+        {
+            bool debugging = exec;
+
             if (IsDebugging)
             {
-                //MessageBox.Show(this, "Already debugging", "Debug", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 if (dbg.IsWaiting)
                 {
                     return;
@@ -5575,24 +6634,30 @@ static void Main(string[] args)
                 return;
             }
 
-            if (Doc.Modified)
+            if (debugging)
             {
-                switch (MessageBox.Show(this, PrettyFile + " has been modified,\r\nwould you like to save it before debugging?", "Save before Debug?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question))
+                if (Doc.Modified)
                 {
-                    case DialogResult.Yes:
-                        DoSave();
-                        break;
-                    case DialogResult.No:
-                        break;
-                    default:
-                        return; // Cancel!
+                    switch (MessageBox.Show(this, PrettyFile + " has been modified,\r\nwould you like to save it before debugging?", "Save before Debug?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question))
+                    {
+                        case DialogResult.Yes:
+                            DoSave();
+                            break;
+                        case DialogResult.No:
+                            break;
+                        default:
+                            return; // Cancel!
+                    }
                 }
             }
 
             string ds = Doc.Text;
             try
             {
-                EnterDebugMode();
+                if (debugging)
+                {
+                    EnterDebugMode();
+                }
 
                 SourceCode cfg = SourceCode.LoadXml(SourceCodeXPathSets, ds);
 
@@ -5670,7 +6735,14 @@ static void Main(string[] args)
                 dbg.cdatalines = cdatalines;
                 dbg.doctext = Doc.Text;
                 dbg.cfg = cfg;
-                dbg.Start();
+                if (debugging)
+                {
+                    dbg.Start();
+                }
+                else
+                {
+                    dbg.ParseAll();
+                }
             }
             catch (JobNumException e)
             {
@@ -5692,7 +6764,14 @@ static void Main(string[] args)
                  * */
                 lock (UiSyncLock)
                 {
-                    _CannotDebug_unlocked(e);
+                    if (debugging)
+                    {
+                        _CannotDebug_unlocked(e);
+                    }
+                    else
+                    {
+                        _ParseError_unlocked(e);
+                    }
                 }
                 //LeaveDebugMode(); // Need to let them read the error..
             }
@@ -5700,7 +6779,14 @@ static void Main(string[] args)
             {
                 lock (UiSyncLock)
                 {
-                    _CannotDebug_unlocked(e);
+                    if (debugging)
+                    {
+                        _CannotDebug_unlocked(e);
+                    }
+                    else
+                    {
+                        _ParseError_unlocked(e);
+                    }
                 }
                 //LeaveDebugMode(); // Need to let them read the error..
             }
@@ -5766,6 +6852,77 @@ static void Main(string[] args)
             }
             //MessageBox.Show(errdispmsg, "Debug", MessageBoxButtons.OK, MessageBoxIcon.Error);
             ShowError_unlocked(errdispmsg);
+        }
+
+
+        internal void _ParseError_unlocked(Exception e)
+        {
+            if ((Control.ModifierKeys & (Keys.Control | Keys.Shift)) == (Keys.Control | Keys.Shift))
+            {
+                Console.WriteLine("Parse error: " + e.ToString());
+            }
+
+            //LeavingDebugMode();
+
+            string errdispmsg = "Parse error:\r\n\r\n" + e.Message;
+            if (e.InnerException != null)
+            {
+                errdispmsg += "\r\n\r\n" + e.InnerException.Message;
+            }
+            try
+            {
+                if (-1 != errdispmsg.IndexOf("CompileSource code compile error: ")
+                    && -1 != errdispmsg.IndexOf("dbg_")
+                    )
+                {
+                    int ic = errdispmsg.IndexOf(".ds(");
+                    if (-1 != ic)
+                    {
+                        {
+                            int icc = errdispmsg.IndexOf(',', ic);
+                            if (-1 != icc)
+                            {
+                                string sln = errdispmsg.Substring(ic + 4, icc - (ic + 4));
+                                int ln;
+                                if (int.TryParse(sln, out ln))
+                                {
+                                    if (ln >= 0 && ln < Doc.Lines.Count)
+                                    {
+                                        Doc.Lines[ln].Select();
+                                    }
+                                }
+                            }
+                        }
+                        {
+                            int ierr = errdispmsg.IndexOf("error", ic, StringComparison.OrdinalIgnoreCase);
+                            if (-1 != ierr)
+                            {
+                                string serr = errdispmsg.Substring(ierr);
+                                int ieol = serr.IndexOfAny(new char[] { '\r', '\n' });
+                                if (-1 != ieol)
+                                {
+                                    serr = serr.Substring(0, ieol);
+                                }
+                                SetStatus(serr, 1000 * 10);
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+#if DEBUG
+                if (!System.Diagnostics.Debugger.IsAttached)
+                {
+                    System.Diagnostics.Debugger.Launch();
+                }
+#endif
+            }
+            {
+                //WriteOutputRed_unlocked(errdispmsg); // This output isn't even visible.
+                //BottomTabs.SelectedIndex = 1;
+                MessageBox.Show(this, errdispmsg, "Parse Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
 
@@ -6027,6 +7184,14 @@ static void Main(string[] args)
             debugShellExecToolStripMenuItem.Checked = !debugShellExecToolStripMenuItem.Checked;
         }
 
+        private void mapInputScrollControlToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            bool on = !config.MapInputScrollControl;
+            config.MapInputScrollControl = on;
+            SaveConfig();
+            EnableMapInputScrollControl(on);
+        }
+
 
         public bool ShouldDebugShellExec
         {
@@ -6075,6 +7240,47 @@ static void Main(string[] args)
             af.Dispose();
         }
 
+        private void parseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            ParseDoc();
+        }
+
+        private void ParseStripButton_Click(object sender, EventArgs e)
+        {
+            ParseDoc();
+        }
+
+
+        static int StreamReadLoop(System.IO.Stream stm, byte[] buf, int len)
+        {
+            int sofar = 0;
+            try
+            {
+                while (sofar < len)
+                {
+                    int xread = stm.Read(buf, sofar, len - sofar);
+                    if (xread <= 0)
+                    {
+                        break;
+                    }
+                    sofar += xread;
+                }
+                return sofar;
+            }
+            catch (ArgumentException e)
+            {
+                throw new ArgumentException("StreamRead* Requested " + len.ToString() + " bytes; " + e.Message, e);
+            }
+        }
+
+        static void StreamReadExact(System.IO.Stream stm, byte[] buf, int len)
+        {
+            if (len != StreamReadLoop(stm, buf, len))
+            {
+                throw new System.IO.IOException("Unable to read from stream");
+            }
+        }
+
 
     }
 
@@ -6106,6 +7312,7 @@ static void Main(string[] args)
 
         public bool ToolbarEnabledEditor = true;
         public bool ToolbarEnabledDebugger = true;
+        public bool MapInputScrollControl = false;
 
     }
 

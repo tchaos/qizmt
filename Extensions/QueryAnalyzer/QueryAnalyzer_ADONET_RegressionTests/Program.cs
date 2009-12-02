@@ -38,7 +38,11 @@ namespace QueryAnalyzer_ADONET_RegressionTests
             if (args.Length > 0 && "-rindexonintpinhash" == args[0])
             {
                 goto rindexonintpinhash;
-            }            
+            }
+            if (args.Length > 0 && "-selnestedfuncs" == args[0])
+            {
+                goto selnestedfuncs;
+            }  
             if(!(args.Length > 0 && "-skipaggregators" == args[0]))
             {
                 string tablename = DbAggregators_CreateTable();
@@ -642,6 +646,24 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
                 Console.WriteLine();
             }
+            selnestedfuncs:
+            {
+                string testname = "SELECT Nested Functions";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    SelectNestedFunctions();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
             {
                 string testname = "Drop";
                 Console.WriteLine("*** Running test {0}...", testname);
@@ -971,6 +993,42 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
                 Console.WriteLine();
             }
+           
+            {
+                string testname = "RIndexKeepValueOrder";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexKeepValueOrder();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
+                string testname = "RIndexAutoBatch";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexAutoBatch();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }        
 
             rindexonintpinhash:
             {

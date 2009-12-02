@@ -55,7 +55,38 @@ namespace MySpace.DataMining.DistributedObjects
                 if (null != qe)
                 {
                     wait = false;
-                    RunCommand(qe.GetCommand(), qe.GetOut(), qe.GetError());
+                    int WaitForProcessTimeout;
+                    if (qe.Timeout <= 0)
+                    {
+                        WaitForProcessTimeout = int.MaxValue; // Infinity for Process.WaitForExit.
+                    }
+                    else
+                    {
+                        WaitForProcessTimeout = qe.Timeout * 1000;
+                    }
+                    try
+                    {
+                        RunCommand(qe.GetCommand(), qe.GetOut(), qe.GetError(), WaitForProcessTimeout);
+                    }
+                    catch (RunCommandTimeout rct)
+                    {
+                        if (!string.IsNullOrEmpty(qe.TimeoutCommand))
+                        {
+                            string tcmd = qe.TimeoutCommand;
+                            for (; ; )
+                            {
+                                string JIDREPL = "#JID#";
+                                int ij = tcmd.IndexOf(JIDREPL, StringComparison.OrdinalIgnoreCase);
+                                if (-1 == ij)
+                                {
+                                    break;
+                                }
+                                tcmd = tcmd.Substring(0, ij) + rct.JID + tcmd.Substring(ij + JIDREPL.Length);
+                            }
+                            RunCommand(tcmd);
+                        }
+
+                    }
                 }
 
             }
@@ -138,6 +169,11 @@ namespace MySpace.DataMining.DistributedObjects
                             sched.SortScheduled();
                             for (int inext = 0; inext < sched.Scheduled.Count; inext++)
                             {
+                                if (sched.Scheduled[inext].Paused)
+                                {
+                                    // Skip this one, it's paused.
+                                    continue;
+                                }
                                 if (DateTime.Now >= sched.Scheduled[inext].NextRun)
                                 {
                                     if (IsScheduledTaskRunning(sched.Scheduled[inext].ID))
@@ -185,6 +221,41 @@ namespace MySpace.DataMining.DistributedObjects
         }
 
 
+        public static bool IsQizmtExecCommand(string Cmd)
+        {
+            if (Cmd.StartsWith("qizmt", StringComparison.OrdinalIgnoreCase) // "qizmt ..." and "qizmt.exe ..."
+                    || Cmd.StartsWith("dspace", StringComparison.OrdinalIgnoreCase)) // "dspace ..." and "dspace.exe ..."
+            {
+                foreach (string word in Cmd.Split(' '))
+                {
+                    if (0 == string.Compare(word, "exec", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+
+        public class RunCommandTimeout : Exception
+        {
+            public RunCommandTimeout(System.Diagnostics.Process RunProcess, long JID)
+                : base("Command timed out")
+            {
+                this.RunProcess = RunProcess;
+                this.JID = JID;
+            }
+
+            public RunCommandTimeout(System.Diagnostics.Process RunProcess)
+                : this(RunProcess, -1)
+            {
+            }
+
+            public System.Diagnostics.Process RunProcess;
+            public long JID;
+        }
+
         public static int RunCommand(string Cmd)
         {
             return RunCommand(Cmd, null, null);
@@ -192,13 +263,21 @@ namespace MySpace.DataMining.DistributedObjects
 
         public static int RunCommand(string Cmd, string Out, string Err)
         {
+            return RunCommand(Cmd, Out, Err, int.MaxValue);
+        }
+
+        public static int RunCommand(string Cmd, string Out, string Err, int WaitForProcessTimeout)
+        {
             try
             {
+                long jid = -1;
+                bool IsQizmtExec = IsQizmtExecCommand(Cmd);
+
                 System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", @"/C " + Cmd);
                 psi.CreateNoWindow = true;
                 //psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
                 psi.UseShellExecute = false;
-                if (null != Out)
+                if (null != Out || IsQizmtExec)
                 {
                     psi.RedirectStandardOutput = true;
                 }
@@ -210,6 +289,11 @@ namespace MySpace.DataMining.DistributedObjects
                 Exception thde = null;
                 System.Threading.Thread outthd = null;
                 System.Threading.Thread errthd = null;
+                StringBuilder jidfinder = null;
+                if (IsQizmtExec)
+                {
+                    jidfinder = new StringBuilder(60);
+                }
                 using (System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi))
                 {
                     if (psi.RedirectStandardOutput)
@@ -234,15 +318,48 @@ namespace MySpace.DataMining.DistributedObjects
                                             }
                                             lock (proc)
                                             {
-                                                if (null == tw)
+                                                if (IsQizmtExec && -1 == jid && null != jidfinder)
                                                 {
-                                                    fs = new System.IO.FileStream(Out, System.IO.FileMode.Append,
-                                                        System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite);
-                                                    tw = new System.IO.StreamWriter(fs);
+                                                    jidfinder.Append(rbuf, 0, read);
+                                                    for (int ijf = 0; ijf < jidfinder.Length; ijf++)
+                                                    {
+                                                        if ('\n' == jidfinder[ijf])
+                                                        {
+                                                            try
+                                                            {
+                                                                string sj = jidfinder.ToString();
+                                                                jidfinder = null;
+                                                                const string JIDLINESTART = "Job Identifier: ";
+                                                                if (sj.StartsWith(JIDLINESTART))
+                                                                {
+                                                                    sj = sj.Substring(JIDLINESTART.Length);
+                                                                    int inl = sj.IndexOf('\n');
+                                                                    if (-1 != inl)
+                                                                    {
+                                                                        sj = sj.Substring(0, inl).Trim();
+                                                                        jid = long.Parse(sj);
+                                                                    }
+                                                                }
+                                                            }
+                                                            catch
+                                                            {
+                                                            }
+                                                            break;
+                                                        }
+                                                    }
                                                 }
-                                                fs.Seek(0, System.IO.SeekOrigin.End);
-                                                tw.Write(rbuf, 0, read);
-                                                tw.Flush();
+                                                if (null != Out)
+                                                {
+                                                    if (null == tw)
+                                                    {
+                                                        fs = new System.IO.FileStream(Out, System.IO.FileMode.Append,
+                                                            System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite);
+                                                        tw = new System.IO.StreamWriter(fs);
+                                                    }
+                                                    fs.Seek(0, System.IO.SeekOrigin.End);
+                                                    tw.Write(rbuf, 0, read);
+                                                    tw.Flush();
+                                                }
                                             }
                                         }
                                     }
@@ -320,13 +437,40 @@ namespace MySpace.DataMining.DistributedObjects
                         errthd.IsBackground = true;
                         errthd.Start();
                     }
-                    proc.WaitForExit();
+                    if (!proc.WaitForExit(WaitForProcessTimeout))
+                    {
+                        try
+                        {
+                            errthd.Abort();
+                        }
+                        catch
+                        {
+                        }
+                        try
+                        {
+                            outthd.Abort();
+                        }
+                        catch
+                        {
+                        }
+                        // Don't actually Kill the process,
+                        // just notify that it took longer than expected.
+                        // Plus, it would only kill cmd.exe
+                        throw new RunCommandTimeout(proc, jid);
+                    }
                     result = proc.ExitCode;
                 }
                 if (null != outthd)
                 {
                     if (!outthd.Join(1000 * 60))
                     {
+                        try
+                        {
+                            errthd.Abort();
+                        }
+                        catch
+                        {
+                        }
                         try
                         {
                             outthd.Abort();
@@ -359,7 +503,11 @@ namespace MySpace.DataMining.DistributedObjects
                 }
                 return result;
             }
-            catch(Exception e)
+            catch (RunCommandTimeout)
+            {
+                throw;
+            }
+            catch (Exception e)
             {
                 if (null != Err)
                 {
@@ -510,6 +658,41 @@ namespace MySpace.DataMining.DistributedObjects
                 ScheduleInfo.SEntry result = sched.Schedule_unlocked(se);
                 sched.Save_unlocked();
                 return result;
+            }
+            finally
+            {
+                mu.ReleaseMutex();
+                IDisposable dmu = mu;
+                dmu.Dispose();
+            }
+        }
+
+
+        public static bool PauseSchedule(long ScheduleID, bool paused)
+        {
+            System.Threading.Mutex mu = new System.Threading.Mutex(false, ScheduleInfo.MUTEXNAME);
+            try
+            {
+                mu.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
+            try
+            {
+                ScheduleInfo sched = ScheduleInfo.Load_unlocked();
+                int index = sched.FindSEntryByID(ScheduleID);
+                if (-1 == index)
+                {
+                    return false;
+                }
+                sched.Scheduled[index].Paused = paused;
+                if (!paused)
+                {
+                    sched.Scheduled[index].CalculateNextRun();
+                }
+                sched.Save_unlocked();
+                return true;
             }
             finally
             {
@@ -709,6 +892,8 @@ namespace MySpace.DataMining.DistributedObjects
                 public string Command;
                 public string Out;
                 public string Error;
+                public int Timeout = 0;
+                public string TimeoutCommand;
 
                 public long GetID() { return ID; }
                 public DateTime GetTimeAdded() { return TimeAdded; }
@@ -744,6 +929,17 @@ namespace MySpace.DataMining.DistributedObjects
                 public long Frequency = -1; // Seconds.
                 public string texceptions; // <TimeSpec>[-<TimeSpec>]
                 public string wexceptions;
+                public string wtexceptions; // WT_FORMAT
+                public bool Paused = false;
+
+                public string GetNextRunString()
+                {
+                    if (Paused)
+                    {
+                        return "<paused>";
+                    }
+                    return NextRun.ToString();
+                }
 
                 public long GetID() { return ID; }
                 public DateTime GetTimeAdded() { return TimeAdded; }
@@ -775,6 +971,7 @@ namespace MySpace.DataMining.DistributedObjects
                     public short year = -1;
                     public sbyte month = -1;
                     public sbyte day = -1;
+                    public sbyte weekday = -1;
                     public sbyte hour = -1;
                     public sbyte Get24Hour()
                     {
@@ -816,8 +1013,27 @@ namespace MySpace.DataMining.DistributedObjects
                     public const string TIME_FORMAT = "h:m[:s][AM|PM]";
                     public const string DATE_TIME_FORMAT = "[" + DATE_FORMAT + ".][" + TIME_FORMAT + "]";
 
+                    // Weekday + time format.
+                    public const string WT_FORMAT = "<weekday>@<" + TIME_FORMAT + ">[-<" + TIME_FORMAT + ">]";
+
                     public static TimeSpec Parse(string value)
                     {
+                        {
+                            int iat = value.IndexOf('@');
+                            if (-1 != iat)
+                            {
+                                DayOfWeek wd = ParseDayOfWeek(value.Substring(0, iat));
+                                string wtst = value.Substring(iat + 1);
+                                if (-1 != wtst.IndexOf('.'))
+                                {
+                                    throw new FormatException("Weekday time cannot specify date: unexpected .");
+                                }
+                                TimeSpec wt = Parse(wtst);
+                                wt.weekday = checked((sbyte)wd);
+                                return wt;
+                            }
+                        }
+
                         string date, time;
                         {
                             int idot = value.IndexOf('.');
@@ -1021,7 +1237,16 @@ namespace MySpace.DataMining.DistributedObjects
                         {
                             s = basetime.Second;
                         }
-                        return new DateTime(y, mo, d, h, mi, s);
+                        DateTime result = new DateTime(y, mo, d, h, mi, s);
+                        if (-1 != weekday)
+                        {
+                            DayOfWeek dow = checked((DayOfWeek)weekday);
+                            while (result.DayOfWeek != dow)
+                            {
+                                result = result.AddDays(1);
+                            }
+                        }
+                        return result;
                     }
 
                     public override string ToString()
@@ -1106,6 +1331,19 @@ namespace MySpace.DataMining.DistributedObjects
                         if (!string.IsNullOrEmpty(texceptions))
                         {
                             List<TimeSpec.Range> xrs = ParseTExceptions(texceptions, NextRun);
+                            foreach (TimeSpec.Range xr in xrs)
+                            {
+                                if (NextRun >= xr.first
+                                    && NextRun <= xr.second)
+                                {
+                                    NextRun = xr.second.AddSeconds(1);
+                                    needfix = true;
+                                }
+                            }
+                        }
+                        if (!string.IsNullOrEmpty(wtexceptions))
+                        {
+                            List<TimeSpec.Range> xrs = ParseTExceptions(wtexceptions, NextRun);
                             foreach (TimeSpec.Range xr in xrs)
                             {
                                 if (NextRun >= xr.first
@@ -1210,6 +1448,10 @@ namespace MySpace.DataMining.DistributedObjects
                         case "wexc":
                             se.wexceptions = value;
                             break;
+                        case "wtexceptions":
+                        case "wtexc":
+                            se.wtexceptions = value;
+                            break;
                         case "stdout":
                         case "out":
                         case "output":
@@ -1312,11 +1554,55 @@ namespace MySpace.DataMining.DistributedObjects
                         case "error":
                             qe.Error = value;
                             break;
+                        case "timeout":
+                        case "exectimeout":
+                            {
+                                long ltimeout;
+                                if (!long.TryParse(value, out ltimeout)
+                                    || ltimeout <= 0)
+                                {
+                                    throw new FormatException("ExecTimeout must be a number greater than 0");
+                                }
+                                if (ltimeout > 2147483) // 2147483 is about 24 days.
+                                {
+                                    throw new FormatException("ExecTimeout too large");
+                                }
+                                qe.Timeout = (int)ltimeout;
+                            }
+                            break;
+                        case "ontimeout":
+                            qe.TimeoutCommand = value;
+                            break;
                     }
                 }
                 if (string.IsNullOrEmpty(qe.Command))
                 {
                     throw new InvalidOperationException("Expected command=<value>");
+                }
+#if DEBUG
+                //System.Threading.Thread.Sleep(1000 * 8);
+#endif
+                if (null != qe.TimeoutCommand)
+                {
+                    if (0 == qe.TimeoutCommand.Length)
+                    {
+                        throw new InvalidOperationException("OnTimeout requires a value");
+                    }
+                    if (qe.Timeout <= 0)
+                    {
+                        throw new InvalidOperationException("ExecTimeout=<value> required with OnTimeout");
+                    }
+                    if (!IsQizmtExecCommand(qe.Command))
+                    {
+                        throw new InvalidOperationException("Command=<value> must be a Qizmt exec for OnTimeout");
+                    }
+                }
+                if (qe.Timeout > 0)
+                {
+                    if (null == qe.TimeoutCommand)
+                    {
+                        throw new InvalidOperationException("OnTimeout=<tcmd> required with ExecTimeout");
+                    }
                 }
                 return qe;
             }

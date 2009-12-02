@@ -14,12 +14,98 @@ namespace RDBMS_DBCORE
         public class PrepareSelect : Local
         {
 
+
+            public class queryresults
+            {
+                public string reftable, temptable;
+                public bool IsRefTable
+                {
+                    get { return null != reftable; }
+                }
+                public bool IsTempTable
+                {
+                    get { return null != temptable; }
+                }
+
+                public class FieldInfo
+                {
+                    [System.Xml.Serialization.XmlAttribute]
+                    public int index;
+                    [System.Xml.Serialization.XmlAttribute]
+                    public string name;
+                    [System.Xml.Serialization.XmlAttribute]
+                    public string qatype, cstype;
+                    [System.Xml.Serialization.XmlAttribute]
+                    public int frontbytes, bytes, backbytes;
+                }
+                [System.Xml.Serialization.XmlElement("field")]
+                public FieldInfo[] fields;
+
+                public int recordcount;
+                public int recordsize;
+                public int parts;
+
+
+                public string GetPseudoTableName()
+                {
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("'");
+                    string tf;
+                    if (IsRefTable)
+                    {
+                        tf = reftable;
+                    }
+                    else if (IsTempTable)
+                    {
+                        tf = temptable;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("GetPseudoTableName: DFSTEMP or DFSREF required");
+                    }
+                    if (!tf.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sb.Append("dfs://");
+                    }
+                    sb.Append(tf);
+                    sb.Append('@');
+                    sb.Append(recordsize);
+                    for (int i = 0; i < fields.Length; i++)
+                    {
+                        sb.Append(';');
+                        sb.Append(fields[i].name);
+                        sb.Append('=');
+                        sb.Append(fields[i].qatype);
+                    }
+                    sb.Append('\'');
+                    return sb.ToString();
+                }
+
+            }
+
+            public static queryresults GetQueryResults(string joboutput)
+            {
+                {
+                    int ixml = joboutput.IndexOf("<?xml");
+                    if (ixml > 0)
+                    {
+                        joboutput = joboutput.Substring(ixml);
+                    }
+                }
+                System.Xml.Serialization.XmlSerializer xs = new System.Xml.Serialization.XmlSerializer(typeof(queryresults));
+                return (queryresults)xs.Deserialize(new System.IO.StringReader(joboutput));
+            }
+
+
             List<DbColumn> cols = null;
             List<string> colswidths = null;
 
 
             protected override void Run()
             {
+#if DEBUG
+                //System.Diagnostics.Debugger.Launch();
+#endif
 
                 string TableName = QlArgsUnescape(DSpace_ExecArgs[0]); // nul-delimited.
                 string DfsOutputName = DSpace_ExecArgs[1];
@@ -30,15 +116,197 @@ namespace RDBMS_DBCORE
                 bool dfstemp = -1 != sOptions.IndexOf("DFSTEMP");
                 bool Update = -1 != sOptions.IndexOf("GUPDATE"); // UPDATE (grouped MR).
                 bool GroupBy = -1 != sOptions.IndexOf("GBY");
+                bool OrderBy = -1 != sOptions.IndexOf("OBY");
+                bool Order2By = -1 != sOptions.IndexOf("O2BY");
                 bool dfsref = -1 != sOptions.IndexOf("DFSREF");
                 bool queryresults = dfstemp || dfsref;
                 bool topdfstemp = -1 != sOptions.IndexOf("TOPTEMP");
                 bool distinct = -1 != sOptions.IndexOf("DISTINCT");
 
                 string SelectWhat = QlArgsUnescape(QlArgsSelectWhat);
+                bool WhatFunctions = -1 != SelectWhat.IndexOf('('); // Select clause has functions (aggregates and/or scalars).
+                if (Order2By)
+                {
+                    WhatFunctions = false;
+#if DEBUG
+                    //System.Diagnostics.Debugger.Launch();
+#endif
+                }
+
+                if (OrderBy)
+                {
+                    if (WhatFunctions || GroupBy)
+                    {
+                        if ("*" == SelectWhat)
+                        {
+                            throw new Exception("Invalid query: cannot SELECT * with ORDER BY and GROUP BY");
+                        }
+
+                        string sOrderByCols = null; // null, or "foo,bar" from "ORDER BY foo,bar".
+                        List<string> OrderByCols = new List<string>();
+
+                        string[] Ops = QlArgsUnescape(QlArgsOps).Split('\0');
+                        List<string> NewOps = new List<string>(Ops.Length);
+                        for (int iop = 0; iop < Ops.Length; iop++)
+                        {
+                            if (0 == string.Compare("ORDER", Ops[iop], true))
+                            {
+                                if (iop + 1 < Ops.Length
+                                    && 0 == string.Compare("BY", Ops[iop + 1], true))
+                                {
+                                    iop++;
+                                    int nparens = 0;
+                                    StringBuilder sob = new StringBuilder();
+                                    StringBuilder curobcol = new StringBuilder();
+                                    for (; ; )
+                                    {
+                                        iop++;
+                                        if (iop >= Ops.Length)
+                                        {
+                                            break;
+                                        }
+                                        sob.Append(Ops[iop]);
+                                        curobcol.Append(Ops[iop]);
+                                        if ("(" == Ops[iop])
+                                        {
+                                            nparens++;
+                                        }
+                                        else if (nparens > 0)
+                                        {
+                                            if (")" == Ops[iop])
+                                            {
+                                                nparens--;
+                                            }
+                                        }
+                                        iop++;
+                                        if (iop >= Ops.Length)
+                                        {
+                                            if (0 != nparens)
+                                            {
+                                                throw new Exception("Expected ) in ORDER BY");
+                                            }
+                                            if (curobcol.Length != 0)
+                                            {
+                                                OrderByCols.Add(curobcol.ToString());
+                                                curobcol.Length = 0;
+                                            }
+                                            break;
+                                        }
+                                        if (0 == nparens)
+                                        {
+                                            if (curobcol.Length != 0)
+                                            {
+                                                OrderByCols.Add(curobcol.ToString());
+                                                curobcol.Length = 0;
+                                            }
+                                            if ("," != Ops[iop])
+                                            {
+                                                break;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            curobcol.Append(Ops[iop]);
+                                        }
+                                        sob.Append(Ops[iop]);
+                                    }
+                                    sOrderByCols = sob.ToString();
+                                    if (iop >= Ops.Length)
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+                            NewOps.Add(Ops[iop]);
+                        }
+                        QlArgsOps = QlArgsEscape(string.Join("\0", NewOps.ToArray()));
+                        
+#if DEBUG
+                        //System.Diagnostics.Debugger.Launch();
+#endif
+                        QueryAnalyzer qa1 = new QueryAnalyzer();
+                        string sel1 = qa1.Exec(
+                            "SELECT DFSTEMP", QlArgsEscape(sOrderByCols + "," + SelectWhat.Replace('\0', ',')),
+                            "FROM", QlArgsEscape(TableName),
+                            QlArgsEscape(string.Join(" ", NewOps.ToArray()))
+                            );
+                        Qa.PrepareSelect.queryresults qr = Qa.PrepareSelect.GetQueryResults(sel1);
+                        for (int iobc = 0; iobc < OrderByCols.Count; iobc++)
+                        {
+                            qr.fields[iobc].name = "~OBY.~" + qr.fields[iobc].name;
+                        }
+                        try
+                        {
+                            /*
+                            QueryAnalyzer qa2 = new QueryAnalyzer();
+                            string sel2 = qa2.Exec(
+                                dfstemp ? "SELECT DFSTEMP" : (dfsref ? "SELECT DFSREF" : "SELECT")
+                                );
+                             * */
+                            string newopts = "";
+                            if (dfstemp)
+                            {
+                                newopts += ";DFSTEMP";
+                            }
+                            if (dfsref)
+                            {
+                                newopts += ";DFSREF";
+                            }
+                            if (topdfstemp)
+                            {
+                                newopts += ";TOPTEMP";
+                            }
+                            if (distinct)
+                            {
+                                newopts += ";DISTINCT";
+                            }
+                            PrepareSelect ps2 = new PrepareSelect();
+                            string neworderby;
+                            {
+                                StringBuilder sbnob = new StringBuilder();
+                                //"ORDER\0BY\0" + sOrderByCols.Replace(',', '\0')
+                                sbnob.Append("ORDER\0BY");
+                                bool firstsbnob = true;
+                                for (int iobc = 0; iobc < OrderByCols.Count; iobc++)
+                                {
+                                    if (!firstsbnob)
+                                    {
+                                        sbnob.Append("\0,");
+                                    }
+                                    firstsbnob = false;
+                                    sbnob.Append('\0');
+                                    sbnob.Append(qr.fields[iobc].name); // Includes "~OBY.~"
+                                }
+                                neworderby = sbnob.ToString();
+                            }
+                            newopts += ";O2BY"; // Order-by phase 2.
+                            // [QlArgs]SelectWhat might have () but they are NOT evaluated at this point (no SFUNC)
+                            string sel2 = ps2.Exec(
+                                Qa.QlArgsEscape(qr.GetPseudoTableName()),
+                                DfsOutputName,
+                                //(OrderByCols.Split(',').Length + 2).ToString() + "-*", // Select N-* where N is after OrderByCols
+                                QlArgsSelectWhat,
+                                TopCount.ToString(),
+                                QlArgsEscape(neworderby),
+                                newopts
+                                );
+                            DSpace_Log(sel2);
+                        }
+                        finally
+                        {
+                            if (qr.IsTempTable)
+                            {
+                                Shell("dspace del \"" + qr.temptable + "\"");
+                            }
+                        }
+
+                        return;
+
+                    }
+                }
+
                 string[] awhat = null;
                 string[] UserColumnNames = null;
-                bool WhatFunctions = -1 != SelectWhat.IndexOf('('); // Select clause has functions (aggregates and/or scalars).
                 if ("*" != SelectWhat && "^" != SelectWhat)
                 {
                     awhat = SelectWhat.Split('\0');
@@ -190,11 +458,12 @@ namespace RDBMS_DBCORE
                     StringBuilder sbRowInfo = new StringBuilder();
                     StringBuilder sbDisplayInfo = new StringBuilder(); // Display
                     int totsize = 0;
+                    string xtablename = xeTable["name"].InnerText;
                     foreach (System.Xml.XmlNode xn in xeTable.SelectNodes("column"))
                     {
                         if (0 != sbRowInfo.Length)
                         {
-                            sbRowInfo.Append(',');
+                            sbRowInfo.Append('\0');
                             sbDisplayInfo.Append(','); // Display
                         }
                         string stsize = xn["bytes"].InnerText;
@@ -212,7 +481,16 @@ namespace RDBMS_DBCORE
                                 }
                             }
                         }
-                        sbRowInfo.Append(TableName + ":" + UserColName); // Note: doesn't consider sub-select.
+                        string xcolname;
+                        if (-1 == UserColName.IndexOf('.'))
+                        {
+                            xcolname = xtablename + "." + UserColName;
+                        }
+                        else
+                        {
+                            xcolname = UserColName;
+                        }
+                        sbRowInfo.Append(xcolname); // Note: doesn't consider sub-select.
                         sbRowInfo.Append('=');
                         sbRowInfo.Append(stsize);
                         sbDisplayInfo.Append(xn["type"].InnerText); // Display
@@ -223,7 +501,7 @@ namespace RDBMS_DBCORE
                             DbColumn c;
                             c.Type = DbType.Prepare(xn["type"].InnerText, tsize);
                             c.RowOffset = totsize;
-                            c.ColumnName = TableName + ":" + UserColName;
+                            c.ColumnName = xcolname;
                             cols.Add(c);
                         }
                         totsize += tsize;
@@ -264,7 +542,7 @@ namespace RDBMS_DBCORE
                         {
                             qafile = qafile.Substring(0, iat);
                         }
-                        Shell("dspace exec \"//Job[@Name='RDBMS_SysGen']/IOSettings/DFS_IO/DFSWriter=" + SysGenOutputFile + "\" RDBMS_SysGen.DBCORE \"" + qafile + "\" \"" + RowInfo + "\" \"" + DisplayInfo + "\" \"" + TableName + "\"");
+                        Shell("dspace exec \"//Job[@Name='RDBMS_SysGen']/IOSettings/DFS_IO/DFSWriter=" + SysGenOutputFile + "\" RDBMS_SysGen.DBCORE \"" + qafile + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + TableName + "\"");
                     }
                 }
                 else
@@ -306,13 +584,13 @@ namespace RDBMS_DBCORE
                         }
                         if (0 != sbRowInfo.Length)
                         {
-                            sbRowInfo.Append(',');
+                            sbRowInfo.Append('\0');
                             sbDisplayInfo.Append(',');
                         }
                         {
                             outputcols.Add(c);
                         }
-                        //sbRowInfo.Append(c.ColumnName); // Already includes "TableName:"
+                        //sbRowInfo.Append(c.ColumnName); // Already includes "TableName."
                         sbRowInfo.Append(UserColumnNames[iww]);
                         sbRowInfo.Append('=');
                         sbRowInfo.Append(c.Type.Size);
@@ -366,21 +644,28 @@ namespace RDBMS_DBCORE
                             {
                                 FuncArgsOptions += ";GBY";
                             }
-                            string FuncSelectOutput1 = Shell("dspace exec" + " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"" + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + FuncDfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + FuncDfsOutput + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + RowInfo + "\" \"" + DisplayInfo + "\" \"" + OutputRowInfo + "\" " + FuncArgsOptions).Trim();
+                            string FuncSelectOutput1 = Shell("dspace exec" + " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"" + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + FuncDfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + FuncDfsOutput + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" " + FuncArgsOptions).Trim();
                             string[] FuncOutputTypeNames;
                             {
                                 const string AOTIBEGINSTRING = "BEGIN:{AC596AA3-8E2F-41fa-B9E1-601D92F08AEC}";
                                 int aotiBegin = FuncSelectOutput1.IndexOf(AOTIBEGINSTRING);
                                 if (-1 == aotiBegin)
                                 {
-                                    throw new Exception("Function (aggregate and/or scalar) Select MR output invalid (expected begin output type information)");
+                                    string et = "Function (aggregate and/or scalar) Select MR output invalid (expected begin output type information)";
+                                    //#if DEBUG
+                                    et += "\r\nMR output:\r\n" + FuncSelectOutput1 + "\r\n";
+                                    //#endif
+                                    throw new Exception(et);
                                 }
                                 int aotiEnd = FuncSelectOutput1.IndexOf("{AC596AA3-8E2F-41fa-B9E1-601D92F08AEC}:END");
                                 if (aotiEnd < aotiBegin)
                                 {
                                     throw new Exception("Function (aggregate and/or scalar)  Select MR output invalid (expected end output type information)");
                                 }
-                                FuncOutputTypeNames = FuncSelectOutput1.Substring(aotiBegin + AOTIBEGINSTRING.Length, aotiEnd - aotiBegin - AOTIBEGINSTRING.Length).Split(',');
+                                {
+                                    string stypes = FuncSelectOutput1.Substring(aotiBegin + AOTIBEGINSTRING.Length, aotiEnd - aotiBegin - AOTIBEGINSTRING.Length);
+                                    FuncOutputTypeNames = System.Text.RegularExpressions.Regex.Split(stypes, @"\{264E73F6-E3C9-43de-A3FD-9AC36F905087\}");
+                                }
                             }
                             if (FuncOutputTypeNames.Length != outputcolswidths.Count)
                             {
@@ -426,7 +711,7 @@ namespace RDBMS_DBCORE
                             string GByDfsOutput = "dfs://RDBMS_SelectGroupBy_" + Guid.NewGuid().ToString();
                             GByDfsOutput = DfsOutputName; // For now...
                             string GByArgsOptions = "GBY";
-                            Shell("dspace exec" + " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"" + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + GByDfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + GByDfsOutput + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + RowInfo + "\" \"" + DisplayInfo + "\" \"" + OutputRowInfo + "\" " + GByArgsOptions).Trim();
+                            Shell("dspace exec" + " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"" + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + GByDfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + GByDfsOutput + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" " + GByArgsOptions).Trim();
                             DfsInput = GByDfsOutput + "@" + OutputsRowSize;
                             {
                                 RowInfo = OutputRowInfo;
@@ -441,7 +726,7 @@ namespace RDBMS_DBCORE
                             {
                                 condxpath += " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"";
                             }
-                            shelloutputSelect1 = Shell("dspace exec" + condxpath + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + DfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + DfsOutputName + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + RowInfo + "\" \"" + DisplayInfo + "\" \"" + OutputRowInfo + "\"").Trim();
+                            shelloutputSelect1 = Shell("dspace exec" + condxpath + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + DfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + DfsOutputName + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\"").Trim();
                         }
                     }
                     else
@@ -466,7 +751,7 @@ namespace RDBMS_DBCORE
                     string distincttablefn = DfsOutputName + "_distinct_" + Guid.NewGuid().ToString();
                     Shell("dspace rename \"" + DfsOutputName + "\" \"" + distincttablefn + "\"");
                     Shell("dspace rename \"" + outtablefn + "\" \"" + DfsOutputName + "\"");
-                    Shell("dspace del \"" + distincttablefn + "\"");                   
+                    Shell("dspace del \"" + distincttablefn + "\"");
                 }
 
                 if (queryresults)
@@ -485,7 +770,7 @@ namespace RDBMS_DBCORE
                     long NumRowsOutput = DfsOutputSize / OutputRowSize;
                     if (0 != (DfsOutputSize % OutputRowSize))
                     {
-                        throw new Exception("Output file size miscalculation (DfsOutputSize % OutputRowSize) for file: " + DfsOutputName);
+                        throw new Exception("Output file size miscalculation (DfsOutputSize{" + DfsOutputSize + "} % OutputRowSize{" + OutputRowSize + "}) for file: " + DfsOutputName);
                     }
                     long recordcount = NumRowsOutput;
                     if (TopCount >= 0)
@@ -516,7 +801,7 @@ namespace RDBMS_DBCORE
                 {
                     DSpace_Log(shelloutputSelect1);
 
-                    DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_Top']/IOSettings/DFS_IO/DFSReader=" + DfsOutputName + "@" + OutputsRowSize + "\" RDBMS_Top.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + OutputRowInfo + "\" \"" + OutputDisplayInfo + "\" " + TopCount.ToString()).Trim());
+                    DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_Top']/IOSettings/DFS_IO/DFSReader=" + DfsOutputName + "@" + OutputsRowSize + "\" RDBMS_Top.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" \"" + OutputDisplayInfo + "\" " + TopCount.ToString()).Trim());
 
                     Shell("dspace del \"" + DfsOutputName + "\"");
                 }
@@ -531,101 +816,249 @@ namespace RDBMS_DBCORE
             }
 
             // If not found, the column and type names are empty, and the size is 0.
-            // Type ID is NULL and RowOffset is 0 if a function (aggregate or scalar).
+            // Type ID is NULL and RowOffset is 0 if a function (aggregate or scalar) or literal.
             DbColumn GetDbColumn(string name, out string sdw)
             {
-                int ci = DbColumn.IndexOf(cols, name);
-                if (-1 != ci)
+#if DEBUG
+                //System.Diagnostics.Debugger.Launch();
+#endif
+                return GetDbColumn(new StringPartReader(name), out sdw);
+            }
+
+            // If not found, the column and type names are empty, and the size is 0.
+            // Type ID is NULL and RowOffset is 0 if a function (aggregate or scalar) or literal.
+            DbColumn GetDbColumn(PartReader reader, out string sdw)
+            {
+                Types.ExpressionType bexprtype;
+                string bexpr = Types.ReadNextBasicExpression(reader, out bexprtype);
+                switch (bexprtype)
                 {
-                    sdw = colswidths[ci];
-                    return cols[ci];
-                }
-
-                DbColumn c;
-
-                int ip = name.IndexOf('(');
-                if (-1 != ip && name.EndsWith(")"))
-                {
-
-                    int mintsize = 0;
-                    string funcname = name.Substring(0, ip);
-                    if (0 == string.Compare("AVG", funcname, true))
-                    {
-                        mintsize = 1 + 9; // DOUBLE
-                    }
-                    else if (0 == string.Compare("STD", funcname, true))
-                    {
-                        mintsize = 1 + 9; // DOUBLE
-                    }
-                    else if (0 == string.Compare("STD_SAMP", funcname, true))
-                    {
-                        mintsize = 1 + 9; // DOUBLE
-                    }
-                    else if (0 == string.Compare("VAR_POP", funcname, true))
-                    {
-                        mintsize = 1 + 9; // DOUBLE
-                    }
-                    else if (0 == string.Compare("VAR_SAMP", funcname, true))
-                    {
-                        mintsize = 1 + 9; // DOUBLE
-                    }
-                    else if (0 == string.Compare("COUNT", funcname, true))
-                    {
-                        mintsize = 1 + 8; // LONG
-                    }
-                    else if (0 == string.Compare("COUNTDISTINCT", funcname, true))
-                    {
-                        mintsize = 1 + 8; // LONG
-                    }
-
-                    int totdw = 0;
-                    string pl = name.Substring(ip + 1, name.Length - ip - 1 - 1);
-                    int tsize = 1;
-                    for (; ; )
-                    {
-                        string s = Qa.NextPart(ref pl);
-                        if (0 == s.Length)
+                    case Types.ExpressionType.NAME:
                         {
-                            break;
-                        }
-                        if (s != ",")
-                        {
-                            int aci = DbColumn.IndexOf(cols, s);
-                            if (-1 == aci)
+                            int ci = DbColumn.IndexOf(cols, bexpr);
+                            if (-1 != ci)
                             {
-                                throw new Exception("Column names are required as function (aggregate and/or scalar) arguments, not a valid column name: " + s);
+                                sdw = colswidths[ci];
+                                return cols[ci];
+                            }
+                        }
+                        break;
+
+                    case Types.ExpressionType.NULL:
+                        {
+                            DbColumn c;
+                            c.Type = DbType.PrepareNull();
+                            c.RowOffset = 0;
+                            c.ColumnName = bexpr;
+                            DisplayWidthFromType(c.Type, out sdw);
+                            return c;
+                        }
+                        break;
+
+                    case Types.ExpressionType.NUMBER:
+                    case Types.ExpressionType.STRING:
+                        {
+                            DbColumn c;
+                            {
+                                DbTypeID typeid;
+                                int sz = Types.LiteralToValueInfo(bexpr, out typeid);
+                                c.Type = DbType.Prepare(sz, typeid);
+                            }
+                            c.RowOffset = 0;
+                            c.ColumnName = bexpr;
+                            DisplayWidthFromType(c.Type, out sdw);
+                            return c;
+                        }
+                        break;
+
+                    case Types.ExpressionType.FUNCTION:
+                        {
+
+                            // First see if there's a column named this!
+                            {
+                                int ci = DbColumn.IndexOf(cols, bexpr);
+                                if (-1 != ci)
+                                {
+                                    sdw = colswidths[ci];
+                                    return cols[ci];
+                                }
+                            }
+
+                            int ip = bexpr.IndexOf('(');
+                            if (-1 == ip)
+                            {
+                                throw new Exception("DEBUG:  Types.ExpressionType.FUNCTION: (-1 == ip)");
+                            }
+                            int mintsize = 0;
+                            string funcname = bexpr.Substring(0, ip);
+                            if (0 == string.Compare("AVG", funcname, true))
+                            {
+                                mintsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("STD", funcname, true))
+                            {
+                                mintsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("STD_SAMP", funcname, true))
+                            {
+                                mintsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("VAR_POP", funcname, true))
+                            {
+                                mintsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("VAR_SAMP", funcname, true))
+                            {
+                                mintsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("COUNT", funcname, true))
+                            {
+                                mintsize = 1 + 8; // LONG
+                            }
+                            else if (0 == string.Compare("COUNTDISTINCT", funcname, true))
+                            {
+                                mintsize = 1 + 8; // LONG
+                            }
+                            else if (0 == string.Compare("PI", funcname, true))
+                            {
+                                mintsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("LEN", funcname, true))
+                            {
+                                mintsize = 1 + 4; // INT
                             }
 #if DEBUG
-                            if (0 == cols[aci].Type.Size)
+                            else if (0 == string.Compare("CAST", funcname, true))
                             {
-                                throw new Exception("Argument to function cannot be " + cols[aci].ColumnName + " (Type.Size=0)");
+#if DEBUG
+                                //System.Diagnostics.Debugger.Launch();
+#endif
                             }
 #endif
-                            tsize += cols[aci].Type.Size - 1;
-                            totdw += int.Parse(colswidths[aci]);
+
+                            int totdw = 0;
+                            string args = bexpr.Substring(ip + 1, bexpr.Length - ip - 1 - 1);
+                            StringPartReader spargs = new StringPartReader(args);
+                            int tsize = 1;
+                            for (; ; )
+                            {
+
+                                Types.ExpressionType subetype;
+                                string sube = Types.ReadNextBasicExpression(spargs, out subetype);
+                                if (Types.ExpressionType.NONE == subetype)
+                                {
+                                    if (1 != tsize)
+                                    {
+                                        throw new Exception("Expected expression in parameter list");
+                                    }
+                                    break;
+                                }
+                                else if (Types.ExpressionType.AS == subetype)
+                                {
+                                    if (0 == string.Compare("CAST", funcname, true))
+                                    {
+                                        int assize;
+                                        int aswidth;
+                                        /*{
+                                            string sargwidth;
+                                            DbColumn argcol = GetDbColumn(sube, out sargwidth);
+                                            int argwidth = int.Parse(sargwidth);
+                                            assize = argcol.Type.Size - 1;
+                                            aswidth = argwidth;
+                                        }*/
+                                        {
+                                            // Remove "'AS " and "'"
+                                            string sastype = sube.Substring(4, sube.Length - 4 - 1).Replace("''", "'");
+                                            DbType astype = DbType.Prepare(DbType.NormalizeName(sastype));
+                                            if (DbTypeID.NULL == astype.ID)
+                                            {
+                                                throw new Exception("Unexpedted AS type: " + sastype);
+                                            }
+                                            //if (astype.Size - 1 > assize)
+                                            {
+                                                assize = astype.Size - 1;
+                                            }
+                                            int xdw = DisplayWidthFromType(astype);
+                                            //if (xdw > aswidth)
+                                            {
+                                                aswidth = xdw;
+                                            }
+                                        }
+                                        //tsize += assize;
+                                        //totdw += aswidth;
+                                        tsize = assize;
+                                        totdw = aswidth;
+                                        break; // Note: ignores anything after this, but that's OK here for CAST.
+                                    }
+                                    else
+                                    {
+                                        throw new Exception("AS not expected here");
+                                    }
+                                }
+                                else
+                                {
+                                    string sargwidth;
+                                    DbColumn argcol = GetDbColumn(sube, out sargwidth);
+                                    int argwidth = int.Parse(sargwidth);
+#if DEBUG
+                                    if (0 == argcol.Type.Size)
+                                    {
+                                        throw new Exception("Argument to function cannot be " + argcol.ColumnName + " (Type.Size=0)");
+                                    }
+#endif
+                                    tsize += argcol.Type.Size - 1;
+                                    totdw += argwidth;
+
+                                }
+
+                                string s = spargs.PeekPart();
+                                if (s != ",")
+                                {
+                                    if (0 == string.Compare("AS", s, true))
+                                    {
+                                        continue;
+                                    }
+                                    if (0 != s.Length)
+                                    {
+                                        spargs.NextPart(); // Eat it.
+                                        throw new Exception("Unexpected: " + s);
+                                    }
+                                    break;
+                                }
+                                spargs.NextPart(); // Eat the ','.
+
+                            }
+                            if (tsize < mintsize)
+                            {
+                                tsize = mintsize;
+                            }
+                            // a tsize of (1 + tbasesize) must have an even tbasesize: integral types have even, and char(n) needs even.
+                            if (0 != ((tsize - 1) % 2))
+                            {
+                                tsize++;
+                            }
+                            DbColumn c;
+                            c.Type = DbType.Prepare("DbFunction", tsize, DbTypeID.NULL);  //(string TypeName, int TypeSize, DbTypeID TypeID)
+                            c.RowOffset = 0;
+                            c.ColumnName = bexpr;
+                            sdw = totdw.ToString();
+                            return c;
                         }
-                    }
-                    if (tsize < mintsize)
-                    {
-                        tsize = mintsize;
-                    }
-                    // a tsize of (1 + tbasesize) must have an even tbasesize: integral types have even, and char(n) needs even.
-                    if (0 != ((tsize - 1) % 2))
-                    {
-                        tsize++;
-                    }
-                    c.Type = DbType.Prepare("DbFunction", tsize, DbTypeID.NULL);  //(string TypeName, int TypeSize, DbTypeID TypeID)
-                    c.RowOffset = 0;
-                    c.ColumnName = name;
-                    sdw = totdw.ToString();
-                    return c;
+                        break;
+
+                    default:
+                        //throw new InvalidOperationException("Unhandled column: " + bexpr);
+                        break;
                 }
 
-                c.Type = DbType.Prepare("", 0, DbTypeID.NULL); //(string TypeName, int TypeSize, DbTypeID TypeID)
-                c.RowOffset = 0;
-                c.ColumnName = string.Empty;
-                sdw = "0";
-                return c;
+                {
+                    DbColumn c;
+                    c.Type = DbType.Prepare("", 0, DbTypeID.NULL);
+                    c.RowOffset = 0;
+                    c.ColumnName = string.Empty;
+                    sdw = "0";
+                    return c;
+                }
 
             }
 
@@ -670,7 +1103,7 @@ namespace RDBMS_DBCORE
             {
                 for (int i = 0; i < cn.Length; i++)
                 {
-                    if (':' == cn[i])
+                    if ('.' == cn[i])
                     {
                         return cn.Substring(i + 1);
                     }
