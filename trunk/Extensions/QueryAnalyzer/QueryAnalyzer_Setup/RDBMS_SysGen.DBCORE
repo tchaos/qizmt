@@ -20,7 +20,7 @@
             {
                 DfsTableFile = DSpace_ExecArgs[0];
                 {
-                    string RowInfo = DSpace_ExecArgs[1];
+                    string RowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[1]);
                     string DisplayInfo = DSpace_ExecArgs[2];
                     //InitColInfos(RowInfo, DisplayInfo); // RDBMS_Select.DBCORE
                 }

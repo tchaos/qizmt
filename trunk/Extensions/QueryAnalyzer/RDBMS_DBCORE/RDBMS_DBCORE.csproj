@@ -63,6 +63,7 @@
     <Compile Include="DbAggregators_LAST.cs" />
     <Compile Include="DbAggregators_MAX.cs" />
     <Compile Include="DbAggregators_MIN.cs" />
+    <Compile Include="DbFunctions_CAST.cs" />
     <Compile Include="DbFunctions_CONVERT.cs" />
     <Compile Include="DbFunctions_DATEADD.cs" />
     <Compile Include="DbFunctions_DATEDIFF.cs" />
@@ -141,6 +142,7 @@
     <Compile Include="QaPrepareInsertValues.cs" />
     <Compile Include="QaPrepareSelect.cs" />
     <Compile Include="QaQueryAnalyzer.cs" />
+    <Compile Include="SelectClause.cs" />
     <Compile Include="Types.cs" />
     <Compile Include="WhereClause.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

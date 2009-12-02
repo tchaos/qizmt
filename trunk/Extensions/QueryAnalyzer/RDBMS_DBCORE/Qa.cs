@@ -193,13 +193,24 @@ namespace RDBMS_DBCORE
         }
 
 
+        public static bool _ShouldDebugShellExec = false;
+
         internal static string Shell(string cmdline, bool suppresserrors)
         {
+            if (_ShouldDebugShellExec)
+            {
+                return Exec.DDShell(cmdline, suppresserrors, false);
+            }
             return Exec.Shell(cmdline, suppresserrors);
         }
 
         internal static string Shell(string cmdline)
         {
+            if (_ShouldDebugShellExec)
+            {
+                const bool suppresserrors = false;
+                return Exec.DDShell(cmdline, suppresserrors, false);
+            }
             return Exec.Shell(cmdline);
         }
 
@@ -377,6 +388,57 @@ namespace RDBMS_DBCORE
         }
 
 
+        static int DisplayWidthFromType(DbType type, out string sdw)
+        {
+            int dw = DisplayWidthFromType(type);
+            switch (dw)
+            {
+                case 10:
+                    sdw = "10";
+                    break;
+                case 20:
+                    sdw = "20";
+                    break;
+                case 22:
+                    sdw = "22";
+                    break;
+                case 4:
+                    sdw = "4";
+                    break;
+                default:
+                    sdw = dw.ToString();
+                    break;
+            }
+            return dw;
+        }
+
+        static int DisplayWidthFromType(DbType type)
+        {
+            switch (type.ID)
+            {
+                case DbTypeID.INT:
+                    return 10;
+                case DbTypeID.LONG:
+                    return 20;
+                case DbTypeID.DOUBLE:
+                    return 20;
+                case DbTypeID.DATETIME:
+                    return 22;
+                case DbTypeID.CHARS:
+                    if (type.Size <= 1)
+                    {
+                        return 0;
+                    }
+                    return (type.Size - 1) / 2;
+                case DbTypeID.NULL:
+                    return 4; // Word "NULL".
+                default:
+                    //throw new InvalidOperationException("Unknown type width: " + type.Name);
+                    return 10; // ?
+            }
+        }
+
+
         // Note: if a parametered table, there must be no spacing around the parentheses at this point.
         static System.Xml.XmlElement FindTable(System.Xml.XmlDocument xd, string TableName)
         {
@@ -540,6 +602,139 @@ namespace RDBMS_DBCORE
                     xeNewTable.AppendChild(NewElement(xd, "size", totsize.ToString())); // Size of a full record.
                     return xeNewTable;
                 }
+                else if (TableName.StartsWith("'dfs://", StringComparison.OrdinalIgnoreCase)
+                    && '\'' == TableName[TableName.Length - 1])
+                {
+                    System.Xml.XmlElement xeNewTable = xd.CreateElement("table");
+                    string colinfo;
+                    string ssize;
+                    {
+                        string tableinfo = TableName.Substring(1, TableName.Length - 2); // Remove single quotes.
+                        int iat = tableinfo.IndexOf('@');
+                        if (-1 == iat)
+                        {
+                            throw new Exception("Record size expected: " + TableName);
+                        }
+                        string tablefile = tableinfo.Substring(0, iat);
+                        {
+                            //xeNewTable.AppendChild(NewElement(xd, "name", TableName)); // Not safe for command line format.
+                            string tablename = tablefile;
+                            if (tablename.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                            {
+                                tablename = tablename.Substring(6);
+                            }
+                            tablename = "dfs." + tablename;
+                            xeNewTable.AppendChild(NewElement(xd, "name", tablename));
+                        }
+                        xeNewTable.AppendChild(NewElement(xd, "file", tablefile));
+                        tableinfo = tableinfo.Substring(iat + 1);
+                        int isem = tableinfo.IndexOf(';');
+                        if (-1 == isem)
+                        {
+                            colinfo = "";
+                            ssize = tableinfo;
+                        }
+                        else
+                        {
+                            colinfo = tableinfo.Substring(isem + 1);
+                            ssize = tableinfo.Substring(0, isem);
+                        }
+                        int.Parse(ssize); // Validate.
+                    }
+                    bool anycols = false;
+                    int totsize = 0;
+                    foreach (string cs in colinfo.Split(';'))
+                    {
+                        int ieq = cs.IndexOf('=');
+                        if (-1 == ieq)
+                        {
+                            throw new Exception("Column info expected: name=type: " + TableName + " at " + cs);
+                        }
+                        anycols = true;
+                        System.Xml.XmlElement col = xd.CreateElement("column");
+                        col.AppendChild(NewElement(xd, "name", cs.Substring(0, ieq)));
+                        string coltype = cs.Substring(ieq + 1);
+                        int colsize;
+                        int colw;
+                        string colj;
+                        switch (coltype.ToUpper())
+                        {
+                            case "INT":
+                                {
+                                    colsize = 1 + 4;
+                                    DbType dt = DbType.Prepare(colsize, DbTypeID.INT);
+                                    colw = DisplayWidthFromType(dt);
+                                    colj = IntJustify();
+                                    coltype = dt.Name;
+                                }
+                                break;
+                            case "LONG":
+                                {
+                                    colsize = 1 + 8;
+                                    DbType dt = DbType.Prepare(colsize, DbTypeID.LONG);
+                                    colw = DisplayWidthFromType(dt);
+                                    colj = LongJustify();
+                                    coltype = dt.Name;
+                                }
+                                break;
+                            case "DATETIME":
+                                {
+                                    colsize = 1 + 8;
+                                    DbType dt = DbType.Prepare(colsize, DbTypeID.DATETIME);
+                                    colw = DisplayWidthFromType(dt);
+                                    colj = DateTimeJustify();
+                                    coltype = dt.Name;
+                                }
+                                break;
+                            case "DOUBLE":
+                                {
+                                    colsize = 1 + 9;
+                                    DbType dt = DbType.Prepare(colsize, DbTypeID.DOUBLE);
+                                    colw = DisplayWidthFromType(dt);
+                                    colj = DoubleJustify();
+                                    coltype = dt.Name;
+                                }
+                                break;
+                            default:
+                                if (coltype.StartsWith("CHAR(", StringComparison.OrdinalIgnoreCase)
+                                    && coltype.EndsWith(")"))
+                                {
+                                    string snchars = coltype.Substring(5, coltype.Length - 5 - 1);
+                                    int nchars;
+                                    if (!int.TryParse(snchars, out nchars) || nchars < 0)
+                                    {
+                                        throw new Exception("Invalid number of characters: " + snchars + ": " + TableName);
+                                    }
+                                    colsize = 1 + (2 * nchars);
+                                    DbType dt = DbType.Prepare(colsize, DbTypeID.CHARS);
+                                    colw = DisplayWidthFromType(dt);
+                                    colj = CharNJustify();
+                                    coltype = dt.Name;
+                                }
+                                else
+                                {
+                                    throw new Exception("Unknown type: " + coltype + ": " + TableName);
+                                }
+                                break;
+                        }
+                        totsize += colsize;
+                        col.AppendChild(NewElement(xd, "type", coltype));
+                        col.AppendChild(NewElement(xd, "bytes", colsize.ToString()));
+                        col.AppendChild(NewElement(xd, "dw", colw.ToString()));
+                        col.AppendChild(NewElement(xd, "justify", colj));
+                        xeNewTable.AppendChild(col);
+                    }
+                    if (!anycols)
+                    {
+                        throw new Exception("Table has no columns: " + TableName);
+                    }
+                    if (totsize != int.Parse(ssize))
+                    {
+                        throw new Exception("Column sizes do not add up to record size; columns add up to " + totsize);
+                    }
+                    xeNewTable.AppendChild(NewElement(xd, "size", ssize)); // Size of a full record.
+                    return xeNewTable;
+                }
             }
             return null;
         }
@@ -554,6 +749,7 @@ namespace RDBMS_DBCORE
         static string CharNJustify() { return "left"; }
         static string IntJustify() { return "left"; }
         static string LongJustify() { return "left"; }
+        static string DateTimeJustify() { return "left"; }
         static string DoubleJustify() { return "left"; }
 
 

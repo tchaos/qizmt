@@ -753,7 +753,7 @@ namespace UserLoader
 
         public int InputRecordLength = int.MinValue;
         public int OutputRecordLength = int.MinValue;
-
+        public List<int> OutputRecordLengths = null;
 
         public int ValueOffsetSize = 4;
 
@@ -1846,6 +1846,16 @@ namespace MySpace.DataMining.EasyReducer
                 csvfilepaths.Append('`');
             }
 
+            StringBuilder csvoutputrecordlengths = new StringBuilder();
+            for (int i = 0; i < OutputRecordLengths.Count; i++)
+            {
+                if (0 != i)
+                {
+                    csvoutputrecordlengths.Append(",");
+                }
+                csvoutputrecordlengths.Append(OutputRecordLengths[i]);
+            }
+
             ArrayComboListEnumerator[] enums = GetEnumeratorsReducerOutput(code, (@"
 
         const int NRAOUTS = " + filepaths.Count.ToString() + @";
@@ -1856,6 +1866,7 @@ namespace MySpace.DataMining.EasyReducer
         const long DfsSampleDistance = " + DfsSampleDistance.ToString() + @";
 
         RandomAccessOutput[] raouts = null;
+        int[] outputrecordlengths = null;
         void OReduce(RandomAccessReducer rar, EntriesOutput output)
         {
             StaticGlobals.ExecutionContext = ExecutionContextType.REDUCE;
@@ -1872,9 +1883,10 @@ namespace MySpace.DataMining.EasyReducer
             if(null == raouts)
             {
                 raouts = new RandomAccessOutput[NRAOUTS];
+                outputrecordlengths = new int[]{" + csvoutputrecordlengths.ToString() + @"};
                 for(int i = 0; i < NRAOUTS; i++)
                 {
-                    raouts[i] = new RandomAccessOutput(output, filepaths[i]);
+                    raouts[i] = new RandomAccessOutput(output, filepaths[i], outputrecordlengths[i]);
                     raouts[i].rar = rar;
                     raouts[i].parentlist = raouts;
                 }
@@ -1965,12 +1977,14 @@ namespace MySpace.DataMining.EasyReducer
 
             const int HEADERSIZE = 4 + 8;
 
-            const int OutputRecordLength = " + OutputRecordLength.ToString() + @";
-            const bool _WriteSamples = OutputRecordLength < 1;
+            int OutputRecordLength = -1;
+            bool _WriteSamples = true;
 
-            public RandomAccessOutput(EntriesOutput eoutput, string basefilename)
+            public RandomAccessOutput(EntriesOutput eoutput, string basefilename, int outputrecordlength)
             {
                 this._basefilename = basefilename;
+                this.OutputRecordLength = outputrecordlength;
+                this._WriteSamples = outputrecordlength < 1;
 
                 StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
             }

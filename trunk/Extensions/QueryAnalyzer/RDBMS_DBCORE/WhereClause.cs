@@ -9,190 +9,6 @@ using MySpace.DataMining.DistributedObjects;
 namespace RDBMS_DBCORE
 {
 
-    public interface IValueContext
-    {
-        ByteSlice CurrentRow { get; }
-        IList<DbColumn> ColumnTypes { get; }
-        DbValue ExecDbFunction(string name, DbFunctionArguments args);
-        DbFunctionTools Tools { get; }
-    }
-
-
-    public abstract class DbValue
-    {
-        public DbValue(IValueContext Context)
-        {
-            this.Context = Context;
-        }
-
-
-        public abstract ByteSlice Eval(out DbType type);
-
-
-        public ByteSlice Eval()
-        {
-            DbType type;
-            return Eval(out type);
-        }
-
-
-        protected internal IValueContext Context;
-    }
-
-
-    public struct DbColumn
-    {
-        public DbType Type;
-        public int RowOffset; // Starting offset of this column in a row.
-        public string ColumnName;
-
-
-        public static int IndexOf(IList<DbColumn> cols, string name)
-        {
-            int matchindex = -1;
-            for (int i = 0; i < cols.Count; i++)
-            {
-                string cn = cols[i].ColumnName;
-                if (name.Length == cn.Length)
-                {
-                    bool good = true;
-                    for (int j = 0; j < name.Length; j++)
-                    {
-                        if (Char.ToLower(name[j]) != Char.ToLower(cn[j]))
-                        {
-                            if (!(name[j] == '.' && cn[j] == ':'))
-                            {
-                                good = false;
-                                break;
-                            }
-                        }
-                    }
-                    if (good)
-                    {
-                        if (-1 != matchindex)
-                        {
-                            throw new Exception("Column name " + name + " does not resolve to a single column");
-                        }
-                        matchindex = i;
-                    }
-                }
-                //
-                int cnindex = 0;
-                for (; cnindex < cn.Length; cnindex++)
-                {
-                    if (cn[cnindex] == ':')
-                    {
-                        cnindex++;
-                        break;
-                    }
-                }
-                if (cn.Length - cnindex == name.Length)
-                {
-                    bool good = true;
-                    for (int j = 0; j < name.Length; j++, cnindex++)
-                    {
-                        if (Char.ToLower(name[j]) != Char.ToLower(cn[cnindex]))
-                        {
-                            good = false;
-                            break;
-                        }
-                    }
-                    if (good)
-                    {
-                        if (-1 != matchindex)
-                        {
-                            throw new Exception("Column name " + name + " does not resolve to a single column");
-                        }
-                        matchindex = i;
-                    }
-                }
-            }
-            return matchindex;
-        }
-    }
-
-
-    public class ColValue : DbValue
-    {
-
-        public ColValue(IValueContext Context, DbColumn col)
-            : base(Context)
-        {
-            this.col = col;
-        }
-
-        public override ByteSlice Eval(out DbType type)
-        {
-            type = col.Type;
-            return ByteSlice.Prepare(Context.CurrentRow, col.RowOffset, col.Type.Size);
-        }
-
-        DbColumn col;
-
-    }
-
-    public class ImmediateValue : DbValue
-    {
-
-        public ImmediateValue(IValueContext Context, ByteSlice value, DbType type)
-            : base(Context)
-        {
-            this._value = value;
-            this._type = type;
-        }
-
-        public override ByteSlice Eval(out DbType type)
-        {
-            type = this._type;
-            return _value;
-        }
-
-        public void SetValue(ByteSlice value)
-        {
-            this._value = value;
-            this._type = DbType.Prepare(value.Length, _type.ID);
-        }
-
-        internal ByteSlice _value;
-        internal DbType _type;
-    }
-
-    public class FuncEvalValue : DbValue
-    {
-        public FuncEvalValue(IValueContext Context, string FunctionName, IList<DbValue> Arguments)
-            : base(Context)
-        {
-            this.funcname = FunctionName;
-            this.args = new DbFunctionArguments(Arguments);
-        }
-
-        public FuncEvalValue(IValueContext Context, string FunctionName, DbFunctionArguments Arguments)
-            : base(Context)
-        {
-            this.funcname = FunctionName;
-            this.args = Arguments;
-        }
-
-        public FuncEvalValue(IValueContext Context, string FunctionName, params DbValue[] Arguments)
-            : base(Context)
-        {
-            this.funcname = FunctionName;
-            this.args = new DbFunctionArguments(Arguments);
-        }
-
-
-        public override ByteSlice Eval(out DbType type)
-        {
-            DbValue ret = Context.ExecDbFunction(funcname, args);
-            return ret.Eval(out type);
-        }
-
-
-        string funcname;
-        DbFunctionArguments args;
-    }
-
-
     public abstract class DbEval
     {
         public DbEval(IValueContext Context)
@@ -471,6 +287,10 @@ namespace RDBMS_DBCORE
 
         public virtual DbEval ParseBase()
         {
+#if DEBUG
+            //System.Diagnostics.Debugger.Launch();
+#endif
+
             bool NOT = false;
             if (0 == string.Compare("NOT", PeekPart(), true))
             {
@@ -660,19 +480,70 @@ namespace RDBMS_DBCORE
                         {
                             for (; ; )
                             {
-                                string argvalue;
-                                Types.ExpressionType argetype;
-
-                                argvalue = Types.ReadNextBasicExpression(argsparser, out argetype);
-                                args.Add(ExpressionToDbValue(argvalue, argetype));
-
-                                if (argsparser.PeekPart() != ",")
+                                if (0 == string.Compare("AS", argsparser.PeekPart(), true))
                                 {
-                                    if (argsparser.PeekPart().Length != 0)
+                                    argsparser.NextPart(); // Eat "AS".
                                     {
-                                        throw new Exception("Unexpected in function arguments: " + argsparser.RemainingString);
+                                        StringBuilder sbas = new StringBuilder();
+                                        int asparens = 0;
+                                        for (; ; )
+                                        {
+                                            string s = argsparser.PeekPart();
+                                            if (0 == s.Length || "," == s)
+                                            {
+                                                break;
+                                            }
+                                            else if ("(" == s)
+                                            {
+                                                asparens++;
+                                                sbas.Append(argsparser.NextPart());
+                                            }
+                                            else if (")" == s)
+                                            {
+                                                if (0 == asparens)
+                                                {
+                                                    break;
+                                                }
+                                                asparens--;
+                                                sbas.Append(argsparser.NextPart());
+                                            }
+                                            else
+                                            {
+                                                sbas.Append(argsparser.NextPart());
+                                            }
+                                        }
+                                        if (0 == sbas.Length)
+                                        {
+                                            throw new Exception("Expected type after AS");
+                                        }
+                                        args.Add(ExpressionToDbValue("'AS " + sbas.Replace("'", "''") + "'",
+                                            Types.ExpressionType.AS));
+
                                     }
-                                    break;
+                                }
+                                else
+                                {
+                                    string argvalue;
+                                    Types.ExpressionType argetype;
+
+                                    argvalue = Types.ReadNextBasicExpression(argsparser, out argetype);
+                                    args.Add(ExpressionToDbValue(argvalue, argetype));
+                                }
+
+                                {
+                                    string s = argsparser.PeekPart();
+                                    if (s != ",")
+                                    {
+                                        if (0 == string.Compare("AS", s, true))
+                                        {
+                                            continue;
+                                        }
+                                        if (s.Length != 0)
+                                        {
+                                            throw new Exception("Unexpected in function arguments: " + argsparser.RemainingString);
+                                        }
+                                        break;
+                                    }
                                 }
                                 argsparser.NextPart(); // Eat the ','.
                             }
@@ -692,6 +563,7 @@ namespace RDBMS_DBCORE
 
                 case Types.ExpressionType.NUMBER:
                 case Types.ExpressionType.STRING:
+                case Types.ExpressionType.AS:
                 case Types.ExpressionType.NULL:
                     {
                         DbTypeID id;

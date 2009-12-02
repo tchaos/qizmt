@@ -181,11 +181,6 @@ namespace QueryAnalyzer_DataProvider
 
         public override bool Read()
         {
-            if (isRindexEnabled)
-            {
-                return _ReadRIndex();
-            }
-
             try
             {
                 if (recordbufpos >= recordbuflen)

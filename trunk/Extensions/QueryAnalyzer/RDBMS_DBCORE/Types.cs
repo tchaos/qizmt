@@ -14,68 +14,120 @@ namespace RDBMS_DBCORE
 
         public static List<byte> NumberLiteralToType(string sNum, DbTypeID typeID)
         {
-            List<byte> buf;
+            return NumberLiteralToTypeBuffer(sNum, typeID, null);
+        }
+
+        public static List<byte> NumberLiteralToTypeBuffer(string sNum, DbTypeID typeID, List<byte> buffer)
+        {
             if (DbTypeID.INT == typeID)
             {
                 Int32 x = Int32.Parse(sNum);
-                buf = new List<byte>(1 + 4);
-                buf.Add(0);
-                Entry.ToBytesAppend((Int32)Entry.ToUInt32(x), buf);
+                if (null == buffer)
+                {
+                    buffer = new List<byte>(1 + 4);
+                }
+                buffer.Clear();
+                buffer.Add(0);
+                Entry.ToBytesAppend((Int32)Entry.ToUInt32(x), buffer);
             }
             else if (DbTypeID.LONG == typeID)
             {
                 Int64 x = Int64.Parse(sNum);
-                buf = new List<byte>(1 + 8);
-                buf.Add(0);
-                Entry.ToBytesAppend64((Int64)Entry.ToUInt64(x), buf);
+                if (null == buffer)
+                {
+                    buffer = new List<byte>(1 + 8);
+                }
+                buffer.Clear();
+                buffer.Add(0);
+                Entry.ToBytesAppend64((Int64)Entry.ToUInt64(x), buffer);
             }
             else if (DbTypeID.DOUBLE == typeID)
             {
                 double x = double.Parse(sNum);
-                buf = new List<byte>(1 + 9);
-                buf.Add(0);
+                if (null == buffer)
+                {
+                    buffer = new List<byte>(1 + 9);
+                }
+                buffer.Clear();
+                buffer.Add(0);
                 recordset rs = recordset.Prepare();
                 rs.PutDouble(x);
                 for (int id = 0; id < 9; id++)
                 {
-                    buf.Add(0);
+                    buffer.Add(0);
                 }
-                rs.GetBytes(buf, 1, 9);
+                rs.GetBytes(buffer, 1, 9);
             }
             else
             {
                 // This type isn't comparable with a number!
-                buf = new List<byte>(1);
-                buf.Add(1); // Nullable byte; IsNull=true;
+                if (null == buffer)
+                {
+                    buffer = new List<byte>(1);
+                }
+                buffer.Clear();
+                buffer.Add(1); // Nullable byte; IsNull=true;
             }
-            return buf;
+            return buffer;
         }
 
-
         public static List<byte> NumberLiteralToBestType(string sNum, out DbTypeID type)
+        {
+            return NumberLiteralToBestTypeBuffer(sNum, out type, null);
+        }
+
+        public static List<byte> NumberLiteralToBestTypeBuffer(string sNum, out DbTypeID type, List<byte> buffer)
         {
             if(0 == sNum.Length)
             {
                 type = DbTypeID.NULL;
-                return NumberLiteralToType(sNum, DbTypeID.NULL); // Null it...
+                return NumberLiteralToTypeBuffer(sNum, DbTypeID.NULL, buffer); // Null it...
             }
             if (-1 != sNum.IndexOf('.'))
             {
                 type = DbTypeID.DOUBLE;
-                return NumberLiteralToType(sNum, DbTypeID.DOUBLE);
+                return NumberLiteralToTypeBuffer(sNum, DbTypeID.DOUBLE, buffer);
             }
             long x = long.Parse(sNum);
             if (x < int.MinValue || x > int.MaxValue)
             {
                 // Stay long.
                 type = DbTypeID.LONG;
-                return NumberLiteralToType(sNum, DbTypeID.LONG);
+                return NumberLiteralToTypeBuffer(sNum, DbTypeID.LONG, buffer);
             }
             else
             {
                 // Can be int!
                 type = DbTypeID.INT;
-                return NumberLiteralToType(sNum, DbTypeID.INT);
+                return NumberLiteralToTypeBuffer(sNum, DbTypeID.INT, buffer);
+            }
+        }
+        
+        // Returns size.
+        public static int NumberLiteralToBestTypeInfo(string sNum, out DbTypeID type)
+        {
+            if(0 == sNum.Length)
+            {
+                type = DbTypeID.NULL;
+                return 1;
+            }
+            if (-1 != sNum.IndexOf('.'))
+            {
+                type = DbTypeID.DOUBLE;
+                return 1 + 9;
+            }
+            long x = long.Parse(sNum);
+            if (x < int.MinValue || x > int.MaxValue)
+            {
+                // Stay long.
+                type = DbTypeID.LONG;
+                return 1 + 8;
+            }
+            else
+            {
+                // Can be int!
+                type = DbTypeID.INT;
+                return 1 + 4;
             }
         }
 
@@ -110,6 +162,7 @@ namespace RDBMS_DBCORE
             STRING,
             NAME,
             FUNCTION, // The parameters are expressions.
+            AS, // AS in CAST.
             NULL, // NULL literal.
         }
 
@@ -166,6 +219,7 @@ namespace RDBMS_DBCORE
                         s = input.NextPart();
                         if (")" != s)
                         {
+                            bool prevident = false;
                             int nparens = 1;
                             for (; ; )
                             {
@@ -173,6 +227,11 @@ namespace RDBMS_DBCORE
                                 {
                                     nparens++;
                                 }
+                                if (prevident)
+                                {
+                                    call.Append(' ');
+                                }
+                                prevident = (s.Length > 0 && (char.IsLetter(s[0]) || '_' == s[0]));
                                 call.Append(s);
                                 s = input.NextPart();
                                 if (")" == s)
@@ -191,6 +250,48 @@ namespace RDBMS_DBCORE
                         call.Append(')');
                         etype = ExpressionType.FUNCTION;
                         return call.ToString();
+                    }
+                    else if (0 == string.Compare("AS", name, true))
+                    {
+                        {
+                            StringBuilder sbas = new StringBuilder();
+                            int asparens = 0;
+                            for (; ; )
+                            {
+                                //string s =
+                                s = input.PeekPart();
+                                if (0 == s.Length || "," == s)
+                                {
+                                    break;
+                                }
+                                else if ("(" == s)
+                                {
+                                    asparens++;
+                                    sbas.Append(input.NextPart());
+                                }
+                                else if (")" == s)
+                                {
+                                    if (0 == asparens)
+                                    {
+                                        break;
+                                    }
+                                    asparens--;
+                                    sbas.Append(input.NextPart());
+                                }
+                                else
+                                {
+                                    sbas.Append(input.NextPart());
+                                }
+                            }
+                            if (0 == sbas.Length)
+                            {
+                                throw new Exception("Expected type after AS");
+                            }
+
+                            etype = ExpressionType.AS;
+                            return "'AS " + sbas.Replace("'", "''") + "'";
+
+                        }
                     }
                     else
                     {
@@ -219,6 +320,11 @@ namespace RDBMS_DBCORE
 
         public static ByteSlice LiteralToValue(string literal, out DbTypeID type)
         {
+            return LiteralToValueBuffer(literal, out type, null);
+        }
+
+        public static ByteSlice LiteralToValueBuffer(string literal, out DbTypeID type, List<byte> buffer)
+        {
             if (literal.Length > 0)
             {
                 if ('\'' == literal[0])
@@ -227,30 +333,61 @@ namespace RDBMS_DBCORE
                     {
                         throw new Exception("Expected closing quote in string literal");
                     }
-                    string str = literal.Substring(1, literal.Length - 2).Replace("''", "'");
-                    byte[] strbytes = System.Text.Encoding.Unicode.GetBytes(str);
-                    //List<byte> buf = new List<byte>(TypeHint.Size);
-                    List<byte> buf = new List<byte>(1 + strbytes.Length);
-                    buf.Add(0);
-                    buf.AddRange(strbytes);
-                    // Pad up the end of the char to be the whole column size.
-                    /*while (buf.Count < TypeHint.Size)
+                    if (null == buffer)
                     {
-                        buf.Add(0);
-                    }*/
+                        buffer = new List<byte>(1 + (literal.Length - 2) * 2);
+                    }
+                    buffer.Clear();
+                    buffer.Add(0);
+                    for (int i = 1; i <= literal.Length - 2; i++)
+                    {
+                        int ich = literal[i];
+                        //ConvertCodeValueToBytesUTF16
+                        buffer.Add((byte)ich);
+                        buffer.Add((byte)(ich >> 8));
+                        if ('\'' == ich)
+                        {
+                            i++; // Skip escape quote.
+#if DEBUG
+                            if ('\'' != literal[i])
+                            {
+                                throw new Exception("DEBUG:  ('\'' != literal[i])");
+                            }
+#endif
+                        }
+                    }
                     type = DbTypeID.CHARS;
-                    return ByteSlice.Prepare(buf);
+#if DEBUG
+                    {
+                        DbTypeID _xtype;
+                        int ltvi = LiteralToValueInfo(literal, out _xtype);
+                        if (buffer.Count != ltvi)
+                        {
+#if DEBUG
+                            System.Diagnostics.Debugger.Launch();
+#endif
+                            throw new Exception("DEBUG:  LiteralToValue: (buffer.Count{" + buffer.Count + "} != LiteralToValueInfo(literal, out _xtype)){" + ltvi + "}");
+                        }
+                    }
+#endif
+                    return ByteSlice.Prepare(buffer);
                 }
                 else if (0 == string.Compare("NULL", literal, true))
                 {
                     type = DbTypeID.NULL;
-                    return ByteSlice.Prepare(new byte[] { 1 }); // Nullable, IsNull=true.
+                    if (null == buffer)
+                    {
+                        buffer = new List<byte>(1);
+                    }
+                    buffer.Clear();
+                    buffer.Add(1); // Nullable, IsNull=true.
+                    return ByteSlice.Prepare(buffer);
                 }
                 else // Assumed numeric.
                 {
                     try
                     {
-                        return ByteSlice.Prepare(NumberLiteralToBestType(literal, out type));
+                        return ByteSlice.Prepare(NumberLiteralToBestTypeBuffer(literal, out type, buffer));
                     }
                     catch
                     {
@@ -259,7 +396,66 @@ namespace RDBMS_DBCORE
                 }
             }
             type = DbTypeID.NULL;
-            return ByteSlice.Prepare(new byte[] { 0 });
+            if (buffer == null)
+            {
+                buffer = new List<byte>(0);
+            }
+            buffer.Clear();
+            return ByteSlice.Prepare(buffer);
+
+        }
+
+        // Returns size.
+        public static int LiteralToValueInfo(string literal, out DbTypeID type)
+        {
+            if (literal.Length > 0)
+            {
+                if ('\'' == literal[0])
+                {
+                    if ('\'' != literal[literal.Length - 1])
+                    {
+                        throw new Exception("Expected closing quote in string literal");
+                    }
+                    int strbyteslen = System.Text.Encoding.Unicode.GetByteCount(literal);
+                    {
+                        strbyteslen -= 2 + 2; // Leading and trailing quote are 2 bytes each.
+                        for (int i = 1; i <= literal.Length - 2; i++)
+                        {
+                            if ('\'' == literal[i])
+                            {
+                                strbyteslen -= 2; // Un-count 1 quote (2 bytes) of escaped quote ("''" -> "'")
+                                i++; // Skip next iteration, it's the other '\''.
+#if DEBUG
+                                if ('\'' != literal[i])
+                                {
+                                    throw new Exception("DEBUG:  ('\'' != literal[i])");
+                                }
+#endif
+                            }
+                        }
+                    }
+                    type = DbTypeID.CHARS;
+                    return 1 + strbyteslen;
+                }
+                else if (0 == string.Compare("NULL", literal, true))
+                {
+                    type = DbTypeID.NULL;
+                    return 1;
+                }
+                else // Assumed numeric.
+                {
+                    try
+                    {
+                        return NumberLiteralToBestTypeInfo(literal, out type);
+                    }
+                    catch
+                    {
+                        // Continue on to null on exception.
+                    }
+                }
+            }
+            type = DbTypeID.NULL;
+            return 0;
 
         }
 
@@ -399,27 +595,58 @@ namespace RDBMS_DBCORE
         public DbTypeID ID;
 
 
+        public static DbType Prepare(string TypeName)
+        {
+            DbType ret;
+            ret.Name = TypeName;
+            ret.Size = NameToSize(TypeName);
+            ret.ID = NameToID(TypeName);
+#if DEBUG
+            if (ret.ID == DbTypeID.NULL)
+            {
+                if (ret.ID != NameToID(NormalizeName(TypeName)))
+                {
+                    throw new Exception("DEBUG:  DbType.Prepare: type name not normalized: " + TypeName);
+                }
+            }
+#endif
+            return ret;
+        }
+
+
         public static DbType Prepare(string TypeName, int TypeSize)
         {
             DbType ret;
             ret.Name = TypeName;
             ret.Size = TypeSize;
             ret.ID = NameToID(TypeName);
+#if DEBUG
+            if (ret.ID == DbTypeID.NULL)
+            {
+                if (ret.ID != NameToID(NormalizeName(TypeName)))
+                {
+                    throw new Exception("DEBUG:  DbType.Prepare: type name not normalized: " + TypeName);
+                }
+            }
+#endif
             return ret;
         }
 
         public static DbType Prepare(string TypeName, int TypeSize, DbTypeID TypeID)
         {
-#if DEBUG
-            if (TypeID != NameToID(TypeName))
-            {
-                throw new Exception("DEBUG:  DbType.Prepare: (TypeID != NameToID(TypeName))");
-            }
-#endif
             DbType ret;
             ret.Name = TypeName;
             ret.Size = TypeSize;
             ret.ID = TypeID;
+#if DEBUG
+            if (ret.ID == DbTypeID.NULL)
+            {
+                if (ret.ID != NameToID(NormalizeName(TypeName)))
+                {
+                    throw new Exception("DEBUG:  DbType.Prepare: type name not normalized: " + TypeName);
+                }
+            }
+#endif
             return ret;
         }
 
@@ -510,6 +737,63 @@ namespace RDBMS_DBCORE
             }
         }
 
+        public static int NameToSize(string name)
+        {
+            if ("int" == name)
+            {
+                return 1 + 4;
+            }
+            else if ("long" == name)
+            {
+                return 1 + 8;
+            }
+            else if ("double" == name)
+            {
+                return 1 + 9;
+            }
+            else if ("DateTime" == name)
+            {
+                return 1 + 8;
+            }
+            else if (name.StartsWith("char(") && ')' == name[name.Length - 1])
+            {
+                int nchars = int.Parse(name.Substring(5, name.Length - 5 - 1));
+                return 1 + (2 * nchars);
+            }
+            else
+            {
+                return 1;
+            }
+        }
+
+        public static string NormalizeName(string name)
+        {
+            if (0 == string.Compare("int", name, true))
+            {
+                return "int";
+            }
+            else if (0 == string.Compare("long", name, true))
+            {
+                return "long";
+            }
+            else if (0 == string.Compare("double", name, true))
+            {
+                return "double";
+            }
+            else if (0 == string.Compare("DateTime", name, true))
+            {
+                return "DateTime";
+            }
+            else if (name.StartsWith("char(", true, null) && ')' == name[name.Length - 1])
+            {
+                return "char(" + name.Substring(5, name.Length - 5 - 1).Trim() + ")";
+            }
+            else
+            {
+                return name;
+            }
+        }
+
     }
 
     public enum DbTypeID
@@ -522,5 +806,189 @@ namespace RDBMS_DBCORE
         DATETIME // Sortable 1 + 8-byte long integer, in ticks.
     }
 
+
+    public interface IValueContext
+    {
+        ByteSlice CurrentRow { get; }
+        IList<DbColumn> ColumnTypes { get; }
+        DbValue ExecDbFunction(string name, DbFunctionArguments args);
+        DbFunctionTools Tools { get; }
+    }
+
+
+    public abstract class DbValue
+    {
+        public DbValue(IValueContext Context)
+        {
+            this.Context = Context;
+        }
+
+
+        public abstract ByteSlice Eval(out DbType type);
+
+
+        public ByteSlice Eval()
+        {
+            DbType type;
+            return Eval(out type);
+        }
+
+
+        protected internal IValueContext Context;
+    }
+
+
+    public struct DbColumn
+    {
+        public DbType Type;
+        public int RowOffset; // Starting offset of this column in a row.
+        public string ColumnName;
+
+
+        public static int IndexOf(IList<DbColumn> cols, string name)
+        {
+            int matchindex = -1;
+            for (int i = 0; i < cols.Count; i++)
+            {
+                string cn = cols[i].ColumnName;
+                if (name.Length == cn.Length)
+                {
+                    bool good = true;
+                    for (int j = 0; j < name.Length; j++)
+                    {
+                        if (Char.ToLower(name[j]) != Char.ToLower(cn[j]))
+                        {
+                            //if (!(name[j] == '.' && cn[j] == '.'))
+                            {
+                                good = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (good)
+                    {
+                        if (-1 != matchindex)
+                        {
+                            throw new Exception("Column name " + name + " does not resolve to a single column");
+                        }
+                        matchindex = i;
+                    }
+                }
+                //
+                int cnindex = 0;
+                for (; cnindex < cn.Length; cnindex++)
+                {
+                    if (cn[cnindex] == '.')
+                    {
+                        cnindex++;
+                        break;
+                    }
+                }
+                if (cn.Length - cnindex == name.Length)
+                {
+                    bool good = true;
+                    for (int j = 0; j < name.Length; j++, cnindex++)
+                    {
+                        if (Char.ToLower(name[j]) != Char.ToLower(cn[cnindex]))
+                        {
+                            good = false;
+                            break;
+                        }
+                    }
+                    if (good)
+                    {
+                        if (-1 != matchindex)
+                        {
+                            throw new Exception("Column name " + name + " does not resolve to a single column");
+                        }
+                        matchindex = i;
+                    }
+                }
+            }
+            return matchindex;
+        }
+    }
+
+
+    public class ColValue : DbValue
+    {
+
+        public ColValue(IValueContext Context, DbColumn col)
+            : base(Context)
+        {
+            this.col = col;
+        }
+
+        public override ByteSlice Eval(out DbType type)
+        {
+            type = col.Type;
+            return ByteSlice.Prepare(Context.CurrentRow, col.RowOffset, col.Type.Size);
+        }
+
+        DbColumn col;
+
+    }
+
+    public class ImmediateValue : DbValue
+    {
+
+        public ImmediateValue(IValueContext Context, ByteSlice value, DbType type)
+            : base(Context)
+        {
+            this._value = value;
+            this._type = type;
+        }
+
+        public override ByteSlice Eval(out DbType type)
+        {
+            type = this._type;
+            return _value;
+        }
+
+        public void SetValue(ByteSlice value)
+        {
+            this._value = value;
+            this._type = DbType.Prepare(value.Length, _type.ID);
+        }
+
+        internal ByteSlice _value;
+        internal DbType _type;
+    }
+
+    // Scalar function only.
+    public class FuncEvalValue : DbValue
+    {
+        public FuncEvalValue(IValueContext Context, string FunctionName, IList<DbValue> Arguments)
+            : base(Context)
+        {
+            this.funcname = FunctionName;
+            this.args = new DbFunctionArguments(Arguments);
+        }
+
+        public FuncEvalValue(IValueContext Context, string FunctionName, DbFunctionArguments Arguments)
+            : base(Context)
+        {
+            this.funcname = FunctionName;
+            this.args = Arguments;
+        }
+
+        public FuncEvalValue(IValueContext Context, string FunctionName, params DbValue[] Arguments)
+            : base(Context)
+        {
+            this.funcname = FunctionName;
+            this.args = new DbFunctionArguments(Arguments);
+        }
+
+
+        public override ByteSlice Eval(out DbType type)
+        {
+            DbValue ret = Context.ExecDbFunction(funcname, args);
+            return ret.Eval(out type);
+        }
+
+
+        string funcname;
+        DbFunctionArguments args;
+    }
 
 }

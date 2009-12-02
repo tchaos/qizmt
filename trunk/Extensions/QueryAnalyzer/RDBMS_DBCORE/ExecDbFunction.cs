@@ -69,12 +69,19 @@ namespace RDBMS_DBCORE
         }
 
 
+        public static bool DbScalarFunctionExists(string name)
+        {
+            EnsureDbFunctions();
+
+            return dbscalarfuncs.ContainsKey(name);
+        }
+
         // Returns null if no such function.
         public static DbValue TryExecDbScalarFunction(string name, DbFunctionTools tools, DbFunctionArguments args)
         {
             EnsureDbFunctions();
 
-            if (!dbscalarfuncs.ContainsKey(name))
+            if (!DbScalarFunctionExists(name))
             {
                 return null;
             }
@@ -95,12 +102,19 @@ namespace RDBMS_DBCORE
         }
 
 
+        public static bool DbAggregatorExists(string name)
+        {
+            EnsureDbAggregators();
+
+            return dbaggregators.ContainsKey(name);
+        }
+
         // Returns null if no such function.
         public static DbValue TryExecDbAggregator(string name, DbFunctionTools tools, DbAggregatorArguments args)
         {
             EnsureDbAggregators();
 
-            if (!dbaggregators.ContainsKey(name))
+            if (!DbAggregatorExists(name))
             {
                 return null;
             }

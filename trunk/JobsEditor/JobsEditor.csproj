@@ -70,6 +70,12 @@
     <Compile Include="GotoDlg.Designer.cs">
       <DependentUpon>GotoDlg.cs</DependentUpon>
     </Compile>
+    <Compile Include="InputScrollControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="InputScrollControl.Designer.cs">
+      <DependentUpon>InputScrollControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="JobDebug.cs" />
     <Compile Include="JobsEditor.cs">
       <SubType>Form</SubType>
@@ -91,6 +97,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="GotoDlg.resx">
       <DependentUpon>GotoDlg.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="InputScrollControl.resx">
+      <DependentUpon>InputScrollControl.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="JobsEditor.resx">
       <DependentUpon>JobsEditor.cs</DependentUpon>
@@ -122,6 +131,7 @@
     <None Include="Resources\DebugStepOver.bmp" />
     <None Include="Resources\DebugStepOut.bmp" />
     <None Include="Resources\DebugSkipToReduce.bmp" />
+    <Content Include="Resources\Parse.bmp" />
     <Content Include="Resources\Qizmt.ico" />
     <Content Include="Resources\Save.bmp" />
   </ItemGroup>

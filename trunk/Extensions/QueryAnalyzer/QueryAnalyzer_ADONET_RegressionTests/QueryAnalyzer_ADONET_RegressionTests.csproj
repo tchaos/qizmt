@@ -81,6 +81,8 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ConnOpen.cs" />
+    <Compile Include="RIndexAutoBatch.cs" />
+    <Compile Include="RIndexKeepValueOrder.cs" />
     <Compile Include="RIndexOnChar.cs" />
     <Compile Include="RIndexOnCharPinHash.cs" />
     <Compile Include="RIndexOnDateTime.cs" />
@@ -99,6 +101,7 @@
     <Compile Include="RSelectThorough.cs" />
     <Compile Include="RSelectWhereOR.cs" />
     <Compile Include="SelectDistinct.cs" />
+    <Compile Include="SelectNestedFunctions.cs" />
     <Compile Include="SelectPortion.cs" />
     <Compile Include="ShellCmdLossless.cs" />
     <Compile Include="Truncate.cs" />

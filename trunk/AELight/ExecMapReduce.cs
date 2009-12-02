@@ -1533,8 +1533,8 @@ public void DSpace_LogResult(string name, bool passed)
                 dfs dc = LoadDfsConfig(cfgj.IOSettings.GetSettingOverrideStrings());
 
                 List<string> outputfiles = new List<string>();
-                {
-                    int RecordLength = Int32.MinValue;
+                List<int> outputrecordlengths = new List<int>();
+                {                    
                     if (outputfile.Length > 0)
                     {
                         string[] ofiles = outputfile.Split(';');
@@ -1571,13 +1571,6 @@ public void DSpace_LogResult(string name, bool passed)
                             {
                                 reclen = -1;
                             }
-                            if (RecordLength != Int32.MinValue && RecordLength != reclen)
-                            {
-                                Console.Error.WriteLine("Error: all map outputs must have the same record length: {0}", thisfile);
-                                SetFailure();
-                                return;
-                            }
-                            RecordLength = reclen;
 
                             if (thisfile.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
                             {
@@ -1597,13 +1590,15 @@ public void DSpace_LogResult(string name, bool passed)
                                 return;
                             }
                             outputfiles.Add(thisfile);
+                            outputrecordlengths.Add(reclen);
                         }
                     }
                     else
                     {
                         outputfiles.Add("");
+                        outputrecordlengths.Add(-1); 
                     }
-                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = RecordLength > 0 ? RecordLength : -1;                    
+                    MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = outputrecordlengths.Count > 0 ? outputrecordlengths[0] : -1;                    
                 }
 
                 string[] slaves = dc.Slaves.SlaveList.Split(',', ';');
@@ -1956,6 +1951,7 @@ public void DSpace_LogResult(string name, bool passed)
                         }
                         bi.acl.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
                         bi.acl.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
+                        bi.acl.OutputRecordLengths = outputrecordlengths;
                         bi.acl.CookRetries = dc.slave.CookRetries;
                         bi.acl.CookTimeout = dc.slave.CookTimeout;
                         bi.acl.LocalCompile = (0 == BlockID); // Only compile first one locally.
@@ -2288,9 +2284,9 @@ public void DSpace_LogResult(string name, bool passed)
                                     dc = LoadDfsConfig(); // Reload in case of change or user modifications.
                                     {
                                         dfs.DfsFile df = new dfs.DfsFile();
-                                        if (MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength > 0)
+                                        if (outputrecordlengths[nfile] > 0)
                                         {
-                                            df.XFileType = DfsFileTypes.BINARY_RECT + "@" + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString();
+                                            df.XFileType = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[nfile].ToString();
                                         }
                                         df.Nodes = new List<dfs.DfsFile.FileNode>();
                                         df.Size = -1; // Preset

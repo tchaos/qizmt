@@ -185,6 +185,51 @@ namespace RDBMS_DBCORE
         }
 
 
+        // RequestCapacity might not be granted exactly. 
+        public List<DbValue> AllocDbValueList(int RequestCapacity)
+        {
+            if (curvaluelist >= valuelists.Count)
+            {
+                if (RequestCapacity < 256)
+                {
+                    RequestCapacity = 256;
+                }
+                List<DbValue> vl = new List<DbValue>(RequestCapacity);
+                valuelists.Add(vl);
+                curvaluelist++;
+                return vl;
+            }
+            // Future: can peek ahead and find buffer with capacity near RequestCapacity and swap.
+            return AllocDbValueList();
+        }
+
+        public List<DbValue> AllocDbValueList()
+        {
+            if (curvaluelist >= valuelists.Count)
+            {
+                List<DbValue> vl = new List<DbValue>(256);
+                valuelists.Add(vl);
+                curvaluelist++;
+                return vl;
+            }
+            else
+            {
+                List<DbValue> vl = valuelists[curvaluelist++];
+                vl.Clear();
+                return vl;
+            }
+        }
+
+        public void FreeLastDbValueList(List<DbValue> vl)
+        {
+            if (curvaluelist <= 0 || !object.ReferenceEquals(valuelists[curvaluelist - 1], vl))
+            {
+                throw new Exception("Mismatched AllocDbValueList / FreeLastDbValueList");
+            }
+            curvaluelist--;
+        }
+
+
         public DbValue AllocValue(ByteSlice value, DbType type)
         {
             if (curval >= values.Count)
@@ -311,6 +356,7 @@ namespace RDBMS_DBCORE
         {
             curbuf = 0;
             curval = 0;
+            curvaluelist = 0;
         }
 
 
@@ -319,6 +365,9 @@ namespace RDBMS_DBCORE
 
         static List<ImmediateValue> values = new List<ImmediateValue>(8);
         static int curval = 0;
+
+        static List<List<DbValue>> valuelists = new List<List<DbValue>>(8);
+        static int curvaluelist = 0;
 
     }
 

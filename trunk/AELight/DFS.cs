@@ -1500,14 +1500,23 @@ switch(workerindex)
                 for (int i = 0; i < df.Nodes.Count; i++)
                 {
                     dfs.DfsFile.FileNode fn = df.Nodes[i];
-                    string fnhost = fn.Host.ToLower();
-                    if (!netpaths.ContainsKey(fnhost))
+                    string[] fnhosts = fn.Host.ToLower().Split(';');
+                    string fnnetpath = null;
+                    foreach (string fnhost in fnhosts)
                     {
-                        Console.Error.WriteLine("File node is on an unhealthy machine: {0}:{1}", fnhost, fn.Name);
+                        if (netpaths.ContainsKey(fnhost))
+                        {
+                            fnnetpath = netpaths[fnhost];
+                            break;
+                        }
+                    }
+                    if (fnnetpath == null)
+                    {
+                        Console.Error.WriteLine("File node is not on any healthy machine: {0}: {1}", fn.Host, fn.Name);
                         SetFailure();
                         return;
                     }
-                    parts[i] = netpaths[fnhost] + @"\" + fn.Name;
+                    parts[i] = fnnetpath + @"\" + fn.Name;
                 }
             }
 

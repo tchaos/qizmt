@@ -109,6 +109,13 @@ namespace MySpace.DataMining.AELight.Properties {
             }
         }
         
+        internal static System.Drawing.Bitmap Parse {
+            get {
+                object obj = ResourceManager.GetObject("Parse", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
         internal static System.Drawing.Bitmap Save {
             get {
                 object obj = ResourceManager.GetObject("Save", resourceCulture);

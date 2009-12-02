@@ -135,15 +135,23 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    swap <file1> <file2>           file names to swap");
             Console.WriteLine("    regressiontest basic           basic regression test " + appname);
             Console.WriteLine("    kill <JobID>                   kill the specified Job Identifier");
-            Console.WriteLine("    enqueue command=<value>        Adds a command to the end of the queue");
+            Console.WriteLine("    enqueue command=<value>");
+            Console.WriteLine("         [ExecTimeout=<secs>   Maximum seconds Qizmt exec can run");
+            Console.WriteLine("         OnTimeout=<tcmd>]     Run on timeout;  e.g.  Qizmt kill #JID#");
+            Console.WriteLine("         Adds a command to the end of the queue");
             Console.WriteLine("    queuekill <QueueID>            Removes the specified Queue Identifier");
             Console.WriteLine("    clearqueue                     Removes all entries from the queue");
             Console.WriteLine("    schedule command=<value> start=<now|<datetime>> [frequency=<seconds>]");
-            Console.WriteLine("             [texceptions=<datetime-datetime>[,...]] ranges when not to run");
-            Console.WriteLine("             [wexceptions=<weekday>[,...]] weekdays not to run");
-            Console.WriteLine("             adds a command entry to the scheduler");
-            Console.WriteLine("             (datetime format is {0})",
+            Console.WriteLine("         [texceptions=<<datetime>[-<datetime>]>[,...]] ranges when not to run");
+            Console.WriteLine("         [wexceptions=<weekday>[,...]] whole weekdays not to run");
+            Console.WriteLine("         [wtexceptions=<wdtime>[,...]] time on day-of-week not to run");
+            Console.WriteLine("         adds a command entry to the scheduler");
+            Console.WriteLine("         (datetime format is {0})",
                 MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.TimeSpec.DATE_TIME_FORMAT);
+            Console.WriteLine("         (wdtime format is {0})",
+                MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.TimeSpec.WT_FORMAT);
+            Console.WriteLine("    pauseschedule <ScheduleID>     Pauses the specified Schedule Identifier");
+            Console.WriteLine("    unpauseschedule <ScheduleID>   Un-pauses the specified Schedule Identifier");
             Console.WriteLine("    unschedule <ScheduleID>        Removes the specified Schedule Identifier");
             Console.WriteLine("    clearschedule                  Removes all entries from the scheduler");
         }
@@ -1815,6 +1823,114 @@ namespace MySpace.DataMining.AELight
                         Console.WriteLine("Schedule Identifier: {0}", se.ID);
                         Console.WriteLine("Scheduled: {0}", se.Command);
                         Console.WriteLine("First Run: {0}", se.NextRun);
+#if DEBUG
+                        if (!string.IsNullOrEmpty(se.texceptions))
+                        {
+                            DateTime dt = DateTime.MaxValue;
+                            List<MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.TimeSpec.Range> xrs
+                                = MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.ParseTExceptions(
+                                se.texceptions, se.NextRun);
+                            foreach (MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.TimeSpec.Range xr
+                                in xrs)
+                            {
+                                if (xr.first < dt)
+                                {
+                                    dt = xr.first;
+                                }
+                            }
+                            Console.WriteLine("DEBUG First texception: {0}", dt);
+                        }
+#endif
+#if DEBUG
+                        if (!string.IsNullOrEmpty(se.wtexceptions))
+                        {
+                            DateTime dt = DateTime.MaxValue;
+                            List<MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.TimeSpec.Range> xrs
+                                = MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.ParseTExceptions(
+                                se.wtexceptions, se.NextRun);
+                            foreach (MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.SEntry.TimeSpec.Range xr
+                                in xrs)
+                            {
+                                if (xr.first < dt)
+                                {
+                                    dt = xr.first;
+                                }
+                            }
+                            Console.WriteLine("DEBUG First wtexception: {0}", dt);
+                        }
+#endif
+                    }
+                    break;
+
+                case "pauseschedule":
+                case "schedulepause":
+                    {
+                        if (args.Length <= 1)
+                        {
+                            Console.Error.WriteLine("Error: expected SID");
+                            SetFailure();
+                            return;
+                        }
+                        string ssid = args[1];
+                        long sid;
+                        try
+                        {
+                            sid = long.Parse(ssid);
+                            if (sid <= 0)
+                            {
+                                throw new Exception("Must be greater than 0");
+                            }
+                            //ssid = sid.ToString(); // Normalize.
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Invalid SID '{0}': {1}", ssid, e.Message);
+                            SetFailure();
+                            return;
+                        }
+                        if (!MySpace.DataMining.DistributedObjects.Scheduler.PauseSchedule(sid, true))
+                        {
+                            Console.Error.WriteLine("No such SID: {0}", ssid);
+                            SetFailure();
+                            return;
+                        }
+                        Console.WriteLine("Done");
+                    }
+                    break;
+
+                case "unpauseschedule":
+                case "scheduleunpause":
+                    {
+                        if (args.Length <= 1)
+                        {
+                            Console.Error.WriteLine("Error: expected SID");
+                            SetFailure();
+                            return;
+                        }
+                        string ssid = args[1];
+                        long sid;
+                        try
+                        {
+                            sid = long.Parse(ssid);
+                            if (sid <= 0)
+                            {
+                                throw new Exception("Must be greater than 0");
+                            }
+                            //ssid = sid.ToString(); // Normalize.
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Invalid SID '{0}': {1}", ssid, e.Message);
+                            SetFailure();
+                            return;
+                        }
+                        if (!MySpace.DataMining.DistributedObjects.Scheduler.PauseSchedule(sid, false))
+                        {
+                            Console.Error.WriteLine("No such SID: {0}", ssid);
+                            SetFailure();
+                            return;
+                        }
+                        Console.WriteLine("Done");
                     }
                     break;
 
@@ -6688,7 +6804,7 @@ namespace MySpace.DataMining.AELight
                             {
                                 Console.WriteLine("  {0} {1} [{2}] {3} (Next Run: {4})",
                                     ss[i].ID, ss[i].UserAdded, ss[i].TimeAdded.ToString(),
-                                    ss[i].Command, ss[i].NextRun.ToString());
+                                    ss[i].Command, ss[i].GetNextRunString());
                             }
                         }
                         else
