@@ -1,0 +1,48 @@
+#summary Qizmt Reference mstring EndsWith
+#labels EndsWith,Qizmt,Reference,mstring
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceMStringMethods Non-static methods of mstring]
+
+<wiki:toc max_depth="2" />
+
+=`EndsWith`=
+{{{public bool EndsWith(mstring s)}}}
+
+Returns true if this mstring ends with the mstring s. 
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+    mstring name = sLine.NextItemToString(',');
+    mstring er = mstring.Prepare("er");
+
+    if (name.EndsWith(er))
+    {
+        output.Add(name, mstring.Prepare());
+    }
+} 
+}}}
+----
+
+
+
+{{{public bool EndsWith(string s)}}}
+
+Returns true if this mstring ends with the string s. 
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+    mstring name = sLine.NextItemToString(',');
+
+    if (name.EndsWith("er"))
+    {
+        output.Add(name, mstring.Prepare());
+    }
+} 
+}}}
