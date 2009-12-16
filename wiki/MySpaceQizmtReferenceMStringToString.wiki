@@ -6,14 +6,14 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 
 <wiki:toc max_depth="2" />
 
-==`ToString`==
+=`ToString`=
 {{{public override string ToString()}}}
 
 Returns a C# string.
-====Remarks====
+===Remarks===
 This results a heap allocation.
 
-====Example==== 
+===Example=== 
 {{{
 public virtual void Map(ByteSlice line, MapOutput output)
 {
