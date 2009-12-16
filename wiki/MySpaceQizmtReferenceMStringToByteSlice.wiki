@@ -1,0 +1,23 @@
+#summary Qizmt Reference mstring ToByteSlice
+#labels Qizmt,Reference,mstring,ToByteSlice
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceMStringMethods Non-static methods of mstring]
+
+<wiki:toc max_depth="2" />
+
+=`ToByteSlice`=
+{{{public ByteSlice ToByteSlice()}}}
+
+Converts the buffer of mstring to UTF-8 and returns a new instance of `ByteSlice`.
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring ms = mstring.Prepare(line);
+    mstring sKey = ms.MSubstring(0, 2);
+    output.Add(sKey.ToByteSlice(), ByteSlice.Prepare());
+} 
+}}}
+----
