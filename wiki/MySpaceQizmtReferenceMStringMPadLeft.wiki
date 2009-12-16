@@ -1,0 +1,44 @@
+#summary Qizmt Reference mstring MPadLeft
+#labels MPadLeft,Qizmt,Reference,mstring
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceMStringMethods Non-static methods of mstring]
+
+<wiki:toc max_depth="2" />
+=`MPadLeft`=
+{{{public mstring MPadLeft(int totalLength, char paddingChar)}}}
+
+Pads this mstring on the left with the padding char for a specified total length.  This mstring is changed and returned.
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+    mstring name = sLine.NextItemToString(',');
+    mstring paddedName = name.MPadLeft(16, ' ');
+    output.Add(paddedName, mstring.Prepare());
+} 
+}}}
+----
+
+
+
+=`PadLeftM`=
+{{{public mstring PadLeftM(int totalLength, char paddingChar)}}}
+
+Pads this mstring on the left with the padding char for a specified total length.  This mstring is changed and returned. 
+
+===Remarks===
+This is equivalent to MPadLeft.
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+    mstring name = sLine.NextItemToString(',');
+    mstring paddedName = name.PadLeftM(16, ' ');
+    output.Add(paddedName, mstring.Prepare());
+} 
+}}}
