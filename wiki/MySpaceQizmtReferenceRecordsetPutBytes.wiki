@@ -1,0 +1,30 @@
+#summary Qizmt Reference recordset PutInt32
+#labels Qizmt,Reference,recordset,PutBytes
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceRecordsetMethods Non-static methods of recordset]
+
+<wiki:toc max_depth="2" />
+
+=`PutBytes`=
+{{{public void PutBytes(IList<byte> bytes, int byteIndex, int byteCount)}}}
+
+Put bytes into the recordset, starting at byteIndex, with byteCount number of bytes to put.
+
+===Example=== 
+{{{
+byte[] buf = new byte[4];
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+    int x = sLine.NextItemToInt(',');
+    Entry.ToBytes(x, buf, 0);
+    recordset rKey = recordset.Prepare();
+    recordset rValue = recordset.Prepare();
+
+    rKey.PutBytes(buf, 0, 2);
+
+    output.Add(rKey, rValue);
+} 
+}}}
+----
