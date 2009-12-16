@@ -9,7 +9,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 =`ToByteSlice`=
 {{{public ByteSlice ToByteSlice()}}}
 
-Converts this recordset to a ByteSlice.  This recordset is changed after the conversion.
+Converts this recordset to a `ByteSlice`.  This recordset is changed after the conversion.
 ===Remarks===
 It is adivsed not to re-use the recordset after it has been converted to a ByteSlice.
 
