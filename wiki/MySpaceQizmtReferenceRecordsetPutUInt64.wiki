@@ -1,0 +1,77 @@
+#summary Qizmt Reference recordset PutInt32
+#labels Qizmt,Reference,recordset,PutUInt64,PutULong
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceRecordsetMethods Non-static methods of recordset]
+
+<wiki:toc max_depth="2" />
+
+=`PutUInt64`=
+{{{public void PutUInt64(UInt64 x)}}}
+
+Put a UInt64 x into the recordset.
+===Remarks===
+The order of putting and getting items from the recordset must be the same.
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring ms = mstring.Prepare(line);
+
+    int i1 = ms.NextItemToInt32(',');
+    int i2 = ms.NextItemToInt32(',');
+    Int64 i3 = ms.NextItemToInt64(',');
+    mstring s = ms.NextItemToString(',');
+    UInt64 i4 = ms.NextItemToUInt64(',');
+
+    recordset rKey = recordset.Prepare();
+    recordset rValue = recordset.Prepare();
+
+    rKey.PutInt32(i1);
+    rKey.PutInt32(i2);
+
+    rValue.PutInt64(i3);
+    rValue.PutString(s);
+    rValue.PutUInt64(i4);
+
+    output.Add(rKey, rValue);
+} 
+}}}
+----
+
+
+
+=`PutULong`=
+{{{public void PutULong(UInt64 x)}}}
+
+Put a UInt64 x into the recordset.
+===Remarks===
+The order of putting and getting items from the recordset must be the same.
+
+====Example==== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring ms = mstring.Prepare(line);
+
+    int i1 = ms.NextItemToInt32(',');
+    int i2 = ms.NextItemToInt32(',');
+    Int64 i3 = ms.NextItemToInt64(',');
+    mstring s = ms.NextItemToString(',');
+    UInt64 i4 = ms.NextItemToUInt64(',');
+
+    recordset rKey = recordset.Prepare();
+    recordset rValue = recordset.Prepare();
+
+    rKey.PutInt32(i1);
+    rKey.PutInt32(i2);
+
+    rValue.PutInt64(i3);
+    rValue.PutString(s);
+    rValue.PutULong(i4);
+
+    output.Add(rKey, rValue);
+} 
+}}}
+----
