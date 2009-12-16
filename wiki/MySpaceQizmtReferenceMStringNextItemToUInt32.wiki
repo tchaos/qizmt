@@ -1,0 +1,78 @@
+#summary Qizmt Reference mstring NextItemToUInt32
+#labels Qizmt,Reference,mstring,NextItemToUInt32
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceMStringMethods Non-static methods of mstring]
+
+<wiki:toc max_depth="2" />
+
+=`NextItemToUInt32`=
+{{{public Int32 NextItemToUInt32(char delimiter)}}}
+
+Get the next UInt32 item, delimited by the char delimiter.
+
+===Example=== 
+{{{
+/*
+Sample Input:
+
+123|apple|444
+444|lemon|555
+54|orange|666
+778|lime|777
+123|soda|888
+*/
+
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+
+    UInt32 i1 = sLine.NextItemToUInt32('|');
+    mstring value = sLine.NextItemToString('|');
+    UInt32 i2 = sLine.NextItemToUInt32('|');
+
+    UInt32 total = i1 + i2;
+
+    mstring key = mstring.Prepare(total);
+
+    output.Add(key, value);
+} 
+}}}
+----
+
+
+
+=`NextItemToUInt`=
+{{{public Int32 NextItemToUInt(char delimiter)}}}
+
+Get the next UInt32 item, delimited by the char delimiter.
+===Remarks===
+This is equivalent to NextItemToUInt32.
+
+===Example=== 
+{{{
+/*
+Sample Input:
+
+123|apple|444
+444|lemon|555
+54|orange|666
+778|lime|777
+123|soda|888
+*/
+
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+
+    UInt32 i1 = sLine.NextItemToUInt('|');
+    mstring value = sLine.NextItemToString('|');
+    UInt32 i2 = sLine.NextItemToUInt('|');
+
+    UInt32 total = i1 + i2;
+
+    mstring key = mstring.Prepare(total);
+
+    output.Add(key, value);
+} 
+}}}
