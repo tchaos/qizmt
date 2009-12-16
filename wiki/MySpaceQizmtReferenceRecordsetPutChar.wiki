@@ -1,4 +1,4 @@
-#summary Qizmt Reference recordset PutInt32
+#summary Qizmt Reference recordset PutChar
 #labels Qizmt,Reference,recordset,PutChar
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
 
@@ -39,4 +39,3 @@ public virtual void Map(ByteSlice line, MapOutput output)
     output.Add(rKey, rValue);
 } 
 }}}
-----
