@@ -81,4 +81,3 @@ public virtual void Map(ByteSlice line, MapOutput output)
     output.Add(rKey, rValue);
 } 
 }}}
-----
