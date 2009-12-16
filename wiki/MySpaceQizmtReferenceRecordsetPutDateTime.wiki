@@ -1,0 +1,27 @@
+#summary Qizmt Reference recordset PutInt32
+#labels Qizmt,Reference,recordset,PutDateTime
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceRecordsetMethods Non-static methods of recordset]
+
+<wiki:toc max_depth="2" />
+
+=`PutDateTime`=
+{{{public void PutDateTime(DateTime x)}}}
+
+Put the DateTime item x into the recordset.
+===Remarks===
+The order of putting and getting items from the recordset must be the same.
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    string sLine = line.ToString();
+    DateTime dt = DateTime.Parse(sLine);
+    recordset key = recordset.Prepare();
+    key.PutDateTime(dt);
+    output.Add(key, recordset.Prepare());
+} 
+}}}
+----
