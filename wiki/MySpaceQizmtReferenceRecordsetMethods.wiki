@@ -25,7 +25,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
  * [MySpaceQizmtReferenceRecordsetPutUInt16 PutUInt16]
  * [MySpaceQizmtReferenceRecordsetPutUInt16#PutUShort PutUShort]
  * [MySpaceQizmtReferenceRecordsetPutBytes PutBytes]
- * [MySpaceQizmtReferenceRecordsetGetInt32 Get32]
+ * [MySpaceQizmtReferenceRecordsetGetInt32 GetInt32]
  * [MySpaceQizmtReferenceRecordsetGetInt32#GetInt GetInt]
  * [MySpaceQizmtReferenceRecordsetGetUInt32 GetUInt32]
  * [MySpaceQizmtReferenceRecordsetGetUInt32#GetUInt GetUInt]
