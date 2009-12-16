@@ -1,0 +1,23 @@
+#summary Qizmt Reference recordset PutInt32
+#labels Qizmt,Reference,recordset,GetDateTime
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceRecordsetMethods Non-static methods of recordset]
+
+<wiki:toc max_depth="2" />
+
+=`GetDateTime`=
+{{{public DateTime GetDateTime()}}}
+
+Get the next DateTime item from the recordset.
+
+===Example=== 
+{{{
+public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+{
+    recordset rkey = recordset.Prepare(key);
+    DateTime dt = rkey.GetDateTime();
+    output.Add(mstring.Prepare(dt.ToString("yyyy-MM-dd hh:mm:ss")));
+} 
+}}}
+----
