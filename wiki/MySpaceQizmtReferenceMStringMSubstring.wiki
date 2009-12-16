@@ -6,14 +6,14 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 
 <wiki:toc max_depth="2" />
 
-==`MSubstring`==
+=`MSubstring`=
 {{{public mstring MSubstring(int startIndex, int length)}}}
 
 Returns an instance of mstring starting at startIndex, with length number of characters.
-====Remarks====
+===Remarks===
 remarks
 
-====Example==== 
+===Example=== 
 {{{
 public virtual void Map(ByteSlice line, MapOutput output)
 {
@@ -31,10 +31,10 @@ public virtual void Map(ByteSlice line, MapOutput output)
 {{{public mstring MSubstring(int startIndex)}}}
 
 Returns an instance of mstring starting at startIndex, until the end of the mstring.
-====Remarks====
+===Remarks===
 remarks
 
-====Example==== 
+===Example=== 
 {{{
 public virtual void Map(ByteSlice line, MapOutput output)
 {
@@ -49,14 +49,14 @@ public virtual void Map(ByteSlice line, MapOutput output)
 
 
 
-==`SubstringM`==
+=`SubstringM`=
 {{{public mstring SubstringM(int startIndex, int length)}}}
 
 Returns an instance of mstring starting at startIndex, with length number of characters.
-====Remarks====
+===Remarks===
 This is equivalent to `MSubstring(int startIndex, int length)`.
 
-====Example==== 
+===Example=== 
 {{{
 public virtual void Map(ByteSlice line, MapOutput output)
 {
@@ -72,10 +72,10 @@ public virtual void Map(ByteSlice line, MapOutput output)
 {{{public mstring SubstringM(int startIndex)}}}
 
 Returns an instance of mstring starting at startIndex, until the end of the mstring.
-====Remarks====
+===Remarks===
 This is equivalent to `MSubstring(int startIndex)`.
 
-====Example==== 
+===Example=== 
 {{{
 public virtual void Map(ByteSlice line, MapOutput output)
 {
