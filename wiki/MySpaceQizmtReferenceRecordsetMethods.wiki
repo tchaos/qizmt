@@ -8,7 +8,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 =Non-static methods of `recordset`=
 
  * [MySpaceQizmtReferenceRecordsetPutInt32 PutInt32]
- * [MySpaceQizmtReferenceRecordsetPutInt32 PutInt]
+ * [MySpaceQizmtReferenceRecordsetPutInt32#PutInt PutInt]
  * [MySpaceQizmtReferenceRecordsetPutUInt32 PutUInt32]
  * [MySpaceQizmtReferenceRecordsetPutUInt32 PutUInt]
  * [MySpaceQizmtReferenceRecordsetPutInt64 PutInt64]
@@ -44,4 +44,3 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
  * [MySpaceQizmtReferenceRecordsetGetUInt16 GetUShort]
  * [MySpaceQizmtReferenceRecordsetGetBytes GetBytes]
  * [MySpaceQizmtReferenceRecordsetToByteSlice ToByteSlice]
-
