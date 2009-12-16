@@ -1,0 +1,43 @@
+#summary Qizmt Reference mstring HasNextItem
+#labels HasNextItem,Qizmt,Reference,mstring
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceMStringMethods Non-static methods of mstring]
+
+<wiki:toc max_depth="2" />
+
+=`HasNextItem`=
+{{{public bool HasNextItem()}}}
+
+Returns true if there is a next item in this mstring. 
+
+===Example=== 
+{{{
+/*
+Sample Input:
+
+Sam,1498,321,45,7,8,9,0
+Jolie,1,2,3,4,5,6,7,8,9,0,1,2,3,4
+John,61,42
+May,1
+*/
+
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring sLine = mstring.Prepare(line);
+    mstring name = sLine.NextItemToString(',');
+    int sum = 0;
+
+    while (sLine.HasNextItem())
+    {
+        int amt = sLine.NextItemToInt(',');
+        sum += amt;
+
+    }
+
+    recordset rValue = recordset.Prepare();
+    rValue.PutInt(sum);
+
+    output.Add(name, rValue);
+} 
+}}}
