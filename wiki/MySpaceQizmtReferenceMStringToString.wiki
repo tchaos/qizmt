@@ -1,0 +1,23 @@
+#summary Qizmt Reference mstring ToString
+#labels Qizmt,Reference,mstring,ToString
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceMStringMethods Non-static methods of mstring]
+
+<wiki:toc max_depth="2" />
+
+==`ToString`==
+{{{public override string ToString()}}}
+
+Returns a C# string.
+====Remarks====
+This results a heap allocation.
+
+====Example==== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    mstring ms = mstring.Prepare(line);
+    Qizmt_Log(ms.ToString());
+} 
+}}}
