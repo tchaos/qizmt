@@ -9,7 +9,65 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 
 =Non-static Methods of mstring=
 
-
+ * [MySpaceQizmtReferenceMStringToByteSlice ToByteSlice]
+ * [MySpaceQizmtReferenceMStringToString ToString]
+ * [MySpaceQizmtReferenceMStringMSubstring MSubstring]
+ * [MySpaceQizmtReferenceMStringMSubstring#SubstringM SubstringM]
+ * [MySpaceQizmtReferenceMStringMTrim MTrim]
+ * [MySpaceQizmtReferenceMStringMTrim#TrimM TrimM]
+ * [MySpaceQizmtReferenceMStringMAppend MAppend]
+ * [MySpaceQizmtReferenceMStringMAppend#AppendM AppendM]
+ * [MySpaceQizmtReferenceMStringConsume Consume]
+ * [MySpaceQizmtReferenceMStringCsvNextItemToString CsvNextItemToString]
+ * [MySpaceQizmtReferenceMStringCsvNextItemToInt32 CsvNextItemToInt32]
+ * [MySpaceQizmtReferenceMStringCsvNextItemToInt32#CsvNextItemToInt CsvNextItemToInt]
+ * [MySpaceQizmtReferenceMStringCsvNextItemToInt64 CsvNextItemToInt64]
+ * [MySpaceQizmtReferenceMStringCsvNextItemToInt64#CsvNextItemToLong CsvNextItemToLong]
+ * [MySpaceQizmtReferenceMStringCsvNextItemToDouble CsvNextItemToDouble]
+ * [MySpaceQizmtReferenceMStringNextItemToString NextItemToString]
+ * [MySpaceQizmtReferenceMStringNextItemToInt16 NextItemToInt16]
+ * [MySpaceQizmtReferenceMStringNextItemToInt16#NextItemToIntShort NextItemToIntShort]
+ * [MySpaceQizmtReferenceMStringNextItemToUInt16 NextItemToUInt16]
+ * [MySpaceQizmtReferenceMStringNextItemToUInt16#NextItemToUShort NextItemToUShort]
+ * [MySpaceQizmtReferenceMStringNextItemToInt32 NextItemToInt32]
+ * [MySpaceQizmtReferenceMStringNextItemToInt32#NextItemToInt NextItemToInt] 
+ * [MySpaceQizmtReferenceMStringNextItemToUInt32 NextItemToUInt32] 
+ * [MySpaceQizmtReferenceMStringNextItemToUInt32#NextItemToUInt NextItemToUInt]
+ * [MySpaceQizmtReferenceMStringNextItemToLong NextItemToLong]
+ * [MySpaceQizmtReferenceMStringNextItemToLong#NextItemToInt64 NextItemToInt64]
+ * [MySpaceQizmtReferenceMStringNextItemToUInt64 NextItemToUInt64]
+ * [MySpaceQizmtReferenceMStringNextItemToUInt64#NextItemToULong NextItemToULong]
+ * [MySpaceQizmtReferenceMStringNextItemToDouble NextItemToDouble]
+ * [MySpaceQizmtReferenceMStringResetGetPosition ResetGetPosition]
+ * [MySpaceQizmtReferenceMStringMToUpper MToUpper]
+ * [MySpaceQizmtReferenceMStringMToUpper#ToUpperM ToUpperM]
+ * [MySpaceQizmtReferenceMStringMToLower MToLower]
+ * [MySpaceQizmtReferenceMStringMToLower#ToLowerM ToLowerM]
+ * [MySpaceQizmtReferenceMStringToInt16 ToInt16]
+ * [MySpaceQizmtReferenceMStringToInt16#ToShort ToShort]
+ * [MySpaceQizmtReferenceMStringToUInt16 ToUInt16]
+ * [MySpaceQizmtReferenceMStringToUInt16#ToUShort ToUShort]
+ * [MySpaceQizmtReferenceMStringToInt32 ToInt32]
+ * [MySpaceQizmtReferenceMStringToInt32#ToInt ToInt]
+ * [MySpaceQizmtReferenceMStringToUInt32 ToUInt32]
+ * [MySpaceQizmtReferenceMStringToUInt32#ToUInt ToUInt]
+ * [MySpaceQizmtReferenceMStringToInt64 ToInt64]
+ * [MySpaceQizmtReferenceMStringToInt64#ToLong ToLong]
+ * [MySpaceQizmtReferenceMStringToUInt64 ToUInt64]
+ * [MySpaceQizmtReferenceMStringToUInt64#ToULong ToULong]
+ * [MySpaceQizmtReferenceMStringToDouble ToDouble]
+ * [MySpaceQizmtReferenceMStringMSplit MSplit]
+ * [MySpaceQizmtReferenceMStringHasNextItem HasNextItem]
+ * [MySpaceQizmtReferenceMStringStartsWith StartsWith]
+ * [MySpaceQizmtReferenceMStringContains Contains]
+ * [MySpaceQizmtReferenceMStringEndsWith EndsWith]
+ * [MySpaceQizmtReferenceMStringIndexOf IndexOf]
+ * [MySpaceQizmtReferenceMStringMPadRight MPadRight]
+ * [MySpaceQizmtReferenceMStringMPadRight#PadRightM PadRightM]
+ * [MySpaceQizmtReferenceMStringMPadLeft MPadLeft]
+ * [MySpaceQizmtReferenceMStringMPadLeft#PadLeftM PadLeftM]
+ * [MySpaceQizmtReferenceMStringMReplace MReplace]
+ * [MySpaceQizmtReferenceMStringMReplace#ReplaceM ReplaceM]
 
 ==`ToByteSlice`==
 {{{public ByteSlice ToByteSlice()}}}
@@ -3043,5 +3101,3 @@ public virtual void Map(ByteSlice line, MapOutput output)
     output.Add(newName, mstring.Prepare());
 } 
 }}}
-
-
