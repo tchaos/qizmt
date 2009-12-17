@@ -1,0 +1,45 @@
+#summary Qizmt Reference Entry Int16ToBytes
+#labels Int16ToBytes,Qizmt,Reference,Entry
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceEntryStaticMethods Static methods of Entry]
+
+<wiki:toc max_depth="2" />
+
+=`Int16ToBytes`=
+{{{public static byte[] Int16ToBytes(Int16 x)}}}
+
+Converts Int16 x to bytes in big endian byte ordering.
+===Remarks===
+A new `byte[]` is allocated each time this method is called.  Consider a more efficient overload of this method in which a `byte[]` is passed in 
+
+as a parameter.
+
+===Example=== 
+{{{
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    string sLine = line.ToString();
+    byte[] myBuffer = Entry.Int16ToBytes(Convert.ToInt16(sLine));
+    output.Add(ByteSlice.Prepare(myBuffer), ByteSlice.Prepare());
+} 
+}}}
+----
+
+
+
+{{{public static void Int16ToBytes(Int16 x, byte[] resultBuffer, int offset)}}}
+
+Converts Int16 x to bytes in big endian byte ordering with offset.
+
+===Example=== 
+{{{
+byte[] myBuffer = new byte[2];
+
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    string sLine = line.ToString();
+    Entry.Int16ToBytes(Convert.ToInt16(sLine), myBuffer, 0);
+    output.Add(ByteSlice.Prepare(myBuffer), ByteSlice.Prepare());
+} 
+}}}
