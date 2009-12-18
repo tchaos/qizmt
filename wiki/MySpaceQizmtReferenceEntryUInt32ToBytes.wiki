@@ -6,14 +6,14 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 
 <wiki:toc max_depth="2" />
 
-==`UInt32ToBytes`==
+=`UInt32ToBytes`=
 {{{public static byte[] UInt32ToBytes(UInt32 x)}}}
 
 Converts UInt32 x to bytes in big endian byte ordering.   A new byte array is allocated each time this method is called.  Consider a more 
 
 efficient overload of this method or `UInt32ToBytesAppend`.
 
-====Example==== 
+===Example=== 
 This example sorts a mixture of negative and positive integers.  
 
 {{{
@@ -47,7 +47,7 @@ public virtual void Map(ByteSlice line, MapOutput output)
 
 Converts UInt32 x to bytes in big endian byte ordering.
 
-====Example==== 
+===Example=== 
 This example sorts a mixture of negative and positive integers. 
 
 {{{
