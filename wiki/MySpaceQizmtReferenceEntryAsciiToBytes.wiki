@@ -1,0 +1,31 @@
+#summary Qizmt Reference Entry AsciiToBytes
+#labels Qizmt,Reference,Entry,AsciiToBytes
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceEntryStaticMethods Static methods of Entry]
+
+<wiki:toc max_depth="2" />
+
+=`AsciiToBytes`=
+{{{public static void AsciiToBytes(string x, byte[] buffer, int offset)}}}
+
+Converts string to bytes using ASCII encoding and appends to buffer with offset.
+
+===Example=== 
+{{{
+byte[] myBuffer = new byte[10];
+
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    string sLine = line.ToString();
+    string[] parts = sLine.Split(',');
+    string value = parts[1];
+    for (int i = 0; i < value.Length; i++)
+    {
+        //Some code for manipulating the string...                  
+    }
+
+    Entry.AsciiToBytes(value, myBuffer, 0);
+    output.Add(ByteSlice.Prepare(parts[0].PadRight(16, '\0')), ByteSlice.Prepare(myBuffer));
+} 
+}}}
