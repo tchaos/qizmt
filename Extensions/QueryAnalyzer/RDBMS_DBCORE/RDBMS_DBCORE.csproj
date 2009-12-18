@@ -140,6 +140,7 @@
     <Compile Include="QaPrepareImport.cs" />
     <Compile Include="QaPrepareImportLines.cs" />
     <Compile Include="QaPrepareInsertValues.cs" />
+    <Compile Include="QaPrepareJoinOn.cs" />
     <Compile Include="QaPrepareSelect.cs" />
     <Compile Include="QaQueryAnalyzer.cs" />
     <Compile Include="SelectClause.cs" />

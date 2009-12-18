@@ -657,7 +657,7 @@
                           #if DEBUG
                           if(Size != OutputColumnSizes[iww])
                           {
-                              throw new Exception("DEBUG:  (Size != OutputColumnSizes[iww])");
+                              throw new Exception("DEBUG:  " + awhat[iww] + ": (Size{" + Size + "} != OutputColumnSizes[iww]{" + OutputColumnSizes[iww] + "})");
                           }
                           #endif
                           cval.AppendTo(newfieldsbuf);

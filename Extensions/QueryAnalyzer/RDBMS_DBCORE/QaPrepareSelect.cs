@@ -41,9 +41,34 @@ namespace RDBMS_DBCORE
                 [System.Xml.Serialization.XmlElement("field")]
                 public FieldInfo[] fields;
 
-                public int recordcount;
+                public long recordcount;
                 public int recordsize;
                 public int parts;
+
+
+                public void SetFields(IList<DbColumn> cols)
+                {
+                    FieldInfo[] f = new FieldInfo[cols.Count];
+                    for (int i = 0; i < f.Length; i++)
+                    {
+                        FieldInfo fi = new FieldInfo();
+                        fi.index = i;
+                        fi.name = cols[i].ColumnName;
+                        string qatype = cols[i].Type.Name;
+                        fi.qatype = qatype;
+                        fi.cstype = QATypeToCSType(qatype);
+                        fi.frontbytes = 1;
+                        fi.bytes = cols[i].Type.Size - 1;
+                        fi.backbytes = 0;
+                        f[i] = fi;
+                    }
+                    SetFields(f);
+                }
+
+                public void SetFields(FieldInfo[] f)
+                {
+                    this.fields = f;
+                }
 
 
                 public string GetPseudoTableName()
@@ -97,6 +122,23 @@ namespace RDBMS_DBCORE
             }
 
 
+            public static string SetQueryResults(queryresults qr)
+            {
+                System.IO.MemoryStream ms = new System.IO.MemoryStream();
+                SetQueryResults(qr, ms);
+                ms.Position = 0;
+                System.IO.StreamReader sr = new System.IO.StreamReader(ms);
+                return sr.ReadToEnd();
+            }
+
+            public static void SetQueryResults(queryresults qr, System.IO.Stream set)
+            {
+                System.Xml.Serialization.XmlSerializer xs =
+                    new System.Xml.Serialization.XmlSerializer(typeof(PrepareSelect.queryresults));
+                xs.Serialize(set, qr);
+            }
+
+
             List<DbColumn> cols = null;
             List<string> colswidths = null;
 
@@ -122,6 +164,7 @@ namespace RDBMS_DBCORE
                 bool queryresults = dfstemp || dfsref;
                 bool topdfstemp = -1 != sOptions.IndexOf("TOPTEMP");
                 bool distinct = -1 != sOptions.IndexOf("DISTINCT");
+                bool joined = -1 != sOptions.IndexOf("JOINED");
 
                 string SelectWhat = QlArgsUnescape(QlArgsSelectWhat);
                 bool WhatFunctions = -1 != SelectWhat.IndexOf('('); // Select clause has functions (aggregates and/or scalars).
@@ -761,7 +804,7 @@ namespace RDBMS_DBCORE
                         int dtfieldindex = 0;
                         foreach (DbColumn c in outputcols)
                         {
-                            LogFieldInfo(dtfieldindex++, c);
+                            LogFieldInfo(dtfieldindex++, c, !joined);
                         }
                     }
 
@@ -801,7 +844,12 @@ namespace RDBMS_DBCORE
                 {
                     DSpace_Log(shelloutputSelect1);
 
-                    DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_Top']/IOSettings/DFS_IO/DFSReader=" + DfsOutputName + "@" + OutputsRowSize + "\" RDBMS_Top.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" \"" + OutputDisplayInfo + "\" " + TopCount.ToString()).Trim());
+                    string sTopOptions = "-";
+                    if (joined)
+                    {
+                        sTopOptions += ";JOINED";
+                    }
+                    DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_Top']/IOSettings/DFS_IO/DFSReader=" + DfsOutputName + "@" + OutputsRowSize + "\" RDBMS_Top.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" \"" + OutputDisplayInfo + "\" " + TopCount.ToString() + " " + sTopOptions).Trim());
 
                     Shell("dspace del \"" + DfsOutputName + "\"");
                 }
@@ -1032,11 +1080,6 @@ namespace RDBMS_DBCORE
                             {
                                 tsize = mintsize;
                             }
-                            // a tsize of (1 + tbasesize) must have an even tbasesize: integral types have even, and char(n) needs even.
-                            if (0 != ((tsize - 1) % 2))
-                            {
-                                tsize++;
-                            }
                             DbColumn c;
                             c.Type = DbType.Prepare("DbFunction", tsize, DbTypeID.NULL);  //(string TypeName, int TypeSize, DbTypeID TypeID)
                             c.RowOffset = 0;
@@ -1063,14 +1106,19 @@ namespace RDBMS_DBCORE
             }
 
 
-            void LogFieldInfo(int fieldindex, DbColumn c)
+            void LogFieldInfo(int fieldindex, DbColumn c, bool ShouldCleanName)
             {
                 string cstype = QATypeToCSType(c.Type.Name);
-                DSpace_Log("    <field index=\"" + fieldindex.ToString() + "\" name=\"" + CleanColumnName(c.ColumnName) + "\" qatype=\"" + c.Type.Name + "\" cstype=\"" + cstype + "\" frontbytes=\"1\" bytes=\"" + (c.Type.Size - 1).ToString() + "\" backbytes=\"0\" />");
+                string name = c.ColumnName;
+                if (ShouldCleanName)
+                {
+                    name = CleanColumnName(name);
+                }
+                DSpace_Log("    <field index=\"" + fieldindex.ToString() + "\" name=\"" + name + "\" qatype=\"" + c.Type.Name + "\" cstype=\"" + cstype + "\" frontbytes=\"1\" bytes=\"" + (c.Type.Size - 1).ToString() + "\" backbytes=\"0\" />");
             }
 
 
-            string QATypeToCSType(string qatype)
+            static string QATypeToCSType(string qatype)
             {
                 if (qatype.StartsWith("char", true, null))
                 {
@@ -1101,16 +1149,21 @@ namespace RDBMS_DBCORE
 
             string CleanColumnName(string cn)
             {
+                int last = 0;
                 for (int i = 0; i < cn.Length; i++)
                 {
                     if ('.' == cn[i])
                     {
-                        return cn.Substring(i + 1);
+                        last = i + 1;
                     }
-                    if ('\'' == cn[i])
+                    if ('\'' == cn[i] || '(' == cn[i])
                     {
                         break;
                     }
+                }
+                if (0 != last)
+                {
+                    return cn.Substring(last);
                 }
                 return cn;
             }

@@ -24,20 +24,25 @@
             }
             List<ColInfo> cols;
             
-            string GetColDisplayName(string s)
+            string CleanColumnName(string cn)
             {
-                for(int i = 0; i < s.Length; i++)
+                int last = 0;
+                for (int i = 0; i < cn.Length; i++)
                 {
-                    if('.' == s[i])
+                    if ('.' == cn[i])
                     {
-                        return s.Substring(i + 1);
+                        last = i + 1;
                     }
-                    if('\'' == s[i])
+                    if ('\'' == cn[i] || '(' == cn[i])
                     {
                         break;
                     }
                 }
-                return s;
+                if (0 != last)
+                {
+                    return cn.Substring(last);
+                }
+                return cn;
             }
             
             void InitColInfos(string RowInfo, string DisplayInfo)
@@ -74,15 +79,23 @@
                 string RowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[2]);
                 string DisplayInfo = DSpace_ExecArgs[3];
                 long TopCount = long.Parse(DSpace_ExecArgs[4]);
+                string sOptions = (DSpace_ExecArgs.Length > 5) ? DSpace_ExecArgs[5] : "";
+                bool joined = -1 != sOptions.IndexOf("JOINED");
                 
                 InitColInfos(RowInfo, DisplayInfo);
                 
                 StringBuilder sb = new StringBuilder();
                 
                 sb.Length = 0;
+                bool ShouldCleanName = !joined;
                 foreach(ColInfo ci in cols)
                 {
-                    sb.AppendFormat("{0,-" +  ci.DisplayWidth.ToString() + "} ", GetColDisplayName(ci.Name));
+                    string name = ci.Name;
+                    if(ShouldCleanName)
+                    {
+                        name = CleanColumnName(ci.Name);
+                    }
+                    sb.AppendFormat("{0,-" +  ci.DisplayWidth.ToString() + "} ", name);
                 }
                 string hsep = new string('-', sb.Length);
                 DSpace_Log(sb.ToString());

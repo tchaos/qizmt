@@ -101,7 +101,8 @@ namespace MySpace.DataMining.DistributedObjects5
         // inputdfsnodes must be accessible by the remote machine. Can be star-delimited failover names (starnames).
         // outputbasepath can contain %n for multiple outputs.
         // outputdfsdirs is a list of network directories of where to put the output files; each chunk is written to: outputdfsdirs[i % outputdfsdirs.Count]
-        public void RemoteExec(IList<string> inputdfsnodes, IList<string> outputdfsdirs, IList<string> outputfilenames, long outputbasefilesize, string code, string[] usings, List<List<long>> outputsizeses, List<List<string>> outputdfsnodeses, List<string> inputdfsfilenames, List<int> inputdfsnodesoffsets)
+        public void RemoteExec(IList<string> inputdfsnodes, IList<string> outputdfsdirs, IList<string> outputfilenames, long outputbasefilesize, string code, string[] usings, List<List<long>> outputsizeses, List<List<string>> outputdfsnodeses,
+            List<string> inputdfsfilenames, List<int> inputdfsnodesoffsets)
         {
             if (outputbasefilesize <= 0)
             {
@@ -128,6 +129,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
             StringBuilder infilenames = new StringBuilder();
             StringBuilder nodesoffsets = new StringBuilder();
+            StringBuilder sbinputrecordlengths = new StringBuilder();
             if (inputdfsfilenames != null)
             {
                 for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
@@ -136,16 +138,20 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         infilenames.Append(", ");
                         nodesoffsets.Append(", ");
+                        sbinputrecordlengths.Append(", ");
                         if (0 == (oi % 100))
                         {
                             infilenames.Append(Environment.NewLine);
                             nodesoffsets.Append(Environment.NewLine);
+                            sbinputrecordlengths.Append(Environment.NewLine);
                         }
                     }
                     infilenames.Append("@`");
                     infilenames.Append(inputdfsfilenames[oi]);
                     infilenames.Append("`");
                     nodesoffsets.Append(inputdfsnodesoffsets[oi]);
+
+                    sbinputrecordlengths.Append(InputRecordLengths[oi]);
                 }
             }            
 
@@ -206,6 +212,13 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
             }
 
+#if DEBUG
+            if (inputdfsfilenames != null)
+            {
+                //System.Diagnostics.Debugger.Launch();
+            }
+#endif
+
             RemoteExecFullSource(
 (@"using System;
 using System.Collections.Generic;
@@ -223,18 +236,23 @@ namespace RemoteExec
         string[] infs = new string [] { " + infs.ToString() + @" };
         string[] infilenames = new string [] { " + infilenames.ToString() + @" };
         int[] nodesoffsets = new int [] { " + nodesoffsets.ToString() + @" };
-        int onf = -1;
+        int[] inputrecordlengths = new int [] { " + sbinputrecordlengths.ToString() + @" };
 
         const int _CookTimeout = " + CookTimeout.ToString() + @";
         const int _CookRetries = " + CookRetries.ToString() + @";
 
-        const int InputRecordLength = " + InputRecordLength.ToString() + @";
+        int InputRecordLength = " + InputRecordLength.ToString() + @";
         
         public RemoteInputStream(UserRExec r)
         {
             this.r = r;
 
             StaticGlobals.DSpace_InputRecordLength = " + InputRecordLength.ToString() + @";
+
+            if(0 == infs.Length)
+            {
+                whichseqreader = 0;
+            }
         }
 
 
@@ -276,6 +294,10 @@ namespace RemoteExec
 
         public bool ReadRecordAppend(List<byte> record)
         {
+            if(EndOfStream)
+            {
+                return false;
+            }
             if(InputRecordLength < 1)
             {
                 throw new Exception(`Cannot read records; not in fixed-length record rectangular binary mode`);
@@ -297,6 +319,10 @@ namespace RemoteExec
 
         public bool ReadRecordAppend(System.IO.Stream record)
         {
+            if(EndOfStream)
+            {
+                return false;
+            }
             if(InputRecordLength < 1)
             {
                 throw new Exception(`Cannot read records; not in fixed-length record rectangular binary mode`);
@@ -319,6 +345,10 @@ namespace RemoteExec
 
         public bool ReadLineAppend(List<byte> line)
         {
+            if(EndOfStream)
+            {
+                return false;
+            }
             if(InputRecordLength > 0)
             {
                 throw new Exception(`Cannot read-line in fixed-length record rectangular binary mode`);
@@ -359,6 +389,10 @@ namespace RemoteExec
 
         public bool ReadLineAppend(StringBuilder line)
         {
+            if(EndOfStream)
+            {
+                return false;
+            }
             if(InputRecordLength > 0)
             {
                 throw new Exception(`Cannot read-line in fixed-length record rectangular binary mode`);
@@ -393,6 +427,10 @@ namespace RemoteExec
 
         public bool ReadLineAppend(System.IO.Stream line)
         {
+            if(EndOfStream)
+            {
+                return false;
+            }
             if(InputRecordLength > 0)
             {
                 throw new Exception(`Cannot read-line in fixed-length record rectangular binary mode`);
@@ -486,7 +524,8 @@ namespace RemoteExec
             _seekseq((int)partindex);
             if(0 != partposition)
             {
-                curseqfile.Position = (long)curpartheadersize + partposition;
+                curpartpos = curseqfile.Seek((long)curpartheadersize + partposition,
+                    System.IO.SeekOrigin.Begin);
             }
         }
 
@@ -516,7 +555,14 @@ namespace RemoteExec
                 {
                     return curpartfulllength - curpartheadersize;
                 }
-                return curseqfile.Position - curpartheadersize;
+                //return curseqfile.Position - curpartheadersize;
+#if DEBUG
+                if(curseqfile.Position != curpartpos)
+                {
+                    throw new Exception(`DEBUG:  CurrentPartPosition: (curseqfile.Position != curpartpos)`);
+                }
+#endif
+                return curpartpos - curpartheadersize;
             }
         }
 
@@ -548,7 +594,9 @@ namespace RemoteExec
                         }*/
                         break;
                     }
-                    rd += curseqfile.Read(array, offset + rd, count - rd);
+                    int onerd = curseqfile.Read(array, offset + rd, count - rd);
+                    curpartpos += onerd;
+                    rd += onerd;
                     if (0 != rd)
                     {
                         prevbyte = array[offset + rd - 1];
@@ -573,6 +621,28 @@ namespace RemoteExec
             catch
             {
                 // Suppress error message. To-do: fix.
+            }
+#if DEBUG
+            if(null != curseqfile)
+            {
+                if(curpartpos != curseqfile.Position)
+                {
+                    throw new Exception(`DEBUG:  Read: (curpartpos{` + curpartpos + `} != curseqfile.Position{` + curseqfile.Position + `})`);
+                }
+                if(curpartfulllength != curseqfile.Length)
+                {
+                    throw new Exception(`DEBUG:  Read: (curpartfulllength != curseqfile.Length)`);
+                }
+            }
+            if(curpartpos > curpartfulllength || curpartpos < 0)
+            {
+                throw new Exception(`DEBUG:  Read: (curpartpos > curpartfulllength || curpartpos < 0)`);
+            }
+#endif
+            if(curpartpos == curpartfulllength)
+            {
+                // Skip to the next file right now to load info about it (record length)
+                _movenextseq();
             }
             return rd;
         }
@@ -616,6 +686,7 @@ namespace RemoteExec
         static byte compressenumout = " + CompressFileOutput.ToString() + @";
         int curpartheadersize = 0;
         long curpartfulllength = 0; // Includes header size.
+        long curpartpos = 0; // Includes header size.
 
 
         void _seqinit()
@@ -671,7 +742,10 @@ namespace RemoteExec
         {
             if(offset == curoffset)
             {
-                StaticGlobals.DSpace_InputFileName = infilenames[curfi++];
+                StaticGlobals.DSpace_InputFileName = infilenames[curfi];
+                InputRecordLength = inputrecordlengths[curfi];
+                StaticGlobals.DSpace_InputRecordLength = InputRecordLength;
+                curfi++;
                 if(curfi < nodesoffsets.Length)
                 {
                     curoffset = nodesoffsets[curfi];
@@ -695,6 +769,8 @@ namespace RemoteExec
                     break;
                 }
                 StaticGlobals.DSpace_InputFileName = infilenames[curfi];
+                InputRecordLength = inputrecordlengths[curfi];
+                StaticGlobals.DSpace_InputRecordLength = InputRecordLength;
             }
         }
 
@@ -726,6 +802,7 @@ namespace RemoteExec
                 stm = new System.IO.Compression.GZipStream(stm, System.IO.Compression.CompressionMode.Decompress);
             }
             curpartheadersize = 0;
+            curpartpos = 0;
             if(skipdfschunkheader && anydata)
             {
                 byte[] buf = new byte[32];
@@ -743,6 +820,7 @@ namespace RemoteExec
                 curpartheadersize = hlen;
             }
             curpartfulllength = stm.Length;
+            curpartpos = curpartheadersize;
             return stm;
         }
 

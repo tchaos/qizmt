@@ -2617,6 +2617,10 @@ namespace mrdebug
             {
                 try
                 {
+#if DEBUG
+                    System.Threading.Thread.Sleep(200);
+#endif
+
                     _EnterCallback();
 
                     lock (dbgproc)

@@ -61,6 +61,13 @@ namespace RDBMS_DBCORE
                 return _QlInSelect(args, ForceDfsTemp, DisallowTop, Update, false);
             }
 
+            struct JoinInfo
+            {
+                internal string type; // "INNER"
+                internal string table; // Join on this table.
+                internal string on; // "ON" clause.
+            }
+
             // args starts after SELECT
             // If Update, implies dfstemp and does grouped job! select.dbcore can select cols to update and set new values.
             string _QlInSelect(string args, bool ForceDfsTemp, bool DisallowTop, bool Update, bool TopDfsTemp)
@@ -80,6 +87,7 @@ namespace RDBMS_DBCORE
                 bool GroupBy = false;
                 bool OrderBy = false;
                 bool distinct = false;
+                List<JoinInfo> joins = null;
                 //string AfterUnion = null; // e.g. '[ALL] SELECT ...' ; can end with ';'
 #if DEBUG
                 //System.Diagnostics.Debugger.Launch();
@@ -177,6 +185,9 @@ namespace RDBMS_DBCORE
                         || 0 == string.Compare("ORDER", op, true)
                         || 0 == string.Compare("SET", op, true)
                         || 0 == string.Compare("GROUP", op, true)
+                        || 0 == string.Compare("INNER", op, true)
+                        || 0 == string.Compare("LEFT", op, true)
+                        || 0 == string.Compare("RIGHT", op, true)
                         )
                     {
                         {
@@ -227,9 +238,84 @@ namespace RDBMS_DBCORE
                                         OrderBy = true;
                                     }
                                 }
+                                else if (0 == string.Compare("INNER", s, true))
+                                {
+                                    string x = args;
+                                    string xs = Qa.NextPart(ref x);
+                                    if (0 == string.Compare("JOIN", xs, true))
+                                    {
+                                        args = x;
+                                        JoinInfo ji = _ParseJoin("INNER", ref args);
+                                        if (null == joins)
+                                        {
+                                            joins = new List<JoinInfo>();
+                                        }
+                                        joins.Add(ji);
+                                        continue;
+                                    }
+                                }
+                                else if (0 == string.Compare("LEFT", s, true))
+                                {
+                                    string x = args;
+                                    string xs = Qa.NextPart(ref x);
+                                    if (0 == string.Compare("OUTER", xs, true))
+                                    {
+                                        args = x;
+                                        s = Qa.NextPart(ref args);
+                                        if (0 == string.Compare("JOIN", s, true))
+                                        {
+                                            JoinInfo ji = _ParseJoin("LEFT_OUTER", ref args);
+                                            if (null == joins)
+                                            {
+                                                joins = new List<JoinInfo>();
+                                            }
+                                            joins.Add(ji);
+                                        }
+                                        else
+                                        {
+                                            throw new Exception("Expected JOIN after LEFT OUTER, not " + s);
+                                        }
+                                        continue;
+                                    }
+                                    else if (0 == string.Compare("JOIN", xs, true))
+                                    {
+                                        throw new Exception("Expected OUTER between LEFT and JOIN");
+                                    }
+                                }
+                                else if (0 == string.Compare("RIGHT", s, true))
+                                {
+                                    string x = args;
+                                    string xs = Qa.NextPart(ref x);
+                                    if (0 == string.Compare("OUTER", xs, true))
+                                    {
+                                        args = x;
+                                        s = Qa.NextPart(ref args);
+                                        if (0 == string.Compare("JOIN", s, true))
+                                        {
+                                            JoinInfo ji = _ParseJoin("RIGHT_OUTER", ref args);
+                                            if (null == joins)
+                                            {
+                                                joins = new List<JoinInfo>();
+                                            }
+                                            joins.Add(ji);
+                                        }
+                                        else
+                                        {
+                                            throw new Exception("Expected JOIN after RIGHT OUTER, not " + s);
+                                        }
+                                        continue;
+                                    }
+                                    else if (0 == string.Compare("JOIN", xs, true))
+                                    {
+                                        throw new Exception("Expected OUTER between RIGHT and JOIN");
+                                    }
+                                }
                                 sbOps.Append(s);
                             }
-                            Ops = sbOps.ToString();
+                            if (sbOps.Length > 0)
+                            {
+                                Ops = sbOps.ToString();
+                            }
                         }
                     }
                     else if (0 == string.Compare("UNION", op, true))
@@ -283,11 +369,12 @@ namespace RDBMS_DBCORE
                                     {
                                         throw new Exception("Expected )");
                                     }
-                                    if (prevident)
+                                    bool thisident = (char.IsLetter(slp[0]) || '_' == slp[0]);
+                                    if (prevident && thisident)
                                     {
                                         swsb.Append(' ');
                                     }
-                                    prevident = (char.IsLetter(slp[0]) || '_' == slp[0]);
+                                    prevident = thisident;
                                     swsb.Append(slp);
                                     if (")" == slp)
                                     {
@@ -334,63 +421,163 @@ namespace RDBMS_DBCORE
 
                 if (0 == string.Compare(TableName, "sys.help", true))
                 {
+                    if (null != joins)
+                    {
+                        throw new Exception("Cannot JOIN with sys.help");
+                    }
                     return _QlSysHelp(dfstemp);
                 }
                 else if (0 == string.Compare(TableName, "sys.indexes", true))
                 {
+                    if (null != joins)
+                    {
+                        throw new Exception("Cannot JOIN with sys.indexes");
+                    }
                     return _QlSysIndexes(dfstemp);
                 }
 
-                string DfsOutputName = "dfs://RDBMS_Select_" + SafeTextDfsPath(TableName.Replace('\0', '-')) + "{" + Guid.NewGuid().ToString() + "}";
-                if (dfstemp)
+                string DeleteDfsInputFile = null; // Delete this input file after the input has been used.
+                bool joined = false;
+                try
                 {
-                    DfsOutputName += DFS_TEMP_FILE_MARKER;
-                }
-                else if (dfsref)
-                {
-                    DfsOutputName = "<dfsref>";
-                }
 
-                if (dfstemp && dfsref)
-                {
-                    throw new Exception("Cannot have DFSTEMP and DFSREF");
-                }
-
-                string sOptions = "";
-                if (dfstemp)
-                {
-                    sOptions += ";DFSTEMP";
-                    if (TopDfsTemp && TopCount > -1)
+                    if (null != joins)
                     {
-                        sOptions += ";TOPTEMP";
+                        foreach (JoinInfo ji in joins)
+                        {
+#if DEBUG
+                            //System.Diagnostics.Debugger.Launch();
+#endif
+
+                            string joinonresult = (new PrepareJoinOn()).Exec(
+                                QlArgsEscape(TableName),
+                                ji.type,
+                                QlArgsEscape(ji.table),
+                                QlArgsEscape(ji.on)
+                                );
+                            PrepareSelect.queryresults qr = PrepareSelect.GetQueryResults(joinonresult);
+
+                            if (null != DeleteDfsInputFile)
+                            {
+                                Shell("qizmt del \"" + DeleteDfsInputFile + "\"");
+                                DeleteDfsInputFile = null;
+                            }
+                            DeleteDfsInputFile = qr.temptable;
+
+                            TableName = qr.GetPseudoTableName();
+
+                        }
+                        joined = true;
+                    }
+
+                    string _dontn = SafeTextDfsPath(TableName.Replace('\0', '-'));
+                    if (_dontn.Length > 100)
+                    {
+                        _dontn = _dontn.Substring(0, 100);
+                    }
+                    string DfsOutputName = "dfs://RDBMS_Select_" + _dontn + "{" + Guid.NewGuid().ToString() + "}";
+                    if (dfstemp)
+                    {
+                        DfsOutputName += DFS_TEMP_FILE_MARKER;
+                    }
+                    else if (dfsref)
+                    {
+                        DfsOutputName = "<dfsref>";
+                    }
+
+                    if (dfstemp && dfsref)
+                    {
+                        throw new Exception("Cannot have DFSTEMP and DFSREF");
+                    }
+
+                    string sOptions = "";
+                    if (dfstemp)
+                    {
+                        sOptions += ";DFSTEMP";
+                        if (TopDfsTemp && TopCount > -1)
+                        {
+                            sOptions += ";TOPTEMP";
+                        }
+                    }
+                    if (dfsref)
+                    {
+                        sOptions += ";DFSREF";
+                    }
+                    if (Update)
+                    {
+                        // Grouped update!
+                        sOptions += ";GUPDATE;DFSTEMP";
+                    }
+                    if (GroupBy)
+                    {
+                        sOptions += ";GBY";
+                    }
+                    if (OrderBy)
+                    {
+                        sOptions += ";OBY";
+                    }
+                    if (distinct)
+                    {
+                        sOptions += ";DISTINCT";
+                    }
+                    if (joined)
+                    {
+                        sOptions += ";JOINED";
+                    }
+                    if (0 == sOptions.Length)
+                    {
+                        sOptions = "-";
+                    }
+                    return (new PrepareSelect()).Exec(QlArgsEscape(TableName), DfsOutputName, QlArgsEscape(SelectWhat), TopCount.ToString(), QlArgsEscape(Ops), sOptions);
+
+                }
+                finally
+                {
+                    if (null != DeleteDfsInputFile)
+                    {
+#if DEBUG
+#else
+                        Shell("qizmt del \"" + DeleteDfsInputFile + "\"");
+                        DeleteDfsInputFile = null;
+#endif
                     }
                 }
-                if (dfsref)
+
+            }
+
+            JoinInfo _ParseJoin(string stype, ref string AfterJOIN)
+            {
+                string args = AfterJOIN;
+                JoinInfo ji;
+                ji.type = stype;
+                ji.table = Qa.NextPart(ref args);
+                if (string.IsNullOrEmpty(ji.table))
                 {
-                    sOptions += ";DFSREF";
+                    throw new Exception("Table name expected for JOIN");
                 }
-                if (Update)
+                if (0 != string.Compare("ON", Qa.NextPart(ref args), true))
                 {
-                    // Grouped update!
-                    sOptions += ";GUPDATE;DFSTEMP";
+                    throw new Exception("ON expected for JOIN " + ji.table);
                 }
-                if (GroupBy)
                 {
-                    sOptions += ";GBY";
+                    string on1, onop, on2;
+                    on1 = Qa.NextPart(ref args);
+                    onop = Qa.NextPart(ref args);
+                    on2 = Qa.NextPart(ref args);
+                    if (0 == on1.Length
+                        || 0 == onop.Length
+                        || 0 == on2.Length)
+                    {
+                        throw new Exception("Invalid ON expression for JOIN " + ji.table);
+                    }
+                    if ("=" != onop)
+                    {
+                        throw new NotImplementedException("ON expression must compare equality with =");
+                    }
+                    ji.on = on1 + " " + onop + " " + on2;
                 }
-                if (OrderBy)
-                {
-                    sOptions += ";OBY";
-                }
-                if (distinct)
-                {
-                    sOptions += ";DISTINCT";
-                }
-                if (0 == sOptions.Length)
-                {
-                    sOptions = "-";
-                }
-                return (new PrepareSelect()).Exec(QlArgsEscape(TableName), DfsOutputName, QlArgsEscape(SelectWhat), TopCount.ToString(), QlArgsEscape(Ops), sOptions);
+                AfterJOIN = args;
+                return ji;
             }
 
 

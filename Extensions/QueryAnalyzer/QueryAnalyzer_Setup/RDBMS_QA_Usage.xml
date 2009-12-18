@@ -59,23 +59,23 @@
   <command>
     <keyword><![CDATA[SELECT]]></keyword>
     <description><![CDATA[Select rows from a table.]]></description>
-    <usage><![CDATA[SELECT [TOP <limit>] * FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column> [, <...>];]]></usage>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
     <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
   </command>
 
   <command>
     <keyword><![CDATA[SELECT <columns>]]></keyword>
-    <description><![CDATA[Select rows from a table, only including specific columns.]]></description>
-    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column> [, <...>];]]></usage>
+    <description><![CDATA[Select rows from a table, only including specific fields. Functions can be applied.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[SELECT TOP 10 Name FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
-    <example2><![CDATA[SELECT TOP 2 color,red FROM colors WHERE red = 34 ORDER BY color;]]></example2>
+    <example2><![CDATA[SELECT TOP 2 UPPER(color),red FROM colors WHERE red = 34 ORDER BY color;]]></example2>
   </command>
 
   <command>
     <keyword><![CDATA[SELECT TOP]]></keyword>
     <description><![CDATA[Select only the top few rows from a table.]]></description>
-    <usage><![CDATA[SELECT TOP <limit> <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column> [, <...>];]]></usage>
+    <usage><![CDATA[SELECT TOP <limit> <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
     <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
   </command>
@@ -83,7 +83,7 @@
   <command>
     <keyword><![CDATA[SELECT FROM]]></keyword>
     <description><![CDATA[Select rows from the specified table.]]></description>
-    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column> [, <...>];]]></usage>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
     <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
   </command>
@@ -91,7 +91,7 @@
   <command>
     <keyword><![CDATA[SELECT FROM Sys.Tables]]></keyword>
     <description><![CDATA[Select from the names of tables.]]></description>
-    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM Sys.Tables [WHERE <comparison> [AND <...>]] ORDER BY <column> [, <...>];]]></usage>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM Sys.Tables [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[SELECT TOP 1 * FROM Sys.Tables WHERE Table = 'Employees' ORDER BY Table;]]></example1>
     <example2><![CDATA[SELECT TOP 1 * FROM Sys.Tables WHERE Table = 'colors' ORDER BY Table;]]></example2>
   </command>
@@ -99,7 +99,7 @@
   <command>
     <keyword><![CDATA[SELECT WHERE]]></keyword>
     <description><![CDATA[Select rows from a table using specific conditions, which can have multiple conditions chained together with AND.]]></description>
-    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> WHERE <comparison> [AND <...>] ORDER BY <column> [, <...>];]]></usage>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> WHERE <comparison> [AND <...>] [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
     <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
   </command>
@@ -107,15 +107,39 @@
   <command>
     <keyword><![CDATA[SELECT ORDER BY]]></keyword>
     <description><![CDATA[Select rows from a table and order them by the specified column or columns.]]></description>
-    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column> [, <...>];]]></usage>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column>[, ...];]]></usage>
     <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
     <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
   </command>
 
   <command>
+    <keyword><![CDATA[SELECT INNER JOIN]]></keyword>
+    <description><![CDATA[Join on particular fields of tables.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <left> INNER JOIN <right> ON <left.field> = <right.field> [<joins...>] [WHERE <comparison> [AND <...>]] [GROUP BY <group_columns>] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees INNER JOIN Jobs ON Employees.JobID = Jobs.ID;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors INNER JOIN decorations ON colors.ID = decorations.colorID WHERE red > 100 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT LEFT OUTER JOIN]]></keyword>
+    <description><![CDATA[Join on particular fields of tables.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <left> LEFT OUTER JOIN <right> ON <left.field> = <right.field> [<joins...>] [WHERE <comparison> [AND <...>]] [GROUP BY <group_columns>] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees INNER JOIN Jobs ON Employees.JobID = Jobs.ID;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors INNER JOIN decorations ON colors.ID = decorations.colorID WHERE red > 100 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT RIGHT OUTER JOIN]]></keyword>
+    <description><![CDATA[Join on particular fields of tables.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <left> LEFT OUTER JOIN <right> ON <left.field> = <right.field> [<joins...>] [WHERE <comparison> [AND <...>]] [GROUP BY <group_columns>] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees INNER JOIN Jobs ON Employees.JobID = Jobs.ID;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors INNER JOIN decorations ON colors.ID = decorations.colorID WHERE red > 100 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
     <keyword><![CDATA[INSERT INTO SELECT]]></keyword>
     <description><![CDATA[Select rows from a table and insert them into a table.]]></description>
-    <usage><![CDATA[INSERT INTO <table_name> SELECT <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column> [, <...>];]]></usage>
+    <usage><![CDATA[INSERT INTO <table_name> SELECT <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[INSERT INTO Employees SELECT * FROM NewEmployees ORDER BY Name;]]></example1>
     <example2><![CDATA[INSERT INTO colors SELECT * FROM red_colors WHERE red = 255 ORDER BY color;]]></example2>
   </command>
@@ -155,7 +179,7 @@
   <command>
     <keyword><![CDATA[SELECT GROUP BY]]></keyword>
     <description><![CDATA[Select data from the table whereby grouping rows by columns with matching fields.]]></description>
-    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] GROUP BY <group_columns>;]]></usage>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] GROUP BY <group_columns> [ORDER BY <order_columns>];]]></usage>
     <example1><![CDATA[SELECT TOP 10 * FROM Employees GROUP BY Year;]]></example1>
     <example2><![CDATA[SELECT color,MIN(green) FROM colors GROUP BY red;]]></example2>
   </command>
