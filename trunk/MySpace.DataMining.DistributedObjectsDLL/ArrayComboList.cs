@@ -754,6 +754,7 @@ namespace UserLoader
         public int InputRecordLength = int.MinValue;
         public int OutputRecordLength = int.MinValue;
         public List<int> OutputRecordLengths = null;
+        public List<int> InputRecordLengths = null;
 
         public int ValueOffsetSize = 4;
 
@@ -776,7 +777,14 @@ namespace UserLoader
                 string offsets = "";
                 for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
                 {
-                    offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                    if (-1 == InputRecordLengths[oi])
+                    {
+                        offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                    }
+                    else
+                    {
+                        offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + "@" + InputRecordLengths[oi] + ";";
+                    }
                 }
                 offsets = offsets.Trim(';');
                 fns = fns + "|" + offsets;               
@@ -876,7 +884,7 @@ namespace UserMapper
         }
         protected bool _issample = false;
 
-        const int InputRecordLength = " + InputRecordLength.ToString() + @";
+        int InputRecordLength = " + InputRecordLength.ToString() + @";
 
         List<byte> _mapbuf = new List<byte>();
         bool _prevCr = false;
@@ -896,7 +904,7 @@ namespace UserMapper
                 StaticGlobals.DSpace_Hosts = new string[]{" + ExpandListCode(StaticGlobals.DSpace_Hosts) + @"};
                 StaticGlobals.DSpace_OutputDirection = `" + StaticGlobals.DSpace_OutputDirection + @"`;
                 StaticGlobals.DSpace_OutputDirection_ascending = " + (StaticGlobals.DSpace_OutputDirection_ascending ? "true" : "false") + @";
-                StaticGlobals.DSpace_InputRecordLength = " + InputRecordLength.ToString() + @";
+                InputRecordLength = StaticGlobals.DSpace_InputRecordLength;
                 StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
                 StaticGlobals.DSpace_MaxDGlobals = " + StaticGlobals.DSpace_MaxDGlobals.ToString() + @";
                 ").Replace('`', '"') + DGlobalsM.ToCode() + (@"
@@ -943,7 +951,7 @@ namespace UserMapper
                                     #if DEBUG
                                     if(InputRecordLength > 0)
                                     {
-                                        throw new Exception(`DEBUG: EOF && (0 != _mapbuf.Count) && (InputRecordLength > 0)`);
+                                        throw new Exception(`DEBUG: EOF && (0 != _mapbuf.Count{` + _mapbuf.Count + `}) && (InputRecordLength > 0)`);
                                     }
                                     #endif
                                     Stack.ResetStack();
@@ -1091,7 +1099,14 @@ namespace UserMapper
                 string offsets = "";
                 for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
                 {
-                    offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                    if (-1 == InputRecordLengths[oi])
+                    {
+                        offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                    }
+                    else
+                    {
+                        offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + "@" + InputRecordLengths[oi] + ";";
+                    }
                 }
                 offsets = offsets.Trim(';');
                 fns = fns + "|" + offsets;

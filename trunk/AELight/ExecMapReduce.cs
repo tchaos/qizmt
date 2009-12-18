@@ -567,11 +567,11 @@ static System.Threading.Mutex _logmutex = new System.Threading.Mutex(false, `dis
     public const string DSpace_LogName = @`" + logname + @"`;
     public const string Qizmt_LogName = DSpace_LogName;
 
-    public const int DSpace_InputRecordLength = " + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength.ToString() + @";
-    public const int Qizmt_InputRecordLength = DSpace_InputRecordLength;
+    public static int DSpace_InputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength; } }
+    public static int Qizmt_InputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength; } }
 
-    public const int DSpace_OutputRecordLength = " + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString() + @";
-    public const int Qizmt_OutputRecordLength = DSpace_OutputRecordLength;
+    public static int DSpace_OutputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength; } }
+    public static int Qizmt_OutputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength; } }
 
 ").Replace('`', '"') + MapReduceCommonDynamicCsCode + CommonDynamicCsCode;
 
@@ -1534,6 +1534,7 @@ public void DSpace_LogResult(string name, bool passed)
 
                 List<string> outputfiles = new List<string>();
                 List<int> outputrecordlengths = new List<int>();
+                List<int> inputrecordlengths = new List<int>();
                 {                    
                     if (outputfile.Length > 0)
                     {
@@ -1683,10 +1684,10 @@ public void DSpace_LogResult(string name, bool passed)
                                 IList<string> mapfiles = SplitInputPaths(dc, cfgj.IOSettings.DFSInput);
                                 mapfileswithnodes = new List<string>(mapfiles.Count);
                                 inputnodesoffsets = new List<int>(mapfiles.Count);
-                                int RecordLength = int.MinValue;
                                 for (int i = 0; i < mapfiles.Count; i++)
                                 {
                                     string dp = mapfiles[i];
+                                    int inreclen;
                                     if (dp.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
                                     {
                                         dp = dp.Substring(6);
@@ -1697,17 +1698,7 @@ public void DSpace_LogResult(string name, bool passed)
                                         {
                                             try
                                             {
-                                                int reclen = Surrogate.GetRecordSize(dp.Substring(ic + 1));
-                                                if (RecordLength != int.MinValue && RecordLength != reclen)
-                                                {
-#if DEBUG
-                                                    System.Diagnostics.Debugger.Launch();
-#endif
-                                                    Console.Error.WriteLine("Error: all map inputs must have the same record length: {0}", dp);
-                                                    SetFailure();
-                                                    return;
-                                                }
-                                                RecordLength = reclen;
+                                                inreclen = Surrogate.GetRecordSize(dp.Substring(ic + 1));
                                                 dp = dp.Substring(0, ic);
                                             }
                                             catch (FormatException e)
@@ -1725,16 +1716,16 @@ public void DSpace_LogResult(string name, bool passed)
                                         }
                                         else
                                         {
-                                            RecordLength = -1;
+                                            inreclen = -1;
                                         }
                                     }
                                     dfs.DfsFile df;
-                                    if (RecordLength > 0)
+                                    if (inreclen > 0)
                                     {
                                         df = DfsFind(dc, dp, DfsFileTypes.BINARY_RECT);
-                                        if (null != df && RecordLength != df.RecordLength)
+                                        if (null != df && inreclen != df.RecordLength)
                                         {
-                                            Console.Error.WriteLine("Error: map input file does not have expected record length of {0}: {1}@{2}", RecordLength, dp, df.RecordLength);
+                                            Console.Error.WriteLine("Error: map input file does not have expected record length of {0}: {1}@{2}", inreclen, dp, df.RecordLength);
                                             SetFailure();
                                             return;
                                         }
@@ -1752,24 +1743,15 @@ public void DSpace_LogResult(string name, bool passed)
                                     if (df.Nodes.Count > 0)
                                     {
                                         mapfileswithnodes.Add(dp);
-                                        inputnodesoffsets.Add(mapinputchunks.Count);                                      
+                                        inputnodesoffsets.Add(mapinputchunks.Count);
+                                        inputrecordlengths.Add(inreclen);
+                                        mapinputchunks.AddRange(df.Nodes);
                                     }                                    
-                                    mapinputchunks.AddRange(df.Nodes);                                    
+                                    
                                 }
-                                if (RecordLength != int.MinValue)
-                                {
-                                    if (MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength != RecordLength)
-                                    {
-                                        if (int.MinValue != MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength)
-                                        {
-                                            Console.Error.WriteLine("Record lengths are not consistent ({0} != {1}) between phases",
-                                                RecordLength,
-                                                MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength);
-                                            return;
-                                        }
-                                        MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = RecordLength;
-                                    }
-                                }
+
+                                MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = inputrecordlengths.Count > 0 ? inputrecordlengths[0] : -1;
+
                             }
                         }
                     }
@@ -1952,6 +1934,7 @@ public void DSpace_LogResult(string name, bool passed)
                         bi.acl.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
                         bi.acl.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
                         bi.acl.OutputRecordLengths = outputrecordlengths;
+                        bi.acl.InputRecordLengths = inputrecordlengths;
                         bi.acl.CookRetries = dc.slave.CookRetries;
                         bi.acl.CookTimeout = dc.slave.CookTimeout;
                         bi.acl.LocalCompile = (0 == BlockID); // Only compile first one locally.

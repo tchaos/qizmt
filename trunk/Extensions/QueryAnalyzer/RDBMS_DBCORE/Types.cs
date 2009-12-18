@@ -227,11 +227,12 @@ namespace RDBMS_DBCORE
                                 {
                                     nparens++;
                                 }
-                                if (prevident)
+                                bool thisident = (s.Length > 0 && (char.IsLetter(s[0]) || '_' == s[0]));
+                                if (prevident && thisident)
                                 {
                                     call.Append(' ');
                                 }
-                                prevident = (s.Length > 0 && (char.IsLetter(s[0]) || '_' == s[0]));
+                                prevident = thisident;
                                 call.Append(s);
                                 s = input.NextPart();
                                 if (")" == s)
@@ -875,15 +876,8 @@ namespace RDBMS_DBCORE
                     }
                 }
                 //
-                int cnindex = 0;
-                for (; cnindex < cn.Length; cnindex++)
-                {
-                    if (cn[cnindex] == '.')
-                    {
-                        cnindex++;
-                        break;
-                    }
-                }
+                int cnindex = cn.LastIndexOf('.');
+                cnindex++;
                 if (cn.Length - cnindex == name.Length)
                 {
                     bool good = true;

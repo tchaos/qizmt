@@ -845,7 +845,7 @@ namespace MySpace.DataMining.AELight
         }
 
 
-        public static void MetaRemoveMachine(string oldhost)
+        public static void MetaRemoveMachine(string oldhost, bool DontTouchOldHost)
         {
 #if DEBUG_REPL
             if (!IsAdminCmd)
@@ -892,6 +892,28 @@ namespace MySpace.DataMining.AELight
 
                 UpdateDfsXml(dc);
 
+            }
+
+            if (!DontTouchOldHost)
+            {
+                System.Threading.Thread sdthread = new System.Threading.Thread(
+                    new System.Threading.ThreadStart(
+                    delegate
+                    {
+                        try
+                        {
+                            string ohnetpath = Surrogate.NetworkPathForHost(oldhost);
+                            System.IO.File.Delete(oldhost + @"\slave.dat");
+                        }
+                        catch
+                        {
+                        }
+                    }));
+                sdthread.Start();
+                if (!sdthread.Join(1000 * 10))
+                {
+                    Console.WriteLine("Warning: timed out while accessing removed machine");
+                }
             }
 
             Console.WriteLine("Done");

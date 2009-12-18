@@ -27,6 +27,8 @@
 //#define DEBUG_SPLIT_SIZE
 #endif
 
+//#define REDUCE_SPLIT_CALLS_GC
+
 
 using System;
 using System.Collections.Generic;
@@ -47,17 +49,19 @@ namespace MySpace.DataMining.DistributedObjects5
 
 #if DEBUG_SPLIT_SIZE
             public const int ZFILE_SPLIT_SIZE = 0x400 * 0x400 * 32; // Testing.
+            public const int ZFILE_SPLITBY_SIZE = ZFILE_SPLIT_SIZE;
 
             // Need extra space to account for bytes encoding lengths.
             public const int MAXKVBUFSIZE = 0x400 * 0x400 * 40; // Testing.
 #else
             public const int ZFILE_SPLIT_SIZE = 0x400 * 0x400 * 0x400; // 1 GB
+            public const int ZFILE_SPLITBY_SIZE = 0x400 * 0x400 * 200;
 
             // Need extra space to account for bytes encoding lengths.
-            public const int MAXKVBUFSIZE = 1342177280; // 1.25 GB
+            public const int MAXKVBUFSIZE = 0x400 * 0x400 * 200;
 #endif
 
-            public const long ZVALUEBLOCK_LIMIT = int.MaxValue;
+            public const long ZVALUEBLOCK32_LIMIT = int.MaxValue;
 
             ArrayComboListPart parent;
             internal int zblockID; // ZBlock ID (0-based n)
@@ -320,13 +324,14 @@ namespace MySpace.DataMining.DistributedObjects5
             public bool Add(byte[] keybuf, int keyoffset, byte[] valuebuf, int valueoffset, int valuelength)
             {
                 long x = (long)(parent.keylen + TValueOffset_Size) + (long)valuelength;
-                if (x >= ZFILE_SPLIT_SIZE)
+                if (x >= ZFILE_SPLITBY_SIZE)
                 {
                     throw new Exception("Key+Value too big; length=" + x.ToString());
                     //parent.SetError("ZBlock.Add: Key+Value too big; length=" + x.ToString());
                     //return false;
                 }
-                if (zvalueblocksize + valuelength > ZVALUEBLOCK_LIMIT)
+                if (zvalueblocksize + valuelength > ZVALUEBLOCK32_LIMIT
+                    && 4 == TValueOffset_Size)
                 {
                     if (parent.jobfailover)
                     {
@@ -386,13 +391,14 @@ namespace MySpace.DataMining.DistributedObjects5
             public bool Add(IList<byte> keybuf, int keyoffset, IList<byte> valuebuf, int valueoffset, int valuelength)
             {
                 long x = (long)(parent.keylen + TValueOffset_Size) + (long)valuelength;
-                if (x >= ZFILE_SPLIT_SIZE)
+                if (x >= ZFILE_SPLITBY_SIZE)
                 {
                     throw new Exception("Key+Value too big; length=" + x.ToString());
                     //parent.SetError("ZBlock.Add: Key+Value too big; length=" + x.ToString());
                     //return false;
                 }
-                if (zvalueblocksize + valuelength > ZVALUEBLOCK_LIMIT)
+                if (zvalueblocksize + valuelength > ZVALUEBLOCK32_LIMIT
+                    && 4 == TValueOffset_Size)
                 {
                     if (parent.jobfailover)
                     {
@@ -694,7 +700,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
                 const IList<byte> vbuf_novalue = null;
                 IList<byte> vbuf;
-                uint v1;
+                int v1;
                 int v2;
 
                 internal bool IsValueSet
@@ -705,17 +711,18 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                 }
 
-                internal uint ValueOffset
+                internal long ValueOffset
                 {
                     get
                     {
-                        return this.v1;
+                        return (long)((ulong)(uint)v1 | ((ulong)(uint)v2 << 32));
                     }
 
                     set
                     {
                         this.vbuf = vbuf_novalue;
-                        this.v1 = value;
+                        this.v1 = (int)(ulong)value;
+                        this.v2 = (int)((ulong)value >> 32);
                     }
                 }
 
@@ -728,9 +735,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
                     set
                     {
-                        int myV1;
-                        value.GetComponents(out this.vbuf, out myV1, out this.v2);
-                        this.v1 = (uint)myV1;
+                        value.GetComponents(out this.vbuf, out this.v1, out this.v2);
                         if (this.vbuf == null)
                         {
                             throw new Exception("DEBUG:  KvSplit.Value: (this.vbuf == null)");
@@ -758,28 +763,29 @@ namespace MySpace.DataMining.DistributedObjects5
                     System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None))
                 {
                     int avgvaluespace = checked((int)(zvalueblocksize / numadded)); // Includes value header.
-                    //long numavgvalues = zvalueblocksize / avgvaluespace;
-                    int maxkeyspersplit = checked((int)((ZFILE_SPLIT_SIZE / 2) / (parent.keylen + TValueOffset_Size)));
-                    int maxvaluespersplit = checked((int)((ZFILE_SPLIT_SIZE / 2) / (avgvaluespace)));
+                    int xvaluespace = avgvaluespace + avgvaluespace / 8 + 4; // Adjust a bit for larger values.
+                    int maxkeyspersplit = checked((int)((ZFILE_SPLITBY_SIZE / 2) / (parent.keylen + TValueOffset_Size)));
+                    int maxvaluespersplit = checked((int)((ZFILE_SPLITBY_SIZE / 2) / (xvaluespace)));
                     
                     int numkeyspersplit = Math.Min(maxkeyspersplit, maxvaluespersplit);
 
                     ensurefzblock(false);
 
-                    if (evaluesbuf.LongLength < ZFILE_SPLIT_SIZE)
+                    if (evaluesbuf.LongLength < ZFILE_SPLITBY_SIZE)
                     {
                         evaluesbuf = null;
-                        long lnew = Entry.Round2PowerLong(ZFILE_SPLIT_SIZE);
+                        //long lnew = Entry.Round2PowerLong(ZFILE_SPLITBY_SIZE);
+                        long lnew = ZFILE_SPLITBY_SIZE;
                         evaluesbuf = new byte[lnew];
                     }
                     byte[] valuesbuf = evaluesbuf;
 
-                    if (ebuf.LongLength < ZFILE_SPLIT_SIZE)
+                    if (ebuf.LongLength < ZFILE_SPLITBY_SIZE)
                     {
                         try
                         {
                             ebuf = null;
-                            long lnew = Entry.Round2PowerLong(ZFILE_SPLIT_SIZE);
+                            long lnew = Entry.Round2PowerLong(ZFILE_SPLITBY_SIZE);
                             if (lnew > Int32.MaxValue)
                             {
                                 lnew = Int32.MaxValue;
@@ -793,7 +799,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                 string better_error = e.ToString();
                                 better_error += System.Environment.NewLine;
                                 better_error += "----------------------------------------------------" + System.Environment.NewLine;
-                                better_error += "zblock combined length: " + (ZFILE_SPLIT_SIZE).ToString() + System.Environment.NewLine;
                                 better_error += "ebuf length: " + ebuf.LongLength.ToString() + System.Environment.NewLine;
                                 better_error += "----------------------------------------------------" + System.Environment.NewLine;
                                 throw new Exception(better_error);
@@ -846,11 +851,9 @@ namespace MySpace.DataMining.DistributedObjects5
                                         int morespace = xoffset + keylen + TValueOffset_Size;
                                         if (morespace < xoffset || morespace > xbuf.Length)
                                         {
-#if DEBUG
                                             throw new Exception("DEBUG:  _CreateLargeResultFile: buffer not large enough for keys");
-#endif
-                                            xoffset = 0;
-                                            xbuf = new byte[0x400 * 0x400 * 512];
+                                            //xoffset = 0;
+                                            //xbuf = new byte[ZFILE_SPLITBY_SIZE];
                                         }
                                     }
 
@@ -864,7 +867,14 @@ namespace MySpace.DataMining.DistributedObjects5
                                     cooking_seekpos += keylen + TValueOffset_Size;
 
                                     KvSplit kvs = KvSplit.Prepare(ByteSlice.Prepare(xbuf, xoffset, keylen));
-                                    kvs.ValueOffset = Entry.BytesToUInt32(xbuf, xoffset + keylen);
+                                    if (8 == TValueOffset_Size)
+                                    {
+                                        kvs.ValueOffset = Entry.BytesToLong(xbuf, xoffset + keylen);
+                                    }
+                                    else
+                                    {
+                                        kvs.ValueOffset = Entry.BytesToUInt32(xbuf, xoffset + keylen);
+                                    }
 #if DEBUG
                                     if (kvs.ValueOffset >= zvalueblocksize)
                                     {
@@ -882,23 +892,24 @@ namespace MySpace.DataMining.DistributedObjects5
                                 {
                                     cooking_inIO = true;
                                     fzvalueblock.Seek(valueblockoffset, System.IO.SeekOrigin.Begin);
-                                    int read = fzvalueblock.Read(valuesbuf, 0, ZFILE_SPLIT_SIZE);
+                                    int read = fzvalueblock.Read(valuesbuf, 0, ZFILE_SPLITBY_SIZE);
                                     cooking_inIO = false;
-                                    uint vstart = (uint)valueblockoffset;
-                                    uint vstop = vstart + (uint)read;
+                                    long vstart = valueblockoffset;
+                                    long vstop = vstart + read;
                                     for (int ik = 0; ik < kvsbufCount; ik++)
                                     {
                                         KvSplit kvs = kvsbuf[ik];
                                         if (!kvs.IsValueSet)
                                         {
-                                            if (kvs.ValueOffset >= vstart
-                                                && kvs.ValueOffset < vstop)
+                                            long kvsValueOffset = kvs.ValueOffset;
+                                            if (kvsValueOffset >= vstart
+                                                && kvsValueOffset < vstop)
                                             {
-                                                int valuesbufoffset = (int)(kvs.ValueOffset - vstart);
+                                                int valuesbufoffset = (int)(kvsValueOffset - vstart);
 #if DEBUG
                                                 if (valuesbufoffset < 0)
                                                 {
-                                                    throw new Exception("DEBUG:  _CreateLargeResultFile: (valuebufoffset < 0) (uint->int overflow)");
+                                                    throw new Exception("DEBUG:  _CreateLargeResultFile: (valuebufoffset < 0) (long->int overflow)");
                                                 }
 #endif
                                                 if (valuesbufoffset + 4 > read)
@@ -912,7 +923,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                                     if (valuesbufoffset + 4 + valuelen > read)
                                                     {
                                                         // Entire value not in valuesbuf.
-                                                        read -= ((valuesbufoffset + 4 + valuelen) - read); // Read it next time.
+                                                        read = valuesbufoffset; // Read it next time.
                                                     }
                                                     else
                                                     {
@@ -921,10 +932,42 @@ namespace MySpace.DataMining.DistributedObjects5
                                                             if (morespace < xoffset || morespace > xbuf.Length)
                                                             {
                                                                 xoffset = 0;
-                                                                xbuf = new byte[0x400 * 0x400 * 512];
+                                                                //xbuf = new byte[Math.Min(ZFILE_SPLITBY_SIZE, (valuelen + 8) * 4)];
+                                                                {
+                                                                    try
+                                                                    {
+                                                                        int xoldlen = xbuf.Length;
+                                                                        ebuf = null;
+                                                                        buf = null;
+                                                                        xbuf = null;
+                                                                        long lnew = Math.Max(xoldlen + valuelen * 2 + 16, xoldlen + xoldlen / 3);
+                                                                        lnew = Entry.Round2PowerLong(lnew);
+                                                                        if (lnew > Int32.MaxValue)
+                                                                        {
+                                                                            lnew = Int32.MaxValue;
+                                                                        }
+                                                                        ebuf = new byte[lnew];
+                                                                    }
+                                                                    catch (Exception e)
+                                                                    {
+                                                                        unchecked
+                                                                        {
+                                                                            string better_error = e.ToString();
+                                                                            better_error += System.Environment.NewLine;
+                                                                            better_error += "----------------------------------------------------" + System.Environment.NewLine;
+                                                                            better_error += "ebuf length: " + ebuf.LongLength.ToString() + System.Environment.NewLine;
+                                                                            better_error += "----------------------------------------------------" + System.Environment.NewLine;
+                                                                            throw new Exception(better_error);
+                                                                        }
+                                                                    }
+                                                                }
+                                                                buf = ebuf;
+                                                                xbuf = buf;
+                                                                XLog.log("Warning: _CreateLargeResultFile: created new value buffer of length " + xbuf.Length
+                                                                    + " (for value of length " + valuelen + ")");
                                                             }
                                                         }
-                                                        Buffer.BlockCopy(valuesbuf, valuesbufoffset, xbuf, xoffset, valuelen);
+                                                        Buffer.BlockCopy(valuesbuf, valuesbufoffset + 4, xbuf, xoffset, valuelen);
                                                         kvs.Value = ByteSlice.Prepare(xbuf, xoffset, valuelen);
                                                         kvsbuf[ik] = kvs;
                                                         xoffset += valuelen;
@@ -985,6 +1028,11 @@ namespace MySpace.DataMining.DistributedObjects5
                                     }
 
                                 }
+
+#if REDUCE_SPLIT_CALLS_GC
+                                System.GC.Collect();
+                                System.GC.WaitForPendingFinalizers();
+#endif
 
                             }
 
@@ -1208,7 +1256,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                 long kflenremain = stm.Length - cooking_seekpos;
                                 cooking_inIO = false;
 
-                                int keycount;
+                                int keycount; // Key count for this turn.
                                 {
                                     long _keycount = kflenremain / (acl.keylen + TValueOffset_Size);
                                     if (_keycount > NumberOfKeysLimit)
@@ -1813,7 +1861,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             int keyspersplit;
                             checked
                             {
-                                numsplits = (int)(zblock.zkeyblocksize / ZFILE_SPLIT_SIZE);
+                                numsplits = (int)(zblock.zkeyblocksize / ZFILE_SPLITBY_SIZE);
                                 numsplits++;
                                 {
                                     long bes = zblock.zkeyblocksize / numsplits;
@@ -1821,15 +1869,16 @@ namespace MySpace.DataMining.DistributedObjects5
                                     {
                                         bes++;
                                     }
-                                    keyspersplit = (int)(bes / acl.keylen);
-                                    if (0 != (bes % acl.keylen))
+                                    keyspersplit = (int)(bes / (acl.keylen + TValueOffset_Size));
+                                    if (0 != (bes % (acl.keylen + TValueOffset_Size)))
                                     {
                                         keyspersplit++;
                                     }
                                 }
                             }
 
-                            if ((zblock.zkeyblocksize / acl.keylen) > ((long)keyspersplit * (long)numsplits))
+                            if ((zblock.zkeyblocksize / (acl.keylen + TValueOffset_Size))
+                                > ((long)keyspersplit * (long)numsplits))
                             {
                                 throw new Exception("Split-sort key count miscalculation");
                             }
@@ -2168,7 +2217,8 @@ namespace MySpace.DataMining.DistributedObjects5
                                         cooking_inIO = false;
                                     }
                                     long zvalueballsize = fzvalueball.Length;
-                                    if (zvalueblocksize + zvalueballsize > ZVALUEBLOCK_LIMIT)
+                                    if (zvalueblocksize + zvalueballsize > ZVALUEBLOCK32_LIMIT
+                                        && 4 == TValueOffset_Size)
                                     {
                                         throw new Exception("Unable to merge cache with delta: resulting values (zValueBlock) too large ("
                                             + (zvalueblocksize + zvalueballsize).ToString() + " bytes)");
@@ -2614,7 +2664,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
             net = new List<byte[]>(8);
 
-            entries = new List<Entry>(1);
+            entries = new List<Entry>(2097152); // 2097152 Entry`s is about 16MB
 
             ebytes = new byte[count_capacity * estimated_row_capacity];
             //evaluesbuf = // Moved down.
@@ -3250,7 +3300,9 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
-        void LoadFoilSamples(IMap mpsamp, string samplesoutputfn, string[] dfsfiles, string[] dfsfilenames, int[] nodesoffsets)
+        void LoadFoilSamples(IMap mpsamp, string samplesoutputfn, string[] dfsfiles,
+            string[] dfsfilenames, int[] nodesoffsets, int[] inputrecordlengths
+            )
         {
             if (System.IO.File.Exists(samplesoutputfn))
             {
@@ -3273,7 +3325,9 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         if (i == curoffset)
                         {
-                            StaticGlobals.DSpace_InputFileName = dfsfilenames[fi++];
+                            StaticGlobals.DSpace_InputFileName = dfsfilenames[fi];
+                            StaticGlobals.DSpace_InputRecordLength = inputrecordlengths[fi];
+                            fi++;
                             if (fi < nodesoffsets.Length)
                             {
                                 curoffset = nodesoffsets[fi];
@@ -4176,6 +4230,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         string[] dfsfiles = null;// XContent.ReceiveXString(nstm, buf).Split(';');
                         string[] dfsfilenames = null;
                         int[] nodesoffsets = null;
+                        int[] inputrecordlengths = null;
                         {
                             string xfiles = XContent.ReceiveXString(nstm, buf);
                             if (xfiles.Length > 0)
@@ -4185,12 +4240,23 @@ namespace MySpace.DataMining.DistributedObjects5
                                 string[] xoffsets = xfiles.Substring(pipe + 1).Split(';');
                                 dfsfilenames = new string[xoffsets.Length];
                                 nodesoffsets = new int[xoffsets.Length];
+                                inputrecordlengths = new int[xoffsets.Length];
                                 for (int xi = 0; xi < xoffsets.Length; xi++)
                                 {
                                     string xoffset = xoffsets[xi];
                                     pipe = xoffset.IndexOf('|');
                                     int offset = Int32.Parse(xoffset.Substring(0, pipe));
                                     string fname = xoffset.Substring(pipe + 1);
+                                    {
+                                        int inreclen = -1;
+                                        int iat = fname.IndexOf('@');
+                                        if (-1 != iat)
+                                        {
+                                            inreclen = int.Parse(fname.Substring(iat + 1));
+                                            fname = fname.Substring(0, iat);
+                                        }
+                                        inputrecordlengths[xi] = inreclen;
+                                    }
                                     dfsfilenames[xi] = fname;
                                     nodesoffsets[xi] = offset;
                                 }
@@ -4231,7 +4297,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             string sampleclassname = classname + "_Sample";
                             //IMap mpsamp = LoadPluginInterface<IMap>(dllfn, sampleclassname);
                             IMap mpsamp = null == asm ? LoadPluginInterface<IMap>(dllfn, sampleclassname) : LoadPluginInterface<IMap>(asm, dllfn, sampleclassname);
-                            LoadFoilSamples(mpsamp, samplesoutputfn, dfsfiles, dfsfilenames, nodesoffsets);
+                            LoadFoilSamples(mpsamp, samplesoutputfn, dfsfiles, dfsfilenames, nodesoffsets, inputrecordlengths);
                         }
 
                     }
@@ -4313,6 +4379,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         string[] dfsfiles = null;// XContent.ReceiveXString(nstm, buf).Split(';');
                         string[] dfsfilenames = null;
                         int[] nodesoffsets = null;
+                        int[] inputrecordlengths = null;
                         {
                             string xfiles = XContent.ReceiveXString(nstm, buf);
                             if (xfiles.Length > 0)
@@ -4322,12 +4389,23 @@ namespace MySpace.DataMining.DistributedObjects5
                                 string[] xoffsets = xfiles.Substring(pipe + 1).Split(';');
                                 dfsfilenames = new string[xoffsets.Length];
                                 nodesoffsets = new int[xoffsets.Length];
+                                inputrecordlengths = new int[xoffsets.Length];
                                 for (int xi = 0; xi < xoffsets.Length; xi++)
                                 {
                                     string xoffset = xoffsets[xi];
                                     pipe = xoffset.IndexOf('|');
                                     int offset = Int32.Parse(xoffset.Substring(0, pipe));
                                     string fname = xoffset.Substring(pipe + 1);
+                                    {
+                                        int inreclen = -1;
+                                        int iat = fname.IndexOf('@');
+                                        if (-1 != iat)
+                                        {
+                                            inreclen = int.Parse(fname.Substring(iat + 1));
+                                            fname = fname.Substring(0, iat);
+                                        }
+                                        inputrecordlengths[xi] = inreclen;
+                                    }
                                     dfsfilenames[xi] = fname;
                                     nodesoffsets[xi] = offset;
                                 }
@@ -4488,7 +4566,9 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                             if (i == curoffset)
                             {
-                                StaticGlobals.DSpace_InputFileName = dfsfilenames[fi++];
+                                StaticGlobals.DSpace_InputFileName = dfsfilenames[fi];
+                                StaticGlobals.DSpace_InputRecordLength = inputrecordlengths[fi];
+                                fi++;
                                 if (fi < nodesoffsets.Length)
                                 {
                                     curoffset = nodesoffsets[fi];
@@ -5842,6 +5922,11 @@ namespace MySpace.DataMining.DistributedObjects5
                         _largezblockresultfilename = null;
                         // Likely place where finishing with (0 == input.entries.Count), but not always.
                     }
+
+#if REDUCE_SPLIT_CALLS_GC
+                    System.GC.Collect();
+                    System.GC.WaitForPendingFinalizers();
+#endif
 
                 }
             }

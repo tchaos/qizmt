@@ -132,11 +132,11 @@ namespace MySpace.DataMining.AELight
     public const string DSpace_OutputFilePath = `" + DFSWriter + @"`; // Includes `dfs://` if in DFS.
     public const string Qizmt_OutputFilePath = DSpace_OutputFilePath;
 
-    public const int DSpace_InputRecordLength = " + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength.ToString() + @";
-    public const int Qizmt_InputRecordLength = DSpace_InputRecordLength;
+    public static int DSpace_InputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength; } }
+    public static int Qizmt_InputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength; } }
 
-    public const int DSpace_OutputRecordLength = " + MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength.ToString() + @";
-    public const int Qizmt_OutputRecordLength = DSpace_OutputRecordLength;
+    public static int DSpace_OutputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength; } }
+    public static int Qizmt_OutputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength; } }
 
     public const string Qizmt_Meta = @`" + Meta + @"`;
 
@@ -351,8 +351,8 @@ public static void DSpace_LogResult(string name, bool passed)
 
                 int nextslave = (new Random(DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2)).Next() % slaves.Length;
                 int hosttypes = 0;
-                int InputRecordLength = int.MinValue;
                 List<int> outputrecordlengths = new List<int>();
+                List<int> inputrecordlengths = new List<int>();
                 for (int BlockID = 0; BlockID < cfgj.IOSettings.DFS_IOs.Length; BlockID++)
                 {
                     int slaveHostID = 0;
@@ -490,6 +490,7 @@ public static void DSpace_LogResult(string name, bool passed)
                         for (int i = 0; i < mapfiles.Count; i++)
                         {
                             string dp = mapfiles[i].Trim();
+                            int inreclen = -1;
                             if (0 != dp.Length) // Allow empty entry where input isn't wanted.
                             {
                                 if (dp.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
@@ -503,14 +504,7 @@ public static void DSpace_LogResult(string name, bool passed)
                                     {
                                         try
                                         {
-                                            int reclen = Surrogate.GetRecordSize(dp.Substring(ic + 1));
-                                            if (InputRecordLength != int.MinValue && InputRecordLength != reclen)
-                                            {
-                                                Console.Error.WriteLine("Error: all remote inputs must have the same record length: {0}", dp);
-                                                SetFailure();
-                                                return;
-                                            }
-                                            InputRecordLength = reclen;
+                                            inreclen = Surrogate.GetRecordSize(dp.Substring(ic + 1));
                                             dp = dp.Substring(0, ic);
                                         }
                                         catch (FormatException e)
@@ -526,18 +520,14 @@ public static void DSpace_LogResult(string name, bool passed)
                                             return;
                                         }
                                     }
-                                    else if (InputRecordLength == int.MinValue)
-                                    {
-                                        InputRecordLength = -1;
-                                    }
                                 }
                                 dfs.DfsFile df;
-                                if (InputRecordLength > 0)
+                                if (inreclen > 0)
                                 {
                                     df = DfsFind(dc, dp, DfsFileTypes.BINARY_RECT);
-                                    if (null != df && InputRecordLength != df.RecordLength)
+                                    if (null != df && inreclen != df.RecordLength)
                                     {
-                                        Console.Error.WriteLine("Error: remote input file does not have expected record length of {0}: {1}@{2}", InputRecordLength, dp, df.RecordLength);
+                                        Console.Error.WriteLine("Error: remote input file does not have expected record length of {0}: {1}@{2}", inreclen, dp, df.RecordLength);
                                         SetFailure();
                                         return;
                                     }
@@ -556,8 +546,10 @@ public static void DSpace_LogResult(string name, bool passed)
                                 {
                                     mapfileswithnodes.Add(dp);
                                     nodesoffsets.Add(nodes.Count);
+                                    inputrecordlengths.Add(inreclen);
+                                    nodes.AddRange(df.Nodes);
                                 }                                
-                                nodes.AddRange(df.Nodes);                                
+                                
                             }
                         }
                         bi.dfsinputpaths = new List<string>(nodes.Count);
@@ -571,13 +563,14 @@ public static void DSpace_LogResult(string name, bool passed)
 
                     bi.thread = new System.Threading.Thread(new System.Threading.ThreadStart(bi.threadproc));
                 }
-                MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = InputRecordLength;
+                MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = inputrecordlengths.Count > 0 ? inputrecordlengths[0] : -1;
                 MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = outputrecordlengths.Count > 0 ? outputrecordlengths[0] : -1;
                 // Need to start threads separately due to StaticGlobals being updated.
                 for (int BlockID = 0; BlockID < cfgj.IOSettings.DFS_IOs.Length; BlockID++)
                 {
                     RemoteBlockInfo bi = blocks[BlockID];
-                    bi.rem.InputRecordLength = InputRecordLength;
+                    bi.rem.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
+                    bi.rem.InputRecordLengths = inputrecordlengths;
                     bi.rem.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
                     bi.rem.OutputRecordLengths = outputrecordlengths;
                     bi.thread.Start();

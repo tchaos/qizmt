@@ -168,6 +168,15 @@ namespace RDBMS_DBCORE
         {
             public string Exec(params string[] args)
             {
+#if DEBUG
+                foreach (string darg in args)
+                {
+                    if (0 == darg.Length)
+                    {
+                        throw new Exception("DEBUG:  " + GetType().FullName + ".Exec() has an empty argument");
+                    }
+                }
+#endif
                 DSpace_ExecArgs = args;
                 Run();
                 return ReadToEnd();
@@ -197,6 +206,9 @@ namespace RDBMS_DBCORE
 
         internal static string Shell(string cmdline, bool suppresserrors)
         {
+#if DEBUG
+            _checkfornullargs(cmdline);
+#endif
             if (_ShouldDebugShellExec)
             {
                 return Exec.DDShell(cmdline, suppresserrors, false);
@@ -206,6 +218,9 @@ namespace RDBMS_DBCORE
 
         internal static string Shell(string cmdline)
         {
+#if DEBUG
+            _checkfornullargs(cmdline);
+#endif
             if (_ShouldDebugShellExec)
             {
                 const bool suppresserrors = false;
@@ -213,6 +228,25 @@ namespace RDBMS_DBCORE
             }
             return Exec.Shell(cmdline);
         }
+
+#if DEBUG
+        internal static void _checkfornullargs(string cmdline)
+        {
+            for (int i = 0; ; )
+            {
+                i = cmdline.IndexOf("\"\"", i);
+                if (-1 == i)
+                {
+                    break;
+                }
+                if (i - 1 < 0 || ' ' == cmdline[i - 1])
+                {
+                    throw new Exception("DEBUG:  Shell() has an empty argument");
+                }
+                i += 2;
+            }
+        }
+#endif
 
 
         public static bool CanUseDfsRef(string xcmd)

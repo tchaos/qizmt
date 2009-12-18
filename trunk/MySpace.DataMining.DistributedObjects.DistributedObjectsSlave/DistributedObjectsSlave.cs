@@ -17,6 +17,11 @@
  *  You should have received a copy of the GNU General Public License                 *
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
 ***************************************************************************************/
+
+#if DEBUG
+#define SLAVE_TRACE
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -593,6 +598,86 @@ namespace MySpace.DataMining.DistributedObjects5
 #endif
 
             XLog.UserLogFile = args[4];
+
+#if SLAVE_TRACE
+            try
+            {
+                Thread mainthread = System.Threading.Thread.CurrentThread;
+                System.Threading.Thread stthd = new System.Threading.Thread(
+                    new System.Threading.ThreadStart(
+                    delegate
+                    {
+                        try
+                        {
+                            string spid = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+                            string dotracefile = spid + ".trace";
+                            for (
+                                ; !System.IO.File.Exists(dotracefile)
+                                ; System.Threading.Thread.Sleep(1000 * 60))
+                            {
+                            }
+                            try
+                            {
+                                System.IO.File.Delete(dotracefile);
+                            }
+                            catch
+                            {
+                            }
+                            XLog.log("SLAVE_TRACE: " + spid + " Start");
+                            for (; ; System.Threading.Thread.Sleep(1000 * 60))
+                            {
+                                {
+                                    mainthread.Suspend();
+                                    try
+                                    {
+                                        System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(mainthread, false);
+                                        StringBuilder sbst = new StringBuilder();
+                                        for (int i = 0, imax = Math.Min(7, st.FrameCount); i < imax; i++)
+                                        {
+                                            if (0 != sbst.Length)
+                                            {
+                                                sbst.Append(", ");
+                                            }
+                                            string mn = "N/A";
+                                            try
+                                            {
+                                                mn = st.GetFrame(i).GetMethod().Name;
+                                            }
+                                            catch
+                                            {
+                                            }
+                                            if (mn.Length > 45)
+                                            {
+                                                mn = "..." + mn.Substring(mn.Length - 45);
+                                            }
+                                            sbst.Append(mn);
+                                        }
+                                        XLog.log("SLAVE_TRACE: " + spid + " Trace: " + sbst.ToString());
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        XLog.log("SLAVE_TRACE: " + spid + " Error: " + e.ToString());
+                                    }
+                                    finally
+                                    {
+                                        mainthread.Resume();
+                                    }
+                                }
+
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }));
+                stthd.IsBackground = true;
+                stthd.Start();
+            }
+            catch (Exception est)
+            {
+                XLog.log("SLAVE_TRACE: Thread start error: " + est.ToString());
+            }
+#endif
 
             sjid = args[5];
             jid = long.Parse(sjid);

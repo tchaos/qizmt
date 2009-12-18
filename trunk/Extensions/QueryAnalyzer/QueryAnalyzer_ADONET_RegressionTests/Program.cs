@@ -42,7 +42,19 @@ namespace QueryAnalyzer_ADONET_RegressionTests
             if (args.Length > 0 && "-selnestedfuncs" == args[0])
             {
                 goto selnestedfuncs;
-            }  
+            }
+            if (args.Length > 0 && "-innerjoin" == args[0])
+            {
+                goto innerjoin;
+            }
+            if (args.Length > 0 && "-outerjoin" == args[0])
+            {
+                goto outerjoin;
+            }
+            if (args.Length > 0 && "-insertintoselecttop" == args[0])
+            {
+                goto insertintoselecttop;
+            }
             if(!(args.Length > 0 && "-skipaggregators" == args[0]))
             {
                 string tablename = DbAggregators_CreateTable();
@@ -664,6 +676,42 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
                 Console.WriteLine();
             }
+            outerjoin:
+            {
+                string testname = "OUTER JOIN";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    OuterJoin();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            innerjoin:
+            {
+                string testname = "INNER JOIN";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    InnerJoin();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
             {
                 string testname = "Drop";
                 Console.WriteLine("*** Running test {0}...", testname);
@@ -801,6 +849,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
                 Console.WriteLine();
             }
+            insertintoselecttop:
             {
                 string testname = "InsertIntoSelectTop";
                 Console.WriteLine("*** Running test {0}...", testname);

@@ -74,8 +74,10 @@
     <Compile Include="Delete.cs" />
     <Compile Include="Drop.cs" />
     <Compile Include="Exec.cs" />
+    <Compile Include="InnerJoin.cs" />
     <Compile Include="InsertIntoSelectTop.cs" />
     <Compile Include="NullParam.cs" />
+    <Compile Include="OuterJoin.cs" />
     <Compile Include="Param.cs" />
     <Compile Include="PinFor.cs" />
     <Compile Include="Program.cs" />

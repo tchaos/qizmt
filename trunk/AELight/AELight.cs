@@ -3198,7 +3198,9 @@ namespace MySpace.DataMining.AELight
                     else
                     {
                         EnterAdminCmd();
-                        MetaRemoveMachine(args[1]);
+                        string RMHost = args[1];
+                        bool DontTouchRMHost = (args.Length > 2 && "-s" == args[2]);
+                        MetaRemoveMachine(RMHost, DontTouchRMHost);
                     }
                     break;
 

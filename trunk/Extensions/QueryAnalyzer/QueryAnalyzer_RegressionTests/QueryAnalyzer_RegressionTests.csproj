@@ -51,6 +51,7 @@
     <Compile Include="DeleteFrom.cs" />
     <Compile Include="DropTable.cs" />
     <Compile Include="Exec.cs" />
+    <Compile Include="GroupByOrderBy.cs" />
     <Compile Include="InsertImport.cs" />
     <Compile Include="InsertImportLines.cs" />
     <Compile Include="InsertIntoXSelect.cs" />
