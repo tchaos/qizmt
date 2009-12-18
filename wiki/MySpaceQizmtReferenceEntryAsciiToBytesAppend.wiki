@@ -1,0 +1,64 @@
+#summary Qizmt Reference Entry AsciiToBytesAppend
+#labels AsciiToBytesAppend,Qizmt,Reference,Entry
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference] / [MySpaceQizmtReferenceEntryStaticMethods Static methods of Entry]
+
+<wiki:toc max_depth="2" />
+
+=`AsciiToBytesAppend`=
+{{{public static void AsciiToBytesAppend(StringBuilder x, List<byte> list)}}}
+
+Converts string to bytes using ASCII encoding and appends to list.
+
+===Example=== 
+{{{
+StringBuilder sb = new StringBuilder();
+List<byte> myBuffer = new List<byte>();
+
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    string sLine = line.ToString();
+    string[] parts = sLine.Split(',');
+
+    myBuffer.Clear();
+    sb.Length = 0;
+    sb.Append(parts[1]);
+
+    for (int i = 0; i < sb.Length; i++)
+    {
+        //Code for manipulating the StringBuilder...                  
+    }
+
+    Entry.AsciiToBytesAppend(sb, myBuffer);
+    output.Add(ByteSlice.PreparePaddedStringAscii(parts[0], Qizmt_KeyLength), ByteSlice.Prepare(myBuffer));
+} 
+}}}
+----
+
+
+
+{{{public static void AsciiToBytesAppend(string x, List<byte> list)}}}
+
+Converts string to bytes using ASCII encoding and appends to list.
+
+===Example=== 
+{{{
+List<byte> myBuffer = new List<byte>();
+
+public virtual void Map(ByteSlice line, MapOutput output)
+{
+    string sLine = line.ToString();
+    string[] parts = sLine.Split(',');
+    myBuffer.Clear();
+    string value = parts[1];
+
+    for (int i = 0; i < value.Length; i++)
+    {
+        //Code for manipulating the string...                  
+    }
+
+    Entry.AsciiToBytesAppend(value, myBuffer);
+    output.Add(ByteSlice.PreparePaddedStringAscii(parts[0], Qizmt_KeyLength), ByteSlice.Prepare(myBuffer));
+} 
+}}}
