@@ -16,7 +16,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
  * 1 Gb/s non-blocking network bandwidth
  * 1TB – 4TB disk space per node in RAID 0 for installation drive
  * RAID 10 for OS drive
- * Windows 2003 SP2, Windows 2008 or Windows Vista
+ * Windows 2003 SP2, Windows 2008, Windows Vista or Windows 7
  * .NET Framework 3.5 SP1
 
 == Cluster Installation ==
