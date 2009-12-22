@@ -1,0 +1,171 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_fget_gz_md5_Preprocessing">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_get_gz_md5_Input.txt");         
+                Shell(@"Qizmt gen regression_test_get_gz_md5_Input.txt 70MB");       
+           
+                string expectedfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();                  
+                Shell(@"Qizmt get regression_test_get_gz_md5_Input.txt " + expectedfile);
+                
+                if(RunTest(true, expectedfile) && RunTest(false, expectedfile))
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_fget_gz_md5.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_fget_gz_md5.xml 0");
+                }
+                
+               System.IO.File.Delete(expectedfile);
+               Shell(@"Qizmt del regression_test_get_gz_md5_Input.txt");            
+            }
+            
+            private static bool RunTest(bool isList, string expectedfile)
+            {
+                string tempdir1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                string tempdir2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                
+                System.IO.Directory.CreateDirectory(tempdir1);
+                System.IO.Directory.CreateDirectory(tempdir2);
+                
+                if(!isList)
+                {
+                    Shell(@"Qizmt fget regression_test_get_gz_md5_Input.txt " + tempdir1 + " " + tempdir2 + " -gz -md5");
+                }  
+                else
+                {
+                    string list = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    using(System.IO.StreamWriter writer = new System.IO.StreamWriter(list))
+                    {
+                        writer.WriteLine("");
+                        writer.WriteLine(tempdir1);
+                        writer.WriteLine("#333");
+                        writer.WriteLine("");
+                        writer.WriteLine(tempdir2);
+                        writer.WriteLine("#444");                        
+                        writer.WriteLine("");
+                        writer.Close();
+                    }
+                    Shell(@"Qizmt fget regression_test_get_gz_md5_Input.txt @" + list + " -gz -md5");
+                    System.IO.File.Delete(list);
+                }
+                
+                List<string> allfiles = new List<string>();
+                allfiles.AddRange(System.IO.Directory.GetFiles(tempdir1, "*.gz"));
+                allfiles.AddRange(System.IO.Directory.GetFiles(tempdir2, "*.gz"));
+
+                string[] sortedfiles = new string[allfiles.Count];
+
+                foreach (string file in allfiles)
+                {
+                    int del = file.LastIndexOf('_');
+                    int index = Int32.Parse(file.Substring(del + 1, file.Length - del - 7 - 1));
+                    sortedfiles[index] = file;
+                }
+
+                const int FILE_BUFFER_SIZE = 0x1000;
+                const int MAX_SIZE_PER_RECEIVE = 0x400 * 64;
+                byte[] fbuf = new byte[MAX_SIZE_PER_RECEIVE];
+                
+                string resultfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();                
+
+                using (System.IO.FileStream fs = new System.IO.FileStream(resultfile, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                {
+                    foreach (string file in sortedfiles)
+                    {
+                        using (System.IO.Stream _fc = new System.IO.FileStream(file, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                        {
+                            System.IO.Stream fc = new System.IO.Compression.GZipStream(_fc, System.IO.Compression.CompressionMode.Decompress);
+                            for (; ; )
+                            {
+                                int xread = fc.Read(fbuf, 0, MAX_SIZE_PER_RECEIVE);
+                                if (xread <= 0)
+                                {
+                                    break;
+                                }
+                                fs.Write(fbuf, 0, xread);
+                            }
+                            fc.Close();                       
+                        }
+                    }
+                    fs.Close();
+                }           
+               
+                bool ok = CompareFiles(resultfile, expectedfile);                 
+                
+                //Check md5
+                if(ok)
+                {
+                    foreach (string file in sortedfiles)
+                    {
+                        string expmd5 = "";
+                        using (System.IO.Stream _fc = new System.IO.FileStream(file, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                        {
+                            System.IO.Stream fc = new System.IO.Compression.GZipStream(_fc, System.IO.Compression.CompressionMode.Decompress);
+                            System.Security.Cryptography.MD5 md5 = new System.Security.Cryptography.MD5CryptoServiceProvider();
+                            byte[] hashresult = md5.ComputeHash(fc);
+                            StringBuilder sbresult = new StringBuilder(32);                           
+                            foreach(byte hb in hashresult)
+                            {
+                                sbresult.Append(hb.ToString("x2"));
+                            }
+                            expmd5 = sbresult.ToString();      
+                            fc.Close();                       
+                        }
+                        
+                        string resultmd5 = System.IO.File.ReadAllText(file.Substring(0, file.Length - 3) + ".hd");
+                      
+                        if(expmd5 != resultmd5)
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }                
+                
+                System.IO.File.Delete(resultfile);
+                System.IO.Directory.Delete(tempdir1, true);
+                System.IO.Directory.Delete(tempdir2, true); 
+                return ok;
+            }
+            
+         private static bool CompareFiles(string f1, string f2)
+        {
+            System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+            System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+            System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+            bool ok = true;
+            for (int i = 0; i < info1.Length; i++)
+            {
+                int b1 = fs1.ReadByte();
+                int b2 = fs2.ReadByte();
+                if (b1 != b2)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            fs1.Close();
+            fs2.Close();
+            return ok;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
