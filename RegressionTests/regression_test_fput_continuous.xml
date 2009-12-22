@@ -1,0 +1,224 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_fput_continuous_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_fput_continuous_Input.txt");
+                Shell(@"Qizmt del regression_test_fput_continuous_Output.txt");
+                Shell(@"Qizmt del regression_test_fput_continuous_Expected.txt");
+                Shell(@"Qizmt del regression_test_fput_continuous_Results.txt");
+                
+                string[] hosts = StaticGlobals.Qizmt_Hosts;
+                
+                int filesCount = 31;  //files per host
+                
+                string tempdir = IOUtils.GetTempDirectory();
+                {
+                    int del = tempdir.IndexOf(@"\", 2);
+                    tempdir = tempdir.Substring(del + 1) + @"\" + Guid.NewGuid().ToString();
+                }
+                
+                string srcfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString() + ".txt";
+                string dirlist = IOUtils.GetTempDirectory() + @"\" +Guid.NewGuid().ToString() + ".txt";
+                
+                Random rnd = new Random();
+                
+                List<string> alldirs = new List<string>();
+                
+                using(System.IO.StreamWriter sw = new System.IO.StreamWriter(srcfile))
+                {
+                    using(System.IO.StreamWriter dw = new System.IO.StreamWriter(dirlist))
+                    {
+                        foreach(string host in hosts)
+                        {
+                            string thisdir = @"\\" + host + @"\" + tempdir;
+                            System.IO.Directory.CreateDirectory(thisdir);                            
+                            dw.WriteLine(thisdir);
+                            alldirs.Add(thisdir);
+                            
+                            for(int i = 0; i < filesCount; i++)
+                            {
+                                string thisfile = thisdir + @"\" + Guid.NewGuid().ToString() + ".txt";
+                                using(System.IO.StreamWriter w = new System.IO.StreamWriter(thisfile))
+                                {
+                                    int num = rnd.Next();
+                                    w.WriteLine(num.ToString());
+                                    sw.WriteLine(num.ToString());
+                                    
+                                    num = rnd.Next();
+                                    w.WriteLine(num.ToString());
+                                    sw.WriteLine(num.ToString());
+                                    
+                                    w.Close();
+                                }                            
+                            }      
+                        }
+                        dw.Close();
+                    }
+                    
+                    sw.Close();
+                }        
+                
+                Shell(@"Qizmt put " + srcfile + " regression_test_fput_continuous_Input.txt");
+                Shell(@"Qizmt fput dirs=@" + dirlist + " mode=continuous dfsfilename=regression_test_fput_continuous_Output.txt pattern=*.txt");      
+                
+                System.IO.File.Delete(srcfile);
+                System.IO.File.Delete(dirlist);
+                foreach(string dir in alldirs)
+                {
+                    System.IO.Directory.Delete(dir, true);
+                }
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_fput_continuous" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_fput_continuous_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_fput_continuous_Expected.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                mstring sLine = mstring.Prepare(line);
+                int num = sLine.NextItemToInt(',');
+                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(num);
+                
+                recordset rValue = recordset.Prepare();
+                
+                output.Add(rKey, rValue);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rKey = recordset.Prepare(key);
+                int num = rKey.GetInt();
+                
+                for(int i = 0; i < values.Length; i++)
+                {                    
+                    mstring sLine = mstring.Prepare(num);                    
+                    output.Add(sLine);
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_fput_continuous" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_fput_continuous_Output.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_fput_continuous_Results.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                mstring sLine = mstring.Prepare(line);
+                int num = sLine.NextItemToInt(',');
+                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(num);
+                
+                recordset rValue = recordset.Prepare();
+                
+                output.Add(rKey, rValue);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rKey = recordset.Prepare(key);
+                int num = rKey.GetInt();
+                
+                for(int i = 0; i < values.Length; i++)
+                {                    
+                    mstring sLine = mstring.Prepare(num);                    
+                    output.Add(sLine);
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_fput_continuous_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                string expfile = IOUtils.GetTempDirectory() + Guid.NewGuid().ToString();
+                string resultfile = IOUtils.GetTempDirectory() + Guid.NewGuid().ToString();
+                                
+                Shell(@"Qizmt get regression_test_fput_continuous_Expected.txt " + expfile);
+                Shell(@"Qizmt get regression_test_fput_continuous_Results.txt " + resultfile);
+                
+                if(CompareFiles(expfile, resultfile))
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_fput_continuous.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_fput_continuous.xml 0");
+                }
+                
+                System.IO.File.Delete(expfile);
+                System.IO.File.Delete(resultfile);
+            }
+            
+            private static bool CompareFiles(string f1, string f2)
+        {
+            System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+            System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+            System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+            bool ok = true;
+            for (int i = 0; i < info1.Length; i++)
+            {
+                int b1 = fs1.ReadByte();
+                int b2 = fs2.ReadByte();
+                if (b1 != b2)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            fs1.Close();
+            fs2.Close();
+            return ok;
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
