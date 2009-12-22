@@ -57,7 +57,7 @@ This guide is intended for use by:
 
  # Read the Qizmt Coding Standards 
  # Read the GPL v3 License, currently at http://www.gnu.org/copyleft/gpl.html
- # If not already installed, install Visual Studio 2008 SP1, VisualSVN and TortoiseSVN onto Windows Vista
+ # If not already installed, install Visual Studio 2008 SP1, VisualSVN and TortoiseSVN onto Windows Vista or Windows 7
  # Uninstall any existing installation of Qizmt with Window’s _add/remove programs_ tool.
  # In Visual Studio, select *VisualSVN -`>` Repo-Browser*
  # Enter http://qizmt.googlecode.com/svn/trunk into the *URL* box
