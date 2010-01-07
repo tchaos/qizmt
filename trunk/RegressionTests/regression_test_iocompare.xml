@@ -19,6 +19,7 @@
             
             Shell(@"Qizmt del " + jobname + ".????ED"); // Previous PASSED/FAILED
             bool failed = true;
+            string msg = "."; //Divide by zero error if there is no sample.
             
             string hostname = System.Net.Dns.GetHostName();
             string guid = Guid.NewGuid().ToString();
@@ -50,49 +51,206 @@
                 Shell(@"Qizmt get " + f1 + " " + f1Local);
                 Shell(@"Qizmt get " + f2 + " " + f2Local);
                 
-                List<string> arr1 = new List<string>();
-
-                using (System.IO.StreamReader reader = new System.IO.StreamReader(f1Local))
+                int RecordLength = -1;
                 {
-                    while (reader.Peek() > -1)
+                    string lsout = Shell(@"Qizmt ls " + f1).Trim();
+                    int ilat = lsout.LastIndexOf('@');
+                    if(-1 != ilat)
                     {
-                        string line = reader.ReadLine();
-                        arr1.Add(line);
+                        string sreclen = lsout.Substring(ilat + 1);
+                        {
+                            int i = 1;
+                            for(; i < sreclen.Length; i++)
+                            {
+                                if(!char.IsDigit(sreclen[i]))
+                                {
+                                    break;
+                                }
+                            }
+                            sreclen = sreclen.Substring(0, i);
+                        }
+                        try
+                        {
+                            RecordLength = int.Parse(sreclen);
+                        }
+                        catch(Exception e)
+                        {
+                            throw new FormatException(e.Message + "  (RecordLength=" + sreclen + ")", e);
+                        }
                     }
-                    reader.Close();
+                }
+                
+                List<byte[]> arr1 = new List<byte[]>();
+
+                using (System.IO.FileStream fs = new System.IO.FileStream(f2Local, System.IO.FileMode.Open))
+                {
+                    System.IO.StreamReader reader = null;
+                    if(RecordLength <= 0)
+                    {
+                        reader = new System.IO.StreamReader(fs);
+                    }
+                    for(;;)
+                    {
+                        byte[] bytes;
+                        if(RecordLength > 0)
+                        {
+                            bytes = new byte[RecordLength];
+                            if(!StreamReadExact2(fs, bytes, RecordLength))
+                            {
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            string line = reader.ReadLine();
+                            if(null == line)
+                            {
+                                break;
+                            }
+                            bytes = Encoding.Unicode.GetBytes(line);
+                        }
+                        arr1.Add(bytes);
+                    }
+                    if(null != reader)
+                    {
+                        reader.Close();
+                    }
                 }
 
-                List<string> arr2 = new List<string>();
+                List<byte[]> arr2 = new List<byte[]>();
 
-                using (System.IO.StreamReader reader = new System.IO.StreamReader(f2Local))
+                using (System.IO.FileStream fs = new System.IO.FileStream(f2Local, System.IO.FileMode.Open))
                 {
-                    while (reader.Peek() > -1)
+                    System.IO.StreamReader reader = null;
+                    if(RecordLength <= 0)
                     {
-                        string line = reader.ReadLine();                  
-                        arr2.Add(line);
+                        reader = new System.IO.StreamReader(fs);
                     }
-                    reader.Close();
+                    for(;;)
+                    {
+                        byte[] bytes;
+                        if(RecordLength > 0)
+                        {
+                            bytes = new byte[RecordLength];
+                            if(!StreamReadExact2(fs, bytes, RecordLength))
+                            {
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            string line = reader.ReadLine();
+                            if(null == line)
+                            {
+                                break;
+                            }
+                            bytes = Encoding.Unicode.GetBytes(line);
+                        }
+                        arr2.Add(bytes);
+                    }
+                    if(null != reader)
+                    {
+                        reader.Close();
+                    }
                 }
-
-                arr1.Sort();
-                arr2.Sort();
+                
+                Comparison<byte[]> bytesorter = delegate(byte[] b1, byte[] b2)
+                    {
+                        int imax = b1.Length;
+                        if(b2.Length < imax)
+                        {
+                            imax = b2.Length;
+                        }
+                        for(int i = 0; i < imax; i++)
+                        {
+                            int bdiff = b1[i] - b2[i];
+                            if(0 != bdiff)
+                            {
+                                return bdiff;
+                            }
+                        }
+                        if(b1.Length < b2.Length)
+                        {
+                            return -1;
+                        }
+                        if(b1.Length > b2.Length)
+                        {
+                            return 1;
+                        }
+                        return 0;
+                    };
+                arr1.Sort(bytesorter);
+                arr2.Sort(bytesorter);
 
                 bool diff = false;
 
                 if (arr1.Count != arr2.Count)
                 {
                     diff = true;
+                    if(RecordLength > 0)
+                    {
+                        msg = "Mismatch number of records (RecordLength=" + RecordLength + ")";
+                    }
+                    else
+                    {
+                        msg = "Mismatch number of lines (text)";
+                    }
                 }
                 else
                 {
-                    for (int i = 0; i < arr1.Count; i++)
-                    {
-                        if (arr1[i] != arr2[i])
+					/*if(0 == arr1.Count && 0 == arr2.Count)
+					{
+						diff = true;
+                        if(RecordLength > 0)
                         {
-                            diff = true;
-                            break;
+                            msg = "Input files are empty (RecordLength=" + RecordLength + ")";
                         }
-                    }
+                        else
+                        {
+                            msg = "Input files are empty (text)";
+                        }
+					}
+					else*/
+					{
+						for (int i = 0; i < arr1.Count; i++)
+						{
+							byte[] b1 = arr1[i];
+							byte[] b2 = arr2[i];
+                            if(b1.Length != b2.Length)
+                            {
+                                diff = true;
+                                if(RecordLength > 0)
+                                {
+                                    msg = "Mismatch record #" + (1 + i) + " (RecordLength=" + RecordLength + ")";
+                                }
+                                else
+                                {
+                                    msg = "Mismatch line #" + (1 + i) + " (text)";
+                                }
+                                break;
+                            }
+                            for(int j = 0; j < b1.Length; j++)
+                            {
+                                if(b1[j] != b2[j])
+                                {
+                                    diff = true;
+                                    if(RecordLength > 0)
+                                    {
+                                        msg = "Mismatch record #" + (1 + i) + " (RecordLength=" + RecordLength + ")";
+                                    }
+                                    else
+                                    {
+                                        msg = "Mismatch line #" + (1 + i) + " (text)";
+                                    }
+                                    break;
+                                }
+                            }
+                            if(diff)
+                            {
+                                break;
+                            }
+						}
+					}
                 }
                 
                 if(!diff)
@@ -102,13 +260,13 @@
             }
             catch(Exception e)
             {
+                msg = e.ToString();
                 Console.Error.WriteLine(e.ToString());
                 failed = true;
             }
             using(System.IO.StreamWriter writer = new System.IO.StreamWriter(tempLocal))
             {
-                //Divide by zero error if there is no sample.
-                writer.Write(".");
+                writer.Write(msg);
                 writer.Close();
             }
             if(failed)
@@ -122,6 +280,44 @@
             System.IO.File.Delete(f1Local);
             System.IO.File.Delete(f2Local);
             System.IO.File.Delete(tempLocal);
+        }
+
+
+        internal static int StreamReadLoop(System.IO.Stream stm, byte[] buf, int len)
+        {
+            int sofar = 0;
+            while (sofar < len)
+            {
+                int xread = stm.Read(buf, sofar, len - sofar);
+                if (xread <= 0)
+                {
+                    break;
+                }
+                sofar += xread;
+            }
+            return sofar;
+        }
+
+        internal static void StreamReadExact(System.IO.Stream stm, byte[] buf, int len)
+        {
+            if (len != StreamReadLoop(stm, buf, len))
+            {
+                throw new System.IO.IOException("Unable to read from stream");
+            }
+        }
+        
+        internal static bool StreamReadExact2(System.IO.Stream stm, byte[] buf, int len)
+        {
+            int read = StreamReadLoop(stm, buf, len);
+            if(read == len)
+            {
+                return true;
+            }
+            if(0 == read)
+            {
+                return false;
+            }
+            throw new System.IO.IOException("Unable to read from stream");
         }
         ]]>
       </Local>

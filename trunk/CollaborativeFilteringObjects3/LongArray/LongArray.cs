@@ -41,7 +41,10 @@ namespace MySpace.DataMining.CollaborativeFilteringObjects3
             {
                 blocks[i] = new byte[BLOCK_SIZE];
             }
-            blocks[nblocks - 1] = new byte[lastblocksize];
+            if (nblocks > 0)
+            {
+                blocks[nblocks - 1] = new byte[lastblocksize];
+            }            
         }
 
 

@@ -1,0 +1,107 @@
+<SourceCode>
+  <Jobs>   
+   <Job Name="t_Preprocessing" Custodian="Cynthia Lok" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_shuffle_input*.bin");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="CreateSampleData" Custodian="Cynthia Lok" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>regression_test_shuffle_input.bin@nInt,nInt,nchar(100)</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Add Reference="System.Data.dll" Type="system"/>
+      <Using>RDBMS_DBCORE</Using>      
+      <Using>System.Data</Using>
+      <Using>System.Data.Common</Using>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                for(int i = 0; i < 1600000; i++)
+                {
+                    DbRecordset rs = DbRecordset.Prepare();
+                    rs.PutInt(i);
+                    rs.PutInt(0);
+                    rs.PutString("x", 100);
+                    ByteSlice bs = rs.ToByteSlice();
+                    dfsoutput.WriteRecord(bs.ToBytes());                    
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="CheckResults" Custodian="Cynthia Lok" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt shuffle regression_test_shuffle_input.bin regression_test_shuffle_input2.bin");
+                string tempfile1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                string tempfile2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                
+                Shell(@"Qizmt get regression_test_shuffle_input.bin " + tempfile1);
+                Shell(@"Qizmt get regression_test_shuffle_input2.bin " + tempfile2);
+                
+                if(CompareFiles(tempfile1, tempfile2))
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_shuffle.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_shuffle.xml 0");
+                }
+                
+                System.IO.File.Delete(tempfile1);
+                System.IO.File.Delete(tempfile2);
+            }
+            
+            private static bool CompareFiles(string f1, string f2)
+            {
+                System.IO.FileInfo info1 = new System.IO.FileInfo(f1);
+                System.IO.FileInfo info2 = new System.IO.FileInfo(f2);
+                if (info1.Length != info2.Length)
+                {
+                    return false;
+                }
+
+                System.IO.FileStream fs1 = new System.IO.FileStream(f1, System.IO.FileMode.Open);
+                System.IO.FileStream fs2 = new System.IO.FileStream(f2, System.IO.FileMode.Open);
+                bool ok = true;
+                for (int i = 0; i < info1.Length; i++)
+                {
+                    int b1 = fs1.ReadByte();
+                    int b2 = fs2.ReadByte();
+                    if (b1 != b2)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+
+                fs1.Close();
+                fs2.Close();
+                return ok;
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

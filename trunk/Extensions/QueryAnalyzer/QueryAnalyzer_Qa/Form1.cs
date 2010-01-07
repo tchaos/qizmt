@@ -46,7 +46,7 @@ namespace RDBMS_qa
             sysStatements["MRDFS.Info"] = "SHELL 'DSpace info'";
             sysStatements["MRDFS.Health"] = "SHELL 'DSpace health'";
             sysStatements["MRDFS.InstallDir"] = "SHELL 'DSpace listinstalldir'";
-            sysStatements["MRDFS.Temprature"] = "SHELL 'DSpace cputemp'";
+            sysStatements["MRDFS.Temperature"] = "SHELL 'DSpace cputemp'";
             sysStatements["MRDFS.Ghost"] = "SHELL 'DSpace ghost'";
             sysStatements["MRDFS.Log"] = "SHELL 'DSpace viewlog'";
             

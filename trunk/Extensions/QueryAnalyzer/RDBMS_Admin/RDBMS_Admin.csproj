@@ -48,6 +48,7 @@
     <Compile Include="ClearLog.cs" />
     <Compile Include="Examples.cs" />
     <Compile Include="Exec.cs" />
+    <Compile Include="Health.cs" />
     <Compile Include="KillAll.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

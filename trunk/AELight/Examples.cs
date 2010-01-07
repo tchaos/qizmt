@@ -242,11 +242,40 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
 
         <Reduce>
           <![CDATA[
+          
+          bool HasSaved = false;
+          List<byte> SavedKey = new List<byte>();
+          int SavedCount = 0; // Init.
+          
+          void HandleSaved(ReduceOutput output)
+          {
+                if(HasSaved)
+                {
+                    mstring sLine = mstring.Prepare(ByteSlice.Prepare(SavedKey));
+                    sLine = sLine.AppendM(',').AppendM(SavedCount);              
+                    output.Add(sLine);
+                    HasSaved = false;
+                    SavedCount = 0; // Reset.
+                }
+          }
+          
+          [KeyRepeatedEnabled]
           public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
           {
-              mstring sLine = mstring.Prepare(UnpadKey(key));
-              sLine = sLine.AppendM(',').AppendM(values.Length);              
-              output.Add(sLine);
+              if(!Qizmt_KeyRepeated)
+              {
+                  HandleSaved(output);
+              }
+              
+              SavedKey.Clear();
+              UnpadKey(key).AppendTo(SavedKey);
+              SavedCount += values.Length;
+              HasSaved = true;
+              
+              if(StaticGlobals.Qizmt_Last)
+              {
+                  HandleSaved(output);
+              }
           }
         ]]>
         </Reduce>
@@ -3103,6 +3132,173 @@ Qizmt exec Qizmt-ClusterLock.xml -c
         ]]>
         </Reduce>
       </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region HeteroInputOutputFiles
+            alljobfiles.Add(@"Qizmt-HeteroInputOutputFiles.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+                @"<SourceCode>
+  <Jobs>
+    <Job Name=`HeteroInputOutputFiles_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del HeteroInputOutputFiles_Input*`);
+                Shell(@`Qizmt del HeteroInputOutputFiles_Output*`);
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`HeteroInputOutputFiles_CreateSampleDataText` Custodian=`` Email=`` Description=`Create sample text data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://HeteroInputOutputFiles_Input1</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample text data.
+                dfsoutput.WriteLine(`1498,The Last Supper,100.45,374000000`);
+                dfsoutput.WriteLine(`1503,Mona Lisa,4.75,600000000`);
+                dfsoutput.WriteLine(`1501,Study for a portrait of Isabella d'Este,1.5,100000000`);
+                dfsoutput.WriteLine(`1501,Study of horse,1.5,100000000`);
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`HeteroInputOutputFiles_CreateSampleDataBinary` Custodian=`` Email=`` Description=`Create sample binary data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://HeteroInputOutputFiles_Input2@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample binary data.
+                List<byte> buf = new List<byte>();
+                for(int i = 1500; i <= 1504; i++)
+                {
+                    recordset rs = recordset.Prepare();
+                    rs.PutInt(i);
+                    buf.Clear();
+                    rs.ToByteSlice().AppendTo(buf);
+                    int buflen = buf.Count;
+                    dfsoutput.WriteRecord(buf);
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`HeteroInputOutputFiles` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://HeteroInputOutputFiles_Input1;dfs://HeteroInputOutputFiles_Input2@4</DFSInput>
+        <DFSOutput>dfs://HeteroInputOutputFiles_Output1;dfs://HeteroInputOutputFiles_Output2@4</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                if(Qizmt_InputRecordLength == 4)
+                {
+                    recordset rs = recordset.Prepare(line);
+                    int i = rs.GetInt();
+                    mstring ms = mstring.Prepare(i);
+                    ms.AppendM(`,N/A,N/A,N/A`);
+                    output.Add(rs, ms);
+                }
+                else if(Qizmt_InputRecordLength == -1) // Text.
+                {
+                    recordset rs = recordset.Prepare();
+                    mstring ms = mstring.Prepare(line);
+                    int i = ms.CsvNextItemToInt32();
+                    rs.PutInt(i);
+                    output.Add(rs, ms);
+                }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rs = recordset.Prepare(key);
+                while(values.MoveNext())
+                {
+                    mstring ms = mstring.Prepare(values.Current);
+                    output.GetOutputByIndex(0).WriteLine(ms);
+                    
+                    output.GetOutputByIndex(1).Add(rs);
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name=`HeteroInputOutputFiles_Display` Custodian=`` Email=`` Description=`Display output`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://HeteroInputOutputFiles_Output1;dfs://HeteroInputOutputFiles_Output2@4</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                List<byte> buf = new List<byte>();
+                for(;;)
+                {
+                    if(Qizmt_InputRecordLength == 4)
+                    {
+                        buf.Clear();
+                        if(!dfsinput.ReadRecordAppend(buf))
+                        {
+                            break;
+                        }
+                        ByteSlice line = ByteSlice.Prepare(buf);
+                        recordset rs = recordset.Prepare(line);
+                        int i = rs.GetInt();
+                        Qizmt_Log(`int : ` + i);
+                    }
+                    else if(Qizmt_InputRecordLength == -1) // Text.
+                    {
+                        buf.Clear();
+                        if(!dfsinput.ReadLineAppend(buf))
+                        {
+                            break;
+                        }
+                        ByteSlice line = ByteSlice.Prepare(buf);
+                        mstring ms = mstring.Prepare(line);
+                        Qizmt_Log(`text: ` + ms);
+                    }
+                }
+            }
+        ]]>
+      </Remote>
     </Job>
   </Jobs>
 </SourceCode>

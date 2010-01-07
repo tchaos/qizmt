@@ -63,7 +63,9 @@
                 "regression_test_rbin_ionames.xml",
                 "regression_test_ExplicitCacheWordCount.xml" //,
 				//"regression_test_hetero_remote_inputs.xml",
-				//"regression_test_hetero_map_inputs.xml"
+				//"regression_test_hetero_map_inputs.xml",
+				//"regression_test_spread_lines.xml",
+				//"regression_test_spread_records.xml"
             };
             
             int iarg = 0;
@@ -101,7 +103,9 @@
                 "regression_test_put_dll.xml",
                 "regression_test_ExplicitCacheWordCount.xml" //,
 				//"regression_test_hetero_remote_inputs.xml",
-				//"regression_test_hetero_map_inputs.xml"
+				//"regression_test_hetero_map_inputs.xml",
+				//"regression_test_spread_lines.xml",
+				//"regression_test_spread_records.xml"
                 };
             }
             

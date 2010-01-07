@@ -1,0 +1,92 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_spread_records_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_spread_records_Input");
+            Shell(@"Qizmt del regression_test_spread_records_Output");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_spread_records_GenData">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_spread_records_Input@97</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                int totalbytes = 0x400 * 0x400 * 10;
+                int len = Qizmt_OutputRecordLength;
+                Random rnd = new Random(unchecked(System.Threading.Thread.CurrentThread.ManagedThreadId + (int)DateTime.Now.Ticks));
+                byte[] buf = new byte[len];
+                int nrows = totalbytes / len;
+                if(0 != (totalbytes % len))
+                {
+                    nrows++;
+                }
+                for(int nrec = 0; nrec < nrows; nrec++)
+                {
+                    rnd.NextBytes(buf);
+                    dfsoutput.WriteRecord(buf);
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_spread_records_Spread</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Qizmt_Log(Shell("Qizmt spread regression_test_spread_records_Input regression_test_spread_records_Output"));
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_spread_records_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_spread_records_Input regression_test_spread_records_Output regression_test_spread_records.xml");          
+            
+            Shell(@"Qizmt del regression_test_spread_records_Input");
+            Shell(@"Qizmt del regression_test_spread_records_Output");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

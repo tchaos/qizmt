@@ -1783,7 +1783,7 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                             try
                             {
-                                System.IO.File.WriteAllText(NetworkPathForHost(slaves[si]) + @"\slaveconfig.xml", slaveconfigxml);
+                                System.IO.File.WriteAllText(NetworkPathForHost(slaves[si]) + @"\slaveconfig.j" +  sjid + ".xml", slaveconfigxml);
                             }
                             catch
                             {
@@ -2404,6 +2404,32 @@ public void DSpace_LogResult(string name, bool passed)
                 }
                 finally
                 {
+                    {
+                        for (int si = 0; si < slaves.Length; si++)
+                        {
+                            System.Threading.Mutex m = new System.Threading.Mutex(false, "AEL_SC_" + slaves[si]);
+                            try
+                            {
+                                m.WaitOne();
+                            }
+                            catch (System.Threading.AbandonedMutexException)
+                            {
+                            }
+                            try
+                            {
+                                System.IO.File.Delete(NetworkPathForHost(slaves[si]) + @"\slaveconfig.j" + sjid + ".xml");
+                            }
+                            catch
+                            {
+                            }
+                            finally
+                            {
+                                m.ReleaseMutex();
+                                m.Close();
+                            }
+                        }
+                    }
+
                     timethread.Abort();
                     DeleteRemoteFoFiles(slaves, logname);
                     AELight.CheckUserLogs(slaves, logname);

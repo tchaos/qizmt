@@ -554,7 +554,7 @@
             this.IsMdiContainer = true;
             this.MainMenuStrip = this.menuStrip1;
             this.Name = "Form1";
-            this.Text = "QueryAnalyzer for DSpace";
+            this.Text = "QueryAnalyzer for Qizmt";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.cmsTable.ResumeLayout(false);
             this.menuStrip1.ResumeLayout(false);

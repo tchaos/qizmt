@@ -9,6 +9,7 @@
         <!-- OutputDfsFile -->
         <OutputMethod>grouped</OutputMethod>
       </IOSettings>
+      <IntermediateDataAddressing>64</IntermediateDataAddressing>
       <MapReduce>
         <Map>
           <![CDATA[

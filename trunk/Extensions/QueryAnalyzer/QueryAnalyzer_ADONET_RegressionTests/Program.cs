@@ -10,7 +10,11 @@ namespace QueryAnalyzer_ADONET_RegressionTests
         public static void Main(string[] args)
         {
             List<KeyValuePair<string, bool>> AllTests = new List<KeyValuePair<string, bool>>();
-           
+            
+            if (args.Length > 0 && "-rindexmutable" == args[0])
+            {
+                goto rindexmutable;
+            }
             if (args.Length > 0 && "-connopen" == args[0])
             {
                 goto connopen;
@@ -1077,7 +1081,78 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                     AllTests.Add(new KeyValuePair<string, bool>(testname, false));
                 }
                 Console.WriteLine();
-            }        
+            }
+
+            {
+                string testname = "RSelectSpillageTest1";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RSelectSpillageTest1();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
+                string testname = "RSelectSpillageTest2";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RSelectSpillageTest2();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
+                string testname = "RIndexFailover";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexFailover();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexReplication";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexReplication();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }            
 
             rindexonintpinhash:
             {
@@ -1098,6 +1173,161 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 Console.WriteLine();
             }
 
+            rindexmutable:
+            {
+                string testname = "RIndexMutable";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexMutable();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexMutable_SpecialCase_1(keepvalueorder)";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexMutable_SpecialCase_1(true);
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexMutable_SpecialCase_1()";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexMutable_SpecialCase_1(false);
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexMutable_SpecialCase_2(keepvalueorder)";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexMutable_SpecialCase_2(true);
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexMutable_SpecialCase_2()";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexMutable_SpecialCase_2(false);
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexMutable_SpecialCase_3()";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexMutable_SpecialCase_3();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOutlierDelete";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOutlierDelete();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOutlierFifo";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOutlierFifo();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexOutlierRandom";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexOutlierRandom();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            
             // - Display final output -
             Console.WriteLine("--STARTRESULTS--");
             foreach (KeyValuePair<string, bool> test in AllTests)
