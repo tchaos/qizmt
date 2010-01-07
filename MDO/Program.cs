@@ -1155,6 +1155,7 @@ namespace MySpace.DataMining.AELight
                                                     catch
                                                     {
                                                     }
+                                                    DeleteAllMatchingFiles(netpath, "slaveconfig.j*.xml");
                                                 }
                                                 //Console.WriteLine();
                                             }

@@ -363,6 +363,31 @@ namespace MySpace.DataMining.AELight
         public List<DfsFile> Files;
 
 
+        public List<DfsFile> FindAll(string dfspathwc)
+        {
+            dfs dc = this;
+
+            if (dfspathwc.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+            {
+                dfspathwc = dfspathwc.Substring(6);
+            }
+
+            List<DfsFile> result = new List<DfsFile>();
+
+            string srex = Surrogate.WildcardRegexString(dfspathwc);
+            System.Text.RegularExpressions.Regex rex = new System.Text.RegularExpressions.Regex(srex, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            foreach (dfs.DfsFile df in dc.Files)
+            {
+                if (rex.IsMatch(df.Name))
+                {
+                    result.Add(df);
+                }
+            }
+
+            return result;
+        }
+
+
         public DfsFile FindAny(string dfspath)
         {
             dfs dc = this;
@@ -3202,6 +3227,45 @@ namespace MySpace.DataMining.AELight
                 _netpathcache = new Dictionary<string, string>();
             }
 #endif
+        }
+
+
+        /// <param name="host">Host to check</param>
+        /// <param name="reason">Why the host is healthy or unhealthy</param>
+        /// <returns>bool IsHealthy</returns>
+        public delegate bool HealthMethod(string host, out string reason);
+
+
+        static readonly char[] _schmTerm = new char[] { '\r', '\n', '\f', '\v', '\0' };
+
+        public static bool SafeCallHealthMethod(HealthMethod hm, string host, out string reason)
+        {
+            try
+            {
+                bool result = hm(host, out reason);
+                {
+                    reason = reason.Trim();
+                    int iterm = reason.IndexOfAny(_schmTerm);
+                    if (-1 != iterm)
+                    {
+                        reason = reason.Substring(0, iterm) + " ...";
+                    }
+                }
+                return result;
+            }
+            catch(Exception e)
+            {
+                reason = "Health method exception: " + e.GetType().Name + ": " + e.Message;
+                {
+                    reason = reason.Trim();
+                    int iterm = reason.IndexOfAny(_schmTerm);
+                    if (-1 != iterm)
+                    {
+                        reason = reason.Substring(0, iterm) + " ...";
+                    }
+                }
+                return false;
+            }
         }
 
 

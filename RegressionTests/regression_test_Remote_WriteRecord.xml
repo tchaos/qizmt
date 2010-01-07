@@ -1,0 +1,117 @@
+
+<SourceCode>
+  <Jobs>    
+  <Job Name="clean_up" Custodian="Cynthia Lok" Email="clok@myspace-inc.com">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regressionTest_Remote_WriteRecord_Input.bin");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="createdata" Custodian="Cynthia Lok" Email="clok@myspace-inc.com" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>regressionTest_Remote_WriteRecord_Input.bin@nInt,nLong,nchar(400)</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                for(int i = 0; i < 10; i++)
+                {
+                    for(int s = 0; s < 50000; s++)
+                    {
+                        DbRecordset rout = DbRecordset.Prepare();
+                        rout.PutInt(s);
+                        rout.PutLong((long)i);
+                        rout.PutString("x", 400);
+                        ByteSlice bs = rout.ToByteSlice();
+                        byte[] buf = bs.ToBytes();
+                        dfsoutput.WriteRecord(buf);   
+                    }       
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="checkdata" Custodian="Cynthia Lok" Email="clok@myspace-inc.com" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regressionTest_Remote_WriteRecord_Input.bin@nInt,nLong,nchar(400)</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
+      <Remote>
+        <![CDATA[
+            byte[] buf = new byte[815];
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                int num = 0;
+                long lnum = 0;
+                while(dfsinput.Read(buf, 0, 815) > 0)
+                {
+                    ByteSlice bs = ByteSlice.Prepare(buf);
+                    DbRecordset rline = DbRecordset.Prepare(bs);
+                    num = rline.GetInt();
+                    lnum = rline.GetLong();
+                    mstring ms = rline.GetString(400); 
+                }
+                
+                bool ok = false;
+                if((num != 50000 - 1) || (lnum != 9))
+                {
+                        ok = false;
+                }
+                else
+                {
+                        ok = true;
+                }
+                
+                if(ok)
+                {
+                    string tempfile = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    Shell("qizmt bulkget " + tempfile + " regressionTest_Remote_WriteRecord_Input.bin");
+                    
+                    string[] lines = System.IO.File.ReadAllLines(tempfile);
+                    foreach(string line in lines)
+                    {
+                        string[] parts = line.Split(' ');
+                        int filesize = Int32.Parse(parts[2]);
+                        if(filesize % 815 != 0)
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    System.IO.File.Delete(tempfile);
+                }
+                
+                if(ok)
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_Remote_WriteRecord.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_Remote_WriteRecord.xml 0");
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

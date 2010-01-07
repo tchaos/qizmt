@@ -937,43 +937,132 @@ namespace RDBMS_DBCORE
                             {
                                 throw new Exception("DEBUG:  Types.ExpressionType.FUNCTION: (-1 == ip)");
                             }
-                            int mintsize = 0;
+                            int extsize = -1;
+                            int tsizenarg = -1; // tsize is only the size of this argument (0-based).
                             string funcname = bexpr.Substring(0, ip);
                             if (0 == string.Compare("AVG", funcname, true))
                             {
-                                mintsize = 1 + 9; // DOUBLE
+                                extsize = 1 + 9; // DOUBLE
                             }
                             else if (0 == string.Compare("STD", funcname, true))
                             {
-                                mintsize = 1 + 9; // DOUBLE
+                                extsize = 1 + 9; // DOUBLE
                             }
                             else if (0 == string.Compare("STD_SAMP", funcname, true))
                             {
-                                mintsize = 1 + 9; // DOUBLE
+                                extsize = 1 + 9; // DOUBLE
                             }
                             else if (0 == string.Compare("VAR_POP", funcname, true))
                             {
-                                mintsize = 1 + 9; // DOUBLE
+                                extsize = 1 + 9; // DOUBLE
                             }
                             else if (0 == string.Compare("VAR_SAMP", funcname, true))
                             {
-                                mintsize = 1 + 9; // DOUBLE
+                                extsize = 1 + 9; // DOUBLE
                             }
                             else if (0 == string.Compare("COUNT", funcname, true))
                             {
-                                mintsize = 1 + 8; // LONG
+                                extsize = 1 + 8; // LONG
                             }
                             else if (0 == string.Compare("COUNTDISTINCT", funcname, true))
                             {
-                                mintsize = 1 + 8; // LONG
+                                extsize = 1 + 8; // LONG
                             }
                             else if (0 == string.Compare("PI", funcname, true))
                             {
-                                mintsize = 1 + 9; // DOUBLE
+                                extsize = 1 + 9; // DOUBLE
                             }
                             else if (0 == string.Compare("LEN", funcname, true))
                             {
-                                mintsize = 1 + 4; // INT
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("ATN2", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("SUBSTRING", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("RAND", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("CHARINDEX", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("INSTR", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("PATINDEX", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("SIGN", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("ROUND", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("TRUNC", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("RADIANS", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("NVL", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("NVL2", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("SQRT", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("POWER", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("DEGREES", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("RADIANS", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("SYSDATE", funcname, true))
+                            {
+                                extsize = 1 + 8; // DateTime
+                            }
+                            else if (0 == string.Compare("MONTHS_BETWEEN", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("DATEDIFF", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("ADD_MONTHS", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("LOG10", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
+                            }
+                            else if (0 == string.Compare("SQUARE", funcname, true))
+                            {
+                                extsize = 1 + 9; // DOUBLE
                             }
 #if DEBUG
                             else if (0 == string.Compare("CAST", funcname, true))
@@ -988,6 +1077,7 @@ namespace RDBMS_DBCORE
                             string args = bexpr.Substring(ip + 1, bexpr.Length - ip - 1 - 1);
                             StringPartReader spargs = new StringPartReader(args);
                             int tsize = 1;
+                            int narg = -1;
                             for (; ; )
                             {
 
@@ -1001,62 +1091,69 @@ namespace RDBMS_DBCORE
                                     }
                                     break;
                                 }
-                                else if (Types.ExpressionType.AS == subetype)
+                                else
                                 {
-                                    if (0 == string.Compare("CAST", funcname, true))
+                                    narg++;
+                                    if (Types.ExpressionType.AS == subetype)
                                     {
-                                        int assize;
-                                        int aswidth;
-                                        /*{
-                                            string sargwidth;
-                                            DbColumn argcol = GetDbColumn(sube, out sargwidth);
-                                            int argwidth = int.Parse(sargwidth);
-                                            assize = argcol.Type.Size - 1;
-                                            aswidth = argwidth;
-                                        }*/
+                                        if (0 == string.Compare("CAST", funcname, true))
                                         {
-                                            // Remove "'AS " and "'"
-                                            string sastype = sube.Substring(4, sube.Length - 4 - 1).Replace("''", "'");
-                                            DbType astype = DbType.Prepare(DbType.NormalizeName(sastype));
-                                            if (DbTypeID.NULL == astype.ID)
+                                            int astsize;
+                                            int aswidth;
+                                            /*{
+                                                string sargwidth;
+                                                DbColumn argcol = GetDbColumn(sube, out sargwidth);
+                                                int argwidth = int.Parse(sargwidth);
+                                                assize = argcol.Type.Size - 1;
+                                                aswidth = argwidth;
+                                            }*/
                                             {
-                                                throw new Exception("Unexpedted AS type: " + sastype);
+                                                // Remove "'AS " and "'"
+                                                string sastype = sube.Substring(4, sube.Length - 4 - 1).Replace("''", "'");
+                                                DbType astype = DbType.Prepare(DbType.NormalizeName(sastype));
+                                                if (DbTypeID.NULL == astype.ID)
+                                                {
+                                                    throw new Exception("Unexpedted AS type: " + sastype);
+                                                }
+                                                //if (astype.Size - 1 > assize)
+                                                {
+                                                    astsize = astype.Size - 1;
+                                                }
+                                                int xdw = DisplayWidthFromType(astype);
+                                                //if (xdw > aswidth)
+                                                {
+                                                    aswidth = xdw;
+                                                }
                                             }
-                                            //if (astype.Size - 1 > assize)
-                                            {
-                                                assize = astype.Size - 1;
-                                            }
-                                            int xdw = DisplayWidthFromType(astype);
-                                            //if (xdw > aswidth)
-                                            {
-                                                aswidth = xdw;
-                                            }
+                                            //tsize += assize;
+                                            //totdw += aswidth;
+                                            tsize = astsize;
+                                            totdw = aswidth;
+                                            break; // Note: ignores anything after this, but that's OK here for CAST.
                                         }
-                                        //tsize += assize;
-                                        //totdw += aswidth;
-                                        tsize = assize;
-                                        totdw = aswidth;
-                                        break; // Note: ignores anything after this, but that's OK here for CAST.
+                                        else
+                                        {
+                                            throw new Exception("AS not expected here");
+                                        }
                                     }
                                     else
                                     {
-                                        throw new Exception("AS not expected here");
-                                    }
-                                }
-                                else
-                                {
-                                    string sargwidth;
-                                    DbColumn argcol = GetDbColumn(sube, out sargwidth);
-                                    int argwidth = int.Parse(sargwidth);
+                                        string sargwidth;
+                                        DbColumn argcol = GetDbColumn(sube, out sargwidth);
+                                        int argwidth = int.Parse(sargwidth);
 #if DEBUG
-                                    if (0 == argcol.Type.Size)
-                                    {
-                                        throw new Exception("Argument to function cannot be " + argcol.ColumnName + " (Type.Size=0)");
-                                    }
+                                        if (0 == argcol.Type.Size)
+                                        {
+                                            throw new Exception("Argument to function cannot be " + argcol.ColumnName + " (Type.Size=0)");
+                                        }
 #endif
-                                    tsize += argcol.Type.Size - 1;
-                                    totdw += argwidth;
+                                        if (-1 == tsizenarg || narg == tsizenarg)
+                                        {
+                                            tsize += argcol.Type.Size - 1;
+                                            totdw += argwidth;
+                                        }
 
+                                    }
                                 }
 
                                 string s = spargs.PeekPart();
@@ -1076,9 +1173,9 @@ namespace RDBMS_DBCORE
                                 spargs.NextPart(); // Eat the ','.
 
                             }
-                            if (tsize < mintsize)
+                            if (-1 != extsize)
                             {
-                                tsize = mintsize;
+                                tsize = extsize;
                             }
                             DbColumn c;
                             c.Type = DbType.Prepare("DbFunction", tsize, DbTypeID.NULL);  //(string TypeName, int TypeSize, DbTypeID TypeID)

@@ -354,52 +354,58 @@ namespace QueryAnalyzer_Protocol
 
         private void RIndexServListenThreadProc()
         {
-            try
+            bool keepgoing = true;
+            while (keepgoing)
             {
-                //RIndexServClientHandler.LoadRIndexMI();
-
-                rindexservsock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
-                    System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
-                System.Net.IPEndPoint ipep = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 55904);
-                for (int i = 0; ; i++)
+                try
                 {
-                    try
+                    if (rindexservsock != null)
                     {
-                        rindexservsock.Bind(ipep);
-                        break;
+                        rindexservsock.Close();
                     }
-                    catch
+
+                    rindexservsock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                        System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                    System.Net.IPEndPoint ipep = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 55904);
+                    for (int i = 0; ; i++)
                     {
-                        if (i >= 5)
+                        try
                         {
-                            throw;
+                            rindexservsock.Bind(ipep);
+                            break;
                         }
-                        System.Threading.Thread.Sleep(1000 * 4);
-                        continue;
+                        catch
+                        {
+                            if (i >= 5)
+                            {
+                                throw;
+                            }
+                            System.Threading.Thread.Sleep(1000 * 4);
+                            continue;
+                        }
+                    }
+
+                    rindexservsock.Listen(30);
+
+                    for (; ; )
+                    {
+                        System.Net.Sockets.Socket dllclientSock = rindexservsock.Accept();
+                        RIndexServClientHandler ch = new RIndexServClientHandler();
+                        System.Threading.Thread cthd = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(ch.ClientThreadProc));
+                        cthd.IsBackground = true;
+                        cthd.Start(dllclientSock);
                     }
                 }
-
-                rindexservsock.Listen(30);
-
-                for (; ; )
+                catch (System.Threading.ThreadAbortException e)
                 {
-                    System.Net.Sockets.Socket dllclientSock = rindexservsock.Accept();
-                    RIndexServClientHandler ch = new RIndexServClientHandler();
-                    System.Threading.Thread cthd = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(ch.ClientThreadProc));
-                    cthd.IsBackground = true;
-                    cthd.Start(dllclientSock);
+                    keepgoing = false;
                 }
-            }
-            catch (System.Threading.ThreadAbortException e)
-            {
-            }
-            catch (Exception e)
-            {
-                XLog.errorlog("RIndexServListenThreadProc exception: " + e.ToString());
-            }
+                catch (Exception e)
+                {
+                    XLog.errorlog("RIndexServListenThreadProc exception: " + e.ToString());
+                }
+            }            
         }
-
-
     }
 
     class StressClientHandler
@@ -1257,7 +1263,7 @@ namespace QueryAnalyzer_Protocol
 
         }
 
-        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn, bool pinmemoryhash, bool keepvalueorder)
+        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn, bool pinmemoryhash, bool keepvalueorder, string outliermode, int outliermax)
         {
             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
             using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
@@ -1355,6 +1361,7 @@ namespace QueryAnalyzer_Protocol
             }
 
             Dictionary<string, string> HostToNetPath;
+            string qizmtRootDir = "";
             {
                 string[] htnlines = htnppartsoutput
                     .Trim().Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -1366,6 +1373,12 @@ namespace QueryAnalyzer_Protocol
                     string host = htnline.Substring(0, isphtn);
                     string netpath = htnline.Substring(isphtn + 1);
                     HostToNetPath[host] = netpath;
+
+                    if (ip == 0)
+                    {
+                        int del = netpath.IndexOf(@"\", 2);
+                        qizmtRootDir = netpath.Substring(del + 1);
+                    }
                 }
             }
 
@@ -1378,7 +1391,7 @@ namespace QueryAnalyzer_Protocol
                     string line = bulkparts[pi];
                     long chunksize = 0;
                     string chunknetpath = null;
-                    using (System.IO.FileStream fs = GetChunkFileStream(line, HostToNetPath, ref rowbuf, out chunksize, out chunknetpath))
+                    using (System.IO.Stream fs = GetChunkFileStream(line, HostToNetPath, ref rowbuf, out chunksize, out chunknetpath, qizmtRootDir))
                     {
                         if (fs == null)
                         {
@@ -1396,7 +1409,7 @@ namespace QueryAnalyzer_Protocol
                 {
                     long chunksize = 0;
                     string chunknetpath = null;
-                    using (System.IO.FileStream fs = GetChunkFileStream(line, HostToNetPath, ref rowbuf, out chunksize, out chunknetpath))
+                    using (System.IO.Stream fs = GetChunkFileStream(line, HostToNetPath, ref rowbuf, out chunksize, out chunknetpath, qizmtRootDir))
                     {
                         if (fs == null)
                         {
@@ -1466,6 +1479,14 @@ namespace QueryAnalyzer_Protocol
                 System.Xml.XmlElement xeKeepValueOrder = xi.CreateElement("keepValueOrder");
                 xeKeepValueOrder.InnerText = keepvalueorder ? "1" : "0";
                 xeIndex.AppendChild(xeKeepValueOrder);
+                System.Xml.XmlElement xeOutlier = xi.CreateElement("outlier");
+                System.Xml.XmlElement xeOutlierMode = xi.CreateElement("mode");
+                xeOutlierMode.InnerText = outliermode;
+                System.Xml.XmlElement xeOutlierMax = xi.CreateElement("max");
+                xeOutlierMax.InnerText = outliermax.ToString();
+                xeOutlier.AppendChild(xeOutlierMode);
+                xeOutlier.AppendChild(xeOutlierMax);
+                xeIndex.AppendChild(xeOutlier);
                 System.Xml.XmlElement xeIndTable = xi.CreateElement("table");
                 xeIndex.AppendChild(xeIndTable);
                 System.Xml.XmlElement xeIndTableName = xi.CreateElement("name");
@@ -1497,33 +1518,20 @@ namespace QueryAnalyzer_Protocol
             }
         }
 
-        System.IO.FileStream GetChunkFileStream(string line, Dictionary<string, string> HostToNetPath, ref byte[] rowbuf, out long chunksize, out string chunknetpath)
+        System.IO.Stream GetChunkFileStream(string line, Dictionary<string, string> HostToNetPath, ref byte[] rowbuf, out long chunksize, out string chunknetpath, string qizmtRootDir)
         {
             string[] parts = line.Split(' ');
-            string[] hosts = parts[0].Split(';');
+            string shosts = parts[0];
             string chunkname = parts[1];
             chunksize = Int64.Parse(parts[2]);
             chunknetpath = null;
             if (chunksize == 0)
             {
                 return null;
-            }
-            string host = null;
-            for (int hi = 0; hi < hosts.Length; hi++)
-            {
-                if (HostToNetPath.ContainsKey(hosts[hi]))
-                {
-                    host = hosts[hi];
-                    break;
-                }
-            }
-            if (host == null)
-            {
-                throw new Exception("Chunk " + chunkname + " is not accessible (not part of this cluster or is down)");
-            }
+            }            
 
-            chunknetpath = HostToNetPath[host] + @"\" + chunkname;
-            System.IO.FileStream fs = new System.IO.FileStream(chunknetpath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
+            chunknetpath = @"\\" + shosts + @"\" + qizmtRootDir + @"\" + chunkname;
+            System.IO.Stream fs = new DfsFileNodeStream(shosts, chunkname, true, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x1000, qizmtRootDir);
             {                
                 // Skip the dfs-chunk file-header...
                 int headerlength = 0;
@@ -1581,6 +1589,8 @@ namespace QueryAnalyzer_Protocol
                     bool pinmemhash = true;
                     bool keepvalueorder = false;
                     string keycolumn = "";
+                    string outliermode = "none";
+                    int outliermax = 0;
                     for (; ; )
                     {
                         string nextcmd = RDBMS_DBCORE.Qa.NextPart(ref cmd).ToLower();
@@ -1618,9 +1628,24 @@ namespace QueryAnalyzer_Protocol
                             case "keepvalueorder":
                                 keepvalueorder = true;
                                 break;
+
+                            case "outlier":
+                                {
+                                    outliermode = RDBMS_DBCORE.Qa.NextPart(ref cmd).ToLower();
+                                    if (outliermode != "delete" && outliermode != "fifo" && outliermode != "random")
+                                    {
+                                        throw new Exception("Outlier mode is invalid.");
+                                    }
+                                    outliermax = Int32.Parse(RDBMS_DBCORE.Qa.NextPart(ref cmd));
+                                    if (outliermax <= 0)
+                                    {
+                                        throw new Exception("Outlier max must be an integer greater than 0.");
+                                    }
+                                }
+                                break;
                         }
                     }
-                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn, pinmemhash, keepvalueorder);
+                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn, pinmemhash, keepvalueorder, outliermode, outliermax);
                     return true;
                 }
                 else

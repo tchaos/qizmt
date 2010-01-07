@@ -825,6 +825,28 @@ namespace MySpace.DataMining.AELight
                 {
                 }
             }
+#if DEBUG
+            try
+            {
+                foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(dlldir + @"\" + dfs.DLL_DIR_NAME))
+                    .GetFiles("*.dll"))
+                {
+
+                    //Console.WriteLine("  {0}", fi.Name);
+                    string dllfn = fi.FullName;
+                    try
+                    {
+                        mygtypes.AddRange(System.Reflection.Assembly.LoadFrom(dllfn).GetTypes());
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch
+            {
+            }
+#endif
             {
                 mygtypes.Add(typeof(Byte));
                 mygtypes.Add(typeof(SByte));
@@ -846,6 +868,11 @@ namespace MySpace.DataMining.AELight
                     mygtypes.Add(t);
                 }
             }
+#if DEBUG
+            mygtypes.Add(typeof(System.Text.StringBuilder));
+            mygtypes.Add(typeof(System.Random));
+            mygtypes.Add(typeof(System.DateTime));
+#endif
 #if DEBUG
             mygtypes.Sort(new TypeSorter());
 #endif
@@ -5132,6 +5159,10 @@ internal class MRRReducerBase
     public class ExplicitCacheAttribute: Attribute
     {
     }
+    
+    public class KeyRepeatedEnabledAttribute: Attribute
+    {
+    }
 
     public class RandomAccessOutput
     {
@@ -5288,6 +5319,30 @@ internal class MRRReducerBase
 
 class MRRReducer: MRRReducerBase
 {
+
+    internal bool _keyrep = false;
+    internal List<byte> _keyrepbuf = null;
+
+    public bool DSpace_KeyRepeated
+    {
+        get
+        {
+            if(null == _keyrepbuf)
+            {
+                throw new InvalidOperationException(`KeyRepeatedEnabled attribute required`);
+            }
+            return _keyrep;
+        }
+    }
+
+    public bool Qizmt_KeyRepeated
+    {
+        get
+        {
+            return DSpace_KeyRepeated;
+        }
+    }
+
     ").Replace('`', '"') + MySpace.DataMining.DistributedObjects.CommonCs.CommonDynamicCsCode
       + reduceinitcode
       + reducecode
@@ -5525,6 +5580,22 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
     }
     mapout.mrrentries.Sort(new System.Comparison<MRRKV>(mrr_kcmp)); // !
     MRRReducer reducer = new MRRReducer();
+    {
+        System.Reflection.MethodInfo reducemi = reducer.GetType().GetMethod(`Reduce`);
+        object[] reduceattribs = reducemi.GetCustomAttributes(false);
+        //bool expcache = false;
+        for(int i = 0; i < reduceattribs.Length; i++)
+        {
+            /*if(null != reduceattribs[i] as MRRReducerBase.ExplicitCacheAttribute)
+            {
+                //expcache = true;
+            }*/
+            if(null != reduceattribs[i] as MRRReducerBase.KeyRepeatedEnabledAttribute)
+            {
+                reducer._keyrepbuf = new List<byte>();
+            }
+        }
+    }
     MRRReducer.RandomAccessEntries rae = new MRRReducer.RandomAccessEntries();
     rae.mrrentries = mapout.mrrentries;
     int nreduceouts = " + prettyfilenames.Count.ToString() + @";
@@ -5563,7 +5634,29 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             Stack.ResetStack();
             recordset.ResetBuffers();
 
+
+            List<byte> _keyrepbuf = reducer._keyrepbuf;
             ByteSlice key = rae[0].Key;
+            if(null != _keyrepbuf)
+            {
+                bool kr = false;
+                if(key.Length == _keyrepbuf.Count)
+                {
+                    bool krsofar = true;
+                    for(int kri = 0; kri < key.Length; kri++)
+                    {
+                        if(key[kri] != _keyrepbuf[kri])
+                        {
+                            krsofar = false;
+                            break;
+                        }
+                    }
+                    kr = krsofar;
+                }
+                reducer._keyrep = kr;
+                _keyrepbuf.Clear();
+                key.AppendTo(_keyrepbuf);
+            }
             if(flip)
             {
                 if(flipbuf == null)
@@ -7476,6 +7569,11 @@ static void Main(string[] args)
                 throw new NotImplementedException();
             }
 
+            public void WriteRecord(IList<byte> record)
+            {
+                throw new NotImplementedException();
+            }
+
             public void WriteBinary(MySpace.DataMining.DistributedObjects.Blob blob)
             {
                 throw new NotImplementedException();
@@ -7485,6 +7583,7 @@ static void Main(string[] args)
             {
                 throw new NotImplementedException();
             }
+
         }
 
     }

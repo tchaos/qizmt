@@ -565,7 +565,13 @@ namespace MySpace.DataMining.DistributedObjects5
                                     }
 
                                     ent.NetEntryOffset = offset;
-                                    fzkeyblock.Read(buf, offset, parent.keylen);
+                                    int read8383 = fzkeyblock.Read(buf, offset, parent.keylen);
+#if DEBUG
+                                    if (read8383 != parent.keylen)
+                                    {
+                                        throw new Exception("DEBUG:  (read8383 != parent.keylen)");
+                                    }
+#endif
                                     offset += parent.keylen;
 
                                     int valueoffset;
@@ -858,11 +864,18 @@ namespace MySpace.DataMining.DistributedObjects5
                                     }
 
                                     cooking_inIO = true;
-                                    if (0 == fzkeyblock.Read(xbuf, xoffset, keylen + TValueOffset_Size))
+                                    int read8291 = fzkeyblock.Read(xbuf, xoffset, keylen + TValueOffset_Size);
+                                    if (0 == read8291)
                                     {
                                         cooking_inIO = false;
                                         break;
                                     }
+#if DEBUG
+                                    if (read8291 != keylen + TValueOffset_Size)
+                                    {
+                                        throw new Exception("DEBUG:  (read8291 != keylen + TValueOffset_Size)");
+                                    }
+#endif
                                     cooking_inIO = false;
                                     cooking_seekpos += keylen + TValueOffset_Size;
 
@@ -5323,10 +5336,17 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     //----------------------------COOKING--------------------------------
 
-                    if (0 == StreamReadLoop(stm, _smallbuf, keylen + 4))
+                    int read7810 = StreamReadLoop(stm, _smallbuf, keylen + 4);
+                    if (0 == read7810)
                     {
                         break;
                     }
+#if DEBUG
+                    if (read7810 != keylen + 4)
+                    {
+                        throw new Exception("DEBUG:  (read7810 != keylen + 4)");
+                    }
+#endif
 
                     int valuelen = Entry.BytesToInt(_smallbuf, keylen);
                     if (valuelen > buf.Length)
@@ -5831,7 +5851,13 @@ namespace MySpace.DataMining.DistributedObjects5
 
                                         // Same key (or first) and it fits, so read and add it and keep going...
                                         cooking_inIO = true;
-                                        _largezblockresultfile.Read(buf, netbuflen + keylen + 4, valuelen);
+                                        int read2911 = _largezblockresultfile.Read(buf, netbuflen + keylen + 4, valuelen);
+#if DEBUG
+                                        if (read2911 != valuelen)
+                                        {
+                                            throw new Exception("DEBUG:  (read2911 != valuelen)");
+                                        }
+#endif
                                         cooking_inIO = false;
                                         cooking_seekpos += valuelen;
 

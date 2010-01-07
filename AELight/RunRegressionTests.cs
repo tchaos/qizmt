@@ -62,6 +62,15 @@ namespace MySpace.DataMining.AELight
                 Console.WriteLine("TESTING: only running one test of each type!");
             }
 
+            bool importonly = false;
+#if DEBUG
+            if ("-import" == RunTestsType || "-importonly" == RunTestsType)
+            {
+                importonly = true;
+                Console.WriteLine("IMPORTING: only importing tests!");
+            }
+#endif
+
             //string dfsxmlpath = Shell("qizmt metapath").Trim();
             string dfsxmlpath = Environment.CurrentDirectory + @"\" + dfs.DFSXMLNAME;
 
@@ -112,6 +121,11 @@ namespace MySpace.DataMining.AELight
             {
             }
             Console.WriteLine("    Import completed; duration: {0}", (DateTime.Now - ImportStartTime).ToString());
+
+            if (importonly)
+            {
+                return;
+            }
 
             Console.WriteLine();
             DateTime RunStartTime = DateTime.Now;

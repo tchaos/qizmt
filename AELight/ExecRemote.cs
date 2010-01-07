@@ -336,7 +336,7 @@ public static void DSpace_LogResult(string name, bool passed)
                         }
                         try
                         {
-                            System.IO.File.WriteAllText(NetworkPathForHost(slaves[si]) + @"\slaveconfig.xml", slaveconfigxml);
+                            System.IO.File.WriteAllText(NetworkPathForHost(slaves[si]) + @"\slaveconfig.j" + sjid + ".xml", slaveconfigxml);
                         }
                         catch
                         {
@@ -595,96 +595,92 @@ public static void DSpace_LogResult(string name, bool passed)
                         for(int oi = 0; oi < blocks[BlockID].DFSWriters.Count; oi++)                        
                         {
                             string dfswriter = blocks[BlockID].DFSWriters[oi];
-                            // Reload DFS config to make sure changes since starting get rolled in, and make sure the output file wasn't created in that time...
-                            using (LockDfsMutex()) // Needed: change between load & save should be atomic.
+                            dfspath = dfswriter; // Init.
+
+                            if (string.IsNullOrEmpty(dfspath))
                             {
-                                dc = LoadDfsConfig();
-                                if (null != DfsFind(dc, dfswriter))
+                                dfspathreplicating = null;
+                                if (blocks[BlockID].outputdfsnodeses[oi].Count > 0)
                                 {
-                                    Console.Error.WriteLine("Error:  output file was created during job: {0}", dfswriter);
-                                    return;
+                                    Console.Error.WriteLine("Output data detected with no DFSWriter specified");
                                 }
-                                dfspath = dfswriter; // Init.                                
-                                if (string.IsNullOrEmpty(dfspath))
+                            }
+                            else
+                            {
+                                // Reload DFS config to make sure changes since starting get rolled in, and make sure the output file wasn't created in that time...
+                                using (LockDfsMutex()) // Needed: change between load & save should be atomic.
                                 {
-                                    dfspathreplicating = null;
-                                    if (blocks[BlockID].outputdfsnodeses[oi].Count > 0)
+                                    dc = LoadDfsConfig();
+                                    if (null != DfsFind(dc, dfswriter))
                                     {
-                                        Console.Error.WriteLine("Output data detected with no DFSWriter specified");
-                                    }
-                                }
-                                else
-                                {
-                                    nonemptyoutputpath = true;
-                                    dfs.DfsFile df = new dfs.DfsFile();
-                                    if (blocks[BlockID].rem.OutputRecordLengths[oi] > 0)
-                                    {
-                                        df.XFileType = DfsFileTypes.BINARY_RECT + "@" + blocks[BlockID].rem.OutputRecordLengths[oi].ToString();
-                                    }
-                                    df.Nodes = new List<dfs.DfsFile.FileNode>();
-                                    df.Size = -1; // Preset
-                                    if (dfspath.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        dfspath = dfspath.Substring(6);
-                                    }
-                                    dfspathreplicating = ".$" + dfspath + ".$replicating-" + Guid.NewGuid().ToString();
-                                    if (null != dc.FindAny(dfspathreplicating))
-                                    {
-                                        Console.Error.WriteLine("Error: file exists: file put into DFS from another location during job: " + dfspathreplicating);
-                                        SetFailure();
+                                        Console.Error.WriteLine("Error:  output file was created during job: {0}", dfswriter);
                                         return;
                                     }
-                                    df.Name = dfspathreplicating;
-                                    bool anybad = false;
-                                    long totalsize = 0;
+
                                     {
-                                        int i = BlockID;
-                                        for (int j = 0; j < blocks[i].outputdfsnodeses[oi].Count; j++)
+                                        nonemptyoutputpath = true;
+                                        dfs.DfsFile df = new dfs.DfsFile();
+                                        if (blocks[BlockID].rem.OutputRecordLengths[oi] > 0)
                                         {
-                                            dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
-                                            fn.Host = blocks[i].slaves[(blocks[i].rem.OutputStartingPoint + j) % blocks[i].slaves.Count];
-                                            fn.Name = blocks[i].outputdfsnodeses[oi][j];
-                                            df.Nodes.Add(fn);
-                                            fn.Length = -1; // Preset
-                                            fn.Position = -1; // Preset
-                                            if (anybad)
+                                            df.XFileType = DfsFileTypes.BINARY_RECT + "@" + blocks[BlockID].rem.OutputRecordLengths[oi].ToString();
+                                        }
+                                        df.Nodes = new List<dfs.DfsFile.FileNode>();
+                                        df.Size = -1; // Preset
+                                        if (dfspath.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            dfspath = dfspath.Substring(6);
+                                        }
+                                        dfspathreplicating = ".$" + dfspath + ".$replicating-" + Guid.NewGuid().ToString();
+                                        if (null != dc.FindAny(dfspathreplicating))
+                                        {
+                                            Console.Error.WriteLine("Error: file exists: file put into DFS from another location during job: " + dfspathreplicating);
+                                            SetFailure();
+                                            return;
+                                        }
+                                        df.Name = dfspathreplicating;
+                                        bool anybad = false;
+                                        long totalsize = 0;
+                                        {
+                                            int i = BlockID;
+                                            for (int j = 0; j < blocks[i].outputdfsnodeses[oi].Count; j++)
                                             {
-                                                continue;
+                                                dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
+                                                fn.Host = blocks[i].slaves[(blocks[i].rem.OutputStartingPoint + j) % blocks[i].slaves.Count];
+                                                fn.Name = blocks[i].outputdfsnodeses[oi][j];
+                                                df.Nodes.Add(fn);
+                                                fn.Length = -1; // Preset
+                                                fn.Position = -1; // Preset
+                                                if (anybad)
+                                                {
+                                                    continue;
+                                                }
+                                                fn.Length = blocks[i].outputsizeses[oi][j];
+                                                fn.Position = totalsize; // Position must be set before totalsize updated!
+                                                if (blocks[i].outputdfsnodeses[oi].Count != blocks[i].outputsizeses[oi].Count)
+                                                {
+                                                    anybad = true;
+                                                    continue;
+                                                }
+                                                totalsize += blocks[i].outputsizeses[oi][j];
                                             }
-                                            fn.Length = blocks[i].outputsizeses[oi][j];
-                                            fn.Position = totalsize; // Position must be set before totalsize updated!
-                                            if (blocks[i].outputdfsnodeses[oi].Count != blocks[i].outputsizeses[oi].Count)
-                                            {
-                                                anybad = true;
-                                                continue;
-                                            }
-                                            totalsize += blocks[i].outputsizeses[oi][j];
+                                        }
+                                        if (!anybad)
+                                        {
+                                            df.Size = totalsize;
+                                        }
+                                        if (totalsize != 0)
+                                        {
+                                            anyoutput = true;
+                                        }
+                                        // Always add the file to DFS, even if blank!
+                                        {
+                                            dc.Files.Add(df);
+                                            UpdateDfsXml(dc); // !
                                         }
                                     }
-                                    if (!anybad)
-                                    {
-                                        df.Size = totalsize;
-                                    }
-                                    if (totalsize != 0)
-                                    {
-                                        anyoutput = true;
-                                    }
-                                    // Always add the file to DFS, even if blank!
-                                    {
-                                        dc.Files.Add(df);
-                                        UpdateDfsXml(dc); // !
-                                    }
-                                }                               
-                            }
-                            if (!anyoutput && verbose && nonemptyoutputpath)
-                            {
-                                Console.Write(" (no DFS output) ");
-                                ConsoleFlush();
-                            }
-                            if (verbose)
-                            {
-                                Console.WriteLine(); // Line after output chars.
-                            }
+                                }
+                            }                            
+                           
                             if (null != dfspathreplicating) // If there was an output file specified...
                             {
                                 ReplicationPhase(dfspathreplicating, verbosereplication, blocks.Count, slaves);
@@ -706,12 +702,47 @@ public static void DSpace_LogResult(string name, bool passed)
                                 }
                             }
                         }
+                        if (!anyoutput && verbose && nonemptyoutputpath)
+                        {
+                            Console.Write(" (no DFS output) ");
+                            ConsoleFlush();
+                        }
+                        if (verbose)
+                        {
+                            Console.WriteLine(); // Line after output chars.
+                        }
                     }
                 }
 
             }
             finally
             {
+                {
+                    for (int si = 0; si < slaves.Length; si++)
+                    {
+                        System.Threading.Mutex m = new System.Threading.Mutex(false, "AEL_SC_" + slaves[si]);
+                        try
+                        {
+                            m.WaitOne();
+                        }
+                        catch (System.Threading.AbandonedMutexException)
+                        {
+                        }
+                        try
+                        {
+                            System.IO.File.Delete(NetworkPathForHost(slaves[si]) + @"\slaveconfig.j" + sjid + ".xml");
+                        }
+                        catch
+                        {
+                        }
+                        finally
+                        {
+                            m.ReleaseMutex();
+                            m.Close();
+                        }
+                    }
+                }
+
                 CheckUserLogs(slaves, logname);
             }
 

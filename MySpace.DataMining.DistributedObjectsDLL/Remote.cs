@@ -885,12 +885,13 @@ namespace RemoteExec
             {
                 throw new Exception(`Record length mismatch; got length of ` + recordCount.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
             }
+            Begin();
             for(int i = 0; i < recordCount; i++)
             {
                 this.WriteByte(record[i]);
             }
+            End();
         }
-
 
         public void WriteLine(IList<byte> line)
         {
@@ -1119,6 +1120,15 @@ namespace RemoteExec
             Write(_wb, 0, 1);
         }
 
+        private void WriteByteRecord(byte x)
+        {
+            if(null == _wb)
+            {
+                _wb = new byte[1];
+            }
+            _wb[0] = x;
+            _WriteToChunk(_wb, 0, 1);            
+        }
 
         internal void _done()
         {

@@ -120,12 +120,8 @@ namespace RDBMS_qa
             selectAllCtrlAToolStripMenuItem.Enabled = enabled;
         }
 
-        public void RunQuery()
+        static string _CleanQuery(string query, string newlinestring)
         {
-            ClearResults();
-
-            string query = txtQuery.Text.Trim();
-
             //Remove newlines from non-string-literal.
             //Identify all string literals.
             Regex regx = new Regex("'[^']*'");
@@ -139,7 +135,7 @@ namespace RDBMS_qa
                 string substr = query.Substring(prevIndex, lit.Index - prevIndex);
 
                 //Replace newline with a space.
-                substr = substr.Replace(Environment.NewLine, " ");
+                substr = substr.Replace("\r", "").Replace("\n", newlinestring);
                 cleanedQuery += substr + lit.Value;
 
                 prevIndex = lit.Index + lit.Length;
@@ -147,13 +143,62 @@ namespace RDBMS_qa
 
             if (prevIndex < query.Length)
             {
-                cleanedQuery += query.Substring(prevIndex).Replace(Environment.NewLine, " ");
+                cleanedQuery += query.Substring(prevIndex).Replace("\r", "").Replace("\n", newlinestring);
             }
 
-            if (cleanedQuery.Length == 0)
+            return cleanedQuery;
+        }
+
+        public void RunQuery()
+        {
+            ClearResults();
+
+            string fquery = txtQuery.Text.Trim();
+            bool hasgo = false;
+            if(fquery.StartsWith("GO", StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show("Query is empty.");
-                return;
+                for (int i = 2; ; i++)
+                {
+                    if (i >= fquery.Length)
+                    {
+                        //hasgo = false;
+                        break;
+                    }
+                    if('\n' == fquery[i])
+                    {
+                        hasgo = true;
+                        fquery = fquery.Substring(i + 1).TrimStart();
+                        break;
+                    }
+                    if (!char.IsWhiteSpace(fquery[i]))
+                    {
+                        //hasgo = false;
+                        break;
+                    }
+                }
+            }
+
+            List<string> queries = new List<string>();
+            if (hasgo)
+            {
+                string nsqueries = _CleanQuery(fquery, "\0");
+                queries.AddRange(nsqueries.Split(new char[] { '\0' },
+                    StringSplitOptions.RemoveEmptyEntries));
+                if (0 == queries.Count)
+                {
+                    MessageBox.Show("Expected query after GO");
+                    return;
+                }
+            }
+            else
+            {
+                string cleanedQuery = _CleanQuery(fquery, " ");
+                if (cleanedQuery.Length == 0)
+                {
+                    MessageBox.Show("Query is empty.");
+                    return;
+                }
+                queries.Add(cleanedQuery);
             }
 
             button1.Enabled = false;          
@@ -169,52 +214,67 @@ namespace RDBMS_qa
                 conn.ConnectionString = ConnectionString;
                 conn.Open();
                 DbCommand cmd = conn.CreateCommand();
-                cmd.CommandText = cleanedQuery;
-
-                if (cleanedQuery.StartsWith("select", StringComparison.OrdinalIgnoreCase) ||
-                    cleanedQuery.StartsWith("shell", StringComparison.OrdinalIgnoreCase)||
-                    cleanedQuery.StartsWith("rselect", StringComparison.OrdinalIgnoreCase))
+                for (int onquery = 0; onquery < queries.Count; onquery++)
                 {
-                    DbDataReader reader = cmd.ExecuteReader();
-
-                    DataSet ds = new DataSet();
-                    DataTable dt = new DataTable();
-
-                    //Get column meta data.
-                    int columnCount = reader.FieldCount;
-                    for (int i = 0; i < columnCount; i++)
+                    string thisquery = queries[onquery].Trim();
+                    if (0 == thisquery.Length)
                     {
-                        dt.Columns.Add(reader.GetName(i));
+                        continue;
                     }
-
-                    ds.Tables.Add(dt);
-
-                    while (reader.Read())
+                    if (onquery > 0)
                     {
-                        object[] row = new object[columnCount];
-                        reader.GetValues(row);
-                        for (int ir = 0; ir < row.Length; ir++)
+                        ShowStatus("Executing next query...");
+                    }
+                    this.Update();
+                    cmd.CommandText = thisquery;
+
+                    if (thisquery.StartsWith("select", StringComparison.OrdinalIgnoreCase) ||
+                        thisquery.StartsWith("shell", StringComparison.OrdinalIgnoreCase) ||
+                        thisquery.StartsWith("rselect", StringComparison.OrdinalIgnoreCase))
+                    {
+                        DbDataReader reader = cmd.ExecuteReader();
+                        ClearResults();
+
+                        DataSet ds = new DataSet();
+                        DataTable dt = new DataTable();
+
+                        //Get column meta data.
+                        int columnCount = reader.FieldCount;
+                        for (int i = 0; i < columnCount; i++)
                         {
-                            if (DBNull.Value == row[ir])
-                            {
-                                row[ir] = "NULL";
-                            }
+                            dt.Columns.Add(reader.GetName(i));
                         }
-                        dt.Rows.Add(row);
-                    }
 
-                    //Get result table schema before closing the reader.
-                    DataTable schema = reader.GetSchemaTable();
-                    reader.Close();
-                    dgvResults.DataSource = ds.Tables[0];
-                    SetGridWidths(schema);
+                        ds.Tables.Add(dt);
+
+                        while (reader.Read())
+                        {
+                            object[] row = new object[columnCount];
+                            reader.GetValues(row);
+                            for (int ir = 0; ir < row.Length; ir++)
+                            {
+                                if (DBNull.Value == row[ir])
+                                {
+                                    row[ir] = "NULL";
+                                }
+                            }
+                            dt.Rows.Add(row);
+                        }
+
+                        //Get result table schema before closing the reader.
+                        DataTable schema = reader.GetSchemaTable();
+                        reader.Close();
+                        dgvResults.DataSource = ds.Tables[0];
+                        SetGridWidths(schema);
+                    }
+                    else
+                    {
+                        cmd.ExecuteNonQuery();
+                        ClearResults();
+                        AddRow("Query results", "Completed");
+                    }
+                    status = "Execution completed";
                 }
-                else
-                {
-                    cmd.ExecuteNonQuery();
-                    AddRow("Query results", "Completed");
-                }
-                status = "Execution completed";   
             }
             catch (Exception e)
             {
@@ -225,9 +285,9 @@ namespace RDBMS_qa
             {
                 try
                 {
-                    conn.Close();  
+                    conn.Close();
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     AddRow("Exception Details", e.ToString());
                     status = "Exceptions occurred";
@@ -354,13 +414,19 @@ namespace RDBMS_qa
                 STORED_PROCEDURES  5
                 OPERATORS          6
              * */
-            txtQuery.Lexing.Keywords[0] = "AND OR UNION ALL INNERJOIN INPUT OUTPUT INNER JOIN LEFT RIGHT OUTER OUTERJOIN LIKE HELP CREATE TABLE INSERT INTO IMPORT IMPORTLINES VALUES SELECT TOP FROM WHERE ORDER BY UPDATE SET TRUNCATE DROP INT LONG DOUBLE CHAR SHELL DELETE DISTINCT GROUP ON".ToLower();
-            
+            txtQuery.Lexing.Keywords[0] = "GO AND OR UNION ALL INNERJOIN INPUT OUTPUT INNER JOIN LEFT RIGHT OUTER OUTERJOIN LIKE HELP CREATE TABLE INSERT INTO IMPORT IMPORTLINES VALUES SELECT TOP FROM WHERE ORDER BY UPDATE SET TRUNCATE DROP SHELL DELETE DISTINCT GROUP ON".ToLower();
+            txtQuery.Lexing.Keywords[1] = "INT LONG DOUBLE CHAR DATETIME".ToLower();
+#if DEBUG
+            txtQuery.Lexing.Keywords[4] = "UPPER LOWER ROUND RAND MIN MAX".ToLower();
+#endif
+
             //txtQuery.Styles[(int)MssqlStyles.IDENTIFIER].ForeColor = 
             txtQuery.Styles[(int)MssqlStyles.STRING].ForeColor = Color.Brown;
             //txtQuery.Styles[(int)MssqlStyles.NUMBER].ForeColor = Color.Black;
             txtQuery.Styles[(int)MssqlStyles.LINE_COMMENT].ForeColor = Color.DarkGreen;
             txtQuery.Styles[(int)MssqlStyles.STATEMENT].ForeColor = Color.Blue;
+            txtQuery.Styles[(int)MssqlStyles.DATATYPE].ForeColor = Color.Navy;
+            txtQuery.Styles[(int)MssqlStyles.FUNCTION].ForeColor = Color.CadetBlue;
 
         }
 

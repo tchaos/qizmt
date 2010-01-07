@@ -2890,6 +2890,282 @@ switch(workerindex)
             Console.WriteLine("{0} {1} {2}", df.Size, df.Type, df.RecordLength);
         }
 
+        public static void DfsShuffle(string[] args)
+        {
+            if (!dfs.DfsConfigExists(DFSXMLPATH))
+            {
+                Console.Error.WriteLine("DFS not setup; use:  {0} format", appname);
+                SetFailure();
+                return;
+            }
+
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("dfs shuffle error:  {0} dfs get <source dfspath> <target dfspath>", appname);
+                SetFailure();
+                return;
+            }
+
+            string sourcefn = args[0];
+            if (sourcefn.StartsWith(@"dfs:\\", StringComparison.OrdinalIgnoreCase))
+            {
+                sourcefn = sourcefn.Substring(6);
+            }
+
+            dfs dc = LoadDfsConfig();
+            dfs.DfsFile dfssf = DfsFindAny(dc, sourcefn);           
+            if (null == dfssf)
+            {
+                Console.Error.WriteLine("Error:  The specified file '{0}' does not exist in DFS", sourcefn);
+                SetFailure();
+                return;
+            }
+            if (0 != string.Compare(dfssf.Type, DfsFileTypes.BINARY_RECT, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Error.WriteLine("Shuffle only supports binary dfs file", dfssf.Name);
+                SetFailure();
+                return;
+            }
+
+            string targetfn = args[1];
+            if (targetfn.StartsWith(@"dfs:\\", StringComparison.OrdinalIgnoreCase))
+            {
+                targetfn = targetfn.Substring(6);
+            }
+            {
+                dfs.DfsFile dfstf = DfsFindAny(dc, targetfn);
+                if (dfstf != null)
+                {
+                    Console.Error.WriteLine("Error:  The specified target file '{0}' already exists in DFS", targetfn);
+                    SetFailure();
+                    return;
+                }
+            }
+
+            string[] chunkhosts = new string[dfssf.Nodes.Count];
+            for (int ni = 0; ni < dfssf.Nodes.Count; ni++)
+            {
+                dfs.DfsFile.FileNode fn = dfssf.Nodes[ni];
+                string[] thishosts = fn.Host.Split(';');
+                chunkhosts[ni] = thishosts[0];
+            }
+
+            Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            for (int hi = 0; hi < chunkhosts.Length; hi++)
+            {
+                int rindex = rnd.Next(0, Int32.MaxValue) % chunkhosts.Length;
+                string oldhost = chunkhosts[hi];
+                chunkhosts[hi] = chunkhosts[rindex];
+                chunkhosts[rindex] = oldhost;
+            }
+
+            StringBuilder sbchunkhosts = new StringBuilder();
+            foreach (string ch in chunkhosts)
+            {
+                if (sbchunkhosts.Length > 0)
+                {
+                    sbchunkhosts.Append(",");
+                }
+                sbchunkhosts.Append("@\"");
+                sbchunkhosts.Append(ch);
+                sbchunkhosts.Append("\"");
+            }
+
+            string guid = Guid.NewGuid().ToString();
+            string root = AELight.AELight_Dir.Replace(':', '$');
+            string outputfn = "shuffle_output_" + guid;
+            string tempfnpost = ".$" + guid + ".$" + System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+            string jobsfn = "shuffle_job.xml" + tempfnpost;
+            try
+            {
+                using (System.IO.StreamWriter sw = System.IO.File.CreateText(jobsfn))
+                {
+                    sw.Write((@"
+<SourceCode>
+  <Jobs>
+     <Job Name=`Shuffle` Custodian=`` Email=`` Description=``>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO_Multi>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://" + outputfn + @"_####.txt</DFSWriter>
+          <Mode>ALL MACHINES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {      
+                string[] hosts = new string[]{" + sbchunkhosts.ToString() + @"};
+                string root = @`" + root + @"`;
+                string tempfile = IOUtils.GetTempDirectory() + @`\` + Guid.NewGuid().ToString();
+                Shell(@`qizmt bulkget ` + tempfile + ` " + sourcefn + @"`);
+                
+                using(System.IO.StreamReader reader = new System.IO.StreamReader(tempfile))
+                {
+                    int linepos = 0;                   
+                    string line = reader.ReadLine();                    
+                    while(line != null)
+                    {
+                        if(linepos % StaticGlobals.Qizmt_BlocksTotalCount == StaticGlobals.Qizmt_BlockID)
+                        {
+                            string[] parts = line.Split(' ');
+                            string[] chunkhosts = parts[0].Split(';');
+                            string chunkname = parts[1];
+                            string size = parts[2];                            
+                            string newhost = hosts[linepos];
+                            string newchunkname = GenerateDataNodeName(`shuffle`, `zd.`, `.zd`);
+                            
+                            string copyfrom = @`\\` + chunkhosts[0] + @`\` + root + @`\` + chunkname;
+                            string copyto = @`\\` + newhost + @`\` + root + @`\` + newchunkname;
+                            int CookTimeout = 1000 * 60;
+                            int CookRetries = 64;
+                            int cooking_cooksremain = CookRetries;
+                            for (; ; ) // Cooking loop.
+                            {
+                                try
+                                {
+                                    System.IO.File.Copy(copyfrom, copyto, true); // overwrite=true
+                                }
+                                catch (Exception e)
+                                {                                    
+                                    if (cooking_cooksremain-- <= 0)
+                                    {
+                                        throw new System.IO.IOException(`cooked too many times (retries=`
+                                            + CookRetries.ToString()
+                                            + `; timeout=` + CookTimeout.ToString()
+                                            + `) on ` + copyfrom, e);
+                                    }
+                                    System.Threading.Thread.Sleep(CookTimeout);                                                    
+                                    continue; // !
+                                }
+                                break;
+                            }                            
+                            dfsoutput.WriteLine(newhost + ` ` + newchunkname + ` ` + size);                            
+                        }
+                        line = reader.ReadLine();
+                        linepos++;
+                    }    
+                }                
+                System.IO.File.Delete(tempfile);              
+            }
+            
+            public static string GenerateDataNodeName(string dfspath, string prefix, string suffix)
+            {
+                StringBuilder sbfnn = new StringBuilder(32);
+                sbfnn.Append(prefix);
+                {
+                    int j = 0;
+                    for (int i = 0; i < dfspath.Length; i++)
+                    {
+                        if (char.IsLetterOrDigit(dfspath[i]))
+                        {
+                            sbfnn.Append(dfspath[i]);
+                            if (++j >= 10)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+                sbfnn.Append('.');
+                sbfnn.Append(Guid.NewGuid().ToString());
+                sbfnn.Append(suffix);
+                return sbfnn.ToString();
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`bulkput` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                string outfn = `" + outputfn + @"`;
+                string[] lines = Shell(@`Qizmt ls ` + outfn + `*`).Split('\n');
+              
+                List<string> outputfiles = new List<string>();
+                foreach(string line in lines)
+                {
+                    string _line = line.Trim();
+                    if(_line.StartsWith(outfn))
+                    {
+                        string[] parts = _line.Split(' ');
+                        outputfiles.Add(parts[0].Trim());    
+                    }
+                }
+                
+                outputfiles.Sort();         
+                
+                List<string[]> newchunks = new List<string[]>();
+                foreach(string outputfile in outputfiles)
+                {
+                    string tempfile = IOUtils.GetTempDirectory() + @`\` + Guid.NewGuid().ToString();
+                    Shell(`Qizmt get ` + outputfile + ` ` + tempfile);
+                    newchunks.Add(System.IO.File.ReadAllLines(tempfile));
+                    System.IO.File.Delete(tempfile);                    
+                }             
+
+                Shell(@`Qizmt del ` + outfn + `*`);
+                
+                {
+                    string tempfile = IOUtils.GetTempDirectory() + @`\` + Guid.NewGuid().ToString();
+                    int curlinepos = 0;
+                    int curfilepos = 0;
+                    using(System.IO.StreamWriter writer = new System.IO.StreamWriter(tempfile))
+                    {
+                        for(;;)
+                        {
+                            if(curlinepos >= newchunks[curfilepos].Length)
+                            {
+                                break;
+                            }
+                            writer.WriteLine(newchunks[curfilepos][curlinepos]);
+                            
+                            curfilepos++;
+                            if(curfilepos >= newchunks.Count)
+                            {
+                                curfilepos = 0;
+                                curlinepos++;
+                            }
+                        }     
+                        writer.Close();
+                    }  
+                    
+                    Shell(`Qizmt bulkput ` + tempfile + ` ` + ` " + targetfn + @" rbin@" + dfssf.RecordLength.ToString() + @"`);
+                    System.IO.File.Delete(tempfile);
+                }                 
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
+").Replace("`", "\""));
+                }
+                Console.WriteLine("Shuffling {0}...", sourcefn);
+                Exec("", LoadConfig(jobsfn), new string[] { }, false, false);
+                Console.WriteLine("Done");
+            }
+            finally
+            {
+                try
+                {
+                    System.IO.File.Delete(jobsfn);
+                }
+                catch
+                {
+                }
+            }
+
+            {
+                
+
+            }
+        }
 
         public static void DfsBulkPut(string[] args)
         {
@@ -4205,6 +4481,10 @@ switch(workerindex)
 
                     case "bulkput":
                         DfsBulkPut(args);
+                        break;
+
+                    case "shuffle":
+                        DfsShuffle(args);
                         break;
 
                     case "getjobs":

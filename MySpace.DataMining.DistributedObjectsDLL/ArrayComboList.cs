@@ -777,7 +777,8 @@ namespace UserLoader
                 string offsets = "";
                 for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
                 {
-                    if (-1 == InputRecordLengths[oi])
+                    if (oi >= InputRecordLengths.Count
+                        || -1 == InputRecordLengths[oi])
                     {
                         offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
                     }
@@ -915,6 +916,20 @@ namespace UserMapper
             bool cooking_is_read = false;
             long cooking_pos = 0; // Last known good position between records/lines.
             //----------------------------COOKING--------------------------------
+
+#if DEBUG
+            try
+            {
+                string _df34891 = @`\MapInputChunk.txt`;
+                if(System.IO.File.Exists(_df34891))
+                {
+                    System.IO.File.AppendAllText(_df34891, input.Name + ` ` + input.Stream.Length + `-` + input.Stream.Position + Environment.NewLine);
+                }
+            }
+            catch
+            {
+            }
+#endif
             
             for(;;)//while cooked
             {
@@ -1099,7 +1114,8 @@ namespace UserMapper
                 string offsets = "";
                 for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
                 {
-                    if (-1 == InputRecordLengths[oi])
+                    if (oi >= InputRecordLengths.Count
+                        || -1 == InputRecordLengths[oi])
                     {
                         offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
                     }
@@ -1605,10 +1621,46 @@ namespace MySpace.DataMining.EasyReducer
             }
         }
 
+
+        bool _keyrep = false;
+        List<byte> _keyrepbuf = null;
+
+        public bool DSpace_KeyRepeated
+        {
+            get
+            {
+                if(null == _keyrepbuf)
+                {
+                    throw new InvalidOperationException(""KeyRepeatedEnabled attribute required"");
+                }
+                return _keyrep;
+            }
+        }
+        
+        public bool Qizmt_KeyRepeated
+        {
+            get
+            {
+                return DSpace_KeyRepeated;
+            }
+        }
+
+
         public bool OnGetEnumerator(EntriesInput input, EntriesOutput output)
         {
             if(null == raentries)
             {
+                {
+                    System.Reflection.MethodInfo reducemi = this.GetType().GetMethod(""Reduce"");
+                    object[] reduceattribs = reducemi.GetCustomAttributes(false);
+                    for(int i = 0; i < reduceattribs.Length; i++)
+                    {
+                        if(null != reduceattribs[i] as KeyRepeatedEnabledAttribute)
+                        {
+                            _keyrepbuf = new List<byte>();
+                        }
+                    }
+                }
                 raentries = new RandomAccessEntries();
             }
             raentries.SetInput(input);
@@ -1618,6 +1670,27 @@ namespace MySpace.DataMining.EasyReducer
             for (; i < input.entries.Count; )
             {
                 input.entries[i].LocateKey(input, out firstkeybuf, out firstkeyoffset, out firstkeylen);
+                ByteSlice key = ByteSlice.Prepare(firstkeybuf, firstkeyoffset, firstkeylen);
+                if(null != _keyrepbuf)
+                {
+                    bool kr = false;
+                    if(key.Length == _keyrepbuf.Count)
+                    {
+                        bool krsofar = true;
+                        for(int kri = 0; kri < key.Length; kri++)
+                        {
+                            if(key[kri] != _keyrepbuf[kri])
+                            {
+                                krsofar = false;
+                                break;
+                            }
+                        }
+                        kr = krsofar;
+                    }
+                    _keyrep = kr;
+                    _keyrepbuf.Clear();
+                    key.AppendTo(_keyrepbuf);
+                }
                 int len = 1;
                 for (int j = i + 1; j < input.entries.Count; j++)
                 {
@@ -1763,6 +1836,10 @@ namespace MySpace.DataMining.EasyReducer
 
 
         public class ExplicitCacheAttribute: Attribute
+        {
+        }
+
+        public class KeyRepeatedEnabledAttribute: Attribute
         {
         }
 
@@ -2101,7 +2178,7 @@ namespace MySpace.DataMining.EasyReducer
                 // Get information...
                 {
                     System.Xml.XmlDocument xd = new System.Xml.XmlDocument();
-                    xd.Load(`slaveconfig.xml`);
+                    xd.Load(`slaveconfig.j` + " + sjid + @" + `.xml`);
                     System.Xml.XmlNode xslave = xd[`slave`];
 
                     if (null != xslave)

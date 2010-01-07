@@ -65,6 +65,7 @@
     <Compile Include="QaParameterCollection.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="XContent.cs" />
+    <Compile Include="XLog.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ky.snk" />

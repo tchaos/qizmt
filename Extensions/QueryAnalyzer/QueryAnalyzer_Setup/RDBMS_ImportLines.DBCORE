@@ -9,6 +9,7 @@
         <!-- OutputDfsFile -->
         <OutputMethod>grouped</OutputMethod>
       </IOSettings>
+      <IntermediateDataAddressing>64</IntermediateDataAddressing>
       <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
       <Using>RDBMS_DBCORE</Using>
       <MapReduce>

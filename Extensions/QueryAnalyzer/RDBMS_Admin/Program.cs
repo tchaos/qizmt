@@ -66,6 +66,10 @@ namespace RDBMS_Admin
                     GenerateRIndexBasicStressTest(args);
                     break;
 
+                case "health":
+                    Health(args);
+                    break;
+
                 default:
                     Console.Error.WriteLine("Not valid: RDBMS_Admin {0}", action);
                     break;
@@ -90,6 +94,7 @@ namespace RDBMS_Admin
             Console.WriteLine("                            [-v verbose]");
             Console.WriteLine("                            generate and run rindex filtering stress test");
             Console.WriteLine("    rindexbasicstresstest   generate a basic rindex stress test");
+            Console.WriteLine("    health   check health of protocol services");
         }
 
         static void GetRawBuildInfo(out int bn, out int rv)

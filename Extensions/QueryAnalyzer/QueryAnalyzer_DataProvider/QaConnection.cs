@@ -97,6 +97,24 @@ namespace QueryAnalyzer_DataProvider
             }
         }
 
+        internal System.Net.Sockets.NetworkStream GetRIndexUpdateNetStream(string host)
+        {
+            if (connstr.RIndex == QaConnectionString.RIndexType.POOLED && sockpool != null && sockpool.Count > 0)
+            {
+                string _host = host.ToUpper();
+                if (sockpool.ContainsKey(_host))
+                {
+                    return netstmpool[_host];
+                }
+                else
+                {
+                    throw new Exception(_host + " host not found in GetRIndexUpdateNetStream.");
+                }
+            }
+
+            throw new Exception("Must be used with rindex=pooled");
+        }
+
         private void _OpenSocketRIndex(string host)
         {
             if (connstr.RIndex == QaConnectionString.RIndexType.POOLED && sockpool != null && sockpool.Count > 0)
@@ -314,7 +332,7 @@ namespace QueryAnalyzer_DataProvider
                         throw new Exception("Index version conflict, need to recreate indexes");
                     }
 
-                    byte[] lastkeybuf = new byte[keylen];
+                    byte[] lastkeybuf = new byte[3];
                     int filelen = 0;
                     XContent.ReceiveXBytesNoCap(netstm, out filelen, ref buf);
                     if (filelen > 0)
@@ -336,7 +354,7 @@ namespace QueryAnalyzer_DataProvider
                                 keybuf[ki] = buf[pos++];
                             }
 
-                            bool samekey = true;
+                            /*bool samekey = true;
                             for (int ki = 0; ki < keybuf.Length; ki++)
                             {
                                 if (lastkeybuf[ki] != keybuf[ki])
@@ -344,14 +362,15 @@ namespace QueryAnalyzer_DataProvider
                                     samekey = false;
                                     break;
                                 }
-                            }
+                            }*/
 
                             int chunknamestartpos = pos;
                             while (buf[pos++] != (byte)'\0')
                             {
                             }
 
-                            if (!samekey)
+                            //samekey = false;
+                            //if (!samekey)
                             {
                                 string chunkname = System.Text.Encoding.UTF8.GetString(buf, chunknamestartpos, pos - chunknamestartpos - 1);
 
@@ -372,7 +391,7 @@ namespace QueryAnalyzer_DataProvider
                                 }
 
                                 lines.Add(new KeyValuePair<byte[], string>(keybuf, chunkname));
-                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, keylen);
+                                Buffer.BlockCopy(keybuf, 0, lastkeybuf, 0, 3);
                             }
                         }
 

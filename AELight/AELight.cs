@@ -154,6 +154,9 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    unpauseschedule <ScheduleID>   Un-pauses the specified Schedule Identifier");
             Console.WriteLine("    unschedule <ScheduleID>        Removes the specified Schedule Identifier");
             Console.WriteLine("    clearschedule                  Removes all entries from the scheduler");
+            Console.WriteLine("    shuffle <source> <target>      Shuffle underlying parts of a rectangular");
+            Console.WriteLine("                                   binary file, maintaining chunk order");
+            Console.WriteLine("    spread <dfsfile> <out-dfsfile> Spread a DFS file across the cluster");
         }
 
 
@@ -1976,6 +1979,141 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "spread":
+                    {
+                        if (args.Length <= 2)
+                        {
+                            Console.Error.WriteLine("Expected: {0} spread <input-dfsfile> <output-dfsfile>", appname);
+                            SetFailure();
+                            return;
+                        }
+
+                        string infn = args[1];
+                        if (infn.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            infn = infn.Substring(6);
+                        }
+                        if (-1 != infn.IndexOf('@'))
+                        {
+                            Console.Error.WriteLine("Record length not expected: {0}", infn);
+                            SetFailure();
+                            return;
+                        }
+                        string outfn = args[2];
+                        if (outfn.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            outfn = outfn.Substring(6);
+                        }
+                        if (-1 != outfn.IndexOf('@'))
+                        {
+                            Console.Error.WriteLine("Record length not expected: {0}", outfn);
+                            SetFailure();
+                            return;
+                        }
+
+                        dfs dc = LoadDfsConfig();
+
+                        dfs.DfsFile inf = dc.FindAny(infn);
+                        if (null == inf)
+                        {
+                            Console.Error.WriteLine("Input file not found in DFS: {0}", infn);
+                            SetFailure();
+                            return;
+                        }
+                        string dfsinput, dfsoutput;
+                        if (inf.RecordLength > 0)
+                        {
+                            dfsinput = "dfs://" + infn + "@" + inf.RecordLength;
+                            dfsoutput = "dfs://" + outfn + "@" + inf.RecordLength;
+                        }
+                        else
+                        {
+                            dfsinput = "dfs://" + infn;
+                            dfsoutput = "dfs://" + outfn;
+                        }
+
+                        if (null != DfsFindAny(dc, outfn))
+                        {
+                            Console.Error.WriteLine("Output file already exists in DFS: {0}", outfn);
+                            SetFailure();
+                            return;
+                        }
+
+                        string tempfnpost = "." + Guid.NewGuid().ToString() + "." + System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+                        string jobsfn = "spread-jobs.xml" + tempfnpost;
+
+                        try
+                        {
+                            using (System.IO.StreamWriter sw = System.IO.File.CreateText(jobsfn))
+                            {
+                                sw.Write((@"<SourceCode>
+  <Jobs>
+    <Job Name=`spread` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>" + dfsinput + @"</DFSInput>
+        <DFSOutput>" + dfsoutput + @"</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            byte[] keybuf = null;
+            ByteSlice keybs;
+            int ikey;
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                if(null == keybuf)
+                {
+                    keybuf = new byte[4];
+                    keybs = ByteSlice.Prepare(keybuf);
+                    ikey = Qizmt_ProcessID;
+                }
+                Entry.ToBytes(ikey, keybuf, 0);
+                output.Add(keybs, line);
+                ikey = unchecked(ikey + 1);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                while(values.MoveNext())
+                {
+                    output.Add(values.Current);
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>
+")
+                                    .Replace('`', '"'));
+                            }
+
+                            Console.WriteLine("Spreading...");
+                            //Exec("", LoadConfig(xpaths, jobsfn), new string[] { }, false, false);
+                            Exec("", LoadConfig(jobsfn), new string[] { }, false, false);
+                            Console.WriteLine();
+                            Console.WriteLine("Successfully spread '{0}' to '{1}'", infn, outfn);
+                        }
+                        finally
+                        {
+                            try
+                            {
+                                System.IO.File.Delete(jobsfn);
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    }
+                    break;
+
                 case "kill":
                 case "killst":
                 case "killmt":
@@ -2149,6 +2287,7 @@ namespace MySpace.DataMining.AELight
                                             string killjzb = "zblock_*.j" + killsjid + ".zb";
                                             string killjoblog = "*_????????-????-????-????-????????????.j" + killsjid + "_log.txt";
                                             string killzf = "zfoil_*.j" + killsjid + ".zf";
+                                            string killslaveconfig = "slaveconfig.j" + killsjid + ".xml";
                                             //foreach (string slave in slaves)
                                             MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
                                                 new Action<string>(
@@ -2397,6 +2536,14 @@ namespace MySpace.DataMining.AELight
                                                     catch (Exception e)
                                                     {
                                                         LogOutput("Unable to delete log files belonging to JID " + killsjid + ": " + e.Message);
+                                                    }
+                                                    try
+                                                    {
+                                                        System.IO.File.Delete(netpath + @"\" + killslaveconfig);
+                                                    }
+                                                    catch
+                                                    {
+                                                        // This is allowed to fail: the file might not exist.
                                                     }
                                                 }), slaves, numthreads);
 
@@ -3820,11 +3967,14 @@ namespace MySpace.DataMining.AELight
                 case "health":
                     {
                         dfs dc = LoadDfsConfig();
+                        
 
                         bool all = false;
                         bool verify = false;
                         string[] hosts = null;
-                        bool mt = "healthmt" == act;
+                        
+                        bool plugininfo = false;
+                        bool mt = "healthst" != act;
 
                         if (args.Length >= 2)
                         {
@@ -3844,6 +3994,12 @@ namespace MySpace.DataMining.AELight
                                         mt = true;
                                         break;
 
+#if DEBUG
+                                    case "-pi":
+                                        plugininfo = true;
+                                        break;
+#endif
+
                                     default:
                                         {
                                             string shosts = args[i];
@@ -3859,6 +4015,102 @@ namespace MySpace.DataMining.AELight
                                         break;
                                 }
                             }
+                        }
+
+                        List<KeyValuePair<string, Surrogate.HealthMethod>> plugins
+                            = new List<KeyValuePair<string, Surrogate.HealthMethod>>();
+                        try
+                        {
+                            string cacdir = null;
+                            List<dfs.DfsFile> healthdlls = dc.FindAll("QizmtHealth*.dll");
+                            if (plugininfo)
+                            {
+                                Console.WriteLine("*PluginInfo: Found {0} matching plugin DLLs in DFS", healthdlls.Count);
+                            }
+                            foreach (dfs.DfsFile healthplugin in healthdlls)
+                            {
+                                if (null == cacdir)
+                                {
+#if HEALTHPLUGIN_FINDCAC
+                                    foreach (string cdh in dc.Slaves.SlaveList.Split(',', ';'))
+                                    {
+                                        System.Threading.Thread cdthd = new System.Threading.Thread(
+                                            new System.Threading.ThreadStart(
+                                            delegate()
+                                            {
+                                                if (Surrogate.IsHealthySlaveMachine(cdh))
+                                                {
+                                                    string cddir = Surrogate.NetworkPathForHost(cdh) + @"\" + dfs.DLL_DIR_NAME;
+                                                    if (System.IO.Directory.Exists(cddir))
+                                                    {
+                                                        cacdir = cddir;
+                                                    }
+                                                }
+                                            }));
+                                        cdthd.Start();
+                                        cdthd.Join(1000 * 30);
+                                        if (null != cacdir)
+                                        {
+                                            break;
+                                        }
+                                    }
+#else
+                                    // Needs participating surrogate.
+                                    string cddir = AELight_Dir + @"\" + dfs.DLL_DIR_NAME;
+                                    if (System.IO.Directory.Exists(cddir))
+                                    {
+                                        cacdir = cddir;
+                                    }
+                                    if (null == cacdir)
+                                    {
+                                        throw new Exception("Unable to locate CAC directory on surrogate (must be participating surrogate for health plugins)");
+                                    }
+#endif
+                                }
+                                if (null == cacdir)
+                                {
+                                    throw new Exception("Unable to locate healthy CAC directory");
+                                }
+                                if (plugininfo)
+                                {
+                                    Console.WriteLine("*PluginInfo: Found CAC dir at: {0}", cacdir);
+                                }
+                                bool foundhealthmethod = false;
+                                try
+                                {
+                                    System.Reflection.Assembly hasm = System.Reflection.Assembly.LoadFrom(cacdir + @"\" + healthplugin.Name);
+                                    foreach (Type t in hasm.GetTypes())
+                                    {
+                                        if (-1 != t.Name.IndexOf("Health", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            System.Reflection.MethodInfo mi = t.GetMethod("CheckHealth",
+                                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                                            if (null != mi)
+                                            {
+                                                Surrogate.HealthMethod hm = (Surrogate.HealthMethod)Delegate.CreateDelegate(typeof(Surrogate.HealthMethod), mi);
+                                                plugins.Add(new KeyValuePair<string, Surrogate.HealthMethod>(healthplugin.Name + " " + t.Name, hm));
+                                                foundhealthmethod = true;
+                                                if (plugininfo)
+                                                {
+                                                    Console.WriteLine("*PluginInfo: CheckHealth method found: {0} {1}", healthplugin.Name, t.Name);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (!foundhealthmethod)
+                                    {
+                                        throw new Exception("Did not find a Health public class with CheckHealth public static method (HealthMethod)");
+                                    }
+                                }
+                                catch (Exception epl)
+                                {
+                                    throw new Exception("Unable to use plugin " + healthplugin.Name + ": " + epl.Message, epl);
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Health plugin error: " + e.Message);
                         }
 
                         if (null == hosts)
@@ -3892,14 +4144,33 @@ namespace MySpace.DataMining.AELight
                                 delegate(string host)
                                 {
                                     //string host = hosts[si];
-                                    string reason;
-                                    if (Surrogate.IsHealthySlaveMachine(host, out reason))
+                                    string reason = null;
+                                    if (!all) // Only do this here if not -a because it'll be done later in more detail.
                                     {
-                                        reason = null;
+                                        foreach (KeyValuePair<string, Surrogate.HealthMethod> plugin in plugins)
+                                        {
+                                            Surrogate.HealthMethod hm = plugin.Value;
+                                            if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
+                                            {
+                                                reason = null;
+                                            }
+                                            else
+                                            {
+                                                badones++;
+                                                break;
+                                            }
+                                        }
                                     }
-                                    else
+                                    if (null == reason)
                                     {
-                                        badones++;
+                                        if (Surrogate.IsHealthySlaveMachine(host, out reason))
+                                        {
+                                            reason = null;
+                                        }
+                                        else
+                                        {
+                                            badones++;
+                                        }
                                     }
                                     if (reason != null)
                                     {
@@ -4008,6 +4279,32 @@ namespace MySpace.DataMining.AELight
                                 percent = (int)Math.Round((double)(totalchecked - badones) * 100.0 / (double)totalchecked, 0);
                             }
                             Console.WriteLine("      {0}% healthy", percent);
+
+                            foreach (KeyValuePair<string, Surrogate.HealthMethod> plugin in plugins)
+                            {
+                                Console.WriteLine("[{0}]", plugin.Key);
+                                Surrogate.HealthMethod hm = plugin.Value;
+                                badones = 0;
+                                MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                    new Action<string>(
+                                    delegate(string host)
+                                    {
+                                        string reason;
+                                        if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
+                                        {
+                                            reason = null;
+                                        }
+                                        else
+                                        {
+                                            badones++;
+                                        }
+                                        if (reason != null)
+                                        {
+                                            Console.WriteLine("  {0}: {1}", host, reason);
+                                        }
+                                    }), hosts, nthreads);
+                                Console.WriteLine("      {0}% healthy", Math.Round((double)(hosts.Length - badones) * 100.0 / (double)hosts.Length, 0));
+                            }
 
                             Console.WriteLine("[Checking GetFiles()]");
                             int getfileserr = 0;
@@ -5066,6 +5363,7 @@ namespace MySpace.DataMining.AELight
                 case "swap":
                 case "fput":
                 case "fget":
+                case "shuffle":
                     {
                         string dfsarg = args[0];
                         Dfs(dfsarg, SubArray(args, 1));

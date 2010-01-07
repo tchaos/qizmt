@@ -687,14 +687,36 @@ namespace MySpace.DataMining.DistributedObjects5
                 Environment.SetEnvironmentVariable("DOSLAVE", "DO5");
 
                 System.Xml.XmlDocument xd = new System.Xml.XmlDocument();
+#if DEBUGslaveconfigload
+                Random _scsr = new Random(DateTime.Now.Millisecond / 2 + System.Threading.Thread.CurrentThread.ManagedThreadId / 2);
+                //for (int i = 0; i < 50; i++)
+                {
+                    System.Threading.Thread.Sleep(_scsr.Next(50, 200));
+                    try
+                    {
+                        xd.Load("slaveconfig.j" + sjid + ".xml");
+                        InitXmlConfig(xd);
+                    }
+                    catch (System.IO.FileNotFoundException e)
+                    {
+                        //System.Diagnostics.Debugger.Launch();
+                    }
+                    catch (Exception e)
+                    {
+                        System.Diagnostics.Debugger.Launch();
+                        throw;
+                    }
+                }
+#else
                 try
                 {
-                    xd.Load("slaveconfig.xml");
+                    xd.Load("slaveconfig.j" + sjid + ".xml");
                     InitXmlConfig(xd);
                 }
                 catch (System.IO.FileNotFoundException e)
                 {
                 }
+#endif
 
                 if (XLog.logging)
                 {

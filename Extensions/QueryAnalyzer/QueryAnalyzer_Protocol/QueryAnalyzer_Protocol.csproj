@@ -69,6 +69,7 @@
   <ItemGroup>
     <Compile Include="CriticalSection.cs" />
     <Compile Include="Exec.cs" />
+    <Compile Include="DfsFileNodeStream.cs" />
     <Compile Include="ProjectInstaller.cs">
       <SubType>Component</SubType>
     </Compile>
