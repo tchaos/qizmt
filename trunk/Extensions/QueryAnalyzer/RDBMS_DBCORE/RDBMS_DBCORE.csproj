@@ -143,6 +143,7 @@
     <Compile Include="QaPrepareJoinOn.cs" />
     <Compile Include="QaPrepareSelect.cs" />
     <Compile Include="QaQueryAnalyzer.cs" />
+    <Compile Include="QaSelect.cs" />
     <Compile Include="SelectClause.cs" />
     <Compile Include="Types.cs" />
     <Compile Include="WhereClause.cs" />

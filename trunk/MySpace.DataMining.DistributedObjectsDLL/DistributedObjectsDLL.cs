@@ -461,6 +461,12 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
+#if DEBUG
+        protected internal int OpenPort = 0;
+        public static List<int> AllOpenPorts = new List<int>();
+#endif
+
+
         public virtual void Open()
         {
             if (didopen)
@@ -468,7 +474,8 @@ namespace MySpace.DataMining.DistributedObjects5
                 throw new Exception("Attempted to Open after already Open");
             }
             didopen = true;
-
+            string portfilename = null;
+            System.IO.FileStream portfile = null;
             try
             {
                 Socket lsock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -480,8 +487,25 @@ namespace MySpace.DataMining.DistributedObjects5
                     lipep = new IPEndPoint(IPAddress.Any, GetSlavePort());
                     try
                     {
-                        lsock.Bind(lipep);
-                        lsock.Listen(2);
+                        System.Threading.Mutex lm = new System.Threading.Mutex(false, "DODLL_Listen{2FDD7284-14A8-4f4d-8448-0CE229C1E596}");
+                        lm.WaitOne();
+                        try
+                        {
+                            string spf = lipep.Port.ToString() + ".pf";
+                            if (System.IO.File.Exists(spf))
+                            {
+                                continue;
+                            }
+                            lsock.Bind(lipep);
+                            lsock.Listen(2);
+                            portfile = new System.IO.FileStream(spf, System.IO.FileMode.Create, System.IO.FileAccess.Write,
+                                System.IO.FileShare.Delete, 8, System.IO.FileOptions.DeleteOnClose);
+                            portfilename = spf;
+                        }
+                        finally
+                        {
+                            lm.ReleaseMutex();
+                        }
                     }
                     catch (SocketException e)
                     {
@@ -493,21 +517,62 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     break;
                 }
+#if DEBUG
+                this.OpenPort = lipep.Port;
+                lock (AllOpenPorts)
+                {
+                    AllOpenPorts.Add(this.OpenPort);
+                }
+#endif
 
                 foreach (SlaveInfo slave in dslaves)
                 {
-                    Socket servSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                    servSock.Connect(slave.blockinfo[3], 55900);
+                    NetworkStream servStm = null;
 
-                    NetworkStream servStm = new XNetworkStream(servSock);
+#if DEBUGfailtest
+                    bool failtest = true;
+#else
+                    const bool failtest = false;
+#endif
+                    for (; ; )
+                    {
+                        Socket servSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                        servSock.Connect(slave.blockinfo[3], 55900);
 
-                    servStm.WriteByte((byte)'B'); // AddBlock.
-                    XContent.SendXContent(servStm, slave.sblockinfo);
-                    XContent.SendXContent(servStm, lipep.Port.ToString());
-                    XContent.SendXContent(servStm, sjid);
+                        servStm = new XNetworkStream(servSock);
 
-                    Socket slaveSock = lsock.Accept();
-                    slave.nstm = new XNetworkStream(slaveSock);
+                        servStm.WriteByte((byte)'B'); // AddBlock.
+                        XContent.SendXContent(servStm, slave.sblockinfo);
+                        XContent.SendXContent(servStm, lipep.Port.ToString());
+                        XContent.SendXContent(servStm, sjid);
+                        {
+                            int rB = servStm.ReadByte();
+                            if ('+' != rB)
+                            {
+                                if ('_' == rB)
+                                {
+                                    throw new Exception("Error returned from AddBlock: " + XContent.ReceiveXString(servStm, null));
+                                }
+                                else
+                                {
+                                    throw new Exception("AddBlock failure");
+                                }
+                            }
+                        }
+
+                        // 30000000 microseconds == 30 seconds
+                        if (failtest || !lsock.Poll(30000000, SelectMode.SelectRead))
+                        {
+#if DEBUGfailtest
+                            failtest = false;
+#endif
+                            servStm.Close();
+                            continue;
+                        }
+                        Socket slaveSock = lsock.Accept();
+                        slave.nstm = new XNetworkStream(slaveSock);
+                        break;
+                    }
                     if (1 != slave.nstm.ReadByte())
                     {
                         throw new Exception("Sub process connection error: invalid handshake  [Non-sub-process connection?]");
@@ -536,13 +601,45 @@ namespace MySpace.DataMining.DistributedObjects5
             {
                 throw new Exception("Error in Open: " + e.ToString() + "  [Note: ensure the Windows service is running]");
             }
+            finally
+            {
+#if DEBUG
+                if (0 != this.OpenPort)
+                {
+                    lock (AllOpenPorts)
+                    {
+                        AllOpenPorts.Remove(this.OpenPort);
+                    }
+                }
+#endif
+                if (null != portfile)
+                {
+                    System.Threading.Mutex lm = new System.Threading.Mutex(false, "DODLL_Listen{2FDD7284-14A8-4f4d-8448-0CE229C1E596}");
+                    lm.WaitOne();
+                    try
+                    {
+                        if (null != portfile)
+                        {
+                            portfile.Close();
+                        }
+                        System.IO.File.Delete(portfilename);
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        lm.ReleaseMutex();
+                    }
+                }
+            }
         }
 
 
         public const int SlavePortMin = 1025;
         public const int SlavePortMax = 65500;
         private static int prevslaveport = int.MaxValue;
-        private static Random slaveportrand = new Random();
+        private static Random slaveportrand = new Random(DateTime.Now.Millisecond / 2 + System.Threading.Thread.CurrentThread.ManagedThreadId / 2);
         private static Dictionary<int, bool> BannedSlavePorts;
 
         static DistObject()

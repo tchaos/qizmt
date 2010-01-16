@@ -82,7 +82,18 @@ namespace MySpace.DataMining.DistributedObjects5
                         }
 
                         rem = LoadRemotePlugin(dllfn, classname);
+#if DEBUG
+                        try
+                        {
+                            rem.OnRemote();
+                        }
+                        catch (Exception e)
+                        {
+                            throw new UserException(e);
+                        }
+#else
                         rem.OnRemote();
+#endif
                     }
                     break;
 

@@ -18,8 +18,10 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
 ***************************************************************************************/
 
-#if DEBUG
 #define SLAVE_TRACE
+
+#if DEBUG
+//#define SLAVE_TRACE_PORT
 #endif
 
 using System;
@@ -37,6 +39,26 @@ namespace MySpace.DataMining.DistributedObjects5
     public interface IDistObject
     {
         void ProcessCommands(NetworkStream nstm);
+    }
+
+
+    // An exception originating from a user plugin.
+    public class UserException : Exception
+    {
+        Exception ue;
+
+        public UserException(Exception e)
+            : base("UserException: " + e.Message)
+        {
+            this.ue = e;
+        }
+
+
+        public override string ToString()
+        {
+            return "UserException: " + ue.ToString();
+        }
+
     }
 
 
@@ -301,6 +323,9 @@ namespace MySpace.DataMining.DistributedObjects5
                 {
                     throw;
                 }
+#if DEBUG
+                XLog.errorlog("DistributedObjectsSlave Warning: IOException+SocketException during task shutdown: " + ioex.ToString());
+#endif
             }
 
             nstm.Close();
@@ -571,6 +596,11 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
+#if SLAVE_TRACE_PORT
+        static List<int> DOSlave_TracePorts = new List<int>();
+#endif
+
+
         public static long jid;
         public static string sjid;
 
@@ -578,113 +608,224 @@ namespace MySpace.DataMining.DistributedObjects5
         // args: <ipaddr> <portnum> <typechar> <capacity> <logfile> <jid>
         static void Main(string[] args)
         {
-#if DEBUG
-            //System.Threading.Thread.Sleep(1000 * 8);
-#endif
-            {
-                //string computer_name = System.Environment.GetEnvironmentVariable("COMPUTERNAME");
-                //if (computer_name == "MAPDDRULE" || computer_name == "MAPDCMILLER")
-                {
-                    if (System.IO.File.Exists("sleep.txt"))
-                    {
-                        System.Threading.Thread.Sleep(1000 * 8);
-                        int i32 = 1 + 32;
-                    }
-                }
-            }
 
-#if DEBUG
-            SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
-#endif
-
-            XLog.UserLogFile = args[4];
-
-#if SLAVE_TRACE
             try
             {
-                Thread mainthread = System.Threading.Thread.CurrentThread;
-                System.Threading.Thread stthd = new System.Threading.Thread(
-                    new System.Threading.ThreadStart(
-                    delegate
+
+#if DEBUGnoisy
+                XLog.errorlog("DistributedObjectsSlave EntryPoint: " + Environment.CommandLine);
+#endif
+
+#if DEBUG
+                //System.Threading.Thread.Sleep(1000 * 8);
+                {
+                    //string computer_name = System.Environment.GetEnvironmentVariable("COMPUTERNAME");
+                    //if (computer_name == "MAPDDRULE" || computer_name == "MAPDCMILLER")
                     {
-                        try
+                        if (System.IO.File.Exists("sleep.txt"))
+                        {
+                            System.Threading.Thread.Sleep(1000 * 8);
+                            int i32 = 1 + 32;
+                        }
+                    }
+                }
+#endif
+
+#if DEBUG
+                SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
+#endif
+
+                XLog.UserLogFile = args[4];
+
+#if SLAVE_TRACE
+                try
+                {
+                    Thread mainthread = System.Threading.Thread.CurrentThread;
+                    System.Threading.Thread stthd = new System.Threading.Thread(
+                        new System.Threading.ThreadStart(
+                        delegate
                         {
                             string spid = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
-                            string dotracefile = spid + ".trace";
-                            for (
-                                ; !System.IO.File.Exists(dotracefile)
-                                ; System.Threading.Thread.Sleep(1000 * 60))
-                            {
-                            }
                             try
                             {
-                                System.IO.File.Delete(dotracefile);
-                            }
-                            catch
-                            {
-                            }
-                            XLog.log("SLAVE_TRACE: " + spid + " Start");
-                            for (; ; System.Threading.Thread.Sleep(1000 * 60))
-                            {
+                                string dotracefile = spid + ".trace";
+                                const string tracefiledelim = "{C8683F6C-0655-42e7-ACD9-0DDED6509A7C}";
+                                for (; ; )
                                 {
-                                    mainthread.Suspend();
-                                    try
+                                    System.IO.StreamWriter traceout = null;
+                                    for (System.Threading.Thread.Sleep(1000 * 60)
+                                        ; !System.IO.File.Exists(dotracefile)
+                                        ; System.Threading.Thread.Sleep(1000 * 60))
                                     {
-                                        System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(mainthread, false);
-                                        StringBuilder sbst = new StringBuilder();
-                                        for (int i = 0, imax = Math.Min(7, st.FrameCount); i < imax; i++)
+                                    }
+                                    {
+                                        string[] tfc;
+                                        try
                                         {
-                                            if (0 != sbst.Length)
-                                            {
-                                                sbst.Append(", ");
-                                            }
-                                            string mn = "N/A";
+                                            tfc = System.IO.File.ReadAllLines(dotracefile);
+                                        }
+                                        catch
+                                        {
+                                            continue;
+                                        }
+                                        if (tfc.Length < 1 || "." != tfc[tfc.Length - 1])
+                                        {
+                                            continue;
+                                        }
+                                        try
+                                        {
+                                            System.IO.File.Delete(dotracefile);
+                                        }
+                                        catch
+                                        {
+                                            continue;
+                                        }
+                                        if ("." != tfc[0])
+                                        {
+                                            string traceoutfp = tfc[0];
                                             try
                                             {
-                                                mn = st.GetFrame(i).GetMethod().Name;
+                                                traceout = System.IO.File.CreateText(traceoutfp);
+                                                traceout.Write("BEGIN:");
+                                                traceout.WriteLine(tracefiledelim);
                                             }
                                             catch
                                             {
+                                                continue;
                                             }
-                                            if (mn.Length > 45)
-                                            {
-                                                mn = "..." + mn.Substring(mn.Length - 45);
-                                            }
-                                            sbst.Append(mn);
                                         }
-                                        XLog.log("SLAVE_TRACE: " + spid + " Trace: " + sbst.ToString());
                                     }
-                                    catch (Exception e)
+                                    if (null == traceout)
                                     {
-                                        XLog.log("SLAVE_TRACE: " + spid + " Error: " + e.ToString());
+                                        XLog.log("SLAVE_TRACE: " + spid + " Start");
                                     }
-                                    finally
+                                    for (; ; System.Threading.Thread.Sleep(1000 * 60))
                                     {
-                                        mainthread.Resume();
-                                    }
-                                }
+                                        {
+                                            try
+                                            {
+#if SLAVE_TRACE_PORT
+                                                if (null == traceout)
+                                                {
+                                                    try
+                                                    {
+                                                        StringBuilder sbtp = new StringBuilder();
+                                                        sbtp.Append("SLAVE_TRACE_PORT: " + spid + ":");
+                                                        for (int i = 0; i < DOSlave_TracePorts.Count; i++)
+                                                        {
+                                                            sbtp.Append(' ');
+                                                            sbtp.Append(DOSlave_TracePorts[i]);
+                                                        }
+                                                        if (0 == DOSlave_TracePorts.Count)
+                                                        {
+                                                            sbtp.Append(" None");
+                                                        }
+                                                        XLog.log(sbtp.ToString());
+                                                    }
+                                                    catch
+                                                    {
+                                                    }
+                                                }
+#endif
+                                                bool thdsuspended = false;
+                                                try
+                                                {
+                                                    mainthread.Suspend();
+                                                    thdsuspended = true;
+                                                }
+                                                catch (System.Threading.ThreadStateException)
+                                                {
+                                                }
+                                                try
+                                                {
+                                                    System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(mainthread, false);
+                                                    StringBuilder sbst = new StringBuilder();
+                                                    const int maxframesprint = 15;
+                                                    for (int i = 0, imax = Math.Min(maxframesprint, st.FrameCount); i < imax; i++)
+                                                    {
+                                                        if (0 != sbst.Length)
+                                                        {
+                                                            sbst.Append(", ");
+                                                        }
+                                                        string mn = "N/A";
+                                                        try
+                                                        {
+                                                            System.Reflection.MethodBase mb = st.GetFrame(i).GetMethod();
+                                                            mn = mb.ReflectedType.Name + "." + mb.Name;
+                                                        }
+                                                        catch
+                                                        {
+                                                        }
+                                                        sbst.Append(mn);
+                                                    }
+                                                    if (st.FrameCount > maxframesprint)
+                                                    {
+                                                        sbst.Append(" ... ");
+                                                        sbst.Append(st.FrameCount - maxframesprint);
+                                                        sbst.Append(" more");
+                                                    }
+                                                    if (null == traceout)
+                                                    {
+                                                        XLog.log("SLAVE_TRACE: " + spid + " Trace: " + sbst.ToString());
+                                                    }
+                                                    else
+                                                    {
+                                                        traceout.WriteLine(sbst.ToString());
+                                                    }
+                                                }
+                                                catch (Exception e)
+                                                {
+                                                    XLog.log("SLAVE_TRACE: " + spid + " Error: " + e.ToString());
+                                                }
+                                                finally
+                                                {
+                                                    if (thdsuspended)
+                                                    {
+                                                        mainthread.Resume();
+                                                    }
+                                                }
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                XLog.log("SLAVE_TRACE: " + spid + " " + mainthread.Name + " Trace Error: Cannot access thread: " + e.ToString());
+                                            }
+                                        }
 
+                                        if (null != traceout)
+                                        {
+                                            traceout.Write(tracefiledelim);
+                                            traceout.WriteLine(":END");
+                                            traceout.Close();
+                                            break;
+                                        }
+                                    }
+
+                                }
                             }
-                        }
-                        catch
-                        {
-                        }
-                    }));
-                stthd.IsBackground = true;
-                stthd.Start();
-            }
-            catch (Exception est)
-            {
-                XLog.log("SLAVE_TRACE: Thread start error: " + est.ToString());
-            }
+                            catch (Exception e)
+                            {
+                                XLog.log("SLAVE_TRACE: " + spid + " Trace Failure: " + e.Message);
+                            }
+                        }));
+                    stthd.IsBackground = true;
+                    stthd.Start();
+                }
+                catch (Exception est)
+                {
+                    XLog.log("SLAVE_TRACE: Thread start error: " + est.ToString());
+                }
 #endif
 
-            sjid = args[5];
-            jid = long.Parse(sjid);
+                sjid = args[5];
+                jid = long.Parse(sjid);
 
-            try
-            {
-                Environment.SetEnvironmentVariable("DOSLAVE", "DO5");
+                try
+                {
+                    Environment.SetEnvironmentVariable("DOSLAVE", "DO5");
+                }
+                catch
+                {
+                }
 
                 System.Xml.XmlDocument xd = new System.Xml.XmlDocument();
 #if DEBUGslaveconfigload
@@ -727,6 +868,9 @@ namespace MySpace.DataMining.DistributedObjects5
                 sock.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
                 string host = args[0];
                 int portnum = ushort.Parse(args[1]);
+#if SLAVE_TRACE_PORT
+                DOSlave_TracePorts.Add(portnum);
+#endif
                 char typechar = args[2][0];
                 try
                 {

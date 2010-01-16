@@ -2672,7 +2672,7 @@ namespace MySpace.DataMining.AELight
                 "addmachine", "addnode",
                 "delnode", "deletenode", "removenode", "remnode", "delmachine", "deletemachine", "removemachine", "remmachine",
                 "format", "\u0040format",
-                "removemetamachine", "removemetahost", "removemetanode", "metaremovemachine",
+                "removemetamachine", "removemetahost", "removemetanode", "metaremovemachine", "metaremove",
                 "metadelete", "metadel", "metarm", "removemetafile",
                 "metabackup",
                 "adminlock",
@@ -3133,6 +3133,9 @@ namespace MySpace.DataMining.AELight
                 {
                     throw; // Not a socket exception.
                 }
+#if DEBUG
+                Console.WriteLine("Surrogate Warning: IOException+SocketException during StreamStdIO: " + ioex.ToString());
+#endif
                 result = 44; // Socket exception.
             }
             finally

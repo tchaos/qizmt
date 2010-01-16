@@ -20,6 +20,12 @@
 
 //#define CLIENT_LOG_ALL
 
+#define AELIGHT_TRACE
+
+#if DEBUG
+//#define AELIGHT_TRACE_PORT // DEBUG only.
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -123,7 +129,7 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    genhostnames <pattern> <startNum>");
             Console.WriteLine("                 <endNum> [<delimiter>]");
             Console.WriteLine("                 generate host names");
-            Console.WriteLine("    viewlog      [machine=<machineName>]");
+            Console.WriteLine("    viewlogs      [machine=<machineName>]");
             Console.WriteLine("                 [count=<number of entries to return>]");
             Console.WriteLine("                 view log entries");
             Console.WriteLine("    clearlogs                      clear logs from all machines in the cluster");
@@ -1301,6 +1307,37 @@ namespace MySpace.DataMining.AELight
         }
 
 
+#if AELIGHT_TRACE
+        static List<System.Threading.Thread> AELight_TraceThreads = new List<System.Threading.Thread>();
+
+#if AELIGHT_TRACE_PORT
+        //static I<int> AELight_TracePorts = null;
+#endif
+#endif
+
+        protected internal static void AELight_StartTraceThread(System.Threading.Thread thd)
+        {
+#if AELIGHT_TRACE
+            lock (AELight_TraceThreads)
+            {
+                AELight_TraceThreads.Add(thd);
+            }
+#endif
+            thd.Start();
+        }
+
+        protected internal static void AELight_JoinTraceThread(System.Threading.Thread thd)
+        {
+            thd.Join();
+#if AELIGHT_TRACE
+            lock (AELight_TraceThreads)
+            {
+                AELight_TraceThreads.Remove(thd);
+            }
+#endif
+        }
+
+
         public static string OriginalUserDir;
         public static string AELight_Dir;
         public static bool isdspace = false; // Is this running as Qizmt?
@@ -1326,6 +1363,204 @@ namespace MySpace.DataMining.AELight
 
         static void Main(string[] args)
         {
+#if AELIGHT_TRACE
+            AELight_TraceThreads.Add(System.Threading.Thread.CurrentThread);
+
+#if DEBUG
+            //System.Diagnostics.Debugger.Launch();
+#endif
+            try
+            {
+                System.Threading.Thread stthd = new System.Threading.Thread(
+                    new System.Threading.ThreadStart(
+                    delegate
+                    {
+                        string spid = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+                        try
+                        {
+                            string dotracefile = spid + ".trace";
+                            const string tracefiledelim = "{C8683F6C-0655-42e7-ACD9-0DDED6509A7C}";
+                            for (; ; )
+                            {
+                                System.IO.StreamWriter traceout = null;
+                                for (System.Threading.Thread.Sleep(1000 * 60)
+                                    ; !System.IO.File.Exists(dotracefile)
+                                    ; System.Threading.Thread.Sleep(1000 * 60))
+                                {
+                                }
+                                {
+                                    string[] tfc;
+                                    try
+                                    {
+                                        tfc = System.IO.File.ReadAllLines(dotracefile);
+                                    }
+                                    catch
+                                    {
+                                        continue;
+                                    }
+                                    if (tfc.Length < 1 || "." != tfc[tfc.Length - 1])
+                                    {
+                                        continue;
+                                    }
+                                    try
+                                    {
+                                        System.IO.File.Delete(dotracefile);
+                                    }
+                                    catch
+                                    {
+                                        continue;
+                                    }
+                                    if ("." != tfc[0])
+                                    {
+                                        string traceoutfp = tfc[0];
+                                        try
+                                        {
+                                            traceout = System.IO.File.CreateText(traceoutfp);
+                                            traceout.Write("BEGIN:");
+                                            traceout.WriteLine(tracefiledelim);
+                                        }
+                                        catch
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                }
+                                if (null == traceout)
+                                {
+                                    LogOutputToFile("AELIGHT_TRACE: " + spid + " Start");
+                                }
+                                for (; ; System.Threading.Thread.Sleep(1000 * 60))
+                                {
+#if AELIGHT_TRACE_PORT
+                                    if (null == traceout)
+                                    {
+                                        try
+                                        {
+                                            StringBuilder sbtp = new StringBuilder();
+                                            sbtp.Append("AELIGHT_TRACE_PORT: " + spid + ":");
+                                            int tpc = 0;
+                                            {
+                                                foreach (int atp in DistributedObjects5.DistObject.AllOpenPorts)
+                                                {
+                                                    sbtp.Append(' ');
+                                                    sbtp.Append(atp);
+                                                    tpc++;
+                                                }
+                                            }
+                                            if (0 == tpc)
+                                            {
+                                                sbtp.Append(" None");
+                                            }
+                                            LogOutputToFile(sbtp.ToString());
+                                        }
+                                        catch
+                                        {
+                                        }
+                                    }
+#endif
+                                    foreach (System.Threading.Thread tthd in AELight_TraceThreads)
+                                    {
+                                        string tr = "";
+                                        try
+                                        {
+                                            bool thdsuspended = false;
+                                            try
+                                            {
+                                                tthd.Suspend();
+                                                thdsuspended = true;
+                                            }
+                                            catch (System.Threading.ThreadStateException)
+                                            {
+                                            }
+                                            try
+                                            {
+                                                System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(tthd, false);
+                                                StringBuilder sbst = new StringBuilder();
+                                                const int maxframesprint = 15;
+                                                for (int i = 0, imax = Math.Min(maxframesprint, st.FrameCount); i < imax; i++)
+                                                {
+                                                    if (0 != sbst.Length)
+                                                    {
+                                                        sbst.Append(", ");
+                                                    }
+                                                    string mn = "N/A";
+                                                    try
+                                                    {
+                                                        System.Reflection.MethodBase mb = st.GetFrame(i).GetMethod();
+                                                        mn = mb.ReflectedType.Name + "." + mb.Name;
+                                                    }
+                                                    catch
+                                                    {
+                                                    }
+                                                    sbst.Append(mn);
+                                                }
+                                                if (st.FrameCount > maxframesprint)
+                                                {
+                                                    sbst.Append(" ... ");
+                                                    sbst.Append(st.FrameCount - maxframesprint);
+                                                    sbst.Append(" more");
+                                                }
+                                                if (null == traceout)
+                                                {
+                                                    LogOutputToFile("AELIGHT_TRACE: " + spid + " " + tthd.Name + " Trace: " + sbst.ToString());
+                                                }
+                                                else
+                                                {
+                                                    traceout.Write("Thread ");
+                                                    string tthdname = tthd.Name;
+                                                    if (null == tthdname || 0 == tthdname.Length)
+                                                    {
+                                                        //tthdname = "<unnamed>";
+                                                        tthdname = tthd.ManagedThreadId.ToString();
+                                                    }
+                                                    traceout.Write(tthdname);
+                                                    traceout.Write(": ");
+                                                    traceout.WriteLine(sbst.ToString());
+                                                }
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                LogOutputToFile("AELIGHT_TRACE: " + spid + " " + tthd.Name + " Error: " + e.ToString());
+                                            }
+                                            finally
+                                            {
+                                                if (thdsuspended)
+                                                {
+                                                    tthd.Resume();
+                                                }
+                                            }
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            LogOutputToFile("AELIGHT_TRACE: " + spid + " " + tthd.Name + " Trace Error: Cannot access thread: " + e.ToString());
+                                        }
+                                    }
+
+                                    if (null != traceout)
+                                    {
+                                        traceout.Write(tracefiledelim);
+                                        traceout.WriteLine(":END");
+                                        traceout.Close();
+                                        break;
+                                    }
+                                }
+
+                            }
+                        }
+                        catch(Exception e)
+                        {
+                            LogOutputToFile("AELIGHT_TRACE: " + spid + " Trace Failure: " + e.Message);
+                        }
+                    }));
+                stthd.IsBackground = true;
+                stthd.Start();
+            }
+            catch (Exception est)
+            {
+                LogOutputToFile("AELIGHT_TRACE: Thread start error: " + est.ToString());
+            }
+#endif
+
 #if DEBUG
             MainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
 #endif
@@ -3145,7 +3380,7 @@ namespace MySpace.DataMining.AELight
                                         {
                                             lock (slaves)
                                             {
-                                                Console.Error.WriteLine("Error on machine {0}: {1}", slave, e.Message);
+                                                Console.Error.WriteLine("WARNING: Error on machine {0}: {1}", slave, e.Message);
                                             }
                                         }
                                     }), slaves, threadcount);
@@ -3337,6 +3572,7 @@ namespace MySpace.DataMining.AELight
                 case "removemetamachine":
                 case "removemetahost":
                 case "removemetanode":
+                case "metaremove":
                     if (args.Length < 2)
                     {
                         Console.Error.WriteLine("Invalid arguments for " + args[0]);
@@ -3579,6 +3815,7 @@ namespace MySpace.DataMining.AELight
                     break;
 
                 case "viewlog":
+                case "viewlogs":
                     {
                         int maxentries = 1000;
                         string machine = null;
@@ -3614,7 +3851,7 @@ namespace MySpace.DataMining.AELight
                                         }                                                         
                                         break;
                                     default:
-                                        Console.Error.WriteLine("Invalid argument for viewlog");
+                                        Console.Error.WriteLine("Invalid argument for viewlogs");
                                         return;
                                 }
                             }
@@ -3959,6 +4196,283 @@ namespace MySpace.DataMining.AELight
                             }
                             ), hosts, threadcount);
 
+                    }
+                    break;
+
+                case "callstack":
+                    if (args.Length <= 1)
+                    {
+                        Console.Error.WriteLine("Invalid syntax for command: callstack: not enough arguments");
+                        SetFailure();
+                        return;
+                    }
+                    if (0 == string.Compare(args[1], "worker", true) || 0 == string.Compare(args[1], "workers", true))
+                    {
+                        if (args.Length <= 3)
+                        {
+                            Console.Error.WriteLine("Invalid syntax for command: callstack worker: not enough arguments");
+                            SetFailure();
+                            return;
+                        }
+                        string sjidcs = args[2];
+                        long jidcs = -1;
+                        if ("*" != sjidcs)
+                        {
+                            if (!long.TryParse(sjidcs, out jidcs) || jidcs < 0)
+                            {
+                                Console.Error.WriteLine("callstack: invalid Job Identifier: " + sjidcs);
+                                SetFailure();
+                                return;
+                            }
+                            sjidcs = jidcs.ToString(); // Normalize.
+                        }
+                        string hostcs = args[3];
+                        {
+                            string netpath = Surrogate.NetworkPathForHost(hostcs);
+                            string[] fps = System.IO.Directory.GetFiles(netpath, "*.j" + sjidcs + ".slave.pid");
+                            if (0 == fps.Length)
+                            {
+                                Console.Error.WriteLine("No workers for Job Identifier {0} found on host {1}", sjidcs, hostcs);
+                            }
+                            else
+                            {
+                                System.Text.RegularExpressions.Regex rex = new System.Text.RegularExpressions.Regex(@"\\(\d+)\.j(\d+).slave.pid$",
+                                    System.Text.RegularExpressions.RegexOptions.Compiled
+                                    | System.Text.RegularExpressions.RegexOptions.Singleline
+                                    | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                                List<KeyValuePair<string, string>> slavecs = new List<KeyValuePair<string,string>>(fps.Length); // Key=slave; Value=jid
+                                for (int i = 0; i < fps.Length; i++)
+                                {
+                                    System.Text.RegularExpressions.Match m = rex.Match(fps[i]);
+                                    if (!m.Success)
+                                    {
+                                        throw new Exception("Internal error: slave pid file mismatch");
+                                    }
+                                    System.Text.RegularExpressions.GroupCollection gc = m.Groups;
+                                    slavecs.Add(new KeyValuePair<string, string>(gc[1].Value, gc[2].Value));
+                                }
+
+                                Console.WriteLine("Waiting on {0} worker callstack{1}...", slavecs.Count, slavecs.Count == 1 ? "" : "s");
+
+                                for (int i = 0; i < slavecs.Count; i++)
+                                {
+                                    string path = netpath + @"\" + slavecs[i].Key + ".trace";
+                                    for (; System.IO.File.Exists(path); System.Threading.Thread.Sleep(1000 * 1))
+                                    {
+                                    }
+                                    string tpath = sjid + "tracing.slave" + slavecs[i].Key + ".tof";
+                                    System.IO.File.WriteAllText(path, tpath + Environment.NewLine + ".");
+                                }
+
+                                for (int tries = 0; slavecs.Count > 0; tries++)
+                                {
+                                    if (0 != tries)
+                                    {
+                                        System.Threading.Thread.Sleep(1000 * 3);
+                                    }
+                                    for (int i = 0; i < slavecs.Count; i++)
+                                    {
+                                        string tpath = netpath + @"\" + sjid + "tracing.slave" + slavecs[i].Key + ".tof";
+                                        {
+                                            string toutput = ReadTraceFromFile(tpath);
+                                            if (null == toutput)
+                                            {
+                                                if (0 == System.IO.Directory.GetFiles(netpath, slavecs[i].Key + ".j*.slave.pid").Length)
+                                                {
+                                                    Console.WriteLine();
+                                                    Console.WriteLine("Worker no longer running");
+                                                    try
+                                                    {
+                                                        System.IO.File.Delete(netpath + @"\" + slavecs[i].Key + ".trace");
+                                                    }
+                                                    catch
+                                                    {
+                                                    }
+                                                    slavecs.RemoveAt(i);
+                                                    i--;
+#if DEBUG
+                                                    //System.Diagnostics.Debugger.Launch();
+#endif
+                                                }
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine();
+                                                Console.WriteLine(toutput);
+                                                try
+                                                {
+                                                    System.IO.File.Delete(tpath);
+                                                }
+                                                catch
+                                                {
+                                                }
+                                                slavecs.RemoveAt(i);
+                                                i--;
+                                            }
+                                        }
+                                    }
+                                }
+                                Console.WriteLine();
+
+                            }
+                        }
+                    }
+                    else if (0 == string.Compare(args[1], "surrogate", true))
+                    {
+                        if (args.Length <= 2)
+                        {
+                            Console.Error.WriteLine("Invalid syntax for command: callstack surrogate: not enough arguments");
+                            SetFailure();
+                            return;
+                        }
+                        string sjidcs = args[2];
+                        long jidcs;
+                        if (!long.TryParse(sjidcs, out jidcs) || jidcs < 0)
+                        {
+                            Console.Error.WriteLine("callstack: invalid Job Identifier: " + sjidcs);
+                            SetFailure();
+                            return;
+                        }
+                        sjidcs = jidcs.ToString(); // Normalize.
+                        string hostcs = System.Net.Dns.GetHostName();
+                        {
+                            string netpath = Surrogate.NetworkPathForHost(hostcs);
+                            string jidcsfp = netpath + @"\" + sjidcs + ".jid";
+                            string saelightpid = null;
+                            int aelightpid = -1;
+                            for (; ; System.Threading.Thread.Sleep(1000 * 3))
+                            {
+                                try
+                                {
+                                    string jidcscontent;
+                                    using (System.IO.FileStream f = new System.IO.FileStream(jidcsfp,
+                                        System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                                        System.IO.FileShare.Read | System.IO.FileShare.Write | System.IO.FileShare.Delete))
+                                    {
+                                        System.IO.StreamReader sr = new System.IO.StreamReader(f);
+                                        jidcscontent = sr.ReadToEnd();
+                                        sr.Close();
+                                    }
+                                    {
+                                        // If any of this fails, try again;
+                                        // it might not be written fully yet.
+                                        int ipidequ = 0;
+                                        for (; ; )
+                                        {
+                                            ipidequ = jidcscontent.IndexOf("pid=", ipidequ);
+                                            if (-1 == ipidequ)
+                                            {
+                                                break;
+                                            }
+                                            if (0 == ipidequ || '\n' == jidcscontent[ipidequ - 1])
+                                            {
+                                                // Ensure newline to ensure the pid= entry was fully written.
+                                                int iendpid = jidcscontent.IndexOf('\n', ipidequ + 4);
+                                                if (-1 != iendpid)
+                                                {
+                                                    saelightpid = jidcscontent.Substring(ipidequ + 4, iendpid - (ipidequ + 4)).Trim();
+                                                    aelightpid = int.Parse(saelightpid);
+                                                    saelightpid = aelightpid.ToString(); // Normalize.
+                                                    break;
+                                                }
+                                                else
+                                                {
+                                                    //ipidequ += 4;
+                                                    //continue;
+                                                    ipidequ = -1;
+                                                    break;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                ipidequ += 4;
+                                                continue;
+                                            }
+                                        }
+                                        if (-1 == ipidequ)
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                }
+                                catch (System.IO.FileNotFoundException)
+                                {
+                                }
+                                catch
+                                {
+                                    continue;
+                                }
+                                break;
+                            }
+                            if (null == saelightpid)
+                            {
+                                Console.Error.WriteLine("No surrogate process for Job Identifier {0}", sjidcs);
+                            }
+                            else
+                            {
+                                Console.WriteLine("Waiting on surrogate callstacks...");
+
+                                {
+                                    string path = netpath + @"\" + saelightpid + ".trace";
+                                    for (; System.IO.File.Exists(path); System.Threading.Thread.Sleep(1000 * 1))
+                                    {
+                                    }
+                                    string tpath = sjid + "tracing.aelight" + saelightpid + ".tof";
+                                    System.IO.File.WriteAllText(path, tpath + Environment.NewLine + ".");
+                                }
+
+                                for (int tries = 0; ; tries++)
+                                {
+                                    if (0 != tries)
+                                    {
+                                        System.Threading.Thread.Sleep(1000 * 3);
+                                    }
+                                    {
+                                        string tpath = netpath + @"\" + sjid + "tracing.aelight" + saelightpid + ".tof";
+                                        {
+                                            string toutput = ReadTraceFromFile(tpath);
+                                            if (null == toutput)
+                                            {
+                                                if (!System.IO.File.Exists(jidcsfp))
+                                                {
+                                                    Console.WriteLine();
+                                                    Console.WriteLine("Worker no longer running");
+                                                    try
+                                                    {
+                                                        System.IO.File.Delete(netpath + @"\" + saelightpid + ".trace");
+                                                    }
+                                                    catch
+                                                    {
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine();
+                                                Console.WriteLine(toutput);
+                                                try
+                                                {
+                                                    System.IO.File.Delete(tpath);
+                                                }
+                                                catch
+                                                {
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                Console.WriteLine();
+
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Invalid syntax for command: callstack: didn't expect " + args[1]);
+                        SetFailure();
+                        return;
                     }
                     break;
 
@@ -6416,6 +6930,38 @@ namespace MySpace.DataMining.AELight
         static bool ListContainsHost(string hosts, string host)
         {
             return -1 != ListContainsHostIndexOf(hosts.Split(';', ','), host);
+        }
+
+
+        // Important: returns null if it's not ready to be read yet!
+        static string ReadTraceFromFile(string fp)
+        {
+            string result = null;
+            try
+            {
+                const string tracefiledelim = "{C8683F6C-0655-42e7-ACD9-0DDED6509A7C}";
+                using (System.IO.FileStream f = new System.IO.FileStream(fp, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                    System.IO.FileShare.Read | System.IO.FileShare.Write | System.IO.FileShare.Delete))
+                {
+                    System.IO.StreamReader sr = new System.IO.StreamReader(f);
+                    string s = sr.ReadToEnd();
+                    sr.Close();
+                    int i = s.IndexOf(tracefiledelim);
+                    if (-1 != i)
+                    {
+                        s = s.Substring(i + tracefiledelim.Length);
+                        i = s.IndexOf(tracefiledelim);
+                        if (-1 != i)
+                        {
+                            result = s.Substring(0, i).Trim('\r', '\n');
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return result;
         }
 
 

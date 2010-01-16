@@ -176,6 +176,8 @@ namespace RDBMS_DBCORE
 #endif
                 }
 
+                bool HasKeyOn = OrderBy || GroupBy;
+
                 if (OrderBy)
                 {
                     if (WhatFunctions || GroupBy)
@@ -553,7 +555,15 @@ namespace RDBMS_DBCORE
                     DisplayInfo = sbDisplayInfo.ToString(); // Display
                 }
 
-                int KeyLength = RowSize; // For now, can null out the extra bytes.
+                int KeyLength;
+                if (HasKeyOn)
+                {
+                    KeyLength = RowSize;
+                }
+                else
+                {
+                    KeyLength = 4;
+                }
 
                 bool IsSpecialOrdered = -1 != sOptions.IndexOf("SPECIALORDER");
 
@@ -585,7 +595,7 @@ namespace RDBMS_DBCORE
                         {
                             qafile = qafile.Substring(0, iat);
                         }
-                        Shell("dspace exec \"//Job[@Name='RDBMS_SysGen']/IOSettings/DFS_IO/DFSWriter=" + SysGenOutputFile + "\" RDBMS_SysGen.DBCORE \"" + qafile + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + TableName + "\"");
+                        Shell("dspace exec \"//Job[@Name='RDBMS_SysGen']/IOSettings/DFS_IO/DFSWriter=" + SysGenOutputFile + "\" RDBMS_SysGen.DBCORE \"" + qafile + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(TableName) + "\"");
                     }
                 }
                 else

@@ -76,40 +76,35 @@
                 int ColLineLength = 1 + (ColLineChars * 2);
                 string line = "";
                 char endchar = '\n';
+                List<byte> linebuf = new List<byte>();
                 foreach(char chr in output)
                 {
                     line += chr;
                     if(line.Length == ColLineChars || chr == endchar)
-                    {
-                        _OutputLine(line, dfsoutput, ColLineLength);
+                    {                        
+                        _OutputLine(line, dfsoutput, ColLineLength, linebuf);
                         line = "";
                     }
                 }
                 
                 if(line.Length > 0)
                 {
-                    _OutputLine(line, dfsoutput, ColLineLength);
+                    _OutputLine(line, dfsoutput, ColLineLength, linebuf);
                 }
             }
             
-            void _OutputLine(string line, RemoteOutputStream dfsoutput, int maxByteLength)
+            void _OutputLine(string line, RemoteOutputStream dfsoutput, int maxByteLength, List<byte> linebuf)
             {
-                recordset rs = recordset.Prepare();
-                rs.PutByte(0); // Nullable byte.
-                rs.PutString(line);
-                {
-                    ByteSlice bs = rs.ToByteSlice();
-                    if(bs.Length > maxByteLength)
+                linebuf.Clear();
+                StringToBytes(line, linebuf, maxByteLength);               
+                {                    
+                    if(linebuf.Count > maxByteLength)
                     {
                         throw new Exception("Column Line: length is too long: " + line);
                     }
-                    for(int ibs = 0; ibs < bs.Length; ibs++)
+                    for(int ibs = 0; ibs < linebuf.Count; ibs++)
                     {
-                        dfsoutput.WriteByte(bs[ibs]);
-                    }
-                    for(int ibs = bs.Length; ibs < DSpace_OutputRecordLength; ibs++)
-                    {
-                        dfsoutput.WriteByte(0);
+                        dfsoutput.WriteByte(linebuf[ibs]);
                     }
                 }
             }            
@@ -123,30 +118,23 @@
                 }
                 
                 int ColLineLength = 1 + (200 * 2);
+                List<byte> linebuf = new List<byte>();
                 foreach(string _line in xml.Split('\n'))
                 {
                     string line = _line.Trim('\n', '\r');
-                    recordset rs = recordset.Prepare();
-                    rs.PutByte(0); // Nullable byte.
-                    rs.PutString(line);
-                    {
-                        ByteSlice bs = rs.ToByteSlice();
-                        if(bs.Length > ColLineLength)
+                    linebuf.Clear();
+                    StringToBytes(line, linebuf, DSpace_OutputRecordLength);                   
+                    {                       
+                        if(linebuf.Count > ColLineLength)
                         {
                             throw new Exception("Column Line: length is too long: " + line);
                         }
-                        for(int ibs = 0; ibs < bs.Length; ibs++)
+                        for(int ibs = 0; ibs < linebuf.Count; ibs++)
                         {
-                            dfsoutput.WriteByte(bs[ibs]);
-                        }
-                        for(int ibs = bs.Length; ibs < DSpace_OutputRecordLength; ibs++)
-                        {
-                            dfsoutput.WriteByte(0);
+                            dfsoutput.WriteByte(linebuf[ibs]);
                         }
                     }
-
-                }
-                
+                }                
             }
             
             
@@ -158,60 +146,40 @@
                     systables = LoadSysTables_unlocked();
                 }
                 
+                List<byte> linebuf = new List<byte>();
+                
                 foreach(System.Xml.XmlNode xn in systables.SelectNodes("/tables/table"))
-                {
-                    recordset rs = recordset.Prepare();
-                    
+                { 
                     int ColTableLength = 1 + (100 * 2);
                     string Table = xn["name"].InnerText;
-                    rs.PutByte(0); // Nullable byte.
-                    rs.PutString(Table);
+                    
+                    linebuf.Clear();
+                    StringToBytes(Table, linebuf, ColTableLength);                    
+                        
+                    if(linebuf.Count > ColTableLength)
                     {
-                        ByteSlice bs = rs.ToByteSlice();
-                        if(bs.Length > ColTableLength)
-                        {
-                            throw new Exception("Column Table: length is too long: " + Table);
-                        }
-                        for(int ibs = bs.Length; ibs < ColTableLength; ibs++)
-                        {
-                            rs.PutByte(0);
-                        }
-                    }
+                        throw new Exception("Column Table: length is too long: " + Table);
+                    }                    
                     
                     int ColFileLength = 1 + (120 * 2);
                     string File = xn["file"].InnerText;
-                    rs.PutByte(0); // Nullable byte.
-                    rs.PutString(File);
-                    {
-                        ByteSlice bs = rs.ToByteSlice();
-                        if(bs.Length > ColTableLength + ColFileLength)
-                        {
-                            throw new Exception("Column File: length is too long: " + File);
-                        }
-                        for(int ibs = bs.Length; ibs < ColTableLength + ColFileLength; ibs++)
-                        {
-                            rs.PutByte(0);
-                        }
-                    }
                     
+                    StringToBytes(File, linebuf, ColTableLength + ColFileLength);                    
+                                           
+                    if(linebuf.Count > ColTableLength + ColFileLength)
                     {
-                        ByteSlice bs = rs.ToByteSlice();
-                        if(bs.Length > DSpace_OutputRecordLength)
-                        {
-                            throw new Exception("Record too long");
-                        }
-                        for(int ibs = 0; ibs < bs.Length; ibs++)
-                        {
-                            dfsoutput.WriteByte(bs[ibs]);
-                        }
-                        for(int ibs = bs.Length; ibs < DSpace_OutputRecordLength; ibs++)
-                        {
-                            dfsoutput.WriteByte(0);
-                        }
+                        throw new Exception("Column File: length is too long: " + File);
+                    }     
+                        
+                    if(linebuf.Count > DSpace_OutputRecordLength)
+                    {
+                        throw new Exception("Record too long");
                     }
-                    
-                }
-                
+                    for(int ibs = 0; ibs < linebuf.Count; ibs++)
+                    {
+                        dfsoutput.WriteByte(linebuf[ibs]);
+                    }     
+                }                
             }
             
             void _SysHelp(RemoteOutputStream dfsoutput)
@@ -220,6 +188,7 @@
                 
                 const int ColLineChars = 1000;
                 int ColLineLength = 1 + (ColLineChars * 2);
+                List<byte> linebuf = new List<byte>();
                 foreach(string _linex in xml.Split('\n'))
                 {
                     string linex = _linex.Trim();
@@ -236,28 +205,19 @@
                             line = linex;
                             linex = "";
                         }
-                        recordset rs = recordset.Prepare();
-                        rs.PutByte(0); // Nullable byte.
-                        rs.PutString(line);
-                        {
-                            ByteSlice bs = rs.ToByteSlice();
-                            if(bs.Length > ColLineLength)
+                        linebuf.Clear();
+                        StringToBytes(line, linebuf, DSpace_OutputRecordLength);                        
+                        {                            
+                            if(linebuf.Count > ColLineLength)
                             {
-                                //DSpace_Log("bs.Length = " + bs.Length.ToString());
-                                //DSpace_Log("ColLineLength = " + ColLineLength.ToString());
                                 throw new Exception("Column Line: length is too long: " + line);
                             }
-                            for(int ibs = 0; ibs < bs.Length; ibs++)
+                            for(int ibs = 0; ibs < linebuf.Count; ibs++)
                             {
-                                dfsoutput.WriteByte(bs[ibs]);
-                            }
-                            for(int ibs = bs.Length; ibs < DSpace_OutputRecordLength; ibs++)
-                            {
-                                dfsoutput.WriteByte(0);
+                                dfsoutput.WriteByte(linebuf[ibs]);
                             }
                         }
                     }
-
                 }
             }
             
@@ -274,27 +234,22 @@
                 string indexdir = QlArgsUnescape(TableName.Substring(ip + 1, TableName.Length - ip - 1 - 1));
                 System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(indexdir);
                 System.IO.FileInfo[] files = dir.GetFiles("ind.Index.*.ind");
+                List<byte> linebuf = new List<byte>();
                 foreach (System.IO.FileInfo file in files)
                 {
                     string[] parts = file.Name.Split('.');
                     string indexname = parts[2];
                     
-                    recordset rs = recordset.Prepare();
-                    rs.PutByte(0); // Nullable byte.
-                    rs.PutString(indexname);
-                    {
-                        ByteSlice bs = rs.ToByteSlice();
-                        if(bs.Length > ColLineLength)
+                    linebuf.Clear();
+                    StringToBytes(indexname, linebuf, DSpace_OutputRecordLength); 
+                    {                        
+                        if(linebuf.Count > ColLineLength)
                         {
                             throw new Exception("Column Line: length is too long: " + indexname);
                         }
-                        for(int ibs = 0; ibs < bs.Length; ibs++)
+                        for(int ibs = 0; ibs < linebuf.Count; ibs++)
                         {
-                            dfsoutput.WriteByte(bs[ibs]);
-                        }
-                        for(int ibs = bs.Length; ibs < DSpace_OutputRecordLength; ibs++)
-                        {
-                            dfsoutput.WriteByte(0);
+                            dfsoutput.WriteByte(linebuf[ibs]);
                         }
                     }
                 }
@@ -383,7 +338,17 @@
             return Qa.QlArgsUnescape(eargs);
         }
             
-            
+        void StringToBytes(string str, List<byte> buf, int maxbyteCount)
+        {
+          byte[] strbytes = System.Text.Encoding.Unicode.GetBytes(str);
+          buf.Add(0); //nullable byte
+          buf.AddRange(strbytes);
+          //Pad up the end of the char.
+          while(buf.Count < maxbyteCount)
+          {
+              buf.Add(0);
+          }
+        }            
         ]]>
       </Remote>
     </Job>
