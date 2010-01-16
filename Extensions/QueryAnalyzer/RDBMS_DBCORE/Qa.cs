@@ -164,7 +164,7 @@ namespace RDBMS_DBCORE
         }
 
 
-        public abstract class Local
+        public abstract class Job
         {
             public string Exec(params string[] args)
             {
@@ -198,6 +198,49 @@ namespace RDBMS_DBCORE
                 string result = _log.ToString();
                 _log.Length = 0;
                 return result;
+            }
+        }
+
+
+        // Implement Run method.
+        public abstract class Local : Job
+        {
+        }
+
+
+        public abstract class MapReduceOutput
+        {
+            public abstract void Add(ByteSlice x);
+        }
+
+        public abstract class MapReduce : Job
+        {
+
+            public int DSpace_KeyLength = 0;
+            public int DSpace_ProcessID = 0;
+
+
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+            }
+
+            public virtual void ReduceInitialize()
+            {
+            }
+
+            public virtual void Reduce(ByteSlice key, IEnumerator<ByteSlice> values, MapReduceOutput output)
+            {
+            }
+
+            public virtual void ReduceFinalize()
+            {
+            }
+
+            protected override void Run()
+            {
+#if DEBUG
+                System.Diagnostics.Debugger.Launch();
+#endif
             }
         }
 

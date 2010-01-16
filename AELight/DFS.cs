@@ -4494,6 +4494,12 @@ switch(workerindex)
                             SetFailure();
                             return;
                         }
+                        if (new System.IO.DirectoryInfo(args[0]).Exists)
+                        {
+                            Console.Error.WriteLine("Argument cannot be a directory. Argument expected: <localpath.dj>");
+                            SetFailure();
+                            return;
+                        }
                         EnsureNetworkPath(args[0]);
                         //using (LockDfsMutex())
                         {

@@ -674,14 +674,17 @@ public void DSpace_LogResult(string name, bool passed)
 #if CONN_BACKLOG_IPSINGLE
                 {
                     object openlock;
-                    if (connbacklog.ContainsKey(SlaveIP))
+                    lock (connbacklog)
                     {
-                        openlock = connbacklog[SlaveIP];
-                    }
-                    else
-                    {
-                        openlock = SlaveIP;
-                        connbacklog[SlaveIP] = SlaveIP;
+                        if (connbacklog.ContainsKey(SlaveIP))
+                        {
+                            openlock = connbacklog[SlaveIP];
+                        }
+                        else
+                        {
+                            openlock = SlaveIP;
+                            connbacklog[SlaveIP] = SlaveIP;
+                        }
                     }
                     lock (openlock)
                     {
@@ -1640,6 +1643,7 @@ public void DSpace_LogResult(string name, bool passed)
                 }
 
                 System.Threading.Thread timethread = new System.Threading.Thread(new System.Threading.ThreadStart(timethreadproc));
+                timethread.Name = "MapReduceJobTime";
                 try
                 {
                     List<MapReduceBlockInfo> blocks = new List<MapReduceBlockInfo>(goodblockcount);
@@ -2137,13 +2141,14 @@ public void DSpace_LogResult(string name, bool passed)
                             bi.acl.FoilKeySkipFactor = FoilKeySkipFactor;
                             bi.all = blocks;
                             bi.thread = new System.Threading.Thread(new System.Threading.ThreadStart(bi.fsortedthreadproc));
+                            bi.thread.Name = "MapReduceJobBlock" + bi.BlockID + "_fsorted";
                             bi.thread.IsBackground = true;
-                            bi.thread.Start();
+                            AELight_StartTraceThread(bi.thread);
                         }
                         for (int i = 0; i < blocks.Count; i++)
                         {
                             MapReduceBlockInfo bi = blocks[i];
-                            bi.thread.Join();
+                            AELight_JoinTraceThread(bi.thread);
                         }
                         if (verbose)
                         {
@@ -2164,14 +2169,15 @@ public void DSpace_LogResult(string name, bool passed)
                         MapReduceBlockInfo bi = blocks[i];
                         bi.all = blocks;
                         bi.thread = new System.Threading.Thread(new System.Threading.ThreadStart(bi.firstthreadproc));
+                        bi.thread.Name = "MapReduceJobBlock" + bi.BlockID + "_map";
                         bi.thread.IsBackground = true;
-                        bi.thread.Start();
+                        AELight_StartTraceThread(bi.thread);
                     }
                     {
                         Exception ee = null;
                         for (int i = 0; i < blocks.Count; i++)
                         {
-                            blocks[i].thread.Join();
+                            AELight_JoinTraceThread(blocks[i].thread);
                             // If failover, check failures..
                             if (cfgj.IsJobFailoverEnabled && blocks[i].blockfail)
                             {
@@ -2199,14 +2205,15 @@ public void DSpace_LogResult(string name, bool passed)
                         for (int i = 0; i < blocks.Count; i++)
                         {
                             blocks[i].thread = new System.Threading.Thread(new System.Threading.ThreadStart(blocks[i].exchangethreadproc));
+                            blocks[i].thread.Name = "MapReduceJobBlock" + blocks[i].BlockID + "_aftermap";
                             blocks[i].thread.IsBackground = true;
-                            blocks[i].thread.Start();
+                            AELight_StartTraceThread(blocks[i].thread);
                         }
                         {
                             Exception ee = null;
                             for (int i = 0; i < blocks.Count; i++)
                             {
-                                blocks[i].thread.Join();
+                                AELight_JoinTraceThread(blocks[i].thread);
                                 // If failover, check failures..
                                 if (cfgj.IsJobFailoverEnabled && blocks[i].blockfail)
                                 {

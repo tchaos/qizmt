@@ -562,6 +562,7 @@ public static void DSpace_LogResult(string name, bool passed)
                     blocks.Add(bi);
 
                     bi.thread = new System.Threading.Thread(new System.Threading.ThreadStart(bi.threadproc));
+                    bi.thread.Name = "RemoteJobBlock" + bi.BlockID;
                 }
                 MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = inputrecordlengths.Count > 0 ? inputrecordlengths[0] : -1;
                 MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = outputrecordlengths.Count > 0 ? outputrecordlengths[0] : -1;
@@ -573,12 +574,12 @@ public static void DSpace_LogResult(string name, bool passed)
                     bi.rem.InputRecordLengths = inputrecordlengths;
                     bi.rem.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
                     bi.rem.OutputRecordLengths = outputrecordlengths;
-                    bi.thread.Start();
+                    AELight_StartTraceThread(bi.thread);
                 }
 
                 for (int BlockID = 0; BlockID < blocks.Count; BlockID++)
                 {
-                    blocks[BlockID].thread.Join();
+                    AELight_JoinTraceThread(blocks[BlockID].thread);
                     blocks[BlockID].rem.Close();
 
                     if (blocks[BlockID].blockfail)

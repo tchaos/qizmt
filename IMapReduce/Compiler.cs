@@ -160,10 +160,12 @@ namespace MySpace.DataMining.DistributedObjects
             string reason = "";
             for (int rotor = 1; ; rotor++)
             {
-                /*if (rotor > 10)
+#if DEBUG
+                if (rotor > 3)
                 {
                     throw new System.IO.FileNotFoundException("ArrayComboList.CompileSource dynamic C# compilation: Unable to create DLL" + reason);
-                }*/
+                }
+#endif
                 try
                 {
                     cp.OutputAssembly = outputname;
@@ -242,7 +244,14 @@ namespace MySpace.DataMining.DistributedObjects
                             }
                         }
                     }
+#if DEBUG
+                    if (rotor > 1)
+                    {
+                        System.Threading.Thread.Sleep(1000 * (rotor - 1));
+                    }
+#else
                     System.Threading.Thread.Sleep(1000 * rotor);
+#endif
 
                     break; // Good.
                 }

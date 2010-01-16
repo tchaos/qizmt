@@ -336,19 +336,26 @@ namespace QueryAnalyzer_Protocol
         {
             for (; ; )
             {
-                List<string> bads = new List<string>(rindexpins.Count);
-                foreach (string indexname in rindexpins.Keys)
+                try
                 {
-                    if (!System.IO.File.Exists("ind.Index." + indexname + ".ind"))
+                    List<string> bads = new List<string>(rindexpins.Count);
+                    foreach (string indexname in rindexpins.Keys)
                     {
-                        bads.Add(indexname);
+                        if (!System.IO.File.Exists("ind.Index." + indexname + ".ind"))
+                        {
+                            bads.Add(indexname);
+                        }
                     }
+                    foreach (string bad in bads)
+                    {
+                        rindexpins.Remove(bad);
+                    }
+                    System.Threading.Thread.Sleep(1000 * 10);
                 }
-                foreach (string bad in bads)
+                catch
                 {
-                    rindexpins.Remove(bad);
-                }
-                System.Threading.Thread.Sleep(1000 * 10);
+
+                }                
             }
         }
 

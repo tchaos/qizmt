@@ -879,10 +879,17 @@ namespace QueryAnalyzer_Protocol
                 }
                 finally
                 {
-                    netstm.Close();
-                    netstm = null;
-                    clientsock.Close();
-                    clientsock = null;
+                    try
+                    {
+                        netstm.Close();
+                        netstm = null;
+                        clientsock.Close();
+                        clientsock = null;
+                    }
+                    catch
+                    {
+
+                    }
                 }
             }
 

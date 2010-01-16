@@ -407,7 +407,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 conn.Open();
                 DbCommand cmd = conn.CreateCommand();
                 cmd.CommandText =
-                   "rinsert into " + indexname + " values(-22, -23) where key = -22\0" +
+                   "BEGIN BULKUPDATE rinsert into " + indexname + " values(-22, -23) where key = -22\0" +
                    "rinsert into " + indexname + " values(-24, -23) where key = -24\0" +
                     "rdelete from " + indexname + " where key = -24 and rid=-23\0" +
                      "rdelete from " + indexname + " where key = -15 and rid=-10\0" +
@@ -430,9 +430,9 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                     "rinsert into " + indexname + " values(2, 1) where key = 2\0" +
                     "rinsert into " + indexname + " values(2, 19) where key = 2\0" +
                     "rinsert into " + indexname + " values(2, 2) where key = 2\0" +
-                    "rdelete from " + indexname + " where key = 2 and rid=19\0"+
-                    "rdelete from " + indexname + " where key = 102 and rid=2\0"+
-                    "rdelete from " + indexname + " where key = 102 and rid=3";
+                    "rdelete from " + indexname + " where key = 2 and rid=19\0" +
+                    "rdelete from " + indexname + " where key = 102 and rid=2\0" +
+                    "rdelete from " + indexname + " where key = 102 and rid=3 END BULKUPDATE";
                 cmd.ExecuteNonQuery();
                 conn.Close();
             }

@@ -17,6 +17,11 @@
  *  You should have received a copy of the GNU General Public License                 *
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
 ***************************************************************************************/
+
+#if DEBUG
+#define DOSERVICE_TRACE
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -54,6 +59,7 @@ namespace MySpace.DataMining.DistributedObjects5
             Block block = null;
             try
             {
+                DistributedObjectsService.DOService_AddTraceThread(null);
                 dllclientSock = (Socket)obj;
                 block = new Block(dllclientSock);
                 block.HandleDllClient();
@@ -73,6 +79,7 @@ namespace MySpace.DataMining.DistributedObjects5
                 {
                 }
             }
+            DistributedObjectsService.DOService_RemoveTraceThread(null);
         }
 
 
@@ -80,6 +87,8 @@ namespace MySpace.DataMining.DistributedObjects5
         {
             try
             {
+                DOService_AddTraceThread(null);
+
                 lsock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 IPEndPoint ipep = new IPEndPoint(IPAddress.Any, 55900);
                 for (int i = 0; ; i++)
@@ -127,6 +136,7 @@ namespace MySpace.DataMining.DistributedObjects5
             {
                 XLog.errorlog("ListenThreadProc exception: " + e.ToString());
             }
+            DOService_RemoveTraceThread(null);
         }
 
         static bool isAllowedMachine(Socket dllclientSock)
@@ -379,12 +389,166 @@ namespace MySpace.DataMining.DistributedObjects5
             }
         }
 
+
+#if DOSERVICE_TRACE
+        static List<System.Threading.Thread> DOService_TraceThreads = new List<System.Threading.Thread>();
+#endif
+
+        protected internal static void DOService_AddTraceThread(System.Threading.Thread thd)
+        {
+#if DOSERVICE_TRACE
+            if (null == thd)
+            {
+                thd = System.Threading.Thread.CurrentThread;
+            }
+            lock (DOService_TraceThreads)
+            {
+                DOService_TraceThreads.Add(thd);
+            }
+#endif
+        }
+
+        protected internal static void DOService_RemoveTraceThread(System.Threading.Thread thd)
+        {
+#if DOSERVICE_TRACE
+            if (null == thd)
+            {
+                thd = System.Threading.Thread.CurrentThread;
+            }
+            lock (DOService_TraceThreads)
+            {
+                DOService_TraceThreads.Remove(thd);
+            }
+#endif
+        }
+
+
         protected override void OnStart(string[] args)
         {
             try
             {
+                DOService_AddTraceThread(null);
+
                 string service_base_dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
                 System.Environment.CurrentDirectory = service_base_dir;
+
+#if DOSERVICE_TRACE
+                try
+                {
+                    System.Threading.Thread stthd = new System.Threading.Thread(
+                        new System.Threading.ThreadStart(
+                        delegate
+                        {
+                            string spid = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+                            try
+                            {
+                                string dotracefile = spid + ".trace";
+                                for (
+                                    ; !System.IO.File.Exists(dotracefile)
+                                    ; System.Threading.Thread.Sleep(1000 * 60))
+                                {
+                                }
+                                try
+                                {
+                                    System.IO.File.Delete(dotracefile);
+                                }
+                                catch
+                                {
+                                }
+                                XLog.errorlog("DOSERVICE_TRACE: " + spid + " Start");
+                                for (System.Threading.Thread.Sleep(1000 * 5); ; System.Threading.Thread.Sleep(1000 * 60))
+                                {
+                                    Dictionary<string, int> traces = new Dictionary<string, int>();
+                                    foreach (System.Threading.Thread tthd in DOService_TraceThreads)
+                                    {
+                                        string tr = "";
+                                        try
+                                        {
+                                            bool thdsuspended = false;
+                                            try
+                                            {
+                                                tthd.Suspend();
+                                                thdsuspended = true;
+                                            }
+                                            catch (System.Threading.ThreadStateException)
+                                            {
+                                            }
+                                            try
+                                            {
+                                                System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(tthd, false);
+                                                StringBuilder sbst = new StringBuilder();
+                                                for (int i = 0, imax = Math.Min(15, st.FrameCount); i < imax; i++)
+                                                {
+                                                    if (0 != sbst.Length)
+                                                    {
+                                                        sbst.Append(", ");
+                                                    }
+                                                    string mn = "N/A";
+                                                    try
+                                                    {
+                                                        System.Reflection.MethodBase mb = st.GetFrame(i).GetMethod();
+                                                        mn = mb.ReflectedType.Name + "." + mb.Name;
+                                                    }
+                                                    catch
+                                                    {
+                                                    }
+                                                    /*if (mn.Length > 150)
+                                                    {
+                                                        mn = "..." + mn.Substring(mn.Length - 150);
+                                                    }*/
+                                                    sbst.Append(mn);
+                                                }
+                                                tr = ("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Trace: " + sbst.ToString());
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                tr = ("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Error: " + e.ToString());
+                                            }
+                                            finally
+                                            {
+                                                if (thdsuspended)
+                                                {
+                                                    tthd.Resume();
+                                                }
+                                            }
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            tr = ("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Trace Error: Cannot access thread: " + e.ToString());
+                                        }
+                                        {
+                                            int trc;
+                                            if (traces.ContainsKey(tr))
+                                            {
+                                                trc = traces[tr] + 1;
+                                            }
+                                            else
+                                            {
+                                                trc = 1;
+                                            }
+                                            traces[tr] = trc;
+                                        }
+                                    }
+                                    foreach (KeyValuePair<string, int> kvp in traces)
+                                    {
+                                        XLog.errorlog(kvp.Key + " [" + kvp.Value + "]");
+                                    }
+
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                XLog.errorlog("DOSERVICE_TRACE: " + spid + " Trace Failure: " + e.Message);
+                            }
+                        }));
+                    stthd.IsBackground = true;
+                    stthd.Start();
+                }
+                catch (Exception est)
+                {
+                    XLog.errorlog("DOSERVICE_TRACE: Thread start error: " + est.ToString());
+                }
+#endif
 
                 // Add to Machine PATH... (if not found)
                 try
@@ -507,6 +671,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         new ThreadStart(
                         delegate
                         {
+                            DOService_AddTraceThread(null);
                             System.Threading.Thread.Sleep(1000 * 30);
                             for (; ; )
                             {
@@ -520,6 +685,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                     System.Threading.Thread.Sleep(1000 * 30);
                                 }
                             }
+                            DOService_RemoveTraceThread(null);
                         }));
                     schedulethd.Name = "Scheduler_ScheduleService";
                     schedulethd.IsBackground = true;
@@ -529,6 +695,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         new ThreadStart(
                         delegate
                         {
+                            DOService_AddTraceThread(null);
                             System.Threading.Thread.Sleep(1000 * 30);
                             for (; ; )
                             {
@@ -542,6 +709,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                     System.Threading.Thread.Sleep(1000 * 30);
                                 }
                             }
+                            DOService_RemoveTraceThread(null);
                         }));
                     queuethd.Name = "Scheduler_QueueService";
                     queuethd.IsBackground = true;
@@ -668,6 +836,43 @@ namespace MySpace.DataMining.DistributedObjects5
                         logusageshutdown();
                     }
                 }
+
+                try
+                {
+                    System.IO.FileInfo[] pffiles = (new System.IO.DirectoryInfo(".")).GetFiles("*.pf");
+                    foreach (System.IO.FileInfo pff in pffiles)
+                    {
+                        pff.Delete();
+                    }
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    System.IO.FileInfo[] tfiles = (new System.IO.DirectoryInfo(".")).GetFiles("*.trace");
+                    foreach (System.IO.FileInfo tf in tfiles)
+                    {
+                        tf.Delete();
+                    }
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    System.IO.FileInfo[] toffiles = (new System.IO.DirectoryInfo(".")).GetFiles("*.tof");
+                    foreach (System.IO.FileInfo tof in toffiles)
+                    {
+                        tof.Delete();
+                    }
+                }
+                catch
+                {
+                }
+
             }
             catch (Exception e)
             {
@@ -810,9 +1015,21 @@ namespace MySpace.DataMining.DistributedObjects5
                 // args: <host> <portnum> <typechar> <capacity> <logfile> <jid>
                 string procname = "MySpace.DataMining.DistributedObjects.DistributedObjectsSlave.exe";
                 string sargs = this.sdllclienthost + " " + dllport.ToString() + " \"" + blockinfo[0] + "\" \"" + blockinfo[2] + "\" \"" + blockinfo[4] + "\" " + sjid;
-                if (XLog.logging)
+                bool substartlogging = XLog.logging;
+#if DEBUGnoisy
+                substartlogging = true;
+#endif
+                if (substartlogging)
                 {
-                    XLog.log(this.name, "Starting sub process \"" + procname + "\" with arguments: " + sargs);
+#if DEBUGfailstart
+                    if ((System.Threading.Thread.CurrentThread.ManagedThreadId % 20) == 0)
+                    {
+                        XLog.errorlog("DEBUG: NOT Starting sub process \"" + procname + "\" with arguments: " + sargs);
+                        return;
+                    }
+#endif
+                    //XLog.log(this.name, "Starting sub process \"" + procname + "\" with arguments: " + sargs);
+                    XLog.errorlog("Starting sub process \"" + procname + "\" with arguments: " + sargs);
                 }
 #if DEBUG_off
                 {
@@ -824,9 +1041,16 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                 }
 #endif
+                lock ("Process.Start{3561B087-424A-4501-972A-693039F7A168}")
+                {
+                    System.Threading.Thread.Sleep(20);
+                }
                 ProcessStartInfo psi = new ProcessStartInfo(procname, sargs);
                 psi.CreateNoWindow = true;
-                Process proc = Process.Start(psi);
+                psi.UseShellExecute = false;
+                Process proc;
+                proc = Process.Start(psi);
+                //proc.WaitForExit(20);
                 //proc.Dispose();
             }
             catch (Exception e)
@@ -935,6 +1159,7 @@ namespace MySpace.DataMining.DistributedObjects5
         {
             try
             {
+                DistributedObjectsService.DOService_AddTraceThread(null);
                 AliveObj alive = (AliveObj)obj;
                 for (; ; )
                 {
@@ -967,11 +1192,13 @@ namespace MySpace.DataMining.DistributedObjects5
             {
                 XLog.errorlog("pingputthreadproc thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString());
             }
+            DistributedObjectsService.DOService_RemoveTraceThread(null);
         }
 
 
         void stdoutputthreadproc(object obj)
         {
+            DistributedObjectsService.DOService_AddTraceThread(null);
             byte bch = (byte)' ';
             try
             {
@@ -1026,6 +1253,7 @@ namespace MySpace.DataMining.DistributedObjects5
                 //stdoutputthreadproc (char)bch exception: e.ToString()
                 XLog.errorlog("stdoutputthreadproc '" + ((char)bch).ToString() + "' thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString());
             }
+            DistributedObjectsService.DOService_RemoveTraceThread(null);
         }
 
 
@@ -1066,19 +1294,29 @@ namespace MySpace.DataMining.DistributedObjects5
                         switch ((char)buf[0])
                         {
                             case 'B': // AddBlock
-                                string sblock = XContent.ReceiveXString(dllclientStm, buf);
-                                // For Hashtable: @"H|objectname|200MB|localhost|C:\hashtable_logs0\|slaveid=0"
-                                // For ArrayList: @"A|objectname|..."
-                                /* // This isn't good because it's before this.name is set, so gets written to bad file.
-                                if (XLog.logging)
+                                try
                                 {
-                                    XLog.log(this.name, "AddBlock received: " + sblock);
+                                    string sblock = XContent.ReceiveXString(dllclientStm, buf);
+                                    // For Hashtable: @"H|objectname|200MB|localhost|C:\hashtable_logs0\|slaveid=0"
+                                    // For ArrayList: @"A|objectname|..."
+                                    /* // This isn't good because it's before this.name is set, so gets written to bad file.
+                                    if (XLog.logging)
+                                    {
+                                        XLog.log(this.name, "AddBlock received: " + sblock);
+                                    }
+                                     * */
+                                    s = XContent.ReceiveXString(dllclientStm, buf);
+                                    ushort dllport = ushort.Parse(s);
+                                    string sjid = XContent.ReceiveXString(dllclientStm, buf);
+                                    AddingBlock(sblock.Split('|'), dllport, sjid);
+                                    dllclientStm.WriteByte((byte)'+');
                                 }
-                                 * */
-                                s = XContent.ReceiveXString(dllclientStm, buf);
-                                ushort dllport = ushort.Parse(s);
-                                string sjid = XContent.ReceiveXString(dllclientStm, buf);
-                                AddingBlock(sblock.Split('|'), dllport, sjid);
+                                catch(Exception e)
+                                {
+                                    dllclientStm.WriteByte((byte)'_');
+                                    XContent.SendXContent(dllclientStm, e.Message);
+                                    throw;
+                                }
                                 break;
 
                             case 'd': // Get current directory.
@@ -1498,6 +1736,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                             {
                                                 try
                                                 {
+                                                    DistributedObjectsService.DOService_AddTraceThread(null);
                                                     while (!alive.isdone)
                                                     {
                                                         if (1 != dllclientStm.Read(inbuf, 0, 1))
@@ -1525,6 +1764,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                                 catch
                                                 {
                                                 }
+                                                DistributedObjectsService.DOService_RemoveTraceThread(null);
                                             }));
                                         inthread.Name = "inthread_from" + tname;
                                         inthread.IsBackground = true;
@@ -1645,6 +1885,9 @@ namespace MySpace.DataMining.DistributedObjects5
                                     {
                                         throw;
                                     }
+#if DEBUG
+                                    XLog.errorlog("DistributedObjectsService Warning: IOException+SocketException during %BiDiExecIO: " + e.ToString());
+#endif
                                 }
                                 catch
                                 {
@@ -1836,6 +2079,9 @@ namespace MySpace.DataMining.DistributedObjects5
                                     {
                                         throw;
                                     }
+#if DEBUG
+                                    XLog.errorlog("DistributedObjectsService Warning: IOException+SocketException during $UniDiExecIO: " + e.ToString());
+#endif
                                 }
                                 catch
                                 {

@@ -149,6 +149,14 @@ namespace RDBMS_qa
             return cleanedQuery;
         }
 
+        private bool IsRIndexQuery(string query)
+        {
+            string _query = query.Trim();
+            return (_query.StartsWith("rselect", StringComparison.OrdinalIgnoreCase) ||
+                _query.StartsWith("rinsert", StringComparison.OrdinalIgnoreCase) ||
+                _query.StartsWith("rdelete", StringComparison.OrdinalIgnoreCase));            
+        }
+
         public void RunQuery()
         {
             ClearResults();
@@ -211,7 +219,14 @@ namespace RDBMS_qa
             {
                 System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
                 conn = fact.CreateConnection();
-                conn.ConnectionString = ConnectionString;
+                if (IsRIndexQuery(queries[0])) //just check the first query
+                {
+                    conn.ConnectionString = ConnectionString + ";rindex=pooled";
+                }
+                else
+                {
+                    conn.ConnectionString = ConnectionString;
+                }                
                 conn.Open();
                 DbCommand cmd = conn.CreateCommand();
                 for (int onquery = 0; onquery < queries.Count; onquery++)

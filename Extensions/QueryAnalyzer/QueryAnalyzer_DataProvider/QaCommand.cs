@@ -156,6 +156,27 @@ namespace QueryAnalyzer_DataProvider
                     throw new Exception("Master indexes is null.");
                 }
 
+                {
+                    string cleanedCmdText = cmdText;
+                    if ((0 == string.Compare("BEGIN", Qa.NextPart(ref cleanedCmdText), true)
+                   && 0 == string.Compare("BULKUPDATE", Qa.NextPart(ref cleanedCmdText), true)))
+                    {
+                        int del = cleanedCmdText.LastIndexOf("BULKUPDATE", StringComparison.OrdinalIgnoreCase);
+                        if (del == -1)
+                        {
+                            throw new Exception("Expected END BULKUPDATE");
+                        }
+                        cleanedCmdText = cleanedCmdText.Substring(0, del);
+                        del = cleanedCmdText.LastIndexOf("END", StringComparison.OrdinalIgnoreCase);
+                        if (del == -1)
+                        {
+                            throw new Exception("Expected END BULKUPDATE");
+                        }
+                        cleanedCmdText = cleanedCmdText.Substring(0, del);
+                        cmdText = cleanedCmdText;
+                    }
+                }
+
                 string[] stmts = cmdText.Split('\0');
                 Dictionary<string, Dictionary<string, BatchInfo>> hostBatches = new Dictionary<string, Dictionary<string, BatchInfo>>(conn.connstr.DataSource.Length, new _CaseInsensitiveEqualityComparer_2664());
                 Dictionary<string, int> chunkInsertCount = new Dictionary<string, int>(conn.connstr.DataSource.Length, new _CaseInsensitiveEqualityComparer_2664());
@@ -178,7 +199,7 @@ namespace QueryAnalyzer_DataProvider
                     foreach (string bhost in hostBatches.Keys)
                     {
                         RIndexUpdateThread thisthd = new RIndexUpdateThread();
-                        threads[thdcnt++] = thisthd;                        
+                        threads[thdcnt++] = thisthd;
                         thisthd.HostName = bhost;
                         thisthd.chunkInsertCount = chunkInsertCount;
                         thisthd.conn = conn;
@@ -199,7 +220,7 @@ namespace QueryAnalyzer_DataProvider
                             throw threads[ti].exception;
                         }
                     }
-                }                
+                }
 
                 return rowsAffected;
             }

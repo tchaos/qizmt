@@ -3696,7 +3696,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     throw new Exception("No such sort class '" + sortclass + "' (OutputMethod)");
             }
 
-            XLog.log("ArrayComboList: " + samples.Count.ToString() + " samples produced from sample-map on this sub process; using sort class " + sortclass + "; memory usage " + distro.GetMemoryUsage());
+            //XLog.log("ArrayComboList: " + samples.Count.ToString() + " samples produced from sample-map on this sub process; using sort class " + sortclass + "; memory usage " + distro.GetMemoryUsage());
         }
 
         private bool IncludeSample(int index, int factor, bool isSkipFactor, int filesCount)
