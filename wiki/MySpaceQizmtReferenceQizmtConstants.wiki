@@ -19,3 +19,4 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 || {{{const string[] Qizmt_ExecArgs}}} || 	Command line arguments sent in with the Qizmt exec command  ||
 || {{{const int Qizmt_KeyLength}}} || IOSettings/ KeyLength  ||
 || {{{const string Qizmt_LogName}}} || 	Name of log file ||
+|| {{{const bool Qizmt_KeyRepeated }}} || 	It has the value of true if the current key in reducer occurs in multiple reducers. ||
