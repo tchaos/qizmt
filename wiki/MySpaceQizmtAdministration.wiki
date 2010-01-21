@@ -164,6 +164,46 @@ generate host names </td><td> generate a list of hostnames using a pattern such 
  <div>    `Qizmt exec sortTestsDriver.xml [v = verify results]`</div>
 </td></tr>
 
+<tr valign="top"><td> `enqueue` </td><td>
+<div>`command=<value>`</div>
+<div>`[ExecTimeout=<secs> Maximum seconds Qizmt exec can run`</div>
+<div>`OnTimeout=<tcmd>] Run on timeout; e.g.  Qizmt kill #JID#`</div>
+<div>Adds a command to the end of the queue</div>
+</td></tr>
+<tr valign="top"><td> `queuekill` </td><td>
+<div>`<QueueID>`</div>
+<div>Removes the specified Queue Identifier</div>
+</td></tr>
+<tr valign="top"><td> `clearqueue` </td><td>
+<div>Removes all entries from the queue</div>
+</td></tr>
+<tr valign="top"><td> `schedule` </td><td>
+<div>`command=<value>`</div>
+<div>`start=<now|<datetime>>`</div>
+<div>`[frequency=<seconds>]`</div>
+<div>`[texceptions=<<datetime>[-<datetime>]>[,...]] ranges when not to run`</div>
+<div>`[wexceptions=<weekday>[,...]] whole weekdays not to run`</div>
+<div>`[wtexceptions=<wdtime>[,...]] time on day-of-week not to run`</div>
+<div>adds a command entry to the scheduler</div>
+<div>(datetime format is `[M[/D[/Y]].][h:m[:s][AM|PM]]`)</div>
+<div>(wdtime format is `<weekday>@<h:m[:s][AM|PM]>[-<h:m[:s][AM|PM]>]`)</div>
+</td></tr>
+<tr valign="top"><td> `pauseschedule` </td><td>
+<div>`<ScheduleID>`</div>
+<div>Pauses the specified Schedule Identifier</div>
+</td></tr>
+<tr valign="top"><td> `unpauseschedule` </td><td>
+<div>`<ScheduleID>`</div>
+<div>Un-pauses the specified Schedule Identifier</div>
+</td></tr>
+<tr valign="top"><td> `unschedule` </td><td>
+<div>`<ScheduleID>`</div>
+<div>Removes the specified Schedule Identifier</div>
+</td></tr>
+<tr valign="top"><td> `clearschedule` </td><td>
+<div>Removes all entries from the scheduler</div>
+</td></tr>
+
 </table>
 
 
