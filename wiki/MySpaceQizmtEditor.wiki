@@ -79,10 +79,12 @@ Activated when ‘.’ Key is pressed. When available, displays list of member f
 <tr><td> Skip to Reduce </td><td> Shift-F12 </td><td> Start reduce phase at end of current map cycle. </td></tr>
 </table>
 
+== Start Debugger Half Way through Map Data ==
+ # During debug mode, open the Map Input Scroll Control.<br/><wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorOpenMapInputScrollControl.png" alt="EditorOpenMapInputScrollControl" />
+ # Press the Nudge button to skip through map data.<br/><wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorMapInputScrollControl.png" alt="EditorMapInputScrollControl" />
 
-== Debugging Thrown Errors from Mapreduce Jobs ==
+== Locating Build Error without IDE ==
 
  # Write a mapreducer that contains an error: <br /> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditorSyntaxError.png" alt="EditorSyntaxError" />
  # Run mapreducer: <br /> <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_ExecSyntaxError.png" alt="ExecSyntaxError" />
  # View executed code of last error from machine on which it occurred; use Ctrl-G to go to the line number of the error. In this example The error occurred on line *1307* and glyph 33:  <br />  *`Qizmt edit *errors*`* <br /><wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_EditErrors.png" alt="EditErrors" />
-
