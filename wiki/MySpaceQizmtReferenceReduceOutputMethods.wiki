@@ -9,8 +9,8 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 
  * [MySpaceQizmtReferenceReduceOutputAdd Add]
  * [MySpaceQizmtReferenceReduceOutputCache Cache]
+ * [MySpaceQizmtReferenceReduceOutputGetOutputByIndex GetOutputByIndex] 
  * [MySpaceQizmtReferenceReduceOutputWriteLine WriteLine]
- * [MySpaceQizmtReferenceReduceOutputWriteRecord WriteRecord]
+ * [MySpaceQizmtReferenceReduceOutputWriteRecord WriteRecord] 
  
  
-
