@@ -743,7 +743,28 @@ namespace QueryAnalyzer_DataProvider
                     {
                         throw new Exception("Index " + indexname + " is not found in the master indexes.");
                     }
-                    if (0 == string.Compare("WHERE", Qa.NextPart(ref xcmd), true))
+
+                    int samplesize = 0;
+                    string nextarg = Qa.NextPart(ref xcmd);
+                    if (0 == string.Compare("SAMPLE", nextarg, true))
+                    {
+                        try
+                        {
+                            samplesize = Int32.Parse(Qa.NextPart(ref xcmd));
+                            if (samplesize <= 0)
+                            {
+                                throw new Exception("SAMPLE size expected to be greater than 0.");
+                            }
+                        }
+                        catch
+                        {
+                            throw new Exception("SAMPLE size integer expected.");
+                        }
+
+                        nextarg = Qa.NextPart(ref xcmd);
+                    }
+
+                    if (0 == string.Compare("WHERE", nextarg, true))
                     {
                         string keytype = "long";
                         int keylen = 9;
@@ -884,6 +905,8 @@ namespace QueryAnalyzer_DataProvider
                                         conn.OpenSocketRIndex(bhost);
                                         conn.netstm.WriteByte((byte)'s'); //search master index
                                         XContent.SendXContent(conn.netstm, indexname);
+                                        Utils.Int32ToBytes(samplesize, buf, 0);
+                                        XContent.SendXContent(conn.netstm, buf, 4);
                                         XContent.SendXContent(conn.netstm, bbatch.ToString());
 
                                         int ib = conn.netstm.ReadByte();

@@ -15,6 +15,7 @@ namespace RDBMS_qa
     {
         private string filename = "";
         private string connstr = "";
+        private string firsthost = "";
 
         public Qa()
         {
@@ -68,6 +69,22 @@ namespace RDBMS_qa
                     return;
                 }
                 connstr = value;
+                SetFirstHost();
+            }
+        }
+
+        private void SetFirstHost()
+        {
+            string[] parts = connstr.Split(';');
+            foreach (string part in parts)
+            {
+                string[] keyval = part.Split('=');
+                string key = keyval[0].Trim();
+                if (string.Compare(key, "data source", true) == 0)
+                {
+                    firsthost = keyval[1].Split(',')[0];
+                    break;
+                }
             }
         }
 
@@ -157,13 +174,18 @@ namespace RDBMS_qa
                 _query.StartsWith("rdelete", StringComparison.OrdinalIgnoreCase));            
         }
 
+        private void TSafe(Action act)
+        {
+            button1.Invoke(act);
+        }
+
         public void RunQuery()
         {
             ClearResults();
 
             string fquery = txtQuery.Text.Trim();
             bool hasgo = false;
-            if(fquery.StartsWith("GO", StringComparison.OrdinalIgnoreCase))
+            if (fquery.StartsWith("GO", StringComparison.OrdinalIgnoreCase))
             {
                 for (int i = 2; ; i++)
                 {
@@ -172,7 +194,7 @@ namespace RDBMS_qa
                         //hasgo = false;
                         break;
                     }
-                    if('\n' == fquery[i])
+                    if ('\n' == fquery[i])
                     {
                         hasgo = true;
                         fquery = fquery.Substring(i + 1).TrimStart();
@@ -209,109 +231,140 @@ namespace RDBMS_qa
                 queries.Add(cleanedQuery);
             }
 
-            button1.Enabled = false;          
+            button1.Enabled = false;
 
             ShowStatus("Executing query...");
 
-            string status = "";
-            DbConnection conn = null;
-            try
-            {
-                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
-                conn = fact.CreateConnection();
-                if (IsRIndexQuery(queries[0])) //just check the first query
-                {
-                    conn.ConnectionString = ConnectionString + ";rindex=pooled";
-                }
-                else
-                {
-                    conn.ConnectionString = ConnectionString;
-                }                
-                conn.Open();
-                DbCommand cmd = conn.CreateCommand();
-                for (int onquery = 0; onquery < queries.Count; onquery++)
-                {
-                    string thisquery = queries[onquery].Trim();
-                    if (0 == thisquery.Length)
-                    {
-                        continue;
-                    }
-                    if (onquery > 0)
-                    {
-                        ShowStatus("Executing next query...");
-                    }
-                    this.Update();
-                    cmd.CommandText = thisquery;
+            this.Update();
 
-                    if (thisquery.StartsWith("select", StringComparison.OrdinalIgnoreCase) ||
-                        thisquery.StartsWith("shell", StringComparison.OrdinalIgnoreCase) ||
-                        thisquery.StartsWith("rselect", StringComparison.OrdinalIgnoreCase))
+            System.Threading.Thread thd = new System.Threading.Thread(new System.Threading.ThreadStart(delegate()
+                {
+                    string status = "";
+                    DbConnection conn = null;
+                    try
                     {
-                        DbDataReader reader = cmd.ExecuteReader();
-                        ClearResults();
-
-                        DataSet ds = new DataSet();
-                        DataTable dt = new DataTable();
-
-                        //Get column meta data.
-                        int columnCount = reader.FieldCount;
-                        for (int i = 0; i < columnCount; i++)
+                        System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
+                        conn = fact.CreateConnection();
+                        if (IsRIndexQuery(queries[0])) //just check the first query
                         {
-                            dt.Columns.Add(reader.GetName(i));
+                            conn.ConnectionString = Utils.GetRIndexConnStr(firsthost);
                         }
-
-                        ds.Tables.Add(dt);
-
-                        while (reader.Read())
+                        else
                         {
-                            object[] row = new object[columnCount];
-                            reader.GetValues(row);
-                            for (int ir = 0; ir < row.Length; ir++)
+                            conn.ConnectionString = ConnectionString;
+                        }
+                        conn.Open();
+                        DbCommand cmd = conn.CreateCommand();
+                        for (int onquery = 0; onquery < queries.Count; onquery++)
+                        {
+                            string thisquery = queries[onquery].Trim();
+                            if (0 == thisquery.Length)
                             {
-                                if (DBNull.Value == row[ir])
-                                {
-                                    row[ir] = "NULL";
-                                }
+                                continue;
                             }
-                            dt.Rows.Add(row);
+                            if (onquery > 0)
+                            {
+                                TSafe(new Action(delegate()
+                                    {
+                                        ShowStatus("Executing next query...");
+                                    }));
+                            }
+                            TSafe(new Action(delegate()
+                                {
+                                    this.Update();
+                                }));
+                            cmd.CommandText = thisquery;
+
+                            if (thisquery.StartsWith("select", StringComparison.OrdinalIgnoreCase) ||
+                                thisquery.StartsWith("shell", StringComparison.OrdinalIgnoreCase) ||
+                                thisquery.StartsWith("rselect", StringComparison.OrdinalIgnoreCase))
+                            {
+                                DbDataReader reader = cmd.ExecuteReader();
+                                TSafe(new Action(delegate()
+                                    {
+                                        ClearResults();
+                                    }));
+
+                                DataSet ds = new DataSet();
+                                DataTable dt = new DataTable();
+
+                                //Get column meta data.
+                                int columnCount = reader.FieldCount;
+                                for (int i = 0; i < columnCount; i++)
+                                {
+                                    dt.Columns.Add(reader.GetName(i));
+                                }
+
+                                ds.Tables.Add(dt);
+
+                                while (reader.Read())
+                                {
+                                    object[] row = new object[columnCount];
+                                    reader.GetValues(row);
+                                    for (int ir = 0; ir < row.Length; ir++)
+                                    {
+                                        if (DBNull.Value == row[ir])
+                                        {
+                                            row[ir] = "NULL";
+                                        }
+                                    }
+                                    dt.Rows.Add(row);
+                                }
+
+                                //Get result table schema before closing the reader.
+                                DataTable schema = reader.GetSchemaTable();
+                                reader.Close();
+                                TSafe(new Action(delegate()
+                                    {
+                                        dgvResults.DataSource = ds.Tables[0];
+                                        SetGridWidths(schema);
+                                    }));                               
+                            }
+                            else
+                            {
+                                cmd.ExecuteNonQuery();
+                                TSafe(new Action(delegate()
+                                    {
+                                        ClearResults();
+                                        AddRow("Query results", "Completed");
+                                    }));                                
+                            }
+                            status = "Execution completed";
                         }
-
-                        //Get result table schema before closing the reader.
-                        DataTable schema = reader.GetSchemaTable();
-                        reader.Close();
-                        dgvResults.DataSource = ds.Tables[0];
-                        SetGridWidths(schema);
                     }
-                    else
+                    catch (Exception e)
                     {
-                        cmd.ExecuteNonQuery();
-                        ClearResults();
-                        AddRow("Query results", "Completed");
+                        TSafe(new Action(delegate()
+                            {
+                                AddRow("Exception Details", e.ToString());
+                            }));                        
+                        status = "Exceptions occurred";
                     }
-                    status = "Execution completed";
-                }
-            }
-            catch (Exception e)
-            {
-                AddRow("Exception Details", e.ToString());
-                status = "Exceptions occurred";
-            }
-            finally
-            {
-                try
-                {
-                    conn.Close();
-                }
-                catch (Exception e)
-                {
-                    AddRow("Exception Details", e.ToString());
-                    status = "Exceptions occurred";
-                }
-            }
+                    finally
+                    {
+                        try
+                        {
+                            conn.Close();
+                        }
+                        catch (Exception e)
+                        {
+                            TSafe(new Action(delegate()
+                            {
+                                AddRow("Exception Details", e.ToString());
+                            }));
+                            status = "Exceptions occurred";
+                        }
+                    }
 
-            EnableEditMenutItems(true);
-            ShowStatus(status);
-            button1.Enabled = true;
+                    TSafe(new Action(delegate()
+                        {
+                            EnableEditMenutItems(true);
+                            ShowStatus(status);
+                            button1.Enabled = true;                           
+                        }));                   
+                }));
+
+            thd.Start();            
         }
 
         private void SetGridWidths(DataTable schema)
@@ -411,7 +464,6 @@ namespace RDBMS_qa
         {
             button1.Enabled = false;
             RunQuery();
-            button1.Enabled = true;
         }
 
         int oldheight;

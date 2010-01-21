@@ -10,7 +10,7 @@ namespace QueryAnalyzer_ADONET_RegressionTests
         public static void Main(string[] args)
         {
             List<KeyValuePair<string, bool>> AllTests = new List<KeyValuePair<string, bool>>();
-            
+           
             if (args.Length > 0 && "-rindexmutable" == args[0])
             {
                 goto rindexmutable;
@@ -1265,6 +1265,23 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 try
                 {
                     RIndexMutable_SpecialCase_3();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+            {
+                string testname = "RIndexSampling";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    RIndexSampling();
                     Console.WriteLine("[PASSED] - {0}", testname);
                     AllTests.Add(new KeyValuePair<string, bool>(testname, true));
                 }
