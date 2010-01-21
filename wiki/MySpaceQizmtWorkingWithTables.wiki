@@ -10,6 +10,8 @@ Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] 
 = Working with Tables =
 Sometimes it is advantageous to store recordsets directly in MR.DFS table files rather than manually tokenizing the data into a text format. By convention, it is suggested to store recordsets in MR.DFS files using the `<file>.tbl` naming convention. If reading a table into a mapreducer job from MR.DFS, the DFSInput must contain `<filename>@<row size>` showing the number of bytes in each row. If writing a table to a mapreducer job from MR.DFS, the DFSOutput must contain `<filename>@<row size>` showing the number of bytes in each row.
 
+== Specifying Schema in Rectangular Binary Files ==
+An alternative to specifying the number of bytes in each row `<filename>@<row size>`, is the use of data type key words.  For example, `<filename>@Int,Int` instead of `<filename>@8`, `<filename>@Int,Long` instead of `<filename>@12`.  The current data type key words supported are: `Int`, `Long`, `DateTime`, and `Char(n)`.
 
 == Writing data from Mapreducer out to a Table ==
 A recordset may be directly written out to a MR.DFS file from a reducer as follows.
@@ -41,4 +43,3 @@ A line of data may be read directly into a recordset only if it was written out 
               output.Add(rout);
  </pre>
    Note: the table row size may be larger than the recordset, but if smaller an exception will be thrown.
-
