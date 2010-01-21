@@ -9,5 +9,433 @@ Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] 
 
 = Qizmt Command Line =
 
-<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_CommandLine.png" alt="CommandLine" />
+<table>
+<tr><td> *Usage* </td><td> *Description* </td></tr>
+
+<tr valign="top">
+<td><div>`retrylogmd5 <logfile>`</div>
+</td>
+<td>writes all output to the logfile</td>
+</tr>
+
+<tr valign="top">
+<td><div>`edit <jobs.xml>`</div>
+</td>
+<td>edit the specified jobs source code XML file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`exec ["</xpath>=<value>"] <jobs.xml>`</div>
+</td>
+<td>run the jobs source code XML file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`addmachine <host>`</div>
+</td>
+<td>add a machine to the cluster</td>
+</tr>
+
+<tr valign="top">
+<td><div>`removemachine <host>`</div>
+</td>
+<td>remove a machine from the cluster</td>
+</tr>
+
+<tr valign="top">
+<td><div>`ps`</div>
+</td>
+<td>distributed processes, schedule and queue info</td>
+</tr>
+
+<tr valign="top">
+<td><div>`who`</div>
+</td>
+<td>show who is logged on</td>
+</tr>
+
+<tr valign="top">
+<td><div>`history [<count>]`</div>
+</td>
+<td>show command history</td>
+</tr>
+
+<tr valign="top">
+<td><div>`killall`</div>
+</td>
+<td>kill all jobs, clean any orphaned intermediate data</td>
+</tr>
+
+<tr valign="top">
+<td><div>`gen <output-dfsfile>`</div>
+<div>`<outputsize>`</div> 
+<div>`[type=<bin|ascii|word>]`</div> 
+<div>`[row=<size>]`</div> 
+<div>`[writers=<count>]`</div> 
+<div>`[rand=custom]`</div> 
+</td>
+<td>generate random binary, ascii or word data</td>
+</tr>
+
+<tr valign="top">
+<td><div>`combine <inputfiles...> [+ <outputfile>]`</div>
+</td>
+<td>combine files into one</td>
+</tr>
+
+<tr valign="top">
+<td><div>`format machines=localhost`</div>
+</td>
+<td>format machines=localhost</td>
+</tr>
+
+<tr valign="top">
+<td><div>`info [<dfspath>[:<host>]]`</div>
+<div>`[-s short host name]`</div> 
+<div>`[-mt multi-threaded]`</div> 
+</td>
+<td>information for DFS or a DFS file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`head <dfspath>[:<host>:<part>] [<count>]`</div>
+</td>
+<td>show first few lines of file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`put <netpath> [<dfspath>[@<recordlen>]]`</div>
+</td>
+<td>put a file into DFS</td>
+</tr>
+
+<tr valign="top">
+<td><div>`fput files|dirs=<item[,item,item]>|@<filepath to list>`</div>
+<div>`[pattern=<pattern>]`</div> 
+<div>`[mode=continuous]`</div> 
+<div>`[dfsfilename=<targetfilename>]`</div> 
+</td>
+<td>put files into DFS</td>
+</tr>
+
+<tr valign="top">
+<td><div>`putbinary <wildcard> <dfspath>`</div>
+</td>
+<td>put binary into DFS</td>
+</tr>
+
+<tr valign="top">
+<td><div>`get [parts=<first>[-[<last>]]] <dfspath> <netpath>`</div>
+</td>
+<td>get a file from DFS</td>
+</tr>
+
+<tr valign="top">
+<td><div>`fget <dfspath>`</div>
+<div>`<targetFolder>[ <targetFolder> <targetFolder>] |`</div> 
+<div>`@<filepath to target folder list> [-gz] [-md5]`</div>
+</td>
+<td>get a file from DFS</td>
+</tr>
+
+<tr valign="top">
+<td><div>`getbinary <dfspath> <netpath>`</div>
+</td>
+<td>get binary from DFS</td>
+</tr>
+
+<tr valign="top">
+<td><div>`del <dfspath|wildcard>`</div>
+</td>
+<td>delete a DFS file using multiple threads</td>
+</tr>
+
+<tr valign="top">
+<td><div>`rename <dfspath-old> <dfspath-new>`</div>
+</td>
+<td>rename a DFS file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`getjobs <netpath.dj>`</div>
+</td>
+<td>archive all jobs</td>
+</tr>
+
+<tr valign="top">
+<td><div>`putjobs <netpath.dj>`</div>
+</td>
+<td>import jobs archive</td>
+</tr>
+
+<tr valign="top">
+<td><div>`ls`</div>
+</td>
+<td>DFS file listing</td>
+</tr>
+
+<tr valign="top">
+<td><div>`countparts <dfspath>`</div>
+</td>
+<td>get parts count of a file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`invalidate <cacheName> <fileNodeName>`</div>
+</td>
+<td>invalidate a file node of the cache</td>
+</tr>
+
+<tr valign="top">
+<td><div>`health [-a check DFS health]`</div>
+<div>`[-v verify driver]`</div> 
+<div>`[-mt multi-threaded]`</div> 
+</td>
+<td>Show the health of the machines in the cluster</td>
+</tr>
+
+<tr valign="top">
+<td><div>`examples`</div>
+</td>
+<td>generate example jobs source code</td>
+</tr>
+
+<tr valign="top">
+<td><div>`importdir <netpath>`</div>
+</td>
+<td>import jobs into DFS</td>
+</tr>
+
+<tr valign="top">
+<td><div>`listinstalldir`</div>
+</td>
+<td>List all installed directories</td>
+</tr>
+
+<tr valign="top">
+<td><div>`harddrivespeedtest [<filesize>]`</div>
+</td>
+<td>Test write/read hard drive speed</td>
+</tr>
+
+<tr valign="top">
+<td><div>`networkspeedtest [<filesize>]`</div>
+</td>
+<td>Test upload/download network speed test</td>
+</tr>
+
+<tr valign="top">
+<td><div>`exechistory`</div>
+</td>
+<td>List the most recent executed commands</td>
+</tr>
+
+<tr valign="top">
+<td><div>`cputemp`</div>
+</td>
+<td>List cpu temperature</td>
+</tr>
+
+<tr valign="top">
+<td><div>`ghost`</div>
+</td>
+<td>List ghost data files</td>
+</tr>
+
+<tr valign="top">
+<td><div>`perfmon <network|cputime|diskio|availablememory>`</div>
+<div>`[a=<Number of readings to get.  Return average.>]`</div> 
+<div>`[t=<Number of threads>]`</div> 
+<div>`[s=<Milliseconds of sleep to take between readings>]`</div> 
+</td>
+<td>get Perfmon counter readings</td>
+</tr>
+
+<tr valign="top">
+<td><div>`perfmon generic`</div>
+<div>`o=<Object/category name>`</div> 
+<div>`c=<Counter name>`</div>
+<div>`i=<Instance Name>`</div>
+<div>`[f Display readings in friendly byte size units]`</div>
+<div>`[a=<Number of readings to get.  Return average.>]`</div>
+<div>`[t=<Number of threads>]`</div>
+<div>`[s=<Milliseconds of sleep to take between readings>]`</div>
+</td>
+<td>specify a Perfmon counter to read</td>
+</tr>
+
+<tr valign="top">
+<td><div>`packetsniff [t=<Number of threads>]`</div>
+<div>`[s=<Milliseconds to sniff>]`</div> 
+<div>`[v verbose]`</div> 
+<div>`[a include non-cluster machines]`</div> 
+</td>
+<td>Sniff packets</td>
+</tr>
+
+<tr valign="top">
+<td><div>`md5 <dfsfile>`</div>
+</td>
+<td>compute MD5 of DFS data file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`checksum <dfsfile>`</div>
+</td>
+<td>compute sum of DFS data file</td>
+</tr>
+
+<tr valign="top">
+<td><div>`sorted <dfsfile>`</div>
+</td>
+<td>check if a DFS data file has sorted lines</td>
+</tr>
+
+<tr valign="top">
+<td><div>`nearprime <positiveNum>`</div>
+</td>
+<td>find the nearest prime number</td>
+</tr>
+
+<tr valign="top">
+<td><div>`genhostnames <pattern> <startNum>`</div>
+<div>`<endNum> [<delimiter>]`</div> 
+</td>
+<td>generate host names</td>
+</tr>
+
+<tr valign="top">
+<td><div>`viewlogs [machine=<machineName>]`</div>
+<div>`[count=<number of entries to return>]`</div> 
+</td>
+<td>view log entries</td>
+</tr>
+
+<tr valign="top">
+<td><div>`clearlogs`</div>
+</td>
+<td>clear logs from all machines in the cluster</td>
+</tr>
+
+<tr valign="top">
+<td><div>`maxuserlogsview`</div>
+</td>
+<td>view maxUserLogs configuration</td>
+</tr>
+
+<tr valign="top">
+<td><div>`maxuserlogsupdate <integer>`</div>
+</td>
+<td>update maxUserLogs configuration</td>
+</tr>
+
+<tr valign="top">
+<td><div>`maxdglobalsview`</div>
+</td>
+<td>view maxDGlobals configuration</td>
+</tr>
+
+<tr valign="top">
+<td><div>`maxdglobalsupdate <integer>`</div>
+</td>
+<td>update maxDGlobals configuration</td>
+</tr>
+
+<tr valign="top">
+<td><div>`recordsize <user-size>`</div>
+</td>
+<td>returns bytes of user-friendly size</td>
+</tr>
+
+<tr valign="top">
+<td><div>`swap <file1> <file2>`</div>
+</td>
+<td>file names to swap</td>
+</tr>
+
+<tr valign="top">
+<td><div>`regressiontest basic`</div>
+</td>
+<td>basic regression test Qizmt</td>
+</tr>
+
+<tr valign="top">
+<td><div>`kill <JobID>`</div>
+</td>
+<td>kill the specified Job Identifier</td>
+</tr>
+
+<tr valign="top">
+<td><div>`enqueue command=<value>`</div>
+<div>`[ExecTimeout=<secs> Maximum seconds Qizmt exec can run`</div> 
+<div>`OnTimeout=<tcmd>] Run on timeout; e.g.  Qizmt kill #JID#`</div> 
+</td>
+<td>Adds a command to the end of the queue</td>
+</tr>
+
+<tr valign="top">
+<td><div>`queuekill <QueueID>`</div>
+</td>
+<td>Removes the specified Queue Identifier</td>
+</tr>
+
+<tr valign="top">
+<td><div>`clearqueue`</div>
+</td>
+<td>Removes all entries from the queue</td>
+</tr>
+
+<tr valign="top">
+<td><div>`schedule command=<value> `</div>
+<div>`start=<now|<datetime>> `</div> 
+<div>`[frequency=<seconds>]`</div> 
+<div>`[texceptions=<<datetime>[-<datetime>]>[,...]] ranges when not to run`</div> 
+<div>`[wexceptions=<weekday>[,...]] whole weekdays not to run`</div> 
+<div>`[wtexceptions=<wdtime>[,...]] time on day-of-week not to run`</div> 
+</td>
+<td><div>adds a command entry to the scheduler</div>
+<div>(datetime format is `[M[/D[/Y]].][h:m[:s][AM|PM]]`)</div>
+<div>(wdtime format is `<weekday>@<h:m[:s][AM|PM]>[-<h:m[:s][AM|PM]>]`)</div>
+</td>
+</tr>
+
+<tr valign="top">
+<td><div>`pauseschedule <ScheduleID>`</div>
+</td>
+<td>Pauses the specified Schedule Identifier</td>
+</tr>
+
+<tr valign="top">
+<td><div>`unpauseschedule <ScheduleID>`</div>
+</td>
+<td>Un-pauses the specified Schedule Identifier</td>
+</tr>
+
+<tr valign="top">
+<td><div>`unschedule <ScheduleID>`</div>
+</td>
+<td>Removes the specified Schedule Identifier</td>
+</tr>
+
+<tr valign="top">
+<td><div>`clearschedule`</div>
+</td>
+<td>Removes all entries from the scheduler</td>
+</tr>
+
+
+
+<tr valign="top">
+<td><div>`shuffle <source> <target>`</div>
+</td>
+<td>Shuffle underlying parts of a rectangular binary file, maintaining chunk order</td>
+</tr>
+
+<tr valign="top">
+<td><div>`spread <dfsfile> <out-dfsfile>`</div>
+</td>
+<td>Spread a DFS file across the cluster</td>
+</tr>
+
+</table>
 
