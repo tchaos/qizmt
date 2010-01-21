@@ -96,9 +96,9 @@ View a list of all users currently logged into all windows machines of the clust
 <table>
 <tr><td> *Command* </td><td> *Usage* </td></tr>
 
-<tr valign="top"><td> `ps` </td><td> distributed process information </td></tr>
-<tr valign="top"><td> `who` </td><td>  </td></tr>
-<tr valign="top"><td> `history` </td><td>  </td></tr>
+<tr valign="top"><td> `ps` </td><td> distributed processes, schedule and queue info </td></tr>
+<tr valign="top"><td> `who` </td><td>show who is logged on  </td></tr>
+<tr valign="top"><td> `history` </td><td>show command history  </td></tr>
 <tr valign="top"><td> `killall` </td><td> kill all jobs, clean any orphaned intermediate data </td></tr>
 <tr valign="top"><td> `info [<dfspath>[:<host>]]`        </td><td> information for MR.DFS or a MR.DFS file </td></tr>
 <tr valign="top"><td> `getjobs \\<netpath>` </td><td> Archive all jobs from MR.DFS to a file on a network path. </td></tr>
