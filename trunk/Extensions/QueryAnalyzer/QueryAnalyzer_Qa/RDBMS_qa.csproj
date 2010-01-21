@@ -118,6 +118,7 @@
     <Compile Include="Qa.Designer.cs">
       <DependentUpon>Qa.cs</DependentUpon>
     </Compile>
+    <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="SciLexer.dll">

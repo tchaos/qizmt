@@ -106,6 +106,7 @@
     <Compile Include="RIndexPin.cs" />
     <Compile Include="RIndexPooled.cs" />
     <Compile Include="RIndexReplication.cs" />
+    <Compile Include="RIndexSampling.cs" />
     <Compile Include="RIndexType.cs" />
     <Compile Include="RSelect.cs" />
     <Compile Include="RSelectLotsOfRows.cs" />

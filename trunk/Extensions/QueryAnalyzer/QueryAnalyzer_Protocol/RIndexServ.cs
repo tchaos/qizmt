@@ -32,7 +32,8 @@ namespace QueryAnalyzer_Protocol
             System.Net.Sockets.NetworkStream netstm;
             byte[] buf = new byte[1024 * 1024 * 8];
             int buflen;
-
+            int[] pseudorand = null;
+            int pseudorandpos = 0;
 
             internal void ClientThreadProc(object _sock)
             {
@@ -274,6 +275,8 @@ namespace QueryAnalyzer_Protocol
                             case (byte)'s': //Search master index.
                                 {
                                     string indexname = XContent.ReceiveXString(netstm, buf);
+                                    XContent.ReceiveXBytes(netstm, out buflen, buf);
+                                    int samplesize = ClientHandler.BytesToInt(buf, 0);
                                     string keydata = XContent.ReceiveXString(netstm, buf);
                                     bool ispin = false;
                                     bool ispinhash = false;
@@ -282,7 +285,7 @@ namespace QueryAnalyzer_Protocol
                                     string keydatatype = "long";
                                     int keylen = 9;
                                     int keyoffset = 0;
-                                    int rowlen = 9 * 3;        
+                                    int rowlen = 9 * 3;
                             
                                     Column[] columns = null;
 
@@ -301,7 +304,7 @@ namespace QueryAnalyzer_Protocol
                                                 ispin = (xnPin.InnerText == "1");
                                                 System.Xml.XmlNode xnPinHash = xnIndex.SelectSingleNode("pinHash");
                                                 ispinhash = (xnPinHash != null && xnPinHash.InnerText == "1");
-                                                keepvalueorder = (xnIndex["keepValueOrder"].InnerText == "1");
+                                                keepvalueorder = (xnIndex["keepValueOrder"].InnerText == "1");                                                
                                                 System.Xml.XmlNode xnTable = xnIndex.SelectSingleNode("table");
                                                 System.Xml.XmlNodeList xnCols = xnTable.SelectNodes("column");
                                                 columns = new Column[xnCols.Count];
@@ -398,14 +401,33 @@ namespace QueryAnalyzer_Protocol
                                         XContent.SendXContent(netstm, buf, 4);
                                     }                                                                     
 
-                                    //return rows.    
-                                    byte[] recordbuf = new byte[rowlen + (0x400 * 0x400 * 20)];
+                                    //return rows.   
+                                    byte[] recordbuf = null;
                                     int recordbufpos = 0;
                                     byte[] keybuf = new byte[keylen];
 
+                                    if (samplesize == 0)
+                                    {
+                                        recordbuf = new byte[rowlen + (0x400 * 0x400 * 20)];
+                                    }
+                                    else
+                                    {
+                                        recordbuf = new byte[(rowlen * samplesize) + (0x400 * 0x400 * 20)];                                        
+
+                                        if (pseudorand == null)
+                                        {
+                                            Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+                                            pseudorand = new int[2000];
+                                            for (int pi = 0; pi < pseudorand.Length; pi++)
+                                            {
+                                                pseudorand[pi] = rnd.Next(0, Int32.MaxValue);
+                                            }
+                                        }
+                                    }
+                                    
                                     string[] xparts = keydata.Split('\0');
                                     for(int pi = 0; pi < xparts.Length; pi += 2)
-                                    {                                        
+                                    {                                                                           
                                         string chunkname = xparts[pi];
                                         string skey = xparts[pi + 1];                                                                
 
@@ -494,18 +516,18 @@ namespace QueryAnalyzer_Protocol
                                                 if (result > -1 || isfirstkeyofchunk)
                                                 {
                                                     #region keepvalueorderIsfalse
-                                                    if (!keepvalueorder)
+                                                    if (!keepvalueorder && samplesize == 0)
                                                     {
                                                         long startingrowpos = result;
 
                                                         //begin a row
                                                         if (result > -1)
-                                                        {
+                                                        { 
                                                             CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
                                                             for (int ci = 0; ci < rowlen; ci++)
                                                             {
                                                                 recordbuf[recordbufpos++] = chunkbuf[result][ci];
-                                                            }
+                                                            }                                                   
                                                         }                                                        
 
                                                         bool lookforward = true;
@@ -524,7 +546,7 @@ namespace QueryAnalyzer_Protocol
                                                                     for (int ci = 0; ci < rowlen; ci++)
                                                                     {
                                                                         recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
-                                                                    }
+                                                                    }                                                            
                                                                 }
                                                                 else
                                                                 {
@@ -554,7 +576,7 @@ namespace QueryAnalyzer_Protocol
                                                                     for (int ci = 0; ci < rowlen; ci++)
                                                                     {
                                                                         recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
-                                                                    }
+                                                                    }                                                          
                                                                 }
                                                                 else
                                                                 {
@@ -612,7 +634,7 @@ namespace QueryAnalyzer_Protocol
                                                                     for (int ci = 0; ci < rowlen; ci++)
                                                                     {
                                                                         recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
-                                                                    }
+                                                                    }                                                             
                                                                 }
                                                                 else
                                                                 {
@@ -658,9 +680,17 @@ namespace QueryAnalyzer_Protocol
                                                         }
                                                     }
                                                     #endregion
-                                                    #region keepvalueorder
+                                                    #region keepvalueorderORsample
                                                     else
-                                                    {
+                                                    {                                                        
+                                                        if (samplesize > 0)
+                                                        {
+                                                            CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen * samplesize);
+                                                        }
+
+                                                        int samplepoppos = 0;
+                                                        int samplestartingpos = recordbufpos;
+
                                                         long startingrowpos = result;
 
                                                         long firstrowindex = startingrowpos;
@@ -720,10 +750,17 @@ namespace QueryAnalyzer_Protocol
                                                                     //Begin first row.
                                                                     for (long ri = prevchunkfirstrowindex; ri < prevchunkbuf.NumberOfRows; ri++)
                                                                     {
-                                                                        CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
-                                                                        for (int ci = 0; ci < rowlen; ci++)
+                                                                        if (samplesize == 0)
                                                                         {
-                                                                            recordbuf[recordbufpos++] = prevchunkbuf[ri][ci];
+                                                                            CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                            for (int ci = 0; ci < rowlen; ci++)
+                                                                            {
+                                                                                recordbuf[recordbufpos++] = prevchunkbuf[ri][ci];
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            CopySampleToBuffer(ref samplepoppos, samplesize, samplestartingpos, recordbuf, ref recordbufpos, prevchunkbuf[ri]);
                                                                         }
                                                                     }
                                                                 }
@@ -734,11 +771,18 @@ namespace QueryAnalyzer_Protocol
                                                         {
                                                             for (long ri = firstrowindex; ri <= startingrowpos; ri++)
                                                             {
-                                                                CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
-                                                                for (int ci = 0; ci < rowlen; ci++)
+                                                                if (samplesize == 0)
                                                                 {
-                                                                    recordbuf[recordbufpos++] = chunkbuf[ri][ci];
+                                                                    CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                    for (int ci = 0; ci < rowlen; ci++)
+                                                                    {
+                                                                        recordbuf[recordbufpos++] = chunkbuf[ri][ci];
+                                                                    }
                                                                 }
+                                                                else
+                                                                {
+                                                                    CopySampleToBuffer(ref samplepoppos, samplesize, samplestartingpos, recordbuf, ref recordbufpos, chunkbuf[ri]);
+                                                                }                                                                
                                                             }
                                                         }
                                                         
@@ -754,11 +798,18 @@ namespace QueryAnalyzer_Protocol
                                                                 }
                                                                 if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
                                                                 {
-                                                                    CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
-                                                                    for (int ci = 0; ci < rowlen; ci++)
+                                                                    if (samplesize == 0)
                                                                     {
-                                                                        recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                                        CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                        for (int ci = 0; ci < rowlen; ci++)
+                                                                        {
+                                                                            recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                                        }
                                                                     }
+                                                                    else
+                                                                    {
+                                                                        CopySampleToBuffer(ref samplepoppos, samplesize, samplestartingpos, recordbuf, ref recordbufpos, chunkbuf[rowpos]);
+                                                                    }                                                                    
                                                                 }
                                                                 else
                                                                 {
@@ -805,11 +856,18 @@ namespace QueryAnalyzer_Protocol
                                                                     }
                                                                     if (CompareBytes(keybuf, chunkbuf[rowpos], keylen, keyoffset) == 0)
                                                                     {
-                                                                        CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
-                                                                        for (int ci = 0; ci < rowlen; ci++)
+                                                                        if (samplesize == 0)
                                                                         {
-                                                                            recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                                            CheckBatchCapacity(ref recordbufpos, recordbuf, rowlen);
+                                                                            for (int ci = 0; ci < rowlen; ci++)
+                                                                            {
+                                                                                recordbuf[recordbufpos++] = chunkbuf[rowpos][ci];
+                                                                            }
                                                                         }
+                                                                        else
+                                                                        {
+                                                                            CopySampleToBuffer(ref samplepoppos, samplesize, samplestartingpos, recordbuf, ref recordbufpos, chunkbuf[rowpos]);
+                                                                        }                                                                        
                                                                     }
                                                                     else
                                                                     {
@@ -823,7 +881,7 @@ namespace QueryAnalyzer_Protocol
                                                     #endregion
                                                 }
                                             }                                            
-                                        }
+                                        }                                        
                                     }
 
                                     if (recordbufpos > 0)
@@ -891,6 +949,39 @@ namespace QueryAnalyzer_Protocol
 
                     }
                 }
+            }
+
+            private void CopySampleToBuffer(ref int samplepoppos, int samplesize, int samplestartingpos, byte[] recordbuf, ref int recordbufpos, RowData row)
+            {
+                if (samplepoppos < samplesize)
+                {
+                    for (int ci = 0; ci < row.Length; ci++)
+                    {
+                        recordbuf[recordbufpos++] = row[ci];
+                    }
+                }
+                else
+                {
+                    int rndindex = GetNextPseudoRandom() % (samplepoppos + 1);
+                    if (rndindex < samplesize)
+                    {
+                        int replacestart = samplestartingpos + (rndindex * row.Length);
+                        for (int ci = 0; ci < row.Length; ci++)
+                        {
+                            recordbuf[replacestart++] = row[ci];
+                        }
+                    }
+                }
+                samplepoppos++;
+            }
+
+            private int GetNextPseudoRandom()
+            {
+                if (pseudorandpos >= pseudorand.Length)
+                {
+                    pseudorandpos = 0;
+                }
+                return pseudorand[pseudorandpos++];
             }
 
             private void CheckBatchCapacity(ref int recordbufpos, byte[] recordbuf, int rowlength)
