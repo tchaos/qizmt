@@ -1,0 +1,59 @@
+#summary Qizmt Reference Multiple Input and Output Files in a Mapreduce Job
+#labels Qizmt,Reference,Multiple,Input,Output,Mapreduce
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtReference MySpace Qizmt Reference]
+
+==Multiple Input and Output Files in a Mapreduce Job==
+
+===Example===
+{{{
+<Job Name="testJob" Custodian="" Email="">
+  <IOSettings>
+    <JobType>mapreduce</JobType>
+    <KeyLength>int</KeyLength>
+    <DFSInput>dfs://job_Input*.txt</DFSInput>
+    <DFSOutput>job_Output1.txt;job_Output2.txt</DFSOutput>
+    <OutputMethod>sorted</OutputMethod>
+  </IOSettings>
+  <MapReduce>
+    <Map>
+      <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {                
+                int key = 0;
+                if(StaticGlobals.DSpace_InputFileName == "job_Input1.txt")
+                {
+                    key = 1;
+                }
+                else if(StaticGlobals.DSpace_InputFileName == "job_Input2.txt")
+                {
+                    key = 2;
+                }
+                
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(key);
+                mstring val = mstring.Prepare(line);
+                output.Add(rkey, val);
+          }
+        ]]>
+    </Map>
+    <Reduce>
+      <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {     
+              recordset rkey = recordset.Prepare(key);
+              int ikey = rkey.GetInt();
+              ReduceOutput thisoutput = output.GetOutputByIndex(ikey - 1);
+              
+              for(int i = 0; i < values.Length; i++)
+              {
+                 thisoutput.Add(values[i].Value);  
+              }
+          }
+        ]]>
+    </Reduce>
+  </MapReduce>
+</Job>
+}}}
