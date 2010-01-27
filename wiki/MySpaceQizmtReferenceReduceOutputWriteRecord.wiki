@@ -9,7 +9,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtRefere
 =`WriteRecord`=
 {{{public void WriteRecord(ByteSlice entry)}}}
 
-Writes the entry to a rectangular binary output file in MR.DFS. This may be used from remote jobs or reducers to produce QSQL ready data. See INSERT INTO <distributed SQL TABLE> BIND.
+Writes the entry to a rectangular binary output file in MR.DFS. This may be used from remote jobs or reducers to produce QSQL ready data. See INSERT INTO <distributed SQL TABLE> BIND 'dfs://<nullable rectangular binary>'
 
 ===Remarks===
 Exception will be thrown if the length of the entry `ByteSlice` is different from the record length of the rectangular binary output file.
