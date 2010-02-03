@@ -1,0 +1,5 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_EditConfig.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_EditConfig.pdb
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_EditConfig\obj\Release\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_EditConfig\obj\Release\QueryAnalyzer_EditConfig.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_EditConfig\obj\Release\QueryAnalyzer_EditConfig.pdb

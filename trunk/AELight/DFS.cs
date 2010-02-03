@@ -785,6 +785,131 @@ namespace MySpace.DataMining.AELight
             DfsPut(args, 0x400 * 64);
         }
 
+        static void DfsCopyTo(string[] args)
+        {
+            if (args.Length <= 1)
+            {
+                Console.Error.WriteLine("copyto usage: <dfs-file> <target-host> [<target-dfs-filename>]");
+                SetFailure();
+                return;
+            }
+            string srcdfsname = args[0];
+            if (-1 != srcdfsname.IndexOf('@'))
+            {
+                Console.Error.WriteLine("Do not specify record length of source DFS file name: " + srcdfsname);
+                SetFailure();
+                return;
+            }
+            if (srcdfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+            {
+                srcdfsname = srcdfsname.Substring(6);
+            }
+            string targethost = args[1];
+            string targetdfsname = srcdfsname;
+            if (args.Length > 2)
+            {
+                targetdfsname = args[2];
+                if (-1 != targetdfsname.IndexOf('@'))
+                {
+                    Console.Error.WriteLine("Do not specify record length of target DFS file name: " + targetdfsname);
+                    SetFailure();
+                    return;
+                }
+            }
+            if (targetdfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+            {
+                targetdfsname = targetdfsname.Substring(6);
+            }
+            dfs dc = LoadDfsConfig();
+            IList<dfs.DfsFile.FileNode> fputfilenodes;
+            int RecordLength;
+            {
+                dfs.DfsFile df = dc.FindAny(srcdfsname);
+                if (null == df)
+                {
+                    Console.Error.WriteLine("DFS file '" + srcdfsname + "' not found");
+                    SetFailure();
+                    return;
+                }
+                if (0 != string.Compare(DfsFileTypes.NORMAL, df.Type, StringComparison.OrdinalIgnoreCase)
+                    && 0 != string.Compare(DfsFileTypes.BINARY_RECT, df.Type, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine("Cannot copyto DFS file '" + srcdfsname + "' of type " + df.Type);
+                    SetFailure();
+                    return;
+                }
+                fputfilenodes = df.Nodes;
+                RecordLength = df.RecordLength;
+            }
+            string fputfilesfilename = MySpace.DataMining.DistributedObjects.IOUtils.GetTempDirectory()
+                + @"\copyto_" + Guid.NewGuid().ToString() + ".txt";
+            try
+            {
+                List<string> unhealthysrcmachines = new List<string>();
+                Dictionary<string, int> uniqueSrcHosts = new Dictionary<string, int>();
+                using (System.IO.StreamWriter sw = new System.IO.StreamWriter(fputfilesfilename))
+                {
+                    foreach (dfs.DfsFile.FileNode fn in fputfilenodes)
+                    {
+                        bool foundhost = false;
+                        foreach (string host in fn.Host.Split(';'))
+                        {
+                            string thissrchost = host.ToUpper();
+                            if (!uniqueSrcHosts.ContainsKey(thissrchost))
+                            {
+                                if (unhealthysrcmachines.Contains(thissrchost))
+                                {
+                                    continue;
+                                }
+                                if (!Surrogate.IsHealthySlaveMachine(thissrchost))
+                                {
+                                    unhealthysrcmachines.Add(thissrchost);
+                                    continue;
+                                }
+                                uniqueSrcHosts.Add(thissrchost, 0);
+                            }
+                            foundhost = true;
+                            sw.WriteLine(@"{0}\{1}", NetworkPathForHost(thissrchost), fn.Name);
+                            break;
+                        }
+                        if (!foundhost)
+                        {
+                            Console.Error.WriteLine("Too many unhealthy machines");
+                            SetFailure();
+                            return;
+                        }
+                    }
+                }
+                Shell((appname + " `@=" + targethost + "` fput `files=@" + fputfilesfilename
+                    + "` mode=dfschunks `dfsfilename=" + targetdfsname + "`").Replace('`', '"'));
+                {
+                    string[] sout = Shell((appname + " `@=" + targethost
+                        + "` ls `" + targetdfsname + "`").Replace('`', '"')).Split(new char[] { '\n', '\r' },
+                        StringSplitOptions.RemoveEmptyEntries);
+                    if (sout.Length < 1 || -1 == sout[0].IndexOf(targetdfsname, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new Exception("File not found in remote cluster after put request");
+                    }
+                    Console.WriteLine("File copied to remote cluster:");
+                    Console.WriteLine(sout[0]);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine("Error: {0}", e.Message);
+            }
+            finally
+            {
+                try
+                {
+                    System.IO.File.Delete(fputfilesfilename);
+                }
+                catch
+                {
+                }
+            }
+        }
+
         static void DfsFPut(string[] args)
         {
             List<string> files = null;
@@ -793,6 +918,7 @@ namespace MySpace.DataMining.AELight
             string dfsfilename = "";
             string mode = "";
             const string contimode = "continuous";
+            const string dfschunksmode = "dfschunks";
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -863,7 +989,7 @@ namespace MySpace.DataMining.AELight
                 }
             }
 
-            if (mode == contimode && dfsfilename.Length == 0)
+            if ((mode == contimode || mode == dfschunksmode) && dfsfilename.Length == 0)
             {
                 Console.Error.WriteLine("fput error:  Must provide dfsfilename when mode is {0}.", contimode);
                 SetFailure();
@@ -957,7 +1083,7 @@ namespace MySpace.DataMining.AELight
                 hosts[i] = str;
             }
 
-            if (mode != contimode)
+            if (mode != contimode && mode != dfschunksmode)
             {
                 for (int i = 0; i < fileList.Count; i++)
                 {
@@ -1285,6 +1411,11 @@ switch(workerindex)
                     string inFile = srcFiles[fi];
                     bool isgz = inFile.EndsWith(`.gz`, StringComparison.OrdinalIgnoreCase);
 
+                    const bool dfschunks = ");
+                    sb.Append(mode == "dfschunks" ? "true" : "false");
+                    sb.Append(@";
+                    bool dfschunksdone = false;
+
                     //----------------------------COOKING--------------------------------
                     int cooktimeout = ");
                     sb.Append(cooktimeout);
@@ -1336,7 +1467,29 @@ switch(workerindex)
                                 }
                             }
 
-                            if (!bomdone)
+                            if (dfschunks)
+                            {
+                                if(!dfschunksdone)
+                                {
+                                    dfschunksdone = true;
+                                    fs.Read(fbuf, 0, 4);
+                                    int headerlen = Entry.BytesToInt(fbuf);
+                                    if(headerlen < 4 || headerlen > 0x400 * 2)
+                                    {
+                                        throw new Exception(`Invalid header length for DFS file chunk: ` + inFile);
+                                    }
+                                    for(int hremain = headerlen - 4; hremain > 0;)
+                                    {
+                                        int hrx = fs.Read(fbuf, 0, hremain);
+                                        if(hrx < 0)
+                                        {
+                                            throw new Exception(`Unable to read entire header from DFS file chunk: ` + inFile);
+                                        }
+                                        hremain -= hrx;
+                                    }
+                                }
+                            }
+                            else if (!bomdone)
                             {                        
                                 int bomread = fs.Read(fbuf, 0, 3);
                                 bomdone = true;
@@ -4469,6 +4622,10 @@ switch(workerindex)
 
                     case "fget":
                         DfsFGet(args);
+                        break;
+
+                    case "copyto":
+                        DfsCopyTo(args);
                         break;
 
                     case "putbinary":

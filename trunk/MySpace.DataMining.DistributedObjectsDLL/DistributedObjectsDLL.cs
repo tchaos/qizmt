@@ -703,6 +703,7 @@ namespace MySpace.DataMining.DistributedObjects5
             BannedSlavePorts[55902] = true;
             BannedSlavePorts[55903] = true;
             BannedSlavePorts[55904] = true;
+            BannedSlavePorts[55905] = true;
             BannedSlavePorts[58326] = true;
             BannedSlavePorts[58343] = true;
             BannedSlavePorts[58789] = true;

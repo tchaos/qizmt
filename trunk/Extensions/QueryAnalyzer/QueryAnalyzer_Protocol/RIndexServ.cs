@@ -42,6 +42,8 @@ namespace QueryAnalyzer_Protocol
 
                 try
                 {
+                    QueryAnalyzer_Protocol.Protocol_AddTraceThread(null);
+
                     for (bool stop = false; !stop; )
                     {
                         int ib = netstm.ReadByte();
@@ -948,6 +950,8 @@ namespace QueryAnalyzer_Protocol
                     {
 
                     }
+
+                    QueryAnalyzer_Protocol.Protocol_RemoveTraceThread(null);
                 }
             }
 

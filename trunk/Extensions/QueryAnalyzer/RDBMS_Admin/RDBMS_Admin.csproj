@@ -45,6 +45,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Callstack.cs" />
     <Compile Include="ClearLog.cs" />
     <Compile Include="Examples.cs" />
     <Compile Include="Exec.cs" />

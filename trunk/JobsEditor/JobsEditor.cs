@@ -4766,6 +4766,7 @@ namespace MySpace.DataMining.AELight
 
                             }
                         }
+                        
                         {
                             foreach (string _dp in dc.SplitInputPaths(cfgj.IOSettings.DFSInput))
                             {
@@ -5499,6 +5500,7 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             curinputpartindex = dfsinput.CurrentPart;
             curinputpartpos = dfsinput.CurrentPartPosition;
             curinputrecordlength = StaticGlobals.DSpace_InputRecordLength;
+            curinputfn = StaticGlobals.DSpace_InputFileName;
             if(StaticGlobals.DSpace_InputRecordLength > 0)
             {
                 hascur = dfsinput.ReadRecordAppend(curinput);                
@@ -5506,13 +5508,13 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             else
             {
                 hascur = dfsinput.ReadLineAppend(curinput);
-            }
-            curinputfn = StaticGlobals.DSpace_InputFileName;
+            } 
         }
         else
         {
             hascur = hasnext;
             curinputrecordlength = nextinputrecordlength;
+            curinputfn = nextinputfn;
             if(hasnext)
             {
                 foreach(byte nb in nextinput)
@@ -5540,6 +5542,7 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             nextinputpartindex = dfsinput.CurrentPart;
             nextinputpartpos = dfsinput.CurrentPartPosition;
             nextinputrecordlength = StaticGlobals.DSpace_InputRecordLength;
+            nextinputfn = StaticGlobals.DSpace_InputFileName;
             if(StaticGlobals.DSpace_InputRecordLength > 0)
             {
                 hasnext = dfsinput.ReadRecordAppend(nextinput);
@@ -5548,23 +5551,18 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             {
                 hasnext = dfsinput.ReadLineAppend(nextinput);
             }
-            nextinputfn = StaticGlobals.DSpace_InputFileName;
         }
 
         if(!hasnext)
         {
             StaticGlobals.DSpace_Last = true;
         }
-
-        bool changedinputfilename = curinputfn != nextinputfn;
-        if(changedinputfilename)
-        {
-            StaticGlobals.DSpace_InputFileName = curinputfn;
-            curinputfn = nextinputfn;
-        } 
         
         int realinputrecordlength = StaticGlobals.DSpace_InputRecordLength;
         StaticGlobals.DSpace_InputRecordLength = curinputrecordlength;
+
+        string realinputfilename = StaticGlobals.DSpace_InputFileName;
+        StaticGlobals.DSpace_InputFileName = curinputfn;
 
         Stack.ResetStack();
         recordset.ResetBuffers();       
@@ -5572,11 +5570,7 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
         ++StaticGlobals.MapIteration;
 
         StaticGlobals.DSpace_InputRecordLength = realinputrecordlength;
-
-        if(changedinputfilename)
-        {
-            StaticGlobals.DSpace_InputFileName = nextinputfn;
-        } 
+        StaticGlobals.DSpace_InputFileName = realinputfilename;       
     }
     mapout.mrrentries.Sort(new System.Comparison<MRRKV>(mrr_kcmp)); // !
     MRRReducer reducer = new MRRReducer();

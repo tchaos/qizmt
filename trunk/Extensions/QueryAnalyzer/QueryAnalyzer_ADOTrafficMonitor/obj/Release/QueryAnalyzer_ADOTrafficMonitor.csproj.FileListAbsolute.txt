@@ -1,0 +1,8 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_ADOTrafficMonitor.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_ADOTrafficMonitor.pdb
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADOTrafficMonitor\obj\Release\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADOTrafficMonitor\obj\Release\QueryAnalyzer_ADOTrafficMonitor.Form1.resources
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADOTrafficMonitor\obj\Release\QueryAnalyzer_ADOTrafficMonitor.Properties.Resources.resources
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADOTrafficMonitor\obj\Release\QueryAnalyzer_ADOTrafficMonitor.csproj.GenerateResource.Cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADOTrafficMonitor\obj\Release\QueryAnalyzer_ADOTrafficMonitor.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADOTrafficMonitor\obj\Release\QueryAnalyzer_ADOTrafficMonitor.pdb

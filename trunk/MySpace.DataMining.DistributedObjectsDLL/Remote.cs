@@ -249,6 +249,11 @@ namespace RemoteExec
 
             StaticGlobals.DSpace_InputRecordLength = " + InputRecordLength.ToString() + @";
 
+            if(infilenames.Length > 0)
+            {
+                StaticGlobals.DSpace_InputFileName = infilenames[0];
+            }
+
             if(0 == infs.Length)
             {
                 whichseqreader = 0;

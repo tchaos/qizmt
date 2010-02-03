@@ -1,4 +1,9 @@
-﻿using System;
+﻿
+//#if DEBUG
+#define PROTOCOL_TRACE
+//#endif
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -167,6 +172,42 @@ namespace QueryAnalyzer_Protocol
             InitializeComponent();
         }
 
+
+
+
+#if PROTOCOL_TRACE
+        static List<System.Threading.Thread> Protocol_TraceThreads = new List<System.Threading.Thread>();
+#endif
+
+        protected internal static void Protocol_AddTraceThread(System.Threading.Thread thd)
+        {
+#if PROTOCOL_TRACE
+            if (null == thd)
+            {
+                thd = System.Threading.Thread.CurrentThread;
+            }
+            lock (Protocol_TraceThreads)
+            {
+                Protocol_TraceThreads.Add(thd);
+            }
+#endif
+        }
+
+        protected internal static void Protocol_RemoveTraceThread(System.Threading.Thread thd)
+        {
+#if PROTOCOL_TRACE
+            if (null == thd)
+            {
+                thd = System.Threading.Thread.CurrentThread;
+            }
+            lock (Protocol_TraceThreads)
+            {
+                Protocol_TraceThreads.Remove(thd);
+            }
+#endif
+        }
+
+
         protected override void OnStart(string[] args)
         {
 #if DEBUG
@@ -197,19 +238,195 @@ namespace QueryAnalyzer_Protocol
 
             CurrentDirNetPath = @"\\" + System.Net.Dns.GetHostName() + @"\" + System.Environment.CurrentDirectory.Replace(':', '$');
 
+            Protocol_AddTraceThread(null);
+
+#if PROTOCOL_TRACE
+            try
+            {
+                System.Threading.Thread stthd = new System.Threading.Thread(
+                    new System.Threading.ThreadStart(
+                    delegate
+                    {
+                        string spid = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+                        try
+                        {
+                            string dotracefile = spid + ".trace.rdbms";
+                            const string tracefiledelim = "{C8683F6C-0655-42e7-ACD9-0DDED6509A7C}";
+                            for (; ; )
+                            {
+                                System.IO.StreamWriter traceout = null;
+                                for (System.Threading.Thread.Sleep(1000 * 60)
+                                    ; !System.IO.File.Exists(dotracefile)
+                                    ; System.Threading.Thread.Sleep(1000 * 60))
+                                {
+                                }
+                                {
+                                    string[] tfc;
+                                    try
+                                    {
+                                        tfc = System.IO.File.ReadAllLines(dotracefile);
+                                    }
+                                    catch
+                                    {
+                                        continue;
+                                    }
+                                    if (tfc.Length < 1 || "." != tfc[tfc.Length - 1])
+                                    {
+                                        continue;
+                                    }
+                                    try
+                                    {
+                                        System.IO.File.Delete(dotracefile);
+                                    }
+                                    catch
+                                    {
+                                        continue;
+                                    }
+                                    if ("." != tfc[0])
+                                    {
+                                        string traceoutfp = tfc[0];
+                                        try
+                                        {
+                                            traceout = System.IO.File.CreateText(traceoutfp);
+                                            traceout.Write("BEGIN:");
+                                            traceout.WriteLine(tracefiledelim);
+                                        }
+                                        catch
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                }
+                                if (null == traceout)
+                                {
+                                    XLog.errorlog("PROTOCOL_TRACE: " + spid + " Start");
+                                }
+                                for (; ; System.Threading.Thread.Sleep(1000 * 60))
+                                {
+                                    foreach (System.Threading.Thread tthd in Protocol_TraceThreads)
+                                    {
+                                        string tr = "";
+                                        try
+                                        {
+                                            bool thdsuspended = false;
+                                            try
+                                            {
+                                                tthd.Suspend();
+                                                thdsuspended = true;
+                                            }
+                                            catch (System.Threading.ThreadStateException)
+                                            {
+                                            }
+                                            try
+                                            {
+                                                System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(tthd, false);
+                                                StringBuilder sbst = new StringBuilder();
+                                                const int maxframesprint = 15;
+                                                for (int i = 0, imax = Math.Min(maxframesprint, st.FrameCount); i < imax; i++)
+                                                {
+                                                    if (0 != sbst.Length)
+                                                    {
+                                                        sbst.Append(", ");
+                                                    }
+                                                    string mn = "N/A";
+                                                    try
+                                                    {
+                                                        System.Reflection.MethodBase mb = st.GetFrame(i).GetMethod();
+                                                        mn = mb.ReflectedType.Name + "." + mb.Name;
+                                                    }
+                                                    catch
+                                                    {
+                                                    }
+                                                    sbst.Append(mn);
+                                                }
+                                                if (st.FrameCount > maxframesprint)
+                                                {
+                                                    sbst.Append(" ... ");
+                                                    sbst.Append(st.FrameCount - maxframesprint);
+                                                    sbst.Append(" more");
+                                                }
+                                                if (null == traceout)
+                                                {
+                                                    XLog.errorlog("PROTOCOL_TRACE: " + spid + " " + tthd.Name + " Trace: " + sbst.ToString());
+                                                }
+                                                else
+                                                {
+                                                    traceout.Write("Thread ");
+                                                    string tthdname = tthd.Name;
+                                                    if (null == tthdname || 0 == tthdname.Length)
+                                                    {
+                                                        //tthdname = "<unnamed>";
+                                                        tthdname = tthd.ManagedThreadId.ToString();
+                                                    }
+                                                    traceout.Write(tthdname);
+                                                    traceout.Write(": ");
+                                                    traceout.WriteLine(sbst.ToString());
+                                                }
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                XLog.errorlog("PROTOCOL_TRACE: " + spid + " " + tthd.Name + " Error: " + e.ToString());
+                                            }
+                                            finally
+                                            {
+                                                if (thdsuspended)
+                                                {
+                                                    tthd.Resume();
+                                                }
+                                            }
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            XLog.errorlog("PROTOCOL_TRACE: " + spid + " " + tthd.Name + " Trace Error: Cannot access thread: " + e.ToString());
+                                        }
+                                    }
+
+                                    if (null != traceout)
+                                    {
+                                        traceout.Write(tracefiledelim);
+                                        traceout.WriteLine(":END");
+                                        traceout.Close();
+                                        break;
+                                    }
+
+                                }
+
+                            }
+
+                        }
+                        catch (Exception e)
+                        {
+                            XLog.errorlog("PROTOCOL_TRACE: " + spid + " Trace Failure: " + e.Message);
+                        }
+                    }));
+                stthd.IsBackground = true;
+                stthd.Start();
+            }
+            catch (Exception est)
+            {
+                XLog.errorlog("PROTOCOL_TRACE: Thread start error: " + est.ToString());
+            }
+#endif
+
+            System.IO.File.WriteAllText("protocol.pid.rdbms", System.Diagnostics.Process.GetCurrentProcess().Id.ToString() + Environment.NewLine);
+
             lthd = new System.Threading.Thread(new System.Threading.ThreadStart(ListenThreadProc));
+            lthd.Name = "ListenThreadProc";
             lthd.IsBackground = true;
             lthd.Start();
 
             stressthd = new System.Threading.Thread(new System.Threading.ThreadStart(StressListenThreadProc));
+            stressthd.Name = "StressListenThreadProc";
             stressthd.IsBackground = true;
             stressthd.Start();
 
             rindexservthd = new System.Threading.Thread(new System.Threading.ThreadStart(RIndexServListenThreadProc));
+            rindexservthd.Name = "RIndexServListenThreadProc";
             rindexservthd.IsBackground = true;
             rindexservthd.Start();
 
             rindexcleanupthd = new System.Threading.Thread(new System.Threading.ThreadStart(RIndexCleanupPinsProc));
+            rindexcleanupthd.Name = "RIndexCleanupPinsProc";
             rindexcleanupthd.IsBackground = true;
             rindexcleanupthd.Start();
         }
@@ -233,6 +450,40 @@ namespace QueryAnalyzer_Protocol
                 stressthd.Abort();
                 stressthd = null;
             }
+
+
+            try
+            {
+                System.IO.FileInfo[] tfiles = (new System.IO.DirectoryInfo(".")).GetFiles("*.trace.rdbms");
+                foreach (System.IO.FileInfo tf in tfiles)
+                {
+                    tf.Delete();
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                System.IO.FileInfo[] toffiles = (new System.IO.DirectoryInfo(".")).GetFiles("*.tof.rdbms");
+                foreach (System.IO.FileInfo tof in toffiles)
+                {
+                    tof.Delete();
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                System.IO.File.Delete("protocol.pid.rdbms");
+            }
+            catch
+            {
+            }
+
         }
 
         internal static int TwoBytesToInt(byte b0, byte b1)
@@ -242,10 +493,13 @@ namespace QueryAnalyzer_Protocol
             return x;
         }
 
+        long protoclientnum = 0;
         private void ListenThreadProc()
         {
             try
             {
+                Protocol_AddTraceThread(null);
+
                 lsock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
                     System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
                 System.Net.IPEndPoint ipep = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 55902);
@@ -274,6 +528,7 @@ namespace QueryAnalyzer_Protocol
                     System.Net.Sockets.Socket dllclientSock = lsock.Accept();
                     ClientHandler ch = new ClientHandler();
                     System.Threading.Thread cthd = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(ch.ClientThreadProc));
+                    cthd.Name = "ProtocolClientThreadProc" + (++protoclientnum);
                     cthd.IsBackground = true;
                     cthd.Start(dllclientSock);
                 }
@@ -285,12 +540,17 @@ namespace QueryAnalyzer_Protocol
             {
                 XLog.errorlog("ListenThreadProc exception: " + e.ToString());
             }
+
+            Protocol_RemoveTraceThread(null);
         }
 
+        long stressclientnum = 0;
         private void StressListenThreadProc()
         {
             try
             {
+                QueryAnalyzer_Protocol.Protocol_AddTraceThread(null);
+
                 stresssock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
                     System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
                 System.Net.IPEndPoint ipep = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 55903);
@@ -319,6 +579,7 @@ namespace QueryAnalyzer_Protocol
                     System.Net.Sockets.Socket dllclientSock = stresssock.Accept();
                     StressClientHandler ch = new StressClientHandler();
                     System.Threading.Thread cthd = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(ch.ClientThreadProc));
+                    cthd.Name = "StressClientThreadProc" + (++stressclientnum);
                     cthd.IsBackground = true;
                     cthd.Start(dllclientSock);
                 }
@@ -330,10 +591,14 @@ namespace QueryAnalyzer_Protocol
             {
                 XLog.errorlog("StressListenThreadProc exception: " + e.ToString());
             }
+
+            QueryAnalyzer_Protocol.Protocol_RemoveTraceThread(null);
         }
 
         private void RIndexCleanupPinsProc()
         {
+            QueryAnalyzer_Protocol.Protocol_AddTraceThread(null);
+
             for (; ; )
             {
                 try
@@ -355,12 +620,17 @@ namespace QueryAnalyzer_Protocol
                 catch
                 {
 
-                }                
+                }
             }
+
+            QueryAnalyzer_Protocol.Protocol_RemoveTraceThread(null);
         }
 
+        long risclientnum = 0;
         private void RIndexServListenThreadProc()
         {
+            QueryAnalyzer_Protocol.Protocol_AddTraceThread(null);
+
             bool keepgoing = true;
             while (keepgoing)
             {
@@ -399,6 +669,7 @@ namespace QueryAnalyzer_Protocol
                         System.Net.Sockets.Socket dllclientSock = rindexservsock.Accept();
                         RIndexServClientHandler ch = new RIndexServClientHandler();
                         System.Threading.Thread cthd = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(ch.ClientThreadProc));
+                        cthd.Name = "RIndexServClientThreadProc" + (++risclientnum);
                         cthd.IsBackground = true;
                         cthd.Start(dllclientSock);
                     }
@@ -411,7 +682,9 @@ namespace QueryAnalyzer_Protocol
                 {
                     XLog.errorlog("RIndexServListenThreadProc exception: " + e.ToString());
                 }
-            }            
+            }
+
+            QueryAnalyzer_Protocol.Protocol_RemoveTraceThread(null);          
         }
     }
 
@@ -430,6 +703,8 @@ namespace QueryAnalyzer_Protocol
 
             try
             {
+                QueryAnalyzer_Protocol.Protocol_AddTraceThread(null);
+
                 for (bool stop = false; !stop; )
                 {
                     int ib = netstm.ReadByte();
@@ -559,6 +834,8 @@ namespace QueryAnalyzer_Protocol
                 netstm = null;
                 clientsock.Close();
                 clientsock = null;
+
+                QueryAnalyzer_Protocol.Protocol_RemoveTraceThread(null);
             }
         }
     }
@@ -1957,6 +2234,8 @@ namespace QueryAnalyzer_Protocol
 
             try
             {
+                QueryAnalyzer_Protocol.Protocol_AddTraceThread(null);
+
                 for (bool stop = false; !stop; )
                 {
                     int ib = netstm.ReadByte();
@@ -2618,6 +2897,8 @@ namespace QueryAnalyzer_Protocol
                 netstm = null;
                 clientsock.Close();
                 clientsock = null;
+
+                QueryAnalyzer_Protocol.Protocol_RemoveTraceThread(null);
             }
         }
 

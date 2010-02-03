@@ -31,21 +31,25 @@
           public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
           {             
               StringBuilder sb = new StringBuilder();
-              while(dfsinput.ReadLineAppend(sb))
+              for(;;)
               {
-                    int key = 0;
-                    if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Remote_Input1.txt")
-                    {
-                        key = 1;
-                    }
-                    else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Remote_Input2.txt")
-                    {
-                        key = 2;
-                    }
-                    
-                    RemoteOutputStream thisoutput = dfsoutput.GetOutputByIndex(key - 1);
-                    thisoutput.WriteLine(sb.ToString());
-                    sb.Length = 0;
+                  int key = 0;
+                  if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Remote_Input1.txt")
+                  {
+                      key = 1;
+                  }
+                  else if(StaticGlobals.DSpace_InputFileName == "regression_test_DSpace_InputFileName_Remote_Input2.txt")
+                  {
+                      key = 2;                  
+                  }
+                                    
+                  if(!dfsinput.ReadLineAppend(sb))
+                  {
+                      break;
+                  }
+                  RemoteOutputStream thisoutput = dfsoutput.GetOutputByIndex(key - 1);
+                  thisoutput.WriteLine(sb.ToString());
+                  sb.Length = 0;
               }
            }
         ]]>

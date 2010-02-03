@@ -1156,6 +1156,8 @@ namespace MySpace.DataMining.AELight
                                                     {
                                                     }
                                                     DeleteAllMatchingFiles(netpath, "slaveconfig.j*.xml");
+                                                    DeleteOldMatchingFiles(new TimeSpan(1 /* days */ , 0, 0),
+                                                        netpath, "stdout.jid*.jso", true);
                                                 }
                                                 //Console.WriteLine();
                                             }

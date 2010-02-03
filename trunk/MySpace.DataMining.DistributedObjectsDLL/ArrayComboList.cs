@@ -195,7 +195,6 @@ namespace MySpace.DataMining.DistributedObjects5
         public int GetZBlockSplitCount()
         {
             ensureopen("ZBlockSplitCount");
-            ensurewassortd("ZBlockSplitCount");
 
             int result = 0;
             checked

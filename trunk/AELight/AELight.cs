@@ -22,6 +22,8 @@
 
 #define AELIGHT_TRACE
 
+#define STDOUT_LOG
+
 #if DEBUG
 //#define AELIGHT_TRACE_PORT // DEBUG only.
 #endif
@@ -50,7 +52,7 @@ namespace MySpace.DataMining.AELight
             //Console.WriteLine("    ps                      distributed process information");
             Console.WriteLine("    ps                      distributed processes, schedule and queue info");
             Console.WriteLine("    who                     show who is logged on");
-            Console.WriteLine("    history [<count>]       show command history");
+            Console.WriteLine("    history [<count>] [-j]  show command history");
             Console.WriteLine("    killall                 kill all jobs, clean any orphaned intermediate data");
             //Console.WriteLine("    gen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]    generate random data");
             //Console.WriteLine("    asciigen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]  generate random ASCII");
@@ -163,6 +165,9 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    shuffle <source> <target>      Shuffle underlying parts of a rectangular");
             Console.WriteLine("                                   binary file, maintaining chunk order");
             Console.WriteLine("    spread <dfsfile> <out-dfsfile> Spread a DFS file across the cluster");
+            Console.WriteLine("    viewjob [-a] <JobID>           View standard output of a job");
+            Console.WriteLine("    copyto <dfsfile> <target-host>");
+            Console.WriteLine("           [<target-dfs-filename>] Copy DFS file to another cluster");
         }
 
 
@@ -1338,6 +1343,72 @@ namespace MySpace.DataMining.AELight
         }
 
 
+#if STDOUT_LOG
+        internal class StdoutLog : System.IO.TextWriter
+        {
+
+            internal static void Start()
+            {
+                System.IO.FileStream jsostm = new System.IO.FileStream(AELight_Dir + @"\stdout.jid" + sjid + ".jso",
+                    System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
+                Console.SetOut(new StdoutLog(Console.Out, new System.IO.StreamWriter(jsostm)));
+            }
+
+
+            System.IO.TextWriter conout;
+            System.IO.StreamWriter logfile;
+
+            internal StdoutLog(System.IO.TextWriter conout, System.IO.StreamWriter logfile)
+            {
+                this.conout = conout;
+                this.logfile = logfile;
+            }
+
+            public override Encoding Encoding
+            {
+                get { return conout.Encoding; }
+            }
+
+            public override void Write(char value)
+            {
+                conout.Write(value);
+                try
+                {
+                    logfile.Write(value);
+                }
+                catch
+                {
+                }
+            }
+
+            public override void WriteLine(string value)
+            {
+                conout.WriteLine(value);
+                try
+                {
+                    logfile.WriteLine(value);
+                    logfile.Flush();
+                }
+                catch
+                {
+                }
+            }
+
+            public override void Flush()
+            {
+                conout.Flush();
+                try
+                {
+                    logfile.Flush();
+                }
+                catch
+                {
+                }
+            }
+        }
+#endif
+
+
         public static string OriginalUserDir;
         public static string AELight_Dir;
         public static bool isdspace = false; // Is this running as Qizmt?
@@ -1593,19 +1664,9 @@ namespace MySpace.DataMining.AELight
                     }
                     else
                     {
-                        ConsoleColor oldc = ConsoleColor.Gray;
-                        if (!isdspace)
-                        {
-                            oldc = Console.ForegroundColor;
-                            Console.ForegroundColor = ConsoleColor.Red;
-                        }
                         Console.Error.WriteLine(Environment.NewLine
-                            + "{0}Job aborted abruptly; to clean up intermediate data and processes, issue command: {3} kill {4} {2}",
-                            (isdspace ? "\u00014" : ""), (isdspace ? "\u00010" : ""), appname, sjid);
-                        if (!isdspace)
-                        {
-                            Console.ForegroundColor = oldc;
-                        }
+                            + "Job aborted abruptly; to clean up intermediate data and processes, issue command: {0} kill {1}",
+                            appname, sjid);
                     }
                 }
             }
@@ -1638,7 +1699,7 @@ namespace MySpace.DataMining.AELight
             else
             {
                 appname = "AELight";
-            }            
+            }
             if (args.Length >= 1 && args[0].StartsWith("-$"))
             {
                 appname = "Qizmt";
@@ -1669,8 +1730,8 @@ namespace MySpace.DataMining.AELight
             {
                 userdomain = Environment.UserDomainName;
                 dousername = Environment.UserName;
-                douser = Environment.UserName + "@" + System.Net.Dns.GetHostName();                
-            }            
+                douser = Environment.UserName + "@" + System.Net.Dns.GetHostName();
+            }
             OriginalUserDir = Environment.CurrentDirectory;
             AELight_Dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             jidfp = AELight_Dir + @"\" + jidfn;
@@ -1864,6 +1925,7 @@ namespace MySpace.DataMining.AELight
                                         sayuser
                                         + " [" + System.DateTime.Now.ToString() + "] "
                                         //+ OriginalUserDir + ">"
+                                        + "@JID#" + sjid + " "
                                         + appname
                                         + " " + sargs
                                         + Environment.NewLine);
@@ -2214,8 +2276,60 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "viewjob":
+                    {
+                        int iarg = 1;
+                        bool attach = false;
+                        if (args.Length > iarg && "-a" == args[iarg])
+                        {
+                            attach = true;
+                            iarg++;
+                        }
+                        if (args.Length <= iarg)
+                        {
+                            Console.Error.WriteLine("Not enough arguments; expected JobID");
+                        }
+                        string viewsjid = args[iarg++];
+                        long viewjid = long.Parse(viewsjid);
+                        viewsjid = viewjid.ToString(); // Normalize.
+                        try
+                        {
+                            using (System.IO.FileStream stm = new System.IO.FileStream(AELight_Dir + @"\stdout.jid" + viewsjid + ".jso",
+                                System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite))
+                            {
+                                using (System.IO.StreamReader sr = new System.IO.StreamReader(stm))
+                                {
+                                    char[] cbuf = new char[500];
+                                    for (; ; )
+                                    {
+                                        int nchars = sr.Read(cbuf, 0, cbuf.Length);
+                                        if (nchars < 1)
+                                        {
+                                            if (!attach || !System.IO.File.Exists(AELight_Dir + @"\" + viewsjid + ".jid"))
+                                            {
+                                                break;
+                                            }
+                                            System.Threading.Thread.Sleep(1000 * 3);
+                                            continue;
+                                        }
+                                        Console.Write(cbuf, 0, nchars);
+                                    }
+                                    ConsoleFlush();
+                                }
+                            }
+                        }
+                        catch (System.IO.FileNotFoundException)
+                        {
+                            Console.Error.WriteLine("Standard output for JID {0} not found", viewsjid);
+                        }
+                    }
+                    break;
+
                 case "spread":
                     {
+#if STDOUT_LOG
+                        StdoutLog.Start();
+#endif
                         if (args.Length <= 2)
                         {
                             Console.Error.WriteLine("Expected: {0} spread <input-dfsfile> <output-dfsfile>", appname);
@@ -2974,6 +3088,10 @@ namespace MySpace.DataMining.AELight
                             {
                                 LogExecHistory(args, ejnetpath, dc.LogExecHistory);
                             }
+
+#if STDOUT_LOG
+                            StdoutLog.Start();
+#endif
 
                             Exec(ExecOpts, LoadConfig(xpaths, ejnetpath), SubArray(args, iarg + 1), true);
                         }
@@ -3736,7 +3854,7 @@ namespace MySpace.DataMining.AELight
                             {
                                 int triesremain = MAX_TRIES;
                                 string fn = Surrogate.NetworkPathForHost(slave) + @"\slave-log.txt";
-                                
+
                                 for (; ; )
                                 {
                                     try
@@ -3744,7 +3862,7 @@ namespace MySpace.DataMining.AELight
                                         System.IO.File.Delete(fn);
                                         lock (slaves)
                                         {
-                                            Console.Write('.');                                            
+                                            Console.Write('.');
                                         }
                                         return;
                                     }
@@ -3757,9 +3875,9 @@ namespace MySpace.DataMining.AELight
                                                 errs.Add(slave);
                                             }
                                             break;
-                                        }                                        
+                                        }
                                     }
-                                }                                
+                                }
                             }
                         ), slaves, slaves.Length);
 
@@ -3776,7 +3894,7 @@ namespace MySpace.DataMining.AELight
                         else
                         {
                             Console.WriteLine("Done");
-                        }                        
+                        }
                     }
                     break;
 
@@ -3844,11 +3962,11 @@ namespace MySpace.DataMining.AELight
                                             if (_max > 0)
                                             {
                                                 maxentries = _max;
-                                            }                       
+                                            }
                                         }
                                         catch
                                         {
-                                        }                                                         
+                                        }
                                         break;
                                     default:
                                         Console.Error.WriteLine("Invalid argument for viewlogs");
@@ -3906,7 +4024,7 @@ namespace MySpace.DataMining.AELight
                                 {
                                     return;
                                 }
-                                
+
                                 string token = "----------------------------------------------------------------" + Environment.NewLine + Environment.NewLine;
 
                                 System.IO.FileStream fs = null;
@@ -4054,7 +4172,7 @@ namespace MySpace.DataMining.AELight
                             Console.WriteLine("-");
                             Console.WriteLine("Entries displayed: {0}", list.Count - start);
                             Console.WriteLine("-");
-                        }              
+                        }
                     }
                     break;
 
@@ -4216,7 +4334,9 @@ namespace MySpace.DataMining.AELight
                         }
                         string sjidcs = args[2];
                         long jidcs = -1;
+#if DEBUG
                         if ("*" != sjidcs)
+#endif
                         {
                             if (!long.TryParse(sjidcs, out jidcs) || jidcs < 0)
                             {
@@ -4240,7 +4360,7 @@ namespace MySpace.DataMining.AELight
                                     System.Text.RegularExpressions.RegexOptions.Compiled
                                     | System.Text.RegularExpressions.RegexOptions.Singleline
                                     | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                                List<KeyValuePair<string, string>> slavecs = new List<KeyValuePair<string,string>>(fps.Length); // Key=slave; Value=jid
+                                List<KeyValuePair<string, string>> slavecs = new List<KeyValuePair<string, string>>(fps.Length); // Key=slave; Value=jid
                                 for (int i = 0; i < fps.Length; i++)
                                 {
                                     System.Text.RegularExpressions.Match m = rex.Match(fps[i]);
@@ -4436,7 +4556,7 @@ namespace MySpace.DataMining.AELight
                                                 if (!System.IO.File.Exists(jidcsfp))
                                                 {
                                                     Console.WriteLine();
-                                                    Console.WriteLine("Worker no longer running");
+                                                    Console.WriteLine("Surrogate process no longer running");
                                                     try
                                                     {
                                                         System.IO.File.Delete(netpath + @"\" + saelightpid + ".trace");
@@ -4445,6 +4565,115 @@ namespace MySpace.DataMining.AELight
                                                     {
                                                     }
                                                     break;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine();
+                                                Console.WriteLine(toutput);
+                                                try
+                                                {
+                                                    System.IO.File.Delete(tpath);
+                                                }
+                                                catch
+                                                {
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                Console.WriteLine();
+
+                            }
+                        }
+                    }
+                    else if (0 == string.Compare(args[1], "driver", true))
+                    {
+                        if (args.Length <= 2)
+                        {
+                            Console.Error.WriteLine("Invalid syntax for command: callstack worker: not enough arguments");
+                            SetFailure();
+                            return;
+                        }
+                        string hostcs = args[2];
+                        {
+                            string netpath = Surrogate.NetworkPathForHost(hostcs);
+                            {
+                                int driverpid;
+                                string sdriverpid;
+                                //Console.Error.WriteLine("No surrogate process for Job Identifier {0}", sjidcs);
+                                for (; ; System.Threading.Thread.Sleep(1000 * 1))
+                                {
+                                    try
+                                    {
+                                        string driverfp = netpath + @"\driver.pid";
+                                        string driverfcontent;
+                                        using (System.IO.FileStream f = new System.IO.FileStream(driverfp,
+                                            System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                                            System.IO.FileShare.Read | System.IO.FileShare.Write | System.IO.FileShare.Delete))
+                                        {
+                                            System.IO.StreamReader sr = new System.IO.StreamReader(f);
+                                            driverfcontent = sr.ReadToEnd();
+                                            sr.Close();
+                                        }
+                                        {
+                                            int inl = driverfcontent.IndexOf('\n'); // Continue if no \n.
+                                            if (-1 != inl)
+                                            {
+                                                sdriverpid = driverfcontent.Substring(0, inl).Trim();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    catch (System.IO.FileNotFoundException)
+                                    {
+                                        Console.Error.WriteLine("No driver process for host {0}", hostcs);
+                                        SetFailure();
+                                        return;
+                                    }
+                                }
+                                driverpid = int.Parse(sdriverpid);
+                                sdriverpid = driverpid.ToString(); // Normalize.
+
+                                Console.WriteLine("Waiting on driver callstack...");
+
+                                {
+                                    string path = netpath + @"\" + sdriverpid + ".trace";
+                                    for (; System.IO.File.Exists(path); System.Threading.Thread.Sleep(1000 * 1))
+                                    {
+                                    }
+                                    string tpath = sjid + "tracing.driver" + sdriverpid + ".tof";
+                                    System.IO.File.WriteAllText(path, tpath + Environment.NewLine + ".");
+                                }
+
+                                for (int tries = 0; ; tries++)
+                                {
+                                    if (0 != tries)
+                                    {
+                                        System.Threading.Thread.Sleep(1000 * 3);
+                                    }
+                                    {
+                                        string tpath = netpath + @"\" + sjid + "tracing.driver" + sdriverpid + ".tof";
+                                        {
+                                            string toutput = ReadTraceFromFile(tpath);
+                                            if (null == toutput)
+                                            {
+                                                if (!System.IO.File.Exists(netpath + @"\" + sdriverpid + ".trace"))
+                                                {
+                                                    Console.WriteLine();
+                                                    Console.WriteLine("Driver no longer running");
+                                                    try
+                                                    {
+                                                        System.IO.File.Delete(netpath + @"\" + sdriverpid + ".trace");
+                                                    }
+                                                    catch
+                                                    {
+                                                    }
+                                                    break;
+#if DEBUG
+                                                    //System.Diagnostics.Debugger.Launch();
+#endif
                                                 }
                                             }
                                             else
@@ -4481,12 +4710,12 @@ namespace MySpace.DataMining.AELight
                 case "health":
                     {
                         dfs dc = LoadDfsConfig();
-                        
+
 
                         bool all = false;
                         bool verify = false;
                         string[] hosts = null;
-                        
+
                         bool plugininfo = false;
                         bool mt = "healthst" != act;
 
@@ -4839,7 +5068,7 @@ namespace MySpace.DataMining.AELight
                                            getfileserr++;
                                            Console.WriteLine("GetFiles() failed for host: {0}.  Error: {1}", host, e.ToString());
                                        }
-                                   }                                                
+                                   }
                                }), hosts, nthreads);
                             if (getfileserr > 0)
                             {
@@ -5135,7 +5364,7 @@ namespace MySpace.DataMining.AELight
                         int max = 0;
                         try
                         {
-                            max = Int32.Parse(args[1]);                            
+                            max = Int32.Parse(args[1]);
                         }
                         catch
                         {
@@ -5218,7 +5447,9 @@ namespace MySpace.DataMining.AELight
                 case "genwords":
                 case "generatewords":
                     {
-
+#if STDOUT_LOG
+                        StdoutLog.Start();
+#endif
                         int iarg = 1;
                         int iargseq = 1; // Index in forced sequence args; if int.MaxValue, an '=' was used.
                         List<string> xpaths = null;
@@ -5502,16 +5733,31 @@ namespace MySpace.DataMining.AELight
                         int iarg = 1;
 
                         List<string> surrogates = null;
+                        bool showjids = false;
 
                         int nlines = 10;
-                        if (args.Length > iarg)
+                        for (; iarg < args.Length; iarg++)
                         {
-                            int xnlines;
-                            if (int.TryParse(args[iarg], out xnlines))
+                            if ("-j" == args[iarg])
                             {
-                                nlines = xnlines;
-                                iarg++;
+                                showjids = true;
+                                continue;
                             }
+                            else if ("-j-" == args[iarg])
+                            {
+                                showjids = false;
+                                continue;
+                            }
+                            else
+                            {
+                                int xnlines;
+                                if (int.TryParse(args[iarg], out xnlines))
+                                {
+                                    nlines = xnlines;
+                                    continue;
+                                }
+                            }
+                            break;
                         }
 
                         if (args.Length > iarg)
@@ -5585,8 +5831,39 @@ namespace MySpace.DataMining.AELight
                                 for (int i = hlines.Length - mynlines; i < hlines.Length; i++)
                                 {
                                     string ln = hlines[i];
+                                    bool oldspace = true;
                                     ln = ln.Replace(" -@log ", " ");
-                                    Console.WriteLine("    {0}", ln.Replace("drule", "SYSTEM"));
+                                    try
+                                    {
+                                        int ijid = ln.IndexOf("] @JID#");
+                                        if (-1 != ijid)
+                                        {
+                                            ijid += 2;
+                                            string b4j = ln.Substring(0, ijid);
+                                            int isp = ln.IndexOf(' ', ijid);
+                                            if (-1 != isp)
+                                            {
+                                                string afj = ln.Substring(isp + 1);
+                                                if (showjids)
+                                                {
+                                                    // Same format as ps.
+                                                    ln = ln.Substring(ijid + 5, isp - (ijid + 5) + 1) + b4j + afj;
+                                                    oldspace = false;
+                                                }
+                                                else
+                                                {
+                                                    ln = b4j + afj;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch (Exception eajaj)
+                                    {
+#if DEBUG
+                                        System.Diagnostics.Debugger.Launch();
+#endif
+                                    }
+                                    Console.WriteLine("{0}{1}", (oldspace ? "    " : "  "), ln.Replace("drule", "SYSTEM"));
                                 }
                             });
 
@@ -5776,6 +6053,9 @@ namespace MySpace.DataMining.AELight
                     break;
 
                 case "md5":
+#if STDOUT_LOG
+                    StdoutLog.Start();
+#endif
                     if (args.Length > 1)
                     {
                         GenerateHash("MD5", args[1]);
@@ -5790,6 +6070,9 @@ namespace MySpace.DataMining.AELight
 
                 case "sum":
                 case "checksum":
+#if STDOUT_LOG
+                    StdoutLog.Start();
+#endif
                     if (args.Length > 1)
                     {
                         GenerateHash("Sum", args[1]);
@@ -5804,6 +6087,9 @@ namespace MySpace.DataMining.AELight
 
                 case "sum2":
                 case "checksum2":
+#if STDOUT_LOG
+                    StdoutLog.Start();
+#endif
                     if (args.Length > 1)
                     {
                         GenerateHash("Sum2", args[1]);
@@ -5819,6 +6105,9 @@ namespace MySpace.DataMining.AELight
                 case "sorted":
                 case "checksorted":
                 case "issorted":
+#if STDOUT_LOG
+                    StdoutLog.Start();
+#endif
                     if (args.Length > 1)
                     {
                         CheckSorted(args[1]);
@@ -5877,7 +6166,17 @@ namespace MySpace.DataMining.AELight
                 case "swap":
                 case "fput":
                 case "fget":
+                    {
+                        string dfsarg = args[0];
+                        Dfs(dfsarg, SubArray(args, 1));
+                    }
+                    break;
+
                 case "shuffle":
+                case "copyto":
+#if STDOUT_LOG
+                    StdoutLog.Start();
+#endif
                     {
                         string dfsarg = args[0];
                         Dfs(dfsarg, SubArray(args, 1));
@@ -5999,7 +6298,7 @@ namespace MySpace.DataMining.AELight
                         LogOutput(e.ToString());
                     }
                     break;
-                
+
                 case "stresstests":
                     if (!dfs.DfsConfigExists(DFSXMLPATH))
                     {

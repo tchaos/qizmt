@@ -1,0 +1,1 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADONET_RegressionTests\obj\Debug\ResolveAssemblyReference.cache

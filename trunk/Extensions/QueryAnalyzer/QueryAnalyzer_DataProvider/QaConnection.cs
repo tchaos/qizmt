@@ -15,7 +15,20 @@ namespace QueryAnalyzer_DataProvider
         private System.Net.Sockets.Socket sock = null;
         private byte[] buf = null;
         internal System.Net.Sockets.NetworkStream netstm = null;
-        internal bool islocked = false;
+        bool _islocked = false;
+        internal bool islocked
+        {
+            get
+            {
+                return _islocked;
+            }
+            set
+            {
+                _islocked = value;
+                lockedby = null;
+            }
+        }
+        internal IDisposable lockedby = null;
         internal Dictionary<string, List<KeyValuePair<byte[], string>>> mindexes = null;
         private Dictionary<string, System.Net.Sockets.Socket> sockpool = null;
         private Dictionary<string, System.Net.Sockets.NetworkStream> netstmpool = null;
@@ -532,6 +545,19 @@ namespace QueryAnalyzer_DataProvider
 
             try
             {
+                if (islocked)
+                {
+                    if (null != lockedby)
+                    {
+                        lockedby.Dispose();
+                        islocked = false;
+                    }
+                    else
+                    {
+                        throw new Exception("QaConnection.Close: The connection is locked  [ensure all readers are closed]");
+                    }
+                }
+
                 FlushBatchNqData();
 
                 netstm.WriteByte((byte)'c'); //close

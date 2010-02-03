@@ -116,6 +116,16 @@ namespace MySpace.DataMining.AELight
 
             void InZBlocks()
             {
+                ZBlockSplitCount = acl.GetZBlockSplitCount();
+                if (ZBlockSplitCount > 0)
+                {
+                    for (int isplit = 0; isplit < ZBlockSplitCount; isplit++)
+                    {
+                        Console.Write("(split)");
+                        ConsoleFlush();
+                    }
+                }
+
                 bool dosorttime = -1 == jobshared.ExecOpts.IndexOf(" -s-");
 
                 acl.SortBlocks();
@@ -1302,6 +1312,7 @@ public void DSpace_LogResult(string name, bool passed)
                 List<dfs.DfsFile.FileNode> newsnownodes = new List<dfs.DfsFile.FileNode>();
                 List<string> newsnowfileswithnodes = new List<string>();
                 List<int> nodesoffsets = new List<int>();
+                List<int> reclens = new List<int>();
                 using (LockDfsMutex())
                 {
                     dfs dc = LoadDfsConfig();
@@ -1402,6 +1413,7 @@ public void DSpace_LogResult(string name, bool passed)
                                 }
                                 newsnowfileswithnodes.Add(dfsname);
                                 nodesoffsets.Add(newsnownodes.Count);
+                                reclens.Add(RecordLength);
                             }
                             newsnownodes.AddRange(df.Nodes);
                             if (verbose)
@@ -1413,10 +1425,10 @@ public void DSpace_LogResult(string name, bool passed)
                     MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = RecordLength;
 
                 }
-
+               
                 if (0 != newsnownodes.Count)
                 {
-                    _ExecOneMapReduce(ExecOpts, cfgj, ExecArgs, verbose, verbosereplication, newsnownodes, newsnowfileswithnodes, nodesoffsets);
+                    _ExecOneMapReduce(ExecOpts, cfgj, ExecArgs, verbose, verbosereplication, newsnownodes, newsnowfileswithnodes, nodesoffsets, reclens);
                     using (LockDfsMutex())
                     {
                         dfs dc = LoadDfsConfig();
@@ -1458,7 +1470,7 @@ public void DSpace_LogResult(string name, bool passed)
                 }
                 try
                 {
-                    _ExecOneMapReduce(ExecOpts, cfgj, ExecArgs, verbose, verbosereplication, null, null, null);
+                    _ExecOneMapReduce(ExecOpts, cfgj, ExecArgs, verbose, verbosereplication, null, null, null, null);
                 }
                 catch (ExceptionFailoverRetryable e)
                 {
@@ -1498,7 +1510,7 @@ public void DSpace_LogResult(string name, bool passed)
         }
 
         // If AddCacheFiles is non-null, it's a ADD-CACHE-ONLY run!
-        static void _ExecOneMapReduce(string ExecOpts, SourceCode.Job cfgj, string[] ExecArgs, bool verbose, bool verbosereplication, List<dfs.DfsFile.FileNode> AddCacheNodes, List<string> AddCacheDfsFileNames, List<int> AddCacheNodesOffsets)
+        static void _ExecOneMapReduce(string ExecOpts, SourceCode.Job cfgj, string[] ExecArgs, bool verbose, bool verbosereplication, List<dfs.DfsFile.FileNode> AddCacheNodes, List<string> AddCacheDfsFileNames, List<int> AddCacheNodesOffsets, List<int> AddCacheNodesRecLengths)
         {
             bool extraverbose = true;
             try
@@ -1674,7 +1686,7 @@ public void DSpace_LogResult(string name, bool passed)
                                 return; // ...
                             }
                         }*/
-
+                        
                         {
                             mapinputchunks = new List<dfs.DfsFile.FileNode>();                            
                             if (null != AddCacheNodes)
@@ -1682,6 +1694,7 @@ public void DSpace_LogResult(string name, bool passed)
                                 mapinputchunks = AddCacheNodes;
                                 mapfileswithnodes = AddCacheDfsFileNames;
                                 inputnodesoffsets = AddCacheNodesOffsets;
+                                inputrecordlengths = AddCacheNodesRecLengths;
                             }
                             else
                             {
@@ -1938,7 +1951,7 @@ public void DSpace_LogResult(string name, bool passed)
                         bi.acl.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
                         bi.acl.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
                         bi.acl.OutputRecordLengths = outputrecordlengths;
-                        bi.acl.InputRecordLengths = inputrecordlengths;
+                        bi.acl.InputRecordLengths = new List<int>();// inputrecordlengths;
                         bi.acl.CookRetries = dc.slave.CookRetries;
                         bi.acl.CookTimeout = dc.slave.CookTimeout;
                         bi.acl.LocalCompile = (0 == BlockID); // Only compile first one locally.
@@ -1996,6 +2009,7 @@ public void DSpace_LogResult(string name, bool passed)
                         int fslavetarget = 0; // Failover target if a particular chunk doesn't 'belong' to a slave...
                         string[] dfsfilenames = new string[blocks.Count];
                         string curfilename = null;
+                        int curreclen = 0;
                         int curoffset = 0;
                         int fi = 0;
                         if (mapinputchunks.Count > 0)
@@ -2006,8 +2020,9 @@ public void DSpace_LogResult(string name, bool passed)
                         {
                             if (curoffset == mi)
                             {
-                                curfilename = mapfileswithnodes[fi++];
-                                if (fi < inputnodesoffsets.Count)
+                                curfilename = mapfileswithnodes[fi];
+                                curreclen = inputrecordlengths[fi];
+                                if (++fi < inputnodesoffsets.Count)
                                 {
                                     curoffset = inputnodesoffsets[fi];
                                 }
@@ -2052,7 +2067,8 @@ public void DSpace_LogResult(string name, bool passed)
                                             }
                                             int offset = blocks[fslavetarget].mapinputdfsnodes.Count - 1;
                                             blocks[fslavetarget].mapinputnodesoffsets.Add(offset);
-                                            blocks[fslavetarget].mapinputfilenames.Add(curfilename);                                            
+                                            blocks[fslavetarget].mapinputfilenames.Add(curfilename);
+                                            blocks[fslavetarget].acl.InputRecordLengths.Add(curreclen);
                                             dfsfilenames[fslavetarget] = curfilename;
                                         }
                                     }
@@ -2075,6 +2091,7 @@ public void DSpace_LogResult(string name, bool passed)
                                         int offset = blocks[leastindex].mapinputdfsnodes.Count - 1;
                                         blocks[leastindex].mapinputnodesoffsets.Add(offset);
                                         blocks[leastindex].mapinputfilenames.Add(curfilename);
+                                        blocks[leastindex].acl.InputRecordLengths.Add(curreclen);
                                         dfsfilenames[leastindex] = curfilename;
                                     }
                                 }
@@ -2259,102 +2276,104 @@ public void DSpace_LogResult(string name, bool passed)
                         if (null == AddCacheNodes && outputfiles.Count > 0) // If not just caching...
                         {
                             bool anyoutput = false;
-                            for (int nfile = 0; nfile < outputfiles.Count; nfile++)
                             {
-                                string ofile = outputfiles[nfile];
-                                if (ofile.Length == 0)
-                                {
-                                    continue;
-                                }
-                                string dfsname;
-                                string dfsnamereplicating;
+                                List<string> dfsnames = new List<string>();
+                                List<string> dfsnamesreplicating = new List<string>();
                                 // Reload DFS config to make sure changes since starting get rolled in, and make sure the output file wasn't created in that time...
                                 using (LockDfsMutex()) // Needed: change between load & save should be atomic.
                                 {
                                     dc = LoadDfsConfig(); // Reload in case of change or user modifications.
                                     {
-                                        dfs.DfsFile df = new dfs.DfsFile();
-                                        if (outputrecordlengths[nfile] > 0)
+                                        for (int nfile = 0; nfile < outputfiles.Count; nfile++)
                                         {
-                                            df.XFileType = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[nfile].ToString();
-                                        }
-                                        df.Nodes = new List<dfs.DfsFile.FileNode>();
-                                        df.Size = -1; // Preset
-                                        dfsname = ofile; // Init.
-                                        if (dfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            dfsname = dfsname.Substring(6);
-                                        }
-                                        dfsnamereplicating = ".$" + dfsname + ".$replicating-" + Guid.NewGuid().ToString();
-                                        df.Name = dfsnamereplicating;
-                                        if (null != DfsFind(dc, df.Name))
-                                        {
-                                            Console.Error.WriteLine("Error:  output file '{0}' was created during job: " + df.Name, ofile);
-                                            return;
-                                        }
-                                        long totalsize = 0;
-                                        bool anybad = false;
-                                        bool foundzero = false;
-                                        for (int i = 0; i < blocks.Count; i++)
-                                        {
-                                            MapReduceBlockInfo block = blocks[i];
-                                            List<string> nodes = block.reduceoutputdfsnodeses[nfile];
-                                            List<long> sizes = block.reduceoutputsizeses[nfile];
-                                            if (nodes.Count != sizes.Count)
+                                            dfs.DfsFile df = new dfs.DfsFile();
+                                            string ofile = outputfiles[nfile];
+                                            if (ofile.Length == 0)
                                             {
-                                                Console.Error.WriteLine("Warning: chunk accounting error");
+                                                continue;
                                             }
-                                            for (int j = 0; j < nodes.Count; j++)
+                                            if (outputrecordlengths[nfile] > 0)
                                             {
-                                                dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
-                                                fn.Host = block.SlaveHost;
-                                                fn.Name = nodes[j];
-                                                df.Nodes.Add(fn);
-                                                fn.Length = -1; // Preset
-                                                fn.Position = -1; // Preset
-                                                if (anybad)
+                                                df.XFileType = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[nfile].ToString();
+                                            }
+                                            df.Nodes = new List<dfs.DfsFile.FileNode>();
+                                            df.Size = -1; // Preset
+                                            string dfsname = ofile;
+                                            if (dfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                dfsname = dfsname.Substring(6);
+                                            }
+                                            string dfsnamereplicating = ".$" + dfsname + ".$replicating-" + Guid.NewGuid().ToString();
+                                            df.Name = dfsnamereplicating;
+                                            if (null != DfsFind(dc, df.Name))
+                                            {
+                                                Console.Error.WriteLine("Error:  output file '{0}' was created during job: " + df.Name, ofile);
+                                                continue;
+                                            }
+                                            dfsnames.Add(dfsname);
+                                            dfsnamesreplicating.Add(dfsnamereplicating);
+                                            long totalsize = 0;
+                                            bool anybad = false;
+                                            bool foundzero = false;
+                                            for (int i = 0; i < blocks.Count; i++)
+                                            {
+                                                MapReduceBlockInfo block = blocks[i];
+                                                List<string> nodes = block.reduceoutputdfsnodeses[nfile];
+                                                List<long> sizes = block.reduceoutputsizeses[nfile];
+                                                if (nodes.Count != sizes.Count)
                                                 {
-                                                    continue;
+                                                    Console.Error.WriteLine("Warning: chunk accounting error");
                                                 }
-                                                fn.Position = totalsize; // Position must be set before totalsize updated!
-                                                if (j >= sizes.Count)
+                                                for (int j = 0; j < nodes.Count; j++)
                                                 {
-                                                    Console.Error.WriteLine("Warning: size not provided for data node chunk from host " + fn.Host);
-                                                    anybad = true;
-                                                    continue;
-                                                }
-                                                if (0 == sizes[j])
-                                                {
-                                                    if (!foundzero)
+                                                    dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
+                                                    fn.Host = block.SlaveHost;
+                                                    fn.Name = nodes[j];
+                                                    df.Nodes.Add(fn);
+                                                    fn.Length = -1; // Preset
+                                                    fn.Position = -1; // Preset
+                                                    if (anybad)
                                                     {
-                                                        foundzero = true;
-                                                        Console.Error.WriteLine("Warning: zero-size data node chunk encountered from host " + fn.Host);
+                                                        continue;
                                                     }
+                                                    fn.Position = totalsize; // Position must be set before totalsize updated!
+                                                    if (j >= sizes.Count)
+                                                    {
+                                                        Console.Error.WriteLine("Warning: size not provided for data node chunk from host " + fn.Host);
+                                                        anybad = true;
+                                                        continue;
+                                                    }
+                                                    if (0 == sizes[j])
+                                                    {
+                                                        if (!foundzero)
+                                                        {
+                                                            foundzero = true;
+                                                            Console.Error.WriteLine("Warning: zero-size data node chunk encountered from host " + fn.Host);
+                                                        }
+                                                    }
+                                                    fn.Length = sizes[j];
+                                                    totalsize += sizes[j];
                                                 }
-                                                fn.Length = sizes[j];
-                                                totalsize += sizes[j];
                                             }
-                                        }
-                                        if (!anybad)
-                                        {
-                                            df.Size = totalsize;
-                                        }
-                                        if (totalsize != 0)
-                                        {
-                                            anyoutput = true;
-                                        }
-                                        // Always produce output file, even if no data.
-                                        {
+                                            if (!anybad)
+                                            {
+                                                df.Size = totalsize;
+                                            }
+                                            if (totalsize != 0)
+                                            {
+                                                anyoutput = true;
+                                            }
+                                            // Always produce output file, even if no data.
                                             dc.Files.Add(df);
-                                            UpdateDfsXml(dc); // !
-                                        }   
+                                        }
+                                        UpdateDfsXml(dc);
                                     }
                                 }
                                 {
 #if MR_REPLICATION_TIME_PRINT
                                     DateTime replstart = DateTime.Now;
 #endif
-                                    if (ReplicationPhase(dfsnamereplicating, verbosereplication, jobshared.blockcount, slaves))
+                                    if (ReplicationPhase(verbosereplication, jobshared.blockcount, slaves, dfsnamesreplicating))
                                     {
 #if MR_REPLICATION_TIME_PRINT
                                         int replsecs = (int)Math.Round((DateTime.Now - replstart).TotalSeconds);
@@ -2368,17 +2387,22 @@ public void DSpace_LogResult(string name, bool passed)
                                 using (LockDfsMutex()) // Needed: change between load & save should be atomic.
                                 {
                                     dc = LoadDfsConfig(); // Reload in case of change or user modifications.
-                                    dfs.DfsFile dfu = dc.FindAny(dfsnamereplicating);
-                                    if (null != dfu)
+                                    for (int nfile = 0; nfile < dfsnames.Count; nfile++)
                                     {
-                                        if (null != DfsFindAny(dc, dfsname))
+                                        string dfsname = dfsnames[nfile];
+                                        string dfsnamereplicating = dfsnamesreplicating[nfile];
+                                        dfs.DfsFile dfu = dc.FindAny(dfsnamereplicating);
+                                        if (null != dfu)
                                         {
-                                            Console.Error.WriteLine("Error:  output file '{0}' was created during job", ofile);
-                                            return;
+                                            if (null != DfsFindAny(dc, dfsname))
+                                            {
+                                                Console.Error.WriteLine("Error:  output file '{0}' was created during job", dfsname);
+                                                continue;
+                                            }
+                                            dfu.Name = dfsname;
                                         }
-                                        dfu.Name = dfsname;
-                                        UpdateDfsXml(dc);
                                     }
+                                    UpdateDfsXml(dc);
                                 }
                             }
                             if (!anyoutput && verbose)

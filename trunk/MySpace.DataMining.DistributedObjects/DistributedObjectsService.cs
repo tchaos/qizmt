@@ -18,9 +18,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
 ***************************************************************************************/
 
-#if DEBUG
+//#if DEBUG
 #define DOSERVICE_TRACE
-#endif
+//#endif
 
 using System;
 using System.Collections.Generic;
@@ -443,98 +443,148 @@ namespace MySpace.DataMining.DistributedObjects5
                             try
                             {
                                 string dotracefile = spid + ".trace";
-                                for (
-                                    ; !System.IO.File.Exists(dotracefile)
-                                    ; System.Threading.Thread.Sleep(1000 * 60))
+                                const string tracefiledelim = "{C8683F6C-0655-42e7-ACD9-0DDED6509A7C}";
+                                for (; ; )
                                 {
-                                }
-                                try
-                                {
-                                    System.IO.File.Delete(dotracefile);
-                                }
-                                catch
-                                {
-                                }
-                                XLog.errorlog("DOSERVICE_TRACE: " + spid + " Start");
-                                for (System.Threading.Thread.Sleep(1000 * 5); ; System.Threading.Thread.Sleep(1000 * 60))
-                                {
-                                    Dictionary<string, int> traces = new Dictionary<string, int>();
-                                    foreach (System.Threading.Thread tthd in DOService_TraceThreads)
+                                    System.IO.StreamWriter traceout = null;
+                                    for (System.Threading.Thread.Sleep(1000 * 60)
+                                        ; !System.IO.File.Exists(dotracefile)
+                                        ; System.Threading.Thread.Sleep(1000 * 60))
                                     {
-                                        string tr = "";
+                                    }
+                                    {
+                                        string[] tfc;
                                         try
                                         {
-                                            bool thdsuspended = false;
+                                            tfc = System.IO.File.ReadAllLines(dotracefile);
+                                        }
+                                        catch
+                                        {
+                                            continue;
+                                        }
+                                        if (tfc.Length < 1 || "." != tfc[tfc.Length - 1])
+                                        {
+                                            continue;
+                                        }
+                                        try
+                                        {
+                                            System.IO.File.Delete(dotracefile);
+                                        }
+                                        catch
+                                        {
+                                            continue;
+                                        }
+                                        if ("." != tfc[0])
+                                        {
+                                            string traceoutfp = tfc[0];
                                             try
                                             {
-                                                tthd.Suspend();
-                                                thdsuspended = true;
+                                                traceout = System.IO.File.CreateText(traceoutfp);
+                                                traceout.Write("BEGIN:");
+                                                traceout.WriteLine(tracefiledelim);
                                             }
-                                            catch (System.Threading.ThreadStateException)
+                                            catch
                                             {
+                                                continue;
                                             }
+                                        }
+                                    }
+                                    if (null == traceout)
+                                    {
+                                        XLog.errorlog("DOSERVICE_TRACE: " + spid + " Start");
+                                    }
+                                    for (; ; System.Threading.Thread.Sleep(1000 * 60))
+                                    {
+                                        foreach (System.Threading.Thread tthd in DOService_TraceThreads)
+                                        {
+                                            string tr = "";
                                             try
                                             {
-                                                System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(tthd, false);
-                                                StringBuilder sbst = new StringBuilder();
-                                                for (int i = 0, imax = Math.Min(15, st.FrameCount); i < imax; i++)
+                                                bool thdsuspended = false;
+                                                try
                                                 {
-                                                    if (0 != sbst.Length)
-                                                    {
-                                                        sbst.Append(", ");
-                                                    }
-                                                    string mn = "N/A";
-                                                    try
-                                                    {
-                                                        System.Reflection.MethodBase mb = st.GetFrame(i).GetMethod();
-                                                        mn = mb.ReflectedType.Name + "." + mb.Name;
-                                                    }
-                                                    catch
-                                                    {
-                                                    }
-                                                    /*if (mn.Length > 150)
-                                                    {
-                                                        mn = "..." + mn.Substring(mn.Length - 150);
-                                                    }*/
-                                                    sbst.Append(mn);
+                                                    tthd.Suspend();
+                                                    thdsuspended = true;
                                                 }
-                                                tr = ("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Trace: " + sbst.ToString());
+                                                catch (System.Threading.ThreadStateException)
+                                                {
+                                                }
+                                                try
+                                                {
+                                                    System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(tthd, false);
+                                                    StringBuilder sbst = new StringBuilder();
+                                                    const int maxframesprint = 15;
+                                                    for (int i = 0, imax = Math.Min(maxframesprint, st.FrameCount); i < imax; i++)
+                                                    {
+                                                        if (0 != sbst.Length)
+                                                        {
+                                                            sbst.Append(", ");
+                                                        }
+                                                        string mn = "N/A";
+                                                        try
+                                                        {
+                                                            System.Reflection.MethodBase mb = st.GetFrame(i).GetMethod();
+                                                            mn = mb.ReflectedType.Name + "." + mb.Name;
+                                                        }
+                                                        catch
+                                                        {
+                                                        }
+                                                        sbst.Append(mn);
+                                                    }
+                                                    if (st.FrameCount > maxframesprint)
+                                                    {
+                                                        sbst.Append(" ... ");
+                                                        sbst.Append(st.FrameCount - maxframesprint);
+                                                        sbst.Append(" more");
+                                                    }
+                                                    if (null == traceout)
+                                                    {
+                                                        XLog.errorlog("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Trace: " + sbst.ToString());
+                                                    }
+                                                    else
+                                                    {
+                                                        traceout.Write("Thread ");
+                                                        string tthdname = tthd.Name;
+                                                        if (null == tthdname || 0 == tthdname.Length)
+                                                        {
+                                                            //tthdname = "<unnamed>";
+                                                            tthdname = tthd.ManagedThreadId.ToString();
+                                                        }
+                                                        traceout.Write(tthdname);
+                                                        traceout.Write(": ");
+                                                        traceout.WriteLine(sbst.ToString());
+                                                    }
+                                                }
+                                                catch (Exception e)
+                                                {
+                                                    XLog.errorlog("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Error: " + e.ToString());
+                                                }
+                                                finally
+                                                {
+                                                    if (thdsuspended)
+                                                    {
+                                                        tthd.Resume();
+                                                    }
+                                                }
                                             }
                                             catch (Exception e)
                                             {
-                                                tr = ("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Error: " + e.ToString());
-                                            }
-                                            finally
-                                            {
-                                                if (thdsuspended)
-                                                {
-                                                    tthd.Resume();
-                                                }
+                                                XLog.errorlog("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Trace Error: Cannot access thread: " + e.ToString());
                                             }
                                         }
-                                        catch (Exception e)
+
+                                        if (null != traceout)
                                         {
-                                            tr = ("DOSERVICE_TRACE: " + spid + " " + tthd.Name + " Trace Error: Cannot access thread: " + e.ToString());
+                                            traceout.Write(tracefiledelim);
+                                            traceout.WriteLine(":END");
+                                            traceout.Close();
+                                            break;
                                         }
-                                        {
-                                            int trc;
-                                            if (traces.ContainsKey(tr))
-                                            {
-                                                trc = traces[tr] + 1;
-                                            }
-                                            else
-                                            {
-                                                trc = 1;
-                                            }
-                                            traces[tr] = trc;
-                                        }
-                                    }
-                                    foreach (KeyValuePair<string, int> kvp in traces)
-                                    {
-                                        XLog.errorlog(kvp.Key + " [" + kvp.Value + "]");
+
                                     }
 
                                 }
+
                             }
                             catch (Exception e)
                             {
@@ -598,6 +648,8 @@ namespace MySpace.DataMining.DistributedObjects5
                 catch(Exception e)
                 {
                 }
+
+                System.IO.File.WriteAllText("driver.pid", System.Diagnostics.Process.GetCurrentProcess().Id.ToString() + Environment.NewLine);
 
                 try
                 {
@@ -886,6 +938,15 @@ namespace MySpace.DataMining.DistributedObjects5
             catch (Exception e)
             {
             }
+
+            try
+            {
+                System.IO.File.Delete("driver.pid");
+            }
+            catch
+            {
+            }
+
         }
     }
 
@@ -1853,7 +1914,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                         }
 
                                         proc.Close();
-                                        dllclientStm.Close(500);
                                     }
                                     else
                                     {
@@ -1866,6 +1926,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                             XLog.errorlog("`" + app + " " + sargs + "` exec: non-alive proc kill failure: " + e.ToString());
                                         }
                                     }
+                                    dllclientStm.Close(500);
                                     return;
                                 }
                                 catch (IOException e)
@@ -2047,7 +2108,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                         }
 
                                         proc.Close();
-                                        dllclientStm.Close(500);
                                     }
                                     else
                                     {
@@ -2060,6 +2120,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                             XLog.errorlog("`" + app + " " + sargs + "` exec: non-alive proc kill failure: " + e.ToString());
                                         }
                                     }
+                                    dllclientStm.Close(500);
                                     return;
                                 }
                                 catch (IOException e)

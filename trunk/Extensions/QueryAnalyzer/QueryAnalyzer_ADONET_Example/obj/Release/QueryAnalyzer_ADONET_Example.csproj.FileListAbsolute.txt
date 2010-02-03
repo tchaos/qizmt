@@ -1,0 +1,5 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_ADONET_Example.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_ADONET_Example.pdb
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADONET_Example\obj\Release\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADONET_Example\obj\Release\QueryAnalyzer_ADONET_Example.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_ADONET_Example\obj\Release\QueryAnalyzer_ADONET_Example.pdb
