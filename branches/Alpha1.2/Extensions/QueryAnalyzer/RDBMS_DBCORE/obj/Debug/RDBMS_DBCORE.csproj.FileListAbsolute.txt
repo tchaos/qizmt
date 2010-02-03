@@ -1,0 +1,1 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\RDBMS_DBCORE\obj\Debug\ResolveAssemblyReference.cache

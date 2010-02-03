@@ -1,0 +1,133 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="dspace_managers_test_metabackup" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            
+            string jobname = "dspace_managers_test_metabackup.xml";
+            
+            Shell(@"Qizmt del " + jobname + ".????ED"); // Delete passed/failed.
+            
+            Shell("Qizmt del dspace_managers_test_metabackup_tempdata_*");
+            
+            string metabackup;
+            {
+                string x = Shell("Qizmt metabackup");
+                const string XSTARTSWITH = "Meta backup location is: ";
+                if(!x.StartsWith(XSTARTSWITH))
+                {
+                    throw new Exception("Output of metabackup not in expected format");
+                }
+                metabackup = x.Substring(XSTARTSWITH.Length).Trim();
+                if("<null>" == metabackup)
+                {
+                    metabackup = null;
+                }
+            }
+            bool hadmetabackup = null != metabackup;
+            
+            if(null == metabackup)
+            {
+                // Metabackup isn't enabled, so turn it on temporarily.
+                metabackup = @"\\" + System.Net.Dns.GetHostName() + @"\C$\temp\metabackup-test_" + Guid.NewGuid().ToString();
+                Shell("Qizmt metabackup " + metabackup);
+            }
+            try
+            {
+                Shell("Qizmt metabackup -backup-now"); // Make sure everything's current.
+                
+                string dfsdir = MySpace.DataMining.AELight.Surrogate.NetworkPathForHost(MySpace.DataMining.AELight.Surrogate.MasterHost);
+                string dfsxmlpath = dfsdir + @"\" + MySpace.DataMining.AELight.dfs.DFSXMLNAME;
+                string dfsxmlmetabackuppath = metabackup + @"\dfs-"
+                    + MySpace.DataMining.AELight.Surrogate.SafeTextPath(System.Net.Dns.GetHostName()) + @".xml";
+                
+                // Make sure meta-backup dfs.xml stays current...
+                
+                if(System.IO.File.ReadAllText(dfsxmlpath) != System.IO.File.ReadAllText(dfsxmlmetabackuppath))
+                {
+                    throw new Exception("Meta-backup of DFS.xml is not exact copy");
+                }
+                
+                string genfilename = "dspace_managers_test_metabackup_tempdata_" + Guid.NewGuid().ToString();
+                Shell("Qizmt gen " + genfilename + " 2MB");
+                
+                if(System.IO.File.ReadAllText(dfsxmlpath) != System.IO.File.ReadAllText(dfsxmlmetabackuppath))
+                {
+                    throw new Exception("Meta-backup of DFS.xml is not exact copy");
+                }
+                
+                Shell("Qizmt del " + genfilename);
+                
+                if(System.IO.File.ReadAllText(dfsxmlpath) != System.IO.File.ReadAllText(dfsxmlmetabackuppath))
+                {
+                    throw new Exception("Meta-backup of DFS.xml is not exact copy");
+                }
+                
+                // Make sure meta-backup of jobs files are current...
+                // Note: at least this test jobs file is in dfs.
+                
+                string thisdir = Environment.CurrentDirectory;
+                if(!System.IO.File.Exists(dfsxmlpath))
+                {
+                    throw new Exception("FNF " + dfsxmlpath);
+                }
+                MySpace.DataMining.AELight.dfs dc = MySpace.DataMining.AELight.dfs.ReadDfsConfig_unlocked(dfsxmlpath);
+                foreach(MySpace.DataMining.AELight.dfs.DfsFile df in dc.Files)
+                {
+                    if(0 == string.Compare(MySpace.DataMining.AELight.DfsFileTypes.JOB, df.Type, true))
+                    {
+                        string nn = df.Nodes[0].Name;
+                        if(System.IO.File.ReadAllText(
+                            MySpace.DataMining.AELight.Surrogate.NetworkPathForHost(df.Nodes[0].Host.Split(';')[0]) + @"\" + nn)
+                            != System.IO.File.ReadAllText(metabackup + @"\" + nn))
+                        {
+                            throw new Exception("Meta-backup for jobs file '" + df.Name + "' is not exact copy");
+                        }
+                    }
+                }
+                
+            }
+            finally
+            {
+                if(!hadmetabackup)
+                {
+                    // Metabackup wasn't enabled, so turn it off.
+                    Shell("Qizmt metabackup -");
+                    foreach(string fn in System.IO.Directory.GetFiles(metabackup))
+                    {
+                        System.IO.File.Delete(fn);
+                    }
+                    System.IO.Directory.Delete(metabackup);
+                }
+            }
+            
+            // Write out success...
+            {
+                string hostname = System.Net.Dns.GetHostName();
+                string guid = Guid.NewGuid().ToString();
+                string tempLocal = @"\\" + hostname + @"\c$\temp\qizmt\" + guid + ".txt";
+                
+                if(!System.IO.Directory.Exists(@"\\" + hostname + @"\c$\temp\qizmt"))
+                {
+                    System.IO.Directory.CreateDirectory(@"\\" + hostname + @"\c$\temp\qizmt");
+                }
+                
+                using(System.IO.StreamWriter writer = new System.IO.StreamWriter(tempLocal))
+                {
+                    writer.Write('.');
+                }
+                Shell(@"Qizmt put " + tempLocal + " " + jobname + ".PASSED");
+                System.IO.File.Delete(tempLocal);
+            }
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

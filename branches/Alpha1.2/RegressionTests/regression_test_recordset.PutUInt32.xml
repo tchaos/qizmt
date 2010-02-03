@@ -1,0 +1,189 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutUInt32_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_recordset.PutUInt32_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutUInt32_Output.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_recordset.PutUInt32_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_recordset.PutUInt32_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //int 
+                    uint x = (uint)rnd.Next();
+                   
+                    string s = x.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //int  
+                    x = (uint)rnd.Next();                    
+                    
+                    s = x.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }        
+                 
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>recordset.PutUInt32</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_recordset.PutUInt32_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_recordset.PutUInt32_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();                
+               
+                int del = sLine.IndexOf(',');
+                
+                uint d = uint.Parse(sLine.Substring(0, del));  
+                uint d2 = uint.Parse(sLine.Substring(del + 1));
+               
+                recordset key = recordset.Prepare();
+                key.PutUInt32((uint)(d % 10));
+                
+                //testing put
+                recordset rs = recordset.Prepare();
+                rs.PutUInt32(d);
+                rs.PutUInt32(d2);
+                
+                //testing get
+                d = rs.GetUInt32();
+                d2 = rs.GetUInt32();
+                
+                //testing put
+                recordset val = recordset.Prepare();
+                val.PutUInt32(d);
+                val.PutUInt32(d2);
+                
+                output.Add(key, val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {      
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rs = recordset.Prepare(values.Items[i]);
+                    
+                    //testing get
+                    uint d = rs.GetUInt32();
+                    uint d2 = rs.GetUInt32();
+                    
+                    recordset val = recordset.Prepare();
+                    val.PutUInt32(d);
+                    val.PutUInt32(d2);
+                    
+                    d = val.GetUInt32();
+                    d2 = val.GetUInt32();
+                    
+                    string s = d.ToString() + "," + d2.ToString();
+                    
+                    output.Add(ByteSlice.Prepare(s));                    
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_recordset.PutUInt32_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_recordset.PutUInt32_Input.txt regression_test_recordset.PutUInt32_Output.txt regression_test_recordset.PutUInt32.xml");          
+            
+            Shell(@"Qizmt del regression_test_recordset.PutUInt32_Input.txt", true);
+            Shell(@"Qizmt del regression_test_recordset.PutUInt32_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

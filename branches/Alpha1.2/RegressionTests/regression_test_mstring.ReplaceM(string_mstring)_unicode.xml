@@ -1,0 +1,339 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.ReplaceM(string_mstring)_unicode_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Output.txt", true);   
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Output1.txt", true);    
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Output2.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.ReplaceM(string_mstring)_unicode_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.ReplaceM(string_mstring)_unicode_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 500;
+                int rowCount = 2000;
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string
+                    for (int cnt = 0; cnt < stringLength; cnt++)
+                    {
+                        int codeValue = rnd.Next(0x20, 0xFFEF);
+                        byte b0 = 0;
+                        byte b1 = 0;
+                        byte b2 = 0;
+                        byte b3 = 0;
+
+                        ConvertCodeValueToBytesUTF8(codeValue, ref b0, ref b1, ref b2, ref b3);
+                        
+                        if (b0 != 0)
+                        {
+                            onerow.Add(b0);
+                        }
+
+                        if (b1 != 0)
+                        {
+                            onerow.Add(b1);
+                        }
+
+                        if (b2 != 0)
+                        {
+                            onerow.Add(b2);
+                        }
+
+                        if (b3 != 0)
+                        {
+                            onerow.Add(b3);
+                        }
+                    }    
+                                        
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+           
+        public static void ConvertCodeValueToBytesUTF8(int codeValue, ref byte b0, ref byte b1, ref byte b2, ref byte b3)
+        {
+            b0 = 0;
+            b1 = 0;
+            b2 = 0;
+            b3 = 0;
+
+            if (0xD800 <= codeValue && codeValue <= 0xDFFF)
+            {
+                //These are surrogates, reserved for UTF16.
+                return;
+            }
+
+            if (0 <= codeValue && codeValue <= 0x7F)
+            {
+                b0 = (byte)codeValue;               
+            }
+            else
+            {
+                if (0x80 <= codeValue && codeValue <= 0x7FF)
+                {
+                    byte t = (byte)(codeValue >> 6);
+                    int x = t & (byte)0x1F;
+                    x = x | (byte)0xC0;
+                    b0 = (byte)x;
+
+                    t = (byte)codeValue;
+                    x = t & (byte)0x3F;
+                    x = x | (byte)0x80;
+                    b1 = (byte)x;
+                }
+                else
+                {
+                    if (0x800 <= codeValue && codeValue <= 0xFFFF)
+                    {
+                        byte t = (byte)(codeValue >> 12);
+                        int x = t & (byte)0x0F;
+                        x = x | (byte)0xE0;
+                        b0 = (byte)x;
+
+                        t = (byte)(codeValue >> 6);
+                        x = t & (byte)0x3F;
+                        x = x | (byte)0x80;
+                        b1 = (byte)x;
+
+                        t = (byte)codeValue;
+                        x = t & (byte)0x3F;
+                        x = x | (byte)0x80;
+                        b2 = (byte)x;
+                    }
+                    else
+                    {
+                        if (0x10000 <= codeValue && codeValue <= 0x10FFFF)
+                        {
+                            byte t = (byte)(codeValue >> 18);
+                            int x = t & (byte)0x07;
+                            x = x | (byte)0xF0;
+                            b0 = (byte)x;
+
+                            t = (byte)(codeValue >> 12);
+                            x = t & (byte)0x3F;
+                            x = x | (byte)0x80;
+                            b1 = (byte)x;
+
+                            t = (byte)(codeValue >> 6);
+                            x = t & (byte)0x3F;
+                            x = x | (byte)0x80;
+                            b2 = (byte)x;
+
+                            t = (byte)codeValue;
+                            x = t & (byte)0x3F;
+                            x = x | (byte)0x80;
+                            b3 = (byte)x;
+                        }
+                    }
+                }
+            }
+        }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>mstring.ReplaceM(string_mstring)_unicode</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput>dfs://regression_test_mstring.ReplaceM(string_mstring)_unicode_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mstring.ReplaceM(string_mstring)_unicode_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();   
+                char key = sLine[0];
+                
+                string oldStr = sLine.Substring(10, 2);
+                mstring newStr = mstring.Prepare(sLine.Substring(30, 2));               
+                mstring ms = mstring.Prepare(line);                
+                mstring val = ms.ReplaceM(oldStr, ref newStr); 
+                output.Add(mstring.Prepare(key), val);     
+                
+                oldStr = sLine.Substring(20, 10);
+                newStr = mstring.Prepare(sLine.Substring(50, 30));
+                ms = mstring.Prepare(line);                
+                val = ms.ReplaceM(oldStr, ref newStr);  
+                output.Add(mstring.Prepare(key), val);                   
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int i = 0; i < values.Length; i++)
+                {
+                    string sLine = values.Items[i].ToString();  
+                    
+                    string oldStr = sLine.Substring(8, 3);
+                    mstring newStr = mstring.Prepare(sLine.Substring(90, 3));               
+                    mstring ms = mstring.Prepare(values.Items[i]);                
+                    mstring val = ms.ReplaceM(oldStr, ref newStr); 
+                    output.Add(val);     
+                    
+                    oldStr = sLine.Substring(80, 10);
+                    newStr = mstring.Prepare(sLine.Substring(20, 30));
+                    ms = mstring.Prepare(values.Items[i]);                
+                    val = ms.ReplaceM(oldStr, ref newStr);  
+                    output.Add(val);                   
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.ReplaceM(string_mstring)_unicode_Imitate_Mapper</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_mstring.ReplaceM(string_mstring)_unicode_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.ReplaceM(string_mstring)_unicode_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();
+                      
+                    string oldStr = sLine.Substring(10, 2);
+                    string newStr = sLine.Substring(30, 2); 
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));     
+                    
+                    oldStr = sLine.Substring(20, 10);
+                    newStr = sLine.Substring(50, 30);                   
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));                  
+                    
+                    sb.Length = 0;                    
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.ReplaceM(string_mstring)_unicode_Imitate_Reducer</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_mstring.ReplaceM(string_mstring)_unicode_Output1.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.ReplaceM(string_mstring)_unicode_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();
+                      
+                    string oldStr = sLine.Substring(8, 3);
+                    string newStr = sLine.Substring(90, 3); 
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));     
+                    
+                    oldStr = sLine.Substring(80, 10);
+                    newStr = sLine.Substring(20, 30);                   
+                    dfsoutput.WriteLine(sLine.Replace(oldStr, newStr));                  
+                    
+                    sb.Length = 0;                   
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.ReplaceM(string_mstring)_unicode_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring.ReplaceM(string_mstring)_unicode_Output.txt regression_test_mstring.ReplaceM(string_mstring)_unicode_Output2.txt regression_test_mstring.ReplaceM(string_mstring)_unicode.xml unicode");          
+            
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Output.txt", true); 
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Output1.txt", true); 
+            Shell(@"Qizmt del regression_test_mstring.ReplaceM(string_mstring)_unicode_Output2.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

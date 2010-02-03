@@ -1,0 +1,330 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_OutputFilesOfDiffRecordSizes_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_OutputFilesOfDiffRecordSizes_Output*");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_OutputFilesOfDiffRecordSizes_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>          <DFSWriter>dfs://regression_test_OutputFilesOfDiffRecordSizes_Output0.bin@int;regression_test_OutputFilesOfDiffRecordSizes_Output1.bin@int,int;regression_test_OutputFilesOfDiffRecordSizes_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                {
+                    List<byte> buf = new List<byte>(4);
+                    Entry.ToBytesAppend(1, buf);
+                    dfsoutput.WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(2, buf);
+                    dfsoutput.WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(3, buf);
+                    dfsoutput.WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(4, buf);
+                    dfsoutput.WriteRecord(buf);
+                }
+                
+                {
+                    List<byte> buf = new List<byte>(8);
+                    Entry.ToBytesAppend(1, buf);
+                    Entry.ToBytesAppend(-1, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(2, buf);
+                    Entry.ToBytesAppend(-1, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(3, buf);
+                    Entry.ToBytesAppend(-1, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(4, buf);
+                    Entry.ToBytesAppend(-1, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                }
+                
+                {
+                    dfsoutput.GetOutputByIndex(2).WriteLine("1x");
+                    dfsoutput.GetOutputByIndex(2).WriteLine("2x");
+                    dfsoutput.GetOutputByIndex(2).WriteLine("3x");
+                    dfsoutput.GetOutputByIndex(2).WriteLine("4x");
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_OutputFilesOfDiffRecordSizes_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>          <DFSWriter>dfs://regression_test_OutputFilesOfDiffRecordSizes_Output3.txt;regression_test_OutputFilesOfDiffRecordSizes_Output4.bin@int</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                {
+                    dfsoutput.GetOutputByIndex(0).WriteLine("1x");
+                    dfsoutput.GetOutputByIndex(0).WriteLine("2x");
+                    dfsoutput.GetOutputByIndex(0).WriteLine("3x");
+                    dfsoutput.GetOutputByIndex(0).WriteLine("4x");
+                }
+                
+                {
+                    List<byte> buf = new List<byte>(4);
+                    Entry.ToBytesAppend(1, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(2, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(3, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                    
+                    buf.Clear();
+                    Entry.ToBytesAppend(4, buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
+                }                
+            }
+        ]]>
+      </Remote>
+    </Job>    
+    <Job Name="regression_test_OutputFilesOfDiffRecordSizes_DisplayInputData" Custodian="" Email="" Description="Display input data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_OutputFilesOfDiffRecordSizes_Output0.bin@int</DFSReader>
+          <DFSWriter>regression_test_OutputFilesOfDiffRecordSizes_Output0.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                List<byte> buf = new List<byte>(4);
+                while(dfsinput.ReadRecordAppend(buf))
+                {                  
+                    int year = Entry.BytesToInt(buf, 0);                    
+                    dfsoutput.WriteLine(year.ToString());
+                    buf.Clear();
+                }                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_OutputFilesOfDiffRecordSizes_DisplayInputData" Custodian="" Email="" Description="Display input data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_OutputFilesOfDiffRecordSizes_Output1.bin@int,int</DFSReader>
+          <DFSWriter>regression_test_OutputFilesOfDiffRecordSizes_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                List<byte> buf = new List<byte>(8);
+                while(dfsinput.ReadRecordAppend(buf))
+                {                  
+                    int year = Entry.BytesToInt(buf, 0);    
+                    int num = Entry.BytesToInt(buf, 4);     
+                    dfsoutput.WriteLine(year.ToString() + "," + num.ToString());
+                    buf.Clear();
+                }                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_OutputFilesOfDiffRecordSizes_DisplayInputData" Custodian="" Email="" Description="Display input data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_OutputFilesOfDiffRecordSizes_Output4.bin@int</DFSReader>
+          <DFSWriter>regression_test_OutputFilesOfDiffRecordSizes_Output4.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                List<byte> buf = new List<byte>(4);
+                while(dfsinput.ReadRecordAppend(buf))
+                {                  
+                    int year = Entry.BytesToInt(buf, 0);                    
+                    dfsoutput.WriteLine(year.ToString());
+                    buf.Clear();
+                }                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_OutputFilesOfDiffRecordSizes_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                bool ok = true;
+                
+                {
+                    string[] _results = Shell(@"Qizmt head regression_test_OutputFilesOfDiffRecordSizes_Output0.txt 10").Split('\r');
+                    List<string> results = new List<string>(4);
+                    foreach(string s in _results)
+                    {
+                        string _s = s.Trim();
+                        if(_s.Length > 0)
+                        {
+                            results.Add(_s);
+                        }
+                    }
+                    
+                    string[] expected = new string[]{"1","2","3","4"};
+                    for(int ri = 0; ri < results.Count; ri++)
+                    {
+                        if(results[ri] != expected[ri])
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                
+                if(ok)
+                {
+                    string[] _results = Shell(@"Qizmt head regression_test_OutputFilesOfDiffRecordSizes_Output1.txt 10").Split('\r');
+                    List<string> results = new List<string>(4);
+                    foreach(string s in _results)
+                    {
+                        string _s = s.Trim();
+                        if(_s.Length > 0)
+                        {
+                            results.Add(_s);
+                        }
+                    }
+                    
+                    string[] expected = new string[]{"1,-1","2,-1","3,-1","4,-1"};
+                    for(int ri = 0; ri < results.Count; ri++)
+                    {
+                        if(results[ri] != expected[ri])
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                
+                if(ok)
+                {
+                    string[] _results = Shell(@"Qizmt head regression_test_OutputFilesOfDiffRecordSizes_Output2.txt 10").Split('\r');
+                    List<string> results = new List<string>(4);
+                    foreach(string s in _results)
+                    {
+                        string _s = s.Trim();
+                        if(_s.Length > 0)
+                        {
+                            results.Add(_s);
+                        }
+                    }
+                    
+                    string[] expected = new string[]{"1x","2x","3x","4x"};
+                    for(int ri = 0; ri < results.Count; ri++)
+                    {
+                        if(results[ri] != expected[ri])
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                
+                if(ok)
+                {
+                    string[] _results = Shell(@"Qizmt head regression_test_OutputFilesOfDiffRecordSizes_Output3.txt 10").Split('\r');
+                    List<string> results = new List<string>(4);
+                    foreach(string s in _results)
+                    {
+                        string _s = s.Trim();
+                        if(_s.Length > 0)
+                        {
+                            results.Add(_s);
+                        }
+                    }
+                    
+                    string[] expected = new string[]{"1x","2x","3x","4x"};
+                    for(int ri = 0; ri < results.Count; ri++)
+                    {
+                        if(results[ri] != expected[ri])
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                
+                 if(ok)
+                {
+                    string[] _results = Shell(@"Qizmt head regression_test_OutputFilesOfDiffRecordSizes_Output4.txt 10").Split('\r');
+                    List<string> results = new List<string>(4);
+                    foreach(string s in _results)
+                    {
+                        string _s = s.Trim();
+                        if(_s.Length > 0)
+                        {
+                            results.Add(_s);
+                        }
+                    }
+                    
+                    string[] expected = new string[]{"1","2","3","4"};
+                    for(int ri = 0; ri < results.Count; ri++)
+                    {
+                        if(results[ri] != expected[ri])
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                
+                if(ok)
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_OutputFilesOfDiffRecordSizes_Remote.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_WritePassFail.xml regression_test_OutputFilesOfDiffRecordSizes_Remote.xml 0");
+                }               
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

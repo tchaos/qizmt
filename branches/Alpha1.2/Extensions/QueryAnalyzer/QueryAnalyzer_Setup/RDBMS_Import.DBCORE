@@ -1,0 +1,159 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_Import">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput></DFSOutput>
+        <!-- OutputDfsFile -->
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <IntermediateDataAddressing>64</IntermediateDataAddressing>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          uint keyinc = 0;
+          List<byte> keybuf = new List<byte>(4);
+          public virtual void Map(ByteSlice record, MapOutput output)
+          {
+              unchecked
+              {
+                    keyinc++;
+              }
+              keybuf.Clear();
+              Entry.UInt32ToBytesAppend(keyinc, keybuf);
+              
+              output.Add(ByteSlice.Prepare(keybuf), record);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          int[] RowTypeSizes;
+          string[] RowTypes;
+          List<byte> result = new List<byte>();
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              if(null == RowTypeSizes)
+              {
+                    string TableName = DSpace_ExecArgs[0];
+                    string ImportDfsFile = DSpace_ExecArgs[1];
+                    string OutputDfsFile = DSpace_ExecArgs[2]; // Gets combined into DfsTableFile.
+                    string DfsTableFile = DSpace_ExecArgs[3];
+                    string RowInfo = DSpace_ExecArgs[4];
+                    string TypeInfo = DSpace_ExecArgs[5];
+                    
+                    string[] sRowTypeSizes = RowInfo.Split(',');
+                    RowTypeSizes = new int[sRowTypeSizes.Length];
+                    for(int i = 0; i < RowTypeSizes.Length; i++)
+                    {
+                        RowTypeSizes[i] = int.Parse(sRowTypeSizes[i]);
+                    }
+                    
+                    RowTypes = TypeInfo.Split(',');
+              }
+              
+              while(values.MoveNext())
+              {
+                  ByteSlice record = values.Current;
+                  
+                  /* // This assumed rectangular columns, but that won't work with strings in a recordset.
+                  int ri = 0;
+                  result.Clear();
+                  foreach(int tsize in RowTypeSizes)
+                  {
+                      result.Add(0); // Not-null.
+                      for(int i = 0; i < tsize - 1; i++)
+                      {
+                          result.Add(record[ri + i]);
+                      }
+                      ri += tsize - 1;
+                  }
+                  */
+                  
+                  result.Clear();
+                  recordset rs = recordset.Prepare(record);
+                  for(int it = 0; it < RowTypeSizes.Length; it++)
+                  {
+                      int tsize = RowTypeSizes[it];
+                      string ttype = RowTypes[it];
+                      result.Add(0); // Not-null.
+                      if(ttype.StartsWith("char", true, null))
+                      {
+                          mstring x = rs.GetString();
+                          ByteSlice bsx = x.ToByteSliceUTF16();
+                          if(bsx.Length > tsize - 1)
+                          {
+                              string bad;
+                              if(x.Length > 200)
+                              {
+                                  bad = x.SubstringM(0, 200).ToString() + "...";
+                              }
+                              else
+                              {
+                                  bad = x.ToString();
+                              }
+                              throw new Exception("String in import file is too large for " + ttype + ": " + bad);
+                          }
+                          bsx.AppendTo(result);
+                          for(int i = bsx.Length; i < tsize - 1; i++)
+                          {
+                              result.Add(0);
+                          }
+                      }
+                      else if("int" == ttype)
+                      {
+                          Int32 x = rs.GetInt32();
+                          Entry.ToBytesAppend((Int32)Entry.ToUInt32(x), result);
+                      }
+                      else if("long" == ttype)
+                      {
+                          Int64 x = rs.GetInt64();
+                          Entry.ToBytesAppend64((Int64)Entry.ToUInt64(x), result);
+                      }
+                      else if("double" == ttype)
+                      {
+                          Double x = rs.GetDouble();
+                          Entry.ToBytesAppendDouble(x, result);
+                      }
+                      else
+                      {
+                          for(int i = 0; i < tsize - 1; i++)
+                          {
+                              result.Add(1);
+                          }
+                          rs.GetBytes(result, result.Count - (tsize - 1), tsize - 1);
+                      }
+                  }
+                  
+                  output.Add(ByteSlice.Prepare(result));
+                  
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="RDBMS_Import_Combine">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string TableName = DSpace_ExecArgs[0];
+            string ImportDfsFile = DSpace_ExecArgs[1];
+            string OutputDfsFile = DSpace_ExecArgs[2]; // Gets combined into DfsTableFile.
+            string DfsTableFile = DSpace_ExecArgs[3];
+            string RowInfo = DSpace_ExecArgs[4];
+            
+            Shell("dspace combine \"" + OutputDfsFile + "\" \"" + DfsTableFile + "\"");
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

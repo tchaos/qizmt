@@ -1,0 +1,61 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_illegalChars_combine_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_illegalChars_combine_1");
+            Shell(@"Qizmt del regression_test_illegalChars_combine_2");
+            string dir = IOUtils.GetTempDirectory();
+            string temp1 = dir + @"\" + Guid.NewGuid().ToString();
+            string temp2 = dir + @"\" + Guid.NewGuid().ToString();
+            System.IO.File.WriteAllText(temp1, "x");
+            System.IO.File.WriteAllText(temp2, "x");
+            Shell("Qizmt put " + temp1 + " regression_test_illegalChars_combine_1");
+            Shell("Qizmt put " + temp2 + " regression_test_illegalChars_combine_2");
+            System.IO.File.Delete(temp1);
+            System.IO.File.Delete(temp2);
+            
+            bool ok = true;
+            for(int i = 32; i < 127; i++)
+            {
+                string fn = "regression_test_illegalChars_combine_";
+                char c = (char)i;
+                
+                if(!Char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '(' && c != ')' && c != '~' && c != '{' && c != '}')
+                {
+                    fn += c;
+                    try
+                    {
+                        Shell("Qizmt combine regression_test_illegalChars_combine_1 regression_test_illegalChars_combine_2 \"+" + fn.Replace(@"\", @"\\") + "\" ");
+                        ok = false;
+                        break;
+                    }
+                    catch(Exception e)
+                    {
+                        
+                    }                   
+                }                
+            }
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_combine.xml 1");                
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_combine.xml 0");   
+            }            
+            
+            Shell(@"Qizmt del regression_test_illegalChars_combine_1");
+            Shell(@"Qizmt del regression_test_illegalChars_combine_2");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

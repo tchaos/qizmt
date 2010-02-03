@@ -1,0 +1,229 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_ImportLines">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput></DFSOutput>
+        <!-- OutputDfsFile -->
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <IntermediateDataAddressing>64</IntermediateDataAddressing>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          uint keyinc = 0;
+          List<byte> keybuf = new List<byte>(4);
+          List<byte> valuebuf = new List<byte>();
+          int[] RowTypeSizes;
+          string[] RowTypes;
+          char chDelim;
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              
+              if(null == RowTypeSizes)
+              {
+                    string TableName = DSpace_ExecArgs[0];
+                    string ImportDfsFile = DSpace_ExecArgs[1];
+                    string OutputDfsFile = DSpace_ExecArgs[2]; // Gets combined into DfsTableFile.
+                    string DfsTableFile = DSpace_ExecArgs[3];
+                    string RowInfo = DSpace_ExecArgs[4];
+                    string TypeInfo = DSpace_ExecArgs[5];
+                    string QlArgDelim = DSpace_ExecArgs[6];
+                    
+                    {
+                        string Delim = null;
+                        string sd = QlArgsUnescape(QlArgDelim);
+                        if(sd.Length > 2 && '\'' == sd[0] && '\'' == sd[sd.Length - 1])
+                        {
+                            Delim = sd.Substring(1, sd.Length - 2).Replace("''", "'");
+                        }
+                        if(Delim == null)
+                        {
+                            throw new Exception("Invalid delimiter");
+                        }
+                        if(Delim.Length != 1)
+                        {
+                            if(Delim.Length > 1)
+                            {
+                                //if(0 == DSpace_BlockID)
+                                {
+                                    DSpace_Log("Warning: delimiter must be one character only; proceeding using first character");
+                                }
+                            }
+                            else
+                            {
+                                throw new Exception("Empty string delimiter");
+                            }
+                        }
+                        chDelim = Delim[0];
+                    }
+                    
+                    string[] sRowTypeSizes = RowInfo.Split(',');
+                    RowTypeSizes = new int[sRowTypeSizes.Length];
+                    for(int i = 0; i < RowTypeSizes.Length; i++)
+                    {
+                        RowTypeSizes[i] = int.Parse(sRowTypeSizes[i]);
+                    }
+                    
+                    RowTypes = TypeInfo.Split(',');
+              }
+              
+              {
+                  unchecked
+                  {
+                        keyinc++;
+                  }
+                  keybuf.Clear();
+                  Entry.UInt32ToBytesAppend(keyinc, keybuf);
+              }
+              
+              try
+              {
+                    valuebuf.Clear();
+                    
+                    mstring ms = mstring.Prepare(line);
+                    
+                    for(int irt = 0; irt < RowTypes.Length; irt++)
+                    {
+                        string rt = RowTypes[irt];
+                        int tsize = RowTypeSizes[irt];
+                        if(rt.StartsWith("char"))
+                        {
+                            mstring x = ms.NextItemToString(chDelim);
+                            ByteSlice bsx = x.ToByteSliceUTF16();
+                            if(bsx.Length > tsize - 1)
+                            {
+                                throw new Exception("String too large for " + rt);
+                            }
+                            valuebuf.Add(0); // Not null.
+                            bsx.AppendTo(valuebuf);
+                            for(int remain = (tsize - 1) - bsx.Length; remain > 0; remain--)
+                            {
+                                valuebuf.Add(0); // Padding to char column size.
+                            }
+                        }
+                        else if("int" == rt)
+                        {
+                            int x = ms.NextItemToInt(chDelim);
+                            recordset rsx = recordset.Prepare();
+                            rsx.PutInt32((Int32)Entry.ToUInt32(x));
+                            ByteSlice bsx = rsx.ToByteSlice();
+                            valuebuf.Add(0); // Not null.
+                            bsx.AppendTo(valuebuf);
+                        }
+                        else if("long" == rt)
+                        {
+                            long x = ms.NextItemToLong(chDelim);
+                            recordset rsx = recordset.Prepare();
+                            rsx.PutInt64((Int64)Entry.ToUInt64(x));
+                            ByteSlice bsx = rsx.ToByteSlice();
+                            valuebuf.Add(0); // Not null.
+                            bsx.AppendTo(valuebuf);
+                        }
+                        else if("DateTime" == rt)
+                        {
+                            mstring x = ms.NextItemToString(chDelim);
+                            DateTime dt = DateTime.Parse(x.ToString());
+                            recordset rsx = recordset.Prepare();
+                            rsx.PutDateTime(dt);
+                            ByteSlice bsx = rsx.ToByteSlice();
+                            valuebuf.Add(0); // Not null.
+                            bsx.AppendTo(valuebuf);
+                        }
+                        else if("double" == rt)
+                        {
+                            double x = ms.NextItemToDouble(chDelim);
+                            recordset rsx = recordset.Prepare();
+                            rsx.PutDouble(x);
+                            ByteSlice bsx = rsx.ToByteSlice();
+                            valuebuf.Add(0); // Not null.
+                            bsx.AppendTo(valuebuf);
+                        }
+                        else
+                        {
+                            throw new Exception("Unhandled data type: " + rt);
+                        }
+                    }
+                    
+              }
+              catch(Exception e)
+              {
+                  DSpace_Log("Error while processing input line: " + e.Message);
+                  return;
+              }
+              
+              if(valuebuf.Count != DSpace_OutputRecordLength)
+              {
+                  throw new Exception("Record length mismatch (" + valuebuf.Count + " != " + DSpace_OutputRecordLength.ToString() + ") [#8128]");
+              }
+              else
+              {
+                output.Add(ByteSlice.Prepare(keybuf), ByteSlice.Prepare(valuebuf));
+              }
+              
+          }
+        
+        
+        string QlArgsEscape(string args)
+        {
+            return Qa.QlArgsEscape(args);
+        }
+        
+        
+        string QlArgsUnescape(string eargs)
+        {
+            return Qa.QlArgsUnescape(eargs);
+        }
+        
+        string QlArgsUnescape(string[] eargs)
+        {
+            return Qa.QlArgsUnescape(eargs);
+        }
+        
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              
+              while(values.MoveNext())
+              {
+                  ByteSlice record = values.Current;
+                  
+                  output.Add(record);
+              }
+              
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="RDBMS_Import_Combine">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string TableName = DSpace_ExecArgs[0];
+            string ImportDfsFile = DSpace_ExecArgs[1];
+            string OutputDfsFile = DSpace_ExecArgs[2]; // Gets combined into DfsTableFile.
+            string DfsTableFile = DSpace_ExecArgs[3];
+            string RowInfo = DSpace_ExecArgs[4];
+            string TypeInfo = DSpace_ExecArgs[5];
+            string QlArgDelim = DSpace_ExecArgs[6];
+            
+            Shell("dspace combine \"" + OutputDfsFile + "\" \"" + DfsTableFile + "\"");
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

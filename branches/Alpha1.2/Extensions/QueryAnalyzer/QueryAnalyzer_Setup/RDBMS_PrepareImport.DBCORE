@@ -1,0 +1,23 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_Import_Prepare">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            
+            RDBMS_DBCORE.Qa.PrepareImport qalocal = new RDBMS_DBCORE.Qa.PrepareImport();
+            DSpace_Log(qalocal.Exec(DSpace_ExecArgs));
+            
+        }
+        
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

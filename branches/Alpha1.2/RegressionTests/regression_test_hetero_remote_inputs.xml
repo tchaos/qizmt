@@ -1,0 +1,201 @@
+<SourceCode>
+	<Jobs>
+		<Job>
+			<Narrative>
+				<Name>regression_test_hetero_remote_inputs_Preprocessing</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>local</JobType>
+			</IOSettings>
+			<Local>
+				<![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_hetero_remote_inputs_Input*");
+            Shell(@"Qizmt del regression_test_hetero_remote_inputs_Interm*");
+            Shell(@"Qizmt del regression_test_hetero_remote_inputs_Output*");
+        }
+        ]]>
+			</Local>
+		</Job>
+		<Job>
+			<Narrative>
+				<Name>regression_test_hetero_remote_inputs</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>local</JobType>
+			</IOSettings>
+			<Local>
+				<![CDATA[
+        public virtual void Local()
+        {
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = "regression_test_hetero_remote_inputs_Input";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            System.IO.File.WriteAllBytes(localfn, Encoding.UTF8.GetBytes("ate" + Environment.NewLine + "below" + Environment.NewLine + "coconut" + Environment.NewLine));
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn);
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+			</Local>
+		</Job>
+		<Job>
+			<Narrative>
+				<Name>regression_test_hetero_remote_inputs_CreateSampleData1</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>remote</JobType>
+				<DFS_IO>
+					<DFSReader></DFSReader>
+					<DFSWriter>dfs://regression_test_hetero_remote_inputs_Interm1</DFSWriter>
+				</DFS_IO>
+			</IOSettings>
+			<Remote>
+				<![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("ate");
+            }
+        ]]>
+			</Remote>
+		</Job>
+		<Job>
+			<Narrative>
+				<Name>regression_test_hetero_remote_inputs_CreateSampleData2</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>remote</JobType>
+				<DFS_IO>
+					<DFSReader></DFSReader>
+					<DFSWriter>dfs://regression_test_hetero_remote_inputs_Interm2@5</DFSWriter>
+				</DFS_IO>
+			</IOSettings>
+			<Remote>
+				<![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(new byte[] { (byte)'b', (byte)'e', (byte)'l', (byte)'o', (byte)'w' });
+            }
+        ]]>
+			</Remote>
+		</Job>
+		<Job>
+			<Narrative>
+				<Name>regression_test_hetero_remote_inputs_CreateSampleData3</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>remote</JobType>
+				<DFS_IO>
+					<DFSReader></DFSReader>
+					<DFSWriter>dfs://regression_test_hetero_remote_inputs_Interm3@1</DFSWriter>
+				</DFS_IO>
+			</IOSettings>
+			<Remote>
+				<![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(new byte[] { 3 });
+            }
+        ]]>
+			</Remote>
+		</Job>
+		<Job>
+			<Narrative>
+				<Name>regression_test_hetero_remote_inputs!</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>remote</JobType>
+				<DFS_IO>
+					<DFSReader>regression_test_hetero_remote_inputs_Interm1;regression_test_hetero_remote_inputs_Interm2@5;regression_test_hetero_remote_inputs_Interm3@1</DFSReader>
+					<DFSWriter>dfs://regression_test_hetero_remote_inputs_Output</DFSWriter>
+				</DFS_IO>
+			</IOSettings>
+			<Remote>
+				<![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                List<byte> buf = new List<byte>();
+                for(;;)
+                {
+                    buf.Clear();
+                    mstring ms;
+                    int reclen = Qizmt_InputRecordLength;
+                    string infile = StaticGlobals.Qizmt_InputFileName;
+                    if(reclen > 0)
+                    {
+                        if(!dfsinput.ReadRecordAppend(buf))
+                        {
+                            break;
+                        }
+                        if(1 == buf.Count && 3 == buf[0])
+                        {
+                            ms = mstring.Prepare("coconut");
+                        }
+                        else
+                        {
+                            ms = mstring.Prepare(ByteSlice.Prepare(buf));
+                        }
+                    }
+                    else
+                    {
+                        if(!dfsinput.ReadLineAppend(buf))
+                        {
+                            break;
+                        }
+                        ms = mstring.Prepare(ByteSlice.Prepare(buf));
+                    }
+                    dfsoutput.WriteLine(ms.ToString());
+                    
+                }
+                
+            }
+        ]]>
+			</Remote>
+		</Job>
+		<Job>
+			<Narrative>
+				<Name>regression_test_hetero_remote_inputs_Postprocessing</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>local</JobType>
+			</IOSettings>
+			<Local>
+				<![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_hetero_remote_inputs_Input regression_test_hetero_remote_inputs_Output regression_test_hetero_remote_inputs.xml");          
+            
+            Shell(@"Qizmt del regression_test_hetero_remote_inputs_Input*");
+            Shell(@"Qizmt del regression_test_hetero_remote_inputs_Interm*");
+            Shell(@"Qizmt del regression_test_hetero_remote_inputs_Output*");
+        }
+        ]]>
+			</Local>
+		</Job>
+	</Jobs>
+</SourceCode>

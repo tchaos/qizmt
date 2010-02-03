@@ -1,0 +1,77 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_remote_DFSIO_multi_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_remote_DFSIO_multi_*.txt");
+            Shell(@"Qizmt wordgen regression_test_remote_DFSIO_multi_Input.txt 100KB");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="regression_test_remote_DFSIO_multi_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO_Multi>
+          <DFSReader>dfs://regression_test_remote_DFSIO_multi_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_remote_DFSIO_multi_Output1####.txt</DFSWriter>
+          <Mode>ALL MACHINES</Mode>
+        </DFS_IO_Multi>
+        <DFS_IO_Multi>
+          <DFSReader>dfs://regression_test_remote_DFSIO_multi_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_remote_DFSIO_multi_Output2####.txt</DFSWriter>
+          <Mode>ALL CORES</Mode>
+        </DFS_IO_Multi>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_remote_DFSIO_multi_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_remote_DFSIO_multi_Output3.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {                           
+                int processID = Qizmt_ProcessID;
+                int processCount = Qizmt_ProcessCount ;
+                
+                StringBuilder sb = new StringBuilder();
+                int i = 0;
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    if(i % processCount == processID)
+                    {
+                        dfsoutput.WriteLine(sb.ToString());
+                    }                    
+                    sb.Length = 0;
+                    i++;
+                }          
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_remote_DFSIO_multi_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt combine regression_test_remote_DFSIO_multi_Output*.txt +regression_test_remote_DFSIO_multi_Result.txt");
+            
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_remote_DFSIO_multi_Input.txt regression_test_remote_DFSIO_multi_Result.txt regression_test_remote_DFSIO_multi.xml");          
+            
+            Shell(@"Qizmt del regression_test_remote_DFSIO_multi_*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

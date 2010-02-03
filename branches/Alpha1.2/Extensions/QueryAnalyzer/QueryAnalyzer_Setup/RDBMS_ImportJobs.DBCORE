@@ -1,0 +1,22 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_ImportJobs">
+      <IOSettings>
+        <JobType>local</JobType>
+        <LocalHost>localhost</LocalHost>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                if(Qizmt_ExecArgs.Length == 0)
+                {
+                    throw new Exception("RDBMS_ImportJobs.DBCORE expects argument: importDirectory");                    
+                }
+                Shell("Qizmt importdirmt \"" + Qizmt_ExecArgs[0] + "\"");
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

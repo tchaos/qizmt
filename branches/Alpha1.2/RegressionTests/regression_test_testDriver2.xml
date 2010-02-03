@@ -1,0 +1,201 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_testDriver2</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>test</JobType>
+      </IOSettings>
+      <Test>
+        <![CDATA[
+        public virtual void Test()
+        {
+            string[] jobfiles = new string[]
+            {
+                "regression_test_dfs_put_small.xml",
+                "regression_test_dfs_put_oneline.xml",
+                "regression_test_dfs_put_blankline.xml",
+                "regression_test_dfs_put_nonascii.xml",
+                "regression_test_dfs_get_small.xml",
+                "regression_test_remote_output_small.xml",
+                "regression_test_remote_output_oneline.xml",
+                "regression_test_remote_output_blank.xml",
+                "regression_test_remote_output_nonascii.xml",
+                "regression_test_remote_input_small.xml",
+                "regression_test_mapreduce_output_grouped_small.xml",
+                "regression_test_mapreduce_output_grouped_oneline.xml",
+                "regression_test_mapreduce_reduce_sharedfields.xml",
+                "regression_test_mapreduce_output_nomapinput.xml",
+                "regression_test_mapreduce_output_noreduceinput.xml",
+                "regression_test_mapreduce_output_noreduceoutput.xml",
+                "regression_test_mapreduce_output_nonascii.xml",
+                "regression_test_mapreduce_input_nonascii.xml",
+                "regression_test_mapreduce_fail_smallkeylength.xml",
+                "regression_test_mapreduce_output_sorted_small.xml",
+                "regression_test_mapreduce_output_sorted_oneline.xml",
+                "regression_test_put_dll.xml",
+                //"regression_test_cvlib.CvCalcBackProject.xml",
+                "regression_test_mapreduce_mapthrow.xml",
+                "regression_test_mapreduce_reducethrow.xml",
+                "regression_test_put_small.xml",
+                "regression_test_cook_zmap.xml",
+                "regression_test_exec_xpath.xml",
+                "regression_test_local_explicithost.xml",
+                "regression_test_rbin_remote_small.xml",
+                "regression_test_rbin_mapreduce_small.xml",
+                "regression_test_rbin_put_small.xml",
+                "regression_test_rbin_get_small.xml",
+                "regression_test_combine.xml",
+                "regression_test_rbin_combine.xml",
+                "regression_test_combine_fail_filetypes.xml",
+                "regression_test_combine_wildcard.xml",
+                "regression_test_rbin_combine_wildcard.xml",
+                "regression_test_combine_fail_filetypes_wildcard.xml",
+                "regression_test_rbin_mapreduce_recordset.xml",
+                "regression_test_rbin_mapreduce_roundup.xml",
+                "regression_test_gendata_oldsyntax.xml",
+                "regression_test_gendata_newsyntax.xml",
+                "regression_test_rbin_mapreduce_2inputs.xml",
+                "regression_test_bulkput.xml",
+                "regression_test_rbin_ionames.xml",
+                "regression_test_ExplicitCacheWordCount.xml" //,
+				//"regression_test_hetero_remote_inputs.xml",
+				//"regression_test_hetero_map_inputs.xml",
+				//"regression_test_spread_lines.xml",
+				//"regression_test_spread_records.xml"
+            };
+            
+            int iarg = 0;
+            
+            bool IsTestTest = false;
+            bool IsBasicTest = false;
+            if(Qizmt_ExecArgs.Length > iarg && "-test" == Qizmt_ExecArgs[iarg])
+            {
+                iarg++;
+                IsTestTest = true;
+            }
+            if(Qizmt_ExecArgs.Length > iarg && "-basic" == Qizmt_ExecArgs[iarg])
+            {
+                iarg++;
+                IsBasicTest = true;
+            }
+            if(IsTestTest)
+            {
+                Console.WriteLine("TESTING: only running one test!");
+                if(jobfiles.Length > 0)
+                {
+                    jobfiles = new string[] { jobfiles[0] };
+                }
+            }
+            if(IsBasicTest)
+            {
+                jobfiles = new string[]
+                {
+                "regression_test_remote_output_small.xml",
+                "regression_test_mapreduce_output_sorted_small.xml",
+                "regression_test_rbin_combine_wildcard.xml",
+                "regression_test_rbin_mapreduce_2inputs.xml",
+                "regression_test_bulkput.xml",
+                "regression_test_rbin_get_small.xml",
+                "regression_test_put_dll.xml",
+                "regression_test_ExplicitCacheWordCount.xml" //,
+				//"regression_test_hetero_remote_inputs.xml",
+				//"regression_test_hetero_map_inputs.xml",
+				//"regression_test_spread_lines.xml",
+				//"regression_test_spread_records.xml"
+                };
+            }
+            
+            if(Qizmt_ExecArgs.Length > iarg && "-parse" == Qizmt_ExecArgs[iarg])
+            {
+                iarg++;
+                Qizmt_Log("Parse successful");
+                return;
+            }
+            
+            Shell(@"Qizmt del regression_test_*.xml.????ED"); // Delete all previous PASSED/FAILED
+            
+            int randseed;
+            Random rnd;
+            if(Qizmt_ExecArgs.Length > iarg && '#' == Qizmt_ExecArgs[iarg][0])
+            {
+                randseed = int.Parse(Qizmt_ExecArgs[iarg++].Substring(1));
+            }
+            else
+            {
+                randseed = (new Random()).Next();
+            }
+            rnd = new Random(randseed);
+            Qizmt_Log("Test combination #" + randseed.ToString());
+            // Shuffle up jobs...
+            for(int i = 0; i < jobfiles.Length; i++)
+            {
+                int ijob = rnd.Next(0, jobfiles.Length);
+                string xjob = jobfiles[i];
+                jobfiles[i] = jobfiles[ijob];
+                jobfiles[ijob] = xjob;
+            }
+            
+            int concurrentjobs = 1;
+            if(Qizmt_ExecArgs.Length > iarg)
+            {
+                concurrentjobs = ushort.Parse(Qizmt_ExecArgs[iarg++]);
+                Qizmt_Log("Running " + concurrentjobs.ToString() + " jobs at a time");
+            }
+            
+            int index = 0;
+            MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                new Action<string>(delegate(string jobfile)
+                //foreach(string jobfile in jobfiles)
+                {
+                    lock(jobfiles)
+                    {
+                        // Don't connect to surrogate all at once...
+                        if(index < concurrentjobs)
+                        {
+                            index++;
+                            System.Threading.Thread.Sleep(400 * index);
+                        }
+                    }
+                    try
+                    {
+                        Qizmt_Log("Qizmt exec " + jobfile);
+                        Qizmt_Log(Shell("Qizmt exec " + jobfile, true).Trim());
+                        Qizmt_Log((DidJobPass(jobfile) ? "[PASSED]" : "[FAILED]") + " - Qizmt exec " + jobfile);
+                        //Qizmt_Log("-");
+                    }
+                    catch(Exception e)
+                    {
+                        Qizmt_Log("Exception from '" + jobfile + "':" + e.ToString());
+                    }
+                }
+                ), jobfiles, concurrentjobs);
+            
+            Qizmt_Log("--STARTRESULTS--");
+            foreach(string jobfile in jobfiles)
+            {
+                Qizmt_LogResult("Qizmt exec " + jobfile, DidJobPass(jobfile));
+                Shell(@"Qizmt del " + jobfile + ".????ED", true); // PASSED|FAILED
+            }
+            Qizmt_Log("--ENDRESULTS--");
+            
+            Qizmt_Log("Test combination #" + randseed.ToString());
+            
+        }
+        
+        bool DidJobPass(string jobfile)
+        {
+            string lsout = Shell(@"Qizmt ls " + jobfile + ".PASSED -mr", true);
+            string[] lslines = lsout.Split('\n');
+            return lslines.Length > 0
+                && null != lslines[0]
+                && lslines[0].IndexOf(jobfile + ".PASSED") != -1;
+        }
+        ]]>
+      </Test>
+    </Job>
+  </Jobs>
+</SourceCode>

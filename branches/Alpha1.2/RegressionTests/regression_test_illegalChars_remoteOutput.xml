@@ -1,0 +1,90 @@
+<SourceCode>
+  <Jobs>
+  <Job>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_illegalChars_remoteOutput_*");
+            
+            string dir = IOUtils.GetTempDirectory() + @"\regressionTestIllegalCharsRemoteOutput\";
+            if(System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.Delete(dir, true);
+            }
+            System.IO.Directory.CreateDirectory(dir);
+            
+            int cnt = 0;
+            List<string> jobs =  new List<string>();            
+            for(int i = 32; i < 127; i++)
+            {                              
+                char c = (char)i;
+                
+                if(!Char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '(' && c != ')' && c != '>' && c != '<' && c != ';' && c != '&' && c != '~' && c != '{' && c != '}')
+                {
+                    string fn = "regression_test_illegalChars_remoteOutput_" + cnt.ToString() + ".xml";  
+                    string output = "regression_test_illegalChars_remoteOutput_" + c + "_output.txt";      
+                    jobs.Add(fn);
+                    cnt++;
+                    System.IO.File.WriteAllText(dir + fn, (@"
+<SourceCode>
+  <Jobs>
+    <Job>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>" + output + @"</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                dfsoutput.WriteLine(""x"");     
+           }
+        ``>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>").Replace('`',']'));                          
+                }                
+            }
+            
+            Shell(@"Qizmt importdir " + dir);
+            
+            bool ok = true;
+            foreach(string job in jobs)
+            {
+                try
+                {
+                    Shell(@"Qizmt exec " + job);
+                    ok = false;
+                    break;
+                }
+                catch(Exception e)
+                {
+                   
+                }                
+            }
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_remoteOutput.xml 1");                
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_remoteOutput.xml 0");   
+            }                
+            
+            Shell(@"Qizmt del regression_test_illegalChars_remoteOutput_*");
+            System.IO.Directory.Delete(dir, true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

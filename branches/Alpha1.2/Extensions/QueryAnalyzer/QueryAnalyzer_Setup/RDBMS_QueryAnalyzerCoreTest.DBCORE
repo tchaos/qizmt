@@ -1,0 +1,101 @@
+<!--
+dspace exec RDBMS_QueryAnalyzerCoreTest.DBCORE
+dspace exec rdbms_queryanalyzer.DBCORE  create table test (num int, str char(40), x int);
+dspace exec rdbms_queryanalyzer.DBCORE  insert into test import 'GenQaData_Output.txt'
+dspace exec rdbms_queryanalyzer.DBCORE  insert into test values(666,'goat cheese',42)
+dspace exec rdbms_queryanalyzer.DBCORE  select top 100 * from test where x = 42 order by num;
+dspace exec rdbms_queryanalyzer.DBCORE  select top 100 * from test where str = 'foo' order by num;
+dspace exec rdbms_queryanalyzer.DBCORE  select top 100 * from test where num = 33 order by str;
+-->
+
+<SourceCode>
+  <Jobs>
+    <Job Name="GenQaData_Preprocessing">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"DSpace del GenQaData_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="GenQaData" Custodian="Christopher Miller" Email="cmiller@myspace-inc.com" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://GenQaData_Output.txt@88</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {
+              
+              {
+                  recordset rs = recordset.Prepare();
+                  rs.PutInt(33);
+                  rs.PutString("hello world");
+                  rs.PutInt(42);
+                  List<byte> foo = new List<byte>();
+                  rs.ToByteSlice().AppendTo(foo);
+                  while(foo.Count < DSpace_OutputRecordLength)
+                  {
+                      foo.Add(0);
+                  }
+                  dfsoutput.WriteRecord(foo);
+              }
+              
+              {
+                  recordset rs = recordset.Prepare();
+                  rs.PutInt(234);
+                  rs.PutString("hi");
+                  rs.PutInt(42);
+                  List<byte> foo = new List<byte>();
+                  rs.ToByteSlice().AppendTo(foo);
+                  while(foo.Count < DSpace_OutputRecordLength)
+                  {
+                      foo.Add(0);
+                  }
+                  dfsoutput.WriteRecord(foo);
+              }
+              
+              {
+                  recordset rs = recordset.Prepare();
+                  rs.PutInt(1000);
+                  rs.PutString("foo");
+                  rs.PutInt(42);
+                  List<byte> foo = new List<byte>();
+                  rs.ToByteSlice().AppendTo(foo);
+                  while(foo.Count < DSpace_OutputRecordLength)
+                  {
+                      foo.Add(0);
+                  }
+                  dfsoutput.WriteRecord(foo);
+              }
+              
+              {
+                  recordset rs = recordset.Prepare();
+                  rs.PutInt(2);
+                  rs.PutString("Y");
+                  rs.PutInt(42);
+                  List<byte> foo = new List<byte>();
+                  rs.ToByteSlice().AppendTo(foo);
+                  while(foo.Count < DSpace_OutputRecordLength)
+                  {
+                      foo.Add(0);
+                  }
+                  dfsoutput.WriteRecord(foo);
+              }
+              
+           }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

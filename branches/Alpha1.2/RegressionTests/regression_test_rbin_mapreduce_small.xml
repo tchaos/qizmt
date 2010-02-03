@@ -1,0 +1,126 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_mapreduce_small_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_rbin_mapreduce_small_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_mapreduce_small_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_rbin_mapreduce_small_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_rbin_mapreduce_small_Input.gensort@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nAB"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nCD"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nEF"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nGH"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nIJ"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nKL"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nMN"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_mapreduce_small</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput>dfs://regression_test_rbin_mapreduce_small_Input.gensort@4</DFSInput>
+        <DFSOutput>dfs://regression_test_rbin_mapreduce_small_Output.gensort@4</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              if(line.Length != 4)
+              {
+                  throw new Exception("map input length");
+              }
+              if(line[0] != '\0' || line[1] != '\n')
+              {
+                  throw new Exception("map input incorrect");
+              }
+              output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              IEnumerator<ByteSlice> evalues = values;
+              while(evalues.MoveNext())
+              {
+                  output.Add(evalues.Current);
+              }
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_mapreduce_small_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_rbin_mapreduce_small_Input.gensort regression_test_rbin_mapreduce_small_Output.gensort regression_test_rbin_mapreduce_small.xml");          
+            
+            Shell(@"Qizmt del regression_test_rbin_mapreduce_small_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_mapreduce_small_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

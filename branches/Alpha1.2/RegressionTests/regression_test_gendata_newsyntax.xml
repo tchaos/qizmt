@@ -1,0 +1,226 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_gendata_newsyntax_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_gendata_newsyntax_Input.txt");
+            Shell(@"Qizmt del regression_test_gendata_newsyntax_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_gendata_newsyntax_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_gendata_newsyntax_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("gendata regression test");
+                dfsoutput.WriteLine("{3C4F51B1-3877-4a75-8D42-0EA0F8B0D7A4}");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_gendata_newsyntax</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_gendata_newsyntax_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_gendata_newsyntax_Output.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Using>MySpace.DataMining.AELight</Using>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                
+                string sguid = Guid.NewGuid().ToString();
+                try
+                {
+                    
+                    // *** Testing new syntax:
+                    // <output-dfsfile> <outputsize> [type=<bin|ascii|word>] [row=<size>] [writers=<count>] [rand=custom]
+                    
+                    {
+                        string outfn_rt001 = sguid + "_rt001";
+                        string cmd_rt001 = "qizmt gen " + outfn_rt001 + " 200";
+                        Shell(cmd_rt001);
+                        long Size_rt001 = _GetDfsFileInfo(outfn_rt001);
+                        if(Size_rt001 < 200)
+                        {
+                            throw new Exception("(Size_rt001 < 200) -- " + cmd_rt001);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt002 = sguid + "_rt002";
+                        string cmd_rt002 = "qizmt gen output=" + outfn_rt002 + " size=300";
+                        Shell(cmd_rt002);
+                        long Size_rt002 = _GetDfsFileInfo(outfn_rt002);
+                        if(Size_rt002 < 300)
+                        {
+                            throw new Exception("(Size_rt002 < 300) -- " + cmd_rt002);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt003 = sguid + "_rt003";
+                        string cmd_rt003 = "qizmt gen " + outfn_rt003 + " 600 row=100B";
+                        Shell(cmd_rt003);
+                        long Size_rt003 = _GetDfsFileInfo(outfn_rt003);
+                        if(Size_rt003 < 600)
+                        {
+                            throw new Exception("(Size_rt003 < 600) -- " + cmd_rt003);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt004 = sguid + "_rt004";
+                        string cmd_rt004 = "qizmt gen " + outfn_rt004 + " 2000 writers=5";
+                        Shell(cmd_rt004);
+                        int NumberOfParts_rt004;
+                        long Size_rt004 = _GetDfsFileInfo(outfn_rt004, out NumberOfParts_rt004);
+                        if(Size_rt004 < 2000)
+                        {
+                            throw new Exception("(Size_rt004 < 600) -- " + cmd_rt004);
+                        }
+                        if(5 != NumberOfParts_rt004)
+                        {
+                            throw new Exception("(5 != NumberOfParts_rt004) -- " + cmd_rt004);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt005 = sguid + "_rt005";
+                        string cmd_rt005 = "qizmt gen " + outfn_rt005 + " 2000 writers=5 type=word";
+                        Shell(cmd_rt005);
+                        int NumberOfParts_rt005;
+                        long Size_rt005 = _GetDfsFileInfo(outfn_rt005, out NumberOfParts_rt005);
+                        if(Size_rt005 < 2000)
+                        {
+                            throw new Exception("(Size_rt005 < 600) -- " + cmd_rt005);
+                        }
+                        if(5 != NumberOfParts_rt005)
+                        {
+                            throw new Exception("(5 != NumberOfParts_rt005) -- " + cmd_rt005);
+                        }
+                    }
+                    
+                    {
+                        string outfn_rt006 = sguid + "_rt006";
+                        string cmd_rt006 = "qizmt gen " + outfn_rt006 + " 2000 rand=custom writers=5 type=word";
+                        Shell(cmd_rt006);
+                        int NumberOfParts_rt006;
+                        long Size_rt006 = _GetDfsFileInfo(outfn_rt006, out NumberOfParts_rt006);
+                        if(Size_rt006 < 2000)
+                        {
+                            throw new Exception("(Size_rt006 < 600) -- " + cmd_rt006);
+                        }
+                        if(5 != NumberOfParts_rt006)
+                        {
+                            throw new Exception("(5 != NumberOfParts_rt006) -- " + cmd_rt006);
+                        }
+                    }
+                    
+                    for(List<byte> line = new List<byte>();
+                        dfsinput.ReadLineAppend(line);
+                        line.Clear())
+                    {
+                        dfsoutput.WriteLine(line);
+                    }
+                    
+                }
+                finally
+                {
+                    Shell("Qizmt del " + sguid + "*");
+                }
+                
+            }
+            
+            
+            // Returns file size; optional parameter for number of parts.
+            // Returns -1 if file not found.
+            // Sets NumberOfParts to -1 if not applicable.
+            long _GetDfsFileInfo(string name, out int NumberOfParts)
+            {
+                string masterhost = Surrogate.LocateMasterHost(Environment.CurrentDirectory);
+                string masterservicedir = Surrogate.NetworkPathForHost(masterhost);
+                dfs dc = dfs.ReadDfsConfig_unlocked(masterservicedir + @"\" + dfs.DFSXMLNAME);
+                dfs.DfsFile df = dc.FindAny(name);
+                if(null == df)
+                {
+                    NumberOfParts = -1;
+                    return -1;
+                }
+                if(0 == string.Compare(DfsFileTypes.NORMAL, df.Type, StringComparison.OrdinalIgnoreCase)
+                    || 0 == string.Compare(DfsFileTypes.JOB, df.Type, StringComparison.OrdinalIgnoreCase)
+                    || 0 == string.Compare(DfsFileTypes.BINARY_RECT, df.Type, StringComparison.OrdinalIgnoreCase))
+                {
+                    NumberOfParts = df.Nodes.Count;
+                }
+                else
+                {
+                    NumberOfParts = -1;
+                }
+                return df.Size;
+            }
+            
+            long _GetDfsFileInfo(string name)
+            {
+                int NumberOfParts;
+                return _GetDfsFileInfo(name, out NumberOfParts);
+            }
+            
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_gendata_newsyntax_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_gendata_newsyntax_Input.txt regression_test_gendata_newsyntax_Output.txt regression_test_gendata_newsyntax.xml");          
+            
+            Shell(@"Qizmt del regression_test_gendata_newsyntax_Input.txt");
+            Shell(@"Qizmt del regression_test_gendata_newsyntax_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

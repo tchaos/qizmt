@@ -1,0 +1,100 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_remote_output_blank_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_remote_output_blank_Input.txt");
+            Shell(@"Qizmt del regression_test_remote_output_blank_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_remote_output_blank</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = "regression_test_remote_output_blank_Input.txt";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            System.IO.File.WriteAllBytes(localfn, new byte[0] { }); // Blank!
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn);
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_remote_output_blank_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_remote_output_blank_Output.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                // Blank!
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_remote_output_blank_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_remote_output_blank_Input.txt regression_test_remote_output_blank_Output.txt regression_test_remote_output_blank.xml");          
+            
+            Shell(@"Qizmt del regression_test_remote_output_blank_Input.txt");
+            Shell(@"Qizmt del regression_test_remote_output_blank_Output.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

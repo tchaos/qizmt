@@ -1,0 +1,130 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_LogResult local</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell("Qizmt del dfs://regression_test_LogResult.PASSED");
+            Shell("Qizmt del dfs://regression_test_output_LogResult_*");
+            
+            Qizmt_LogResult("local pass", true);
+            Qizmt_LogResult("local fail", false);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_LogResult remote</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_output_LogResult_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                dfsoutput.WriteLine("one line to feed into mapreduce");
+                Qizmt_LogResult("remote pass", true);
+                Qizmt_LogResult("remote fail", false);       
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_LogResult mapreduce</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>31</KeyLength>
+        <DFSInput>dfs://regression_test_output_LogResult_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_output_LogResult_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                output.Add(line, line);
+                
+                Qizmt_LogResult("map pass", true);
+                Qizmt_LogResult("map fail", false);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize()
+          {
+                Qizmt_LogResult("reduce-init pass", true);
+                Qizmt_LogResult("reduce-init fail", false); 
+          }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+                output.Add(key); // Have some output.
+
+                Qizmt_LogResult("reduce pass", true);
+                Qizmt_LogResult("reduce fail", false); 
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize()
+          {
+                Qizmt_LogResult("reduce-final pass", true);
+                Qizmt_LogResult("reduce-final fail", false); 
+          }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_LogResult_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_LogResult.PASSED</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {
+                Exec.Shell("Qizmt del dfs://regression_test_output_LogResult_*");
+                
+                Qizmt_Log("PASSED");
+           }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>

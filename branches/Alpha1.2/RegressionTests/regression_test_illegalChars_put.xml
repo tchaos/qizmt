@@ -1,0 +1,52 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_illegalChars_put_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {                  
+            string dir = IOUtils.GetTempDirectory();
+            string temp1 = dir + @"\" + Guid.NewGuid().ToString();            
+            System.IO.File.WriteAllText(temp1, "x");
+            
+            bool ok = true;
+            for(int i = 32; i < 127; i++)
+            {
+                string fn = "regression_test_illegalChars_put_";
+                char c = (char)i;
+                
+                if(!Char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '(' && c != ')' && c != '~' && c != '{' && c != '}')
+                {
+                    fn += c;
+                    try
+                    {
+                        Shell("Qizmt put " + temp1 + " \"" + fn.Replace(@"\", @"\\") + "\"");
+                        ok = false;
+                        break;
+                    }
+                    catch(Exception e)
+                    {
+                       
+                    }                   
+                }                
+            }
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_put.xml 1");                
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_put.xml 0");   
+            }            
+            
+            System.IO.File.Delete(temp1);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

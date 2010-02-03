@@ -1,0 +1,185 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MSubstring(int_int)_neg2_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mstring.MSubstring(int_int)_neg2_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.MSubstring(int_int)_neg2_Output.txt", true);   
+            Shell(@"Qizmt del regression_test_mstring.MSubstring(int_int)_neg2_Output1.txt", true);    
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.MSubstring(int_int)_neg2_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.MSubstring(int_int)_neg2_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 5;
+                int rowCount = 2;               
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                       onerow.Add(b);   
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>mstring.MSubstring(int_int)_neg2</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_mstring.MSubstring(int_int)_neg2_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mstring.MSubstring(int_int)_neg2_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+               mstring s = mstring.Prepare("xyz");
+                              
+               try
+               {
+                   s.MSubstring(1, 5);
+               }
+               catch(ArgumentOutOfRangeException e)
+               {
+                   if(e.Message.IndexOf("within the string") > -1)
+                   {
+                       output.Add(ByteSlice.Prepare("1"), ByteSlice.Prepare());
+                   }
+               }
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                    
+               int num = values.Length;
+               
+               for(int i = 0; i < 2; i++)
+               {
+                   mstring s = mstring.Prepare("xyz");
+                              
+                   try
+                   {
+                       s.MSubstring(1, 5);
+                   }
+                   catch(ArgumentOutOfRangeException e)
+                   {
+                       if(e.Message.IndexOf("within the string") > -1)
+                       {
+                           num++;
+                       }
+                   }                
+               }                     
+               
+               output.Add(ByteSlice.Prepare(num.ToString()));
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MSubstring(int_int)_neg2_Imitate_Mapper</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.MSubstring(int_int)_neg2_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                dfsoutput.WriteLine("4");
+           }
+        ]]>
+      </Remote>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.MSubstring(int_int)_neg2_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring.MSubstring(int_int)_neg2_Output.txt regression_test_mstring.MSubstring(int_int)_neg2_Output1.txt regression_test_mstring.MSubstring(int_int)_neg2.xml");          
+            
+            Shell(@"Qizmt del regression_test_mstring.MSubstring(int_int)_neg2_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.MSubstring(int_int)_neg2_Output.txt", true); 
+            Shell(@"Qizmt del regression_test_mstring.MSubstring(int_int)_neg2_Output1.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

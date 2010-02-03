@@ -1,0 +1,204 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.SubstringM(int_int)_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Output.txt", true);  
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Output1.txt", true); 
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Output2.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_mstring.SubstringM(int_int)_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.SubstringM(int_int)_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 300;
+                int rowCount = 2000;                
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    for(int cnt = 0; cnt < stringLength; cnt++)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                       onerow.Add(b);   
+                    }     
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>mstring.SubstringM(int_int)</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_mstring.SubstringM(int_int)_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_mstring.SubstringM(int_int)_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              string t = line.ToString();              
+              mstring sLine = mstring.Prepare(line);
+              mstring val = sLine.SubstringM(37, 200);
+                               
+              output.Add(mstring.Prepare(t[0]), val);               
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {                          
+                for(int i = 0; i < values.Length; i++)
+                {           
+                      mstring sLine = mstring.Prepare(values.Items[i]);
+                      mstring val = sLine.SubstringM(21, 101);
+                                       
+                      output.Add(val);                
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.SubstringM(int_int)_Imitate_Mapper</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_mstring.SubstringM(int_int)_Input.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.SubstringM(int_int)_Output1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();                      
+                    
+                    dfsoutput.WriteLine(sLine.Substring(37, 200));
+                    sb.Length = 0;
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.SubstringM(int_int)_Imitate_Mapper</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_mstring.SubstringM(int_int)_Output1.txt</DFSReader>
+          <DFSWriter>dfs://regression_test_mstring.SubstringM(int_int)_Output2.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                StringBuilder sb = new StringBuilder();
+                
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string sLine = sb.ToString();  
+                    
+                    dfsoutput.WriteLine(sLine.Substring(21, 101));
+                    sb.Length = 0;
+                }
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring.SubstringM(int_int)_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring.SubstringM(int_int)_Output.txt regression_test_mstring.SubstringM(int_int)_Output2.txt regression_test_mstring.SubstringM(int_int).xml");          
+            
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Output.txt", true);
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Output1.txt", true); 
+            Shell(@"Qizmt del regression_test_mstring.SubstringM(int_int)_Output2.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

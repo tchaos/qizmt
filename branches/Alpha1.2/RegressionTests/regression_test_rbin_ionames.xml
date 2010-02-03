@@ -1,0 +1,184 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_rbin_ionames_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_rbin_ionames_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_ionames_Output.gensort");
+            Shell(@"Qizmt del regression_test_rbin_ionames_Output2.gensort");
+            Shell(@"Qizmt del regression_test_rbin_ionames_cache");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_ionames PUT</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            string localdir = @"\\" + System.Net.Dns.GetHostName() + @"\c$\temp\qizmt";
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = "regression_test_rbin_ionames_Input.gensort";
+            string localfn = localdir + @"\" + Guid.NewGuid().ToString() + fn;
+            System.IO.File.WriteAllBytes(localfn, new byte[] {
+                0, 0, 0, 42,
+                0, 0, 0, 91
+                });
+            try
+            {
+                Shell(@"Qizmt dfs put " + localfn + " " + fn + "@int");
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_rbin_ionames REMOTE</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>regression_test_rbin_ionames_Input.gensort@int</DFSReader>
+          <DFSWriter>dfs://regression_test_rbin_ionames_Output.gensort@int</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            List<byte> inbuf = new List<byte>();
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                
+                bool got42 = false, got91 = false;
+                for(;;)
+                {
+                    inbuf.Clear();
+                    if(!dfsinput.ReadRecordAppend(inbuf))
+                    {
+                        break;
+                    }
+                    if(inbuf.Count < 4)
+                    {
+                        throw new Exception("Buffer not large enough for int; got " + inbuf.Count.ToString() + " bytes");
+                    }
+                    recordset inrs = recordset.Prepare(ByteSlice.Prepare(inbuf));
+                    int num = inrs.GetInt();
+                    if(42 == num)
+                    {
+                        if(got42)
+                        {
+                            throw new Exception("Expected value only once");
+                        }
+                        got42 = true;
+                        dfsoutput.WriteRecord(inbuf);
+                    }
+                    else if(91 == num)
+                    {
+                        if(got91)
+                        {
+                            throw new Exception("Expected value only once");
+                        }
+                        got91 = true;
+                        dfsoutput.WriteRecord(inbuf);
+                    }
+                }
+                if(!got42 || !got91)
+                {
+                    throw new Exception("Did not get expected values");
+                }
+                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_ionames MAP-REDUCE</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <Delta>
+        <Name>regression_test_rbin_ionames_cache</Name>
+        <DFSInput>dfs://regression_test_rbin_ionames_Output.gensort@int</DFSInput>
+        <!-- Note: same input file twice (1) -->
+      </Delta>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_rbin_ionames_Output.gensort@int</DFSInput>
+        <!-- Note: same input file twice (2) -->
+        <DFSOutput>dfs://regression_test_rbin_ionames_Output2.gensort@int</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(line, line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              IEnumerator<ByteSlice> evalues = values;
+              if(evalues.MoveNext()) // Only do the first one in this case, due to the duplicate input file.
+              {
+                  output.Add(evalues.Current);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_ionames_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_rbin_ionames_Input.gensort regression_test_rbin_ionames_Output2.gensort regression_test_rbin_ionames.xml");          
+            
+            Shell(@"Qizmt del regression_test_rbin_ionames_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_ionames_Output.gensort");
+            Shell(@"Qizmt del regression_test_rbin_ionames_Output2.gensort");
+            Shell(@"Qizmt del regression_test_rbin_ionames_cache");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

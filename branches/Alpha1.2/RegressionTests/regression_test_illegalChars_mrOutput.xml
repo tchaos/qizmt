@@ -1,0 +1,104 @@
+<SourceCode>
+  <Jobs>
+  <Job>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_illegalChars_mrOutput_*");
+            
+            string dir = IOUtils.GetTempDirectory() + @"\regressionTestIllegalCharsMROutput\";
+            if(System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.Delete(dir, true);
+            }
+            System.IO.Directory.CreateDirectory(dir);
+            
+            int cnt = 0;
+            List<string> jobs =  new List<string>();            
+            for(int i = 32; i < 127; i++)
+            {                              
+                char c = (char)i;
+                
+                if(!Char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '(' && c != ')' && c != '>' && c != '<' && c != ';' && c != '&' && c != '~' && c != '{' && c != '}')
+                {
+                    string fn = "regression_test_illegalChars_mrOutput_" + cnt.ToString() + ".xml";  
+                    string output = "regression_test_illegalChars_mrOutput_" + c + "_output.txt";      
+                    jobs.Add(fn);
+                    cnt++;
+                    System.IO.File.WriteAllText(dir + fn, (@"
+<SourceCode>
+<Jobs>
+<Job>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>3</KeyLength>
+        <DFSInput>dfs://regression_test_illegalChars_mrOutput_Input.txt</DFSInput>
+        <DFSOutput>dfs://" + output + @"</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                output.Add(line, line);
+          }
+        ``>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              output.Add(key);
+          }
+        ``>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>").Replace('`',']'));                          
+                }                
+            }
+            
+            Shell(@"Qizmt importdir " + dir);
+            
+            string temp = dir + Guid.NewGuid().ToString();
+            System.IO.File.WriteAllText(temp, "x");
+            Shell(@"Qizmt put " + temp + " regression_test_illegalChars_mrOutput_Input.txt");
+            
+            bool ok = true;
+            foreach(string job in jobs)
+            {
+                try
+                {
+                    Shell(@"Qizmt exec " + job);
+                    ok = false;
+                    break;
+                }
+                catch(Exception e)
+                {
+                    
+                }                
+            }
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_mrOutput.xml 1");                
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_mrOutput.xml 0");   
+            }                
+            
+            Shell(@"Qizmt del regression_test_illegalChars_mrOutput_*");
+            System.IO.Directory.Delete(dir, true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

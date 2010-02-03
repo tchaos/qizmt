@@ -1,0 +1,115 @@
+<!--
+
+This test needs
+    #define COOK_TEST_ZMapStreamToZBlocks
+for ArrayComboListSlave.cs
+Note that this define can break normal jobs if cooking is disabled even if perfectly functional ZMapStreamToZBlocks
+(this define depends on cooking being enabled to recover from test).
+
+-->
+
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_cook_zmap_Preprocessing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt dfs del dfs://regression_test_cook_zmap_Input.txt", true);
+            Shell(@"Qizmt dfs del dfs://regression_test_cook_zmap_Output.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Load sample data" Name="regression_test_cook_zmap_LoadData" Custodian="" email="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_cook_zmap_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {
+             dfsoutput.WriteLine("-3");
+             dfsoutput.WriteLine("-2");
+             dfsoutput.WriteLine("-1");
+             dfsoutput.WriteLine("0");
+             dfsoutput.WriteLine("1");
+             dfsoutput.WriteLine("2");
+             dfsoutput.WriteLine("3");
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="regression_test_cook_zmap" Custodian="" email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <OutputMethod>sorted</OutputMethod>
+        <DFSInput>dfs://regression_test_cook_zmap_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_cook_zmap_Output.txt</DFSOutput>
+        <Setting name="Subprocess_RetryTimeout" value="1000" />
+        <!-- slave/CookTimeout -->
+        <Setting name="Subprocess_RetryCount" value="30" />
+        <!-- slave/CookRetries -->
+        <Setting name="Subprocess_TotalPrime" value="1" />
+        <!-- Blocks/TotalCount -->
+        <Setting name="Subprocess_SortedTotalCount" value="1" />
+        <!-- Blocks/SortedTotalCount -->
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              mstring sLine = mstring.Prepare(line);             
+              uint i = Entry.ToUInt32(sLine.ToInt());
+              byte[] buffer = Entry.UInt32ToBytes(i);
+              output.Add(ByteSlice.Prepare(buffer), ByteSlice.Prepare("\0\0\0\0\0" + (123 * i).ToString()));
+          }                
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              while(values.MoveNext())
+              {
+                 int num = Entry.ToInt32(Entry.BytesToUInt32(key.ToBytes()));
+                  
+                 output.Add(mstring.Prepare(num));
+              }
+          }          
+            
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="regression_test_cook_zmap_Postprocessing" Custodian="" email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Qizmt_Log(Shell(@"Qizmt head dfs://regression_test_cook_zmap_Output.txt 100"));
+            
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_cook_zmap_Input.txt regression_test_cook_zmap_Output.txt regression_test_cook_zmap.xml");
+            
+            Shell(@"Qizmt dfs del dfs://regression_test_cook_zmap_Input.txt", true);
+            Shell(@"Qizmt dfs del dfs://regression_test_cook_zmap_Output.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

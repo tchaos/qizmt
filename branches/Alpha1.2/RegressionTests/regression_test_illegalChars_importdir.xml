@@ -1,0 +1,78 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="re_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {   
+            string dir = IOUtils.GetTempDirectory() + @"\regressionTestIllegalCharsImportDir\";
+            if(System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.Delete(dir, true);
+            }
+            System.IO.Directory.CreateDirectory(dir);
+            
+            bool ok = true;
+            int cnt = 0;
+            for(int i = 33; i < 127; i++)
+            {
+                string jn = "regression_test_illegalChars_importdir_";
+                char c = (char)i;
+                
+                if(!Char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '(' && c != ')' && c != '\\' && c != '/' && c != ':' && c != '*' && c != '?' && c != '"' && c != '<' && c != '>' && c != '|' && c != '~' && c != '{' && c != '}')
+                {
+                    cnt++;
+                    jn += c; 
+                    System.IO.File.WriteAllText(dir + jn, (@"
+<SourceCode>
+<Jobs>
+<Job>
+<IOSettings>
+<JobType>local</JobType>
+</IOSettings>
+<Local>
+<![CDATA[
+public virtual void Local()
+{}
+``>
+</Local>
+</Job>
+</Jobs>
+</SourceCode>").Replace('`',']'));                          
+                }                
+            }
+            
+            try
+            {
+                Shell("Qizmt importdir " + dir);
+                ok = false;
+            }
+            catch(Exception e)
+            {                
+                System.Text.RegularExpressions.Regex regx = new System.Text.RegularExpressions.Regex("Illegal char");
+                System.Text.RegularExpressions.MatchCollection matches = regx.Matches(e.Message);
+                if(matches.Count != cnt)
+                {
+                    ok = false;
+                }
+            }             
+            
+            if(ok)
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_importdir.xml 1");                
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_illegalChars_importdir.xml 0");   
+            }    
+            
+            System.IO.Directory.Delete(dir, true);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

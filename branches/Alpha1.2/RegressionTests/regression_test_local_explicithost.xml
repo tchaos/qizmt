@@ -1,0 +1,64 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_local_explicithost" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            if(Qizmt_ExecArgs.Length > 0 && "-newhost" == Qizmt_ExecArgs[0])
+            {
+                Qizmt_Log("{2ECE3494-CF92-46ba-A6C7-736600B64951}");
+            }
+            else
+            {
+                // First run; get things going...
+                {
+                    Qizmt_Log("Ensuring localhost works...");
+                    string output = Shell(@"Qizmt exec ""//Job[@Name='regression_test_local_explicithost']/IOSettings/LocalHost=127.0.0.1"" regression_test_local_explicithost.xml -newhost");
+                    if(-1 == output.IndexOf("{2ECE3494-CF92-46ba-A6C7-736600B64951}"))
+                    {
+                        Qizmt_Log("localhost job ran but did not output an expected GUID; instead output the following: " + output);
+                        Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_local_explicithost.xml 0");
+                        //throw new Exception("localhost job ran but did not output an expected GUID");
+                        return;
+                    }
+                }
+                {
+                    Qizmt_Log("Ensuring invalid host doesn't work...");
+                    bool ok = false;
+                    string output = "";
+                    try
+                    {
+                        output = Shell(@"Qizmt exec ""//Job[@Name='regression_test_local_explicithost']/IOSettings/LocalHost=invalid host test"" regression_test_local_explicithost.xml -newhost");
+                        if(-1 != output.IndexOf("System.Net.Sockets.SocketException: No such host is known"))
+                        {
+                            throw new Exception("System.Net.Sockets.SocketException: No such host is known");
+                        }
+                    }
+                    catch
+                    {
+                        ok = true;
+                    }
+                    if(!ok)
+                    {
+                        Qizmt_Log("Invalid host did not fail, perhaps this feature is not operational; instead output the following: " + output);
+                        Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_local_explicithost.xml 0");
+                        //throw new Exception("Invalid host did not fail, perhaps this feature is not operational");
+                        return;
+                    }
+                }
+                
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_local_explicithost.xml 1");
+                
+            }
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

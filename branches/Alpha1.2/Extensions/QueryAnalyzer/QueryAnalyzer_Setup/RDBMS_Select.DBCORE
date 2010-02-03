@@ -1,0 +1,97 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="RDBMS_Select">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput></DFSInput>
+        <DFSOutput></DFSOutput>
+        <OutputMethod>fsorted</OutputMethod>
+        <!-- Don't use rsorted! -->
+      </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            
+            Qa.SelectMap selmap = null;
+            
+            public virtual void Map(ByteSlice row, MapOutput output)
+            {
+                if(null == selmap)
+                {
+                    selmap = new Qa.SelectMap();
+                    selmap.DSpace_KeyLength = DSpace_KeyLength;
+                    selmap.DSpace_ProcessID = DSpace_ProcessID;
+                    selmap.Exec(DSpace_ExecArgs);
+                }
+                
+                selmap.Map(row, output);
+            }
+        
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+                
+                Qa.SelectReduce selreduce = null;
+
+                public void ReduceInitialize()
+                {
+                    selreduce = new Qa.SelectReduce();
+                    selreduce.DSpace_KeyLength = DSpace_KeyLength;
+                    selreduce.DSpace_ProcessID = DSpace_ProcessID;
+                    selreduce.Exec(DSpace_ExecArgs);
+                    
+                    selreduce.ReduceInitialize();
+                }
+                
+          ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          
+          class SelectOutput:Qa.MapReduceOutput
+          {
+              public ReduceOutput output;
+              
+              public override void Add(ByteSlice x)
+              {
+                  output.Add(x);
+              }
+          }
+          
+          SelectOutput selreduceout = null;
+          
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              if(null == selreduceout)
+              {
+                  selreduceout = new SelectOutput();
+              }
+              selreduceout.output = output;
+              
+              selreduce.Reduce(key, values, selreduceout);
+          }
+          
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+                
+                public void ReduceFinalize()
+                {
+                    
+                    selreduce.ReduceFinalize();
+                    
+                    DSpace_Log(selreduce.ReadToEnd());
+                    
+                }
+                
+          ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>

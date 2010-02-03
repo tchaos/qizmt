@@ -1,0 +1,3 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Debug\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Debug\QueryAnalyzer_Protocol.ProjectInstaller.resources
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Debug\QueryAnalyzer_Protocol.csproj.GenerateResource.Cache

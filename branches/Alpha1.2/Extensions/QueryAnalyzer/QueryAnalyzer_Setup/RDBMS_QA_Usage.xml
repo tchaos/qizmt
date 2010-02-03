@@ -1,0 +1,630 @@
+<usages>
+  
+  <command>
+    <keyword><![CDATA[HELP]]></keyword>
+    <description><![CDATA[Show this help screen.]]></description>
+    <usage><![CDATA[HELP [<keyword>];]]></usage>
+    <example1><![CDATA[HELP;]]></example1>
+    <example2><![CDATA[HELP CREATE TABLE;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[CREATE TABLE]]></keyword>
+    <description><![CDATA[Create a table.]]></description>
+    <usage><![CDATA[CREATE TABLE <table_name> (<column_name> <type> [, ...]);]]></usage>
+    <example1><![CDATA[CREATE TABLE Employees (Name char(200), Years int);]]></example1>
+    <example2><![CDATA[CREATE TABLE colors (color char(50), red int, green int, blue int);]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[INSERT INTO]]></keyword>
+    <description><![CDATA[Insert data into the specified table.]]></description>
+    <usage><![CDATA[INSERT INTO <table_name> ...]]></usage>
+    <example1><![CDATA[INSERT INTO Employees IMPORT 'dfs://company-roster';]]></example1>
+    <example2><![CDATA[INSERT INTO colors VALUES('Forest Green', 34, 139, 34);]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[INSERT IMPORT]]></keyword>
+    <description><![CDATA[Insert data into a table from a MR.DFS rectangular binary data file.]]></description>
+    <usage><![CDATA[INSERT INTO <table_name> IMPORT <dfs_file>;]]></usage>
+    <example1><![CDATA[INSERT INTO Employees IMPORT 'dfs://company-roster';]]></example1>
+    <example2><![CDATA[INSERT INTO colors IMPORT 'dfs://ColorList';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[INSERT BIND]]></keyword>
+    <description><![CDATA[Bind data into a table using a MR.DFS rectangular binary data file created using the DbRecordset object. The file is directly bound into the table, leaving the original file name inaccessible.]]></description>
+    <usage><![CDATA[INSERT INTO <table_name> BIND <dfs_file>;]]></usage>
+    <example1><![CDATA[INSERT INTO Employees BIND 'dfs://db-company-roster';]]></example1>
+    <example2><![CDATA[INSERT INTO colors BIND 'dfs://DbColorList';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[INSERT IMPORTLINES]]></keyword>
+    <description><![CDATA[Insert data into a table from a line-based MR.DFS file with a character delimiter.]]></description>
+    <usage><![CDATA[INSERT INTO <table_name> IMPORTLINES <dfs_file> [DELIMITER <character>];]]></usage>
+    <example1><![CDATA[INSERT INTO Employees IMPORTLINES 'dfs://company-roster-lines';]]></example1>
+    <example2><![CDATA[INSERT INTO colors IMPORTLINES 'dfs://UserColorList.txt' DELIMITER '/';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[INSERT VALUES]]></keyword>
+    <description><![CDATA[Insert a list of literal values into a table.]]></description>
+    <usage><![CDATA[INSERT INTO <table_name> VALUES(<value> [, ...]);]]></usage>
+    <example1><![CDATA[INSERT INTO Employees VALUES('George Jefferson', 4);]]></example1>
+    <example2><![CDATA[INSERT INTO colors VALUES('Forest Green', 34, 139, 34);]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT]]></keyword>
+    <description><![CDATA[Select rows from a table.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT <columns>]]></keyword>
+    <description><![CDATA[Select rows from a table, only including specific fields. Functions can be applied.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 Name FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 UPPER(color),red FROM colors WHERE red = 34 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT TOP]]></keyword>
+    <description><![CDATA[Select only the top few rows from a table.]]></description>
+    <usage><![CDATA[SELECT TOP <limit> <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT FROM]]></keyword>
+    <description><![CDATA[Select rows from the specified table.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT FROM Sys.Tables]]></keyword>
+    <description><![CDATA[Select from the names of tables.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM Sys.Tables [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 1 * FROM Sys.Tables WHERE Table = 'Employees' ORDER BY Table;]]></example1>
+    <example2><![CDATA[SELECT TOP 1 * FROM Sys.Tables WHERE Table = 'colors' ORDER BY Table;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT WHERE]]></keyword>
+    <description><![CDATA[Select rows from a table using specific conditions, which can have multiple conditions chained together with AND.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> WHERE <comparison> [AND <...>] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT ORDER BY]]></keyword>
+    <description><![CDATA[Select rows from a table and order them by the specified column or columns.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] ORDER BY <column>[, ...];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Years = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE red = 34 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT INNER JOIN]]></keyword>
+    <description><![CDATA[Join on particular fields of tables.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <left> INNER JOIN <right> ON <left.field> = <right.field> [<joins...>] [WHERE <comparison> [AND <...>]] [GROUP BY <group_columns>] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees INNER JOIN Jobs ON Employees.JobID = Jobs.ID;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors INNER JOIN decorations ON colors.ID = decorations.colorID WHERE red > 100 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT LEFT OUTER JOIN]]></keyword>
+    <description><![CDATA[Join on particular fields of tables.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <left> LEFT OUTER JOIN <right> ON <left.field> = <right.field> [<joins...>] [WHERE <comparison> [AND <...>]] [GROUP BY <group_columns>] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees INNER JOIN Jobs ON Employees.JobID = Jobs.ID;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors INNER JOIN decorations ON colors.ID = decorations.colorID WHERE red > 100 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT RIGHT OUTER JOIN]]></keyword>
+    <description><![CDATA[Join on particular fields of tables.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] * FROM <left> LEFT OUTER JOIN <right> ON <left.field> = <right.field> [<joins...>] [WHERE <comparison> [AND <...>]] [GROUP BY <group_columns>] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees INNER JOIN Jobs ON Employees.JobID = Jobs.ID;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors INNER JOIN decorations ON colors.ID = decorations.colorID WHERE red > 100 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[INSERT INTO SELECT]]></keyword>
+    <description><![CDATA[Select rows from a table and insert them into a table.]]></description>
+    <usage><![CDATA[INSERT INTO <table_name> SELECT <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[INSERT INTO Employees SELECT * FROM NewEmployees ORDER BY Name;]]></example1>
+    <example2><![CDATA[INSERT INTO colors SELECT * FROM red_colors WHERE red = 255 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ALTER TABLE RENAME SWAP]]></keyword>
+    <description><![CDATA[Swap two table names.]]></description>
+    <usage><![CDATA[ALTER TABLE <table1> RENAME SWAP <table2>;]]></usage>
+    <example1><![CDATA[ALTER TABLE colors RENAME SWAP colors_alt;]]></example1>
+    <example2><![CDATA[ALTER TABLE Employees RENAME SWAP Employees_alt;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[UPDATE]]></keyword>
+    <description><![CDATA[Update values in a table under certain conditions. See SELECT WHERE for more information on the WHERE clause.]]></description>
+    <usage><![CDATA[UPDATE <table_name> SET <column>=<value> [, <...>] WHERE <comparison> [AND <...>];]]></usage>
+    <example1><![CDATA[UPDATE Employees SET Years=5 WHERE Name='George Jefferson';]]></example1>
+    <example2><![CDATA[UPDATE colors SET red=255 WHERE color='Ruby Red';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[UPDATE SET]]></keyword>
+    <description><![CDATA[Update values in a table under certain conditions. See SELECT WHERE for more information on the WHERE clause.]]></description>
+    <usage><![CDATA[UPDATE <table_name> SET <column>=<value> [, <...>] WHERE <comparison> [AND <...>];]]></usage>
+    <example1><![CDATA[UPDATE Employees SET Years=5 WHERE Name='George Jefferson';]]></example1>
+    <example2><![CDATA[UPDATE colors SET red=255 WHERE color='Ruby Red';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[UPDATE WHERE]]></keyword>
+    <description><![CDATA[Update values in a table under certain conditions. See SELECT WHERE for more information on the WHERE clause.]]></description>
+    <usage><![CDATA[UPDATE <table_name> SET <column>=<value> [, <...>] WHERE <comparison> [AND <...>];]]></usage>
+    <example1><![CDATA[UPDATE Employees SET Years=5 WHERE Name='George Jefferson';]]></example1>
+    <example2><![CDATA[UPDATE colors SET red=255 WHERE color='Ruby Red';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SELECT GROUP BY]]></keyword>
+    <description><![CDATA[Select data from the table whereby grouping rows by columns with matching fields.]]></description>
+    <usage><![CDATA[SELECT [TOP <limit>] <columns> FROM <table_name> [WHERE <comparison> [AND <...>]] GROUP BY <group_columns> [ORDER BY <order_columns>];]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees GROUP BY Year;]]></example1>
+    <example2><![CDATA[SELECT color,MIN(green) FROM colors GROUP BY red;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[DELETE]]></keyword>
+    <description><![CDATA[Delete rows from a table under certain conditions. See SELECT WHERE for more information on the WHERE clause.]]></description>
+    <usage><![CDATA[DELETE FROM <table_name> WHERE <comparison> [AND <...>];]]></usage>
+    <example1><![CDATA[DELETE FROM Employees WHERE Name='George Jefferson';]]></example1>
+    <example2><![CDATA[DELETE FROM colors WHERE color='Ruby Red';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[DELETE FROM]]></keyword>
+    <description><![CDATA[Delete rows from a table under certain conditions. See SELECT WHERE for more information on the WHERE clause.]]></description>
+    <usage><![CDATA[DELETE FROM <table_name> WHERE <comparison> [AND <...>];]]></usage>
+    <example1><![CDATA[DELETE FROM Employees WHERE Name='George Jefferson';]]></example1>
+    <example2><![CDATA[DELETE FROM colors WHERE color='Ruby Red';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[DELETE WHERE]]></keyword>
+    <description><![CDATA[Delete rows from a table under certain conditions. See SELECT WHERE for more information on the WHERE clause.]]></description>
+    <usage><![CDATA[DELETE FROM <table_name> WHERE <comparison> [AND <...>];]]></usage>
+    <example1><![CDATA[DELETE FROM Employees WHERE Name='George Jefferson';]]></example1>
+    <example2><![CDATA[DELETE FROM colors WHERE color='Ruby Red';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[TRUNCATE TABLE]]></keyword>
+    <description><![CDATA[Remove all rows from the table.]]></description>
+    <usage><![CDATA[TRUNCATE TABLE <table_name>;]]></usage>
+    <example1><![CDATA[TRUNCATE TABLE Employees;]]></example1>
+    <example2><![CDATA[TRUNCATE TABLE colors;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[DROP TABLE]]></keyword>
+    <description><![CDATA[Delete a table.]]></description>
+    <usage><![CDATA[DROP TABLE <table_name>;]]></usage>
+    <example1><![CDATA[DROP TABLE Employees;]]></example1>
+    <example2><![CDATA[DROP TABLE colors;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[char(n)]]></keyword>
+    <description><![CDATA[Data-type for a fixed-length string. String length must be <= n. Representing a single quote in a string literal is done by adding a second adjacent single quote. Storage: ((n * 2) + 1) Bytes]]></description>
+    <usage><![CDATA['<text>';]]></usage>
+    <example1><![CDATA['hello world']]></example1>
+    <example2><![CDATA['normal ''single quotes'' normal']]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[int]]></keyword>
+    <description><![CDATA[Data-type for a signed 32-bit integer. An integer literal can include a preceding + or - sign character. Range: -2^31 (-2,147,483,648) to 2^31-1 (2,147,483,647)  Storage: (4 + 1) Bytes]]></description>
+    <usage><![CDATA[[+|-]<integer>]]></usage>
+    <example1><![CDATA[9]]></example1>
+    <example2><![CDATA[-409983]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[long]]></keyword>
+    <description><![CDATA[Data-type for a signed 64-bit integer, or long integer. A long integer literal can include a preceding + or - sign character. Range: -2^63 (-9,223,372,036,854,775,808) to 2^63-1 (9,223,372,036,854,775,807)  Storage: (8 + 1) Bytes]]></description>
+    <usage><![CDATA[[+|-]<long_integer>]]></usage>
+    <example1><![CDATA[7]]></example1>
+    <example2><![CDATA[-2021432403507]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[double]]></keyword>
+    <description><![CDATA[Data-type for a signed 64-bit floating-point number, or double-precision floating-point number. A double literal can include a preceding + or - sign character.  Storage: (8 + 1) Bytes]]></description>
+    <usage><![CDATA[[+|-]<dec>.<dec>]]></usage>
+    <example1><![CDATA[6.1]]></example1>
+    <example2><![CDATA[-300.991]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[DateTime]]></keyword>
+    <description><![CDATA[Data-type for date and time. Storage: (8 + 1) Bytes]]></description>
+    <usage><![CDATA['<date time>';]]></usage>
+    <example1><![CDATA['8/7/2010 12:38:15 PM']]></example1>
+    <example2><![CDATA['8/7/2009 12:38:15 PM']]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SHELL]]></keyword>
+    <description><![CDATA[Outputs a table from the output of a program.]]></description>
+    <usage><![CDATA[SHELL '<program> [<arguments...>]';]]></usage>
+    <example1><![CDATA[SHELL 'dspace.exe ls';]]></example1>
+    <example2><![CDATA[SHELL 'myapp.exe';]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ABS]]></keyword>
+    <description><![CDATA[A mathematical function that returns the absolute (positive) value of the specified numeric expression.  Returns the same type as numeric_expression.]]></description>
+    <usage><![CDATA[ABS(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE ABS(Years) = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE ABS(red) = 34 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ACOS]]></keyword>
+    <description><![CDATA[A mathematical function that returns the angle, in radians, whose cosine is the specified numeric expression; also called arccosine.  Return type is double.]]></description>
+    <usage><![CDATA[ACOS(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE ACOS(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE ACOS(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ASIN]]></keyword>
+    <description><![CDATA[Returns the angle, in radians, whose sine is the specified numeric expression. This is also called arcsine.  Return type is double.]]></description>
+    <usage><![CDATA[ASIN(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE ASIN(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE ASIN(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ATAN]]></keyword>
+    <description><![CDATA[Returns the angle in radians whose tangent is a specified numeric expression. This is also called arctangent.  Return type is double.]]></description>
+    <usage><![CDATA[ATAN(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE ATAN(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE ATAN(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ATN2]]></keyword>
+    <description><![CDATA[Returns the angle, in radians, between the positive x-axis and the ray from the origin to the point (y, x), where x and y are the values of the two specified numeric expressions. Return type is double.]]></description>
+    <usage><![CDATA[AT2N(numeric_expression, numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE ATN2(x, y) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE ATN2(x, y) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[CEILING]]></keyword>
+    <description><![CDATA[Returns the smallest integral value that is greater than or equal to the specified double number. Return type is double.]]></description>
+    <usage><![CDATA[CEILING(double) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE CEILING(area) = 10.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE CEILING(area) = 1.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[CHARINDEX]]></keyword>
+    <description><![CDATA[Searches expression2 for expression1 and returns its starting position if found. The search starts at start_location (0-index based).  It expression1 is not found, -1 is returned.  Return type is int.]]></description>
+    <usage><![CDATA[CHARINDEX(expression1, expression2 [, start_location]) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE CHARINDEX('Mr', title) = 0 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE CHARINDEX('P', color) = 0 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[COS]]></keyword>
+    <description><![CDATA[A mathematical function that returns the trigonometric cosine of the specified angle, in radians, in specified expression.  Return type is double.]]></description>
+    <usage><![CDATA[COS(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE COS(angle) = 1.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE COS(angle) = 1.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[COT]]></keyword>
+    <description><![CDATA[A mathematical function that returns the trigonometric cotangent of the specified angle, in radians, in the specified expression.  Return type is double.]]></description>
+    <usage><![CDATA[COT(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE COT(angle) = 1.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE COT(angle) = 1.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[DEGREES]]></keyword>
+    <description><![CDATA[Returns the corresponding angle in degrees for an angle specified in radians.  Return type is double.]]></description>
+    <usage><![CDATA[DEGREES(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE DEGREES(angle) = 90.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE DEGREES(angle) = 90.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[EQUAL]]></keyword>
+    <description><![CDATA[Compares expression1 with expression2.  Returns 1 if they are equal, otherwise, returns 0. Return type is int.]]></description>
+    <usage><![CDATA[EQUAL(expression1, expression2) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE EQUAL(Years, 4) = 1 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE EQUAL(red, blue) = 1 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[EXP]]></keyword>
+    <description><![CDATA[Returns the exponential value of the specified numeric expression.  The constant e is the base of natural logarithms.  Return type is double.]]></description>
+    <usage><![CDATA[EXP(numeric_expression) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE EXP(Years) = 1.0 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE EXP(red) = 1.0 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[FLOOR]]></keyword>
+    <description><![CDATA[Returns the largest integer less than or equal to the specified double number.  Return type is double.]]></description>
+    <usage><![CDATA[FLOOR(double) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE FLOOR(area) = 10.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE FLOOR(area) = 1.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[GREATER]]></keyword>
+    <description><![CDATA[Compares expression1 with expression2.  Returns 1 if expression1 is greater than expression2, otherwise, returns 0. Return type is int.]]></description>
+    <usage><![CDATA[GREATER(expression1, expression2) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE GREATER(Name, 'M') = 1 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE GREATER(red, blue) = 1 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[GREATEREQUAL]]></keyword>
+    <description><![CDATA[Compares expression1 with expression2.  Returns 1 if expression1 is greater than or equal to expression2, otherwise, returns 0. Return type is int.]]></description>
+    <usage><![CDATA[GREATEREQUAL(expression1, expression2) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE GREATEREQUAL(Name, 'M') = 1 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE GREATEREQUAL(red, blue) = 1 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ISLIKE]]></keyword>
+    <description><![CDATA[Determines whether a specific character string matches a specified pattern. A pattern can include regular characters and wildcard characters. Wildcard character (%): Matches any string of zero or more characters. 
+    Wildcard character(_): Matches any single character. Wildcard character([]): Matches any single character within the specified range ([a-f]) or set ([abcdef]).  Wildcard character([^]): Matches any single character not within the specified range ([^a-f]) or set ([^abcdef]).  Returns 1 if a match is found, otherwise, returns 0.  Return type is int.]]></description>
+    <usage><![CDATA[ISLIKE(char(n) text, char(n) pattern) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE ISLIKE(Name, 'john%') = 1 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE ISLIKE(color, 'g%') = 1 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LEFT]]></keyword>
+    <description><![CDATA[Returns the left part of a character string with the specified number of characters.]]></description>
+    <usage><![CDATA[LEFT(char(n), int) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE LEFT(Name, 4) = 'John' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE LEFT(color, 3) = 'Red' ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LEN]]></keyword>
+    <description><![CDATA[Returns the number of characters of the specified string expression. Return type is int.]]></description>
+    <usage><![CDATA[LEN(char(n)) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE LEN(Name) = 4 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE LEN(color) = 3 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LESSER]]></keyword>
+    <description><![CDATA[Compares expression1 with expression2.  Returns 1 if expression1 is less than expression2, otherwise, returns 0. Return type is int.]]></description>
+    <usage><![CDATA[LESSER(expression1, expression2) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE LESSER(Name, 'M') = 1 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE LESSER(red, blue) = 1 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LESSEREQUAL]]></keyword>
+    <description><![CDATA[Compares expression1 with expression2.  Returns 1 if expression1 is less than or equal to expression2, otherwise, returns 0. Return type is int.]]></description>
+    <usage><![CDATA[LESSEREQUAL(expression1, expression2) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE LESSEREQUAL(Name, 'M') = 1 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE LESSEREQUAL(red, blue) = 1 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LOG]]></keyword>
+    <description><![CDATA[Returns the natural logarithm of the specified numeric expression.  Return type is double.]]></description>
+    <usage><![CDATA[LOG(numeric_expression)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE LOG(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE LOG(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LOG10]]></keyword>
+    <description><![CDATA[Returns the base-10 logarithm of the specified numeric expression.  Return type is double.]]></description>
+    <usage><![CDATA[LOG10(numeric_expression)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE LOG10(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE LOG10(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LOWER]]></keyword>
+    <description><![CDATA[Returns a character expression after converting uppercase character data to lowercase.]]></description>
+    <usage><![CDATA[LOWER(char(n)) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE LOWER(Name) = 'john' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE LOWER(color) = 'red' ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[LTRIM]]></keyword>
+    <description><![CDATA[Returns a character expression after it removes leading blanks.]]></description>
+    <usage><![CDATA[LTRIM(char(n)) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE LTRIM(Name) = 'john' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE LTRIM(color) = 'red' ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[NOTEQUAL]]></keyword>
+    <description><![CDATA[Compares expression1 with expression2.  Returns 1 if they are not equal, otherwise, returns 0. Return type is int.]]></description>
+    <usage><![CDATA[NOTEQUAL(expression1, expression2) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE NOTEQUAL(Years, 4) = 1 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE NOTEQUAL(red, blue) = 1 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[PATINDEX]]></keyword>
+    <description>
+      <![CDATA[Returns the starting position (0-index based) of the first occurrence of a pattern in a specified expression, or -1 if the pattern is not found, on char(n) data types. 
+      A pattern can include regular characters and wildcard characters. 
+      Wildcard character (%): Matches any string of zero or more characters. 
+    Wildcard character(_): Matches any single character. 
+    Wildcard character([]): Matches any single character within the specified range ([a-f]) or set ([abcdef]).  
+    Wildcard character([^]): Matches any single character not within the specified range ([^a-f]) or set ([^abcdef]).  
+    Return type is int.]]>
+    </description>
+    <usage><![CDATA[PATINDEX(char(n) pattern, char(n) text)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE PATINDEX('%PhD%', Name) = 0 ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE PATINDEX('%R%', color) = 0 ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[PI]]></keyword>
+    <description><![CDATA[Returns the constant value of PI.  Return type is double.]]></description>
+    <usage><![CDATA[PI()) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE height = PI() ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE height = PI() ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[POWER]]></keyword>
+    <description><![CDATA[Returns the value of the specified expression to the specified power.  Return type is double.]]></description>
+    <usage><![CDATA[POWER(numeric_expression, numeric_expression power)) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE POWER(height, 2) = 4.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE POWER(height, 3) = 9.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[RADIANS]]></keyword>
+    <description><![CDATA[Returns radians when a numeric expression, in degrees, is entered.  Return type is double.]]></description>
+    <usage><![CDATA[RADIANS(numeric_expression)) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE RADIANS(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE RADIANS(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[RAND]]></keyword>
+    <description><![CDATA[Returns a double number greater than or equal to 0.0, and less than 1.0.  Return type is double.]]></description>
+    <usage><![CDATA[RAND() ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE area = RAND() ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE area = RAND() ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[REVERSE]]></keyword>
+    <description><![CDATA[Returns the reverse of a string value.]]></description>
+    <usage><![CDATA[REVERSE(char(n)) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE REVERSE(Name) = 'yraM' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE REVERSE(color) = 'deR' ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[RIGHT]]></keyword>
+    <description><![CDATA[Returns the right part of a character string with the specified number of characters.]]></description>
+    <usage><![CDATA[RIGHT(char(n), int) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE RIGHT(Name, 4) = 'John' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE RIGHT(color, 3) = 'Red' ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[ROUND]]></keyword>
+    <description><![CDATA[Returns a double, rounded to the specified length or precision in int.  Return type is double.]]></description>
+    <usage><![CDATA[ROUND(double, int) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE ROUND(area, 1) = 10.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE ROUND(area, 2) = 10.12 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[RTRIM]]></keyword>
+    <description><![CDATA[Returns a character string after truncating all trailing blanks.]]></description>
+    <usage><![CDATA[RTRIM(char(n))]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE RTRIM(Name) = 'john' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE RTRIM(color) = 'red' ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SIGN]]></keyword>
+    <description><![CDATA[Returns the positive (+1), zero (0), or negative (-1) sign of the specified expression.  Return type is int.]]></description>
+    <usage><![CDATA[SIGN(numeric_expression)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE SIGN(angle) = 1 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE SIGN(angle) = 1 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SIN]]></keyword>
+    <description><![CDATA[Returns the trigonometric sine of the specified angle, in radians, and in numeric expression.  Return type is double.]]></description>
+    <usage><![CDATA[SIN(numeric_expression)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE SIN(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE SIN(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SPACE]]></keyword>
+    <description><![CDATA[Returns a string of repeated spaces.]]></description>
+    <usage><![CDATA[SPACE(int)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE Name = SPACE(1) ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE color = SPACE(1) ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SQRT]]></keyword>
+    <description><![CDATA[Returns the square root of the specified numeric expression.  Return type is double.]]></description>
+    <usage><![CDATA[SQRT(numeric_expression)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE SQRT(area) = 2.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE SQRT(area) = 3.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SQUARE]]></keyword>
+    <description><![CDATA[Returns the square of the specified numeric expression.  Return type is double.]]></description>
+    <usage><![CDATA[SQUARE(numeric_expression)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE SQUARE(area) = 4.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE SQUARE(area) = 9.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[SUBSTRING]]></keyword>
+    <description><![CDATA[Returns part of a char(n) expression.]]></description>
+    <usage><![CDATA[SUBSTRING(char(n), int startIndex, int length)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE SUBSTRING(Name, 0, 2) = 'Mr' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE SUBSTRING(color, 0, 1) = 'R' ORDER BY color;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[TAN]]></keyword>
+    <description><![CDATA[Returns the tangent of the input numeric expression.  Return type is double.]]></description>
+    <usage><![CDATA[TAN(numeric_expression)]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Triangles WHERE TAN(angle) = 0.0 ORDER BY area;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM Trapezoids WHERE TAN(angle) = 0.0 ORDER BY area;]]></example2>
+  </command>
+
+  <command>
+    <keyword><![CDATA[UPPER]]></keyword>
+    <description><![CDATA[Returns a character expression with lowercase character data converted to uppercase.]]></description>
+    <usage><![CDATA[UPPER(char(n)) ]]></usage>
+    <example1><![CDATA[SELECT TOP 10 * FROM Employees WHERE UPPER(Name) = 'JOHN' ORDER BY Name;]]></example1>
+    <example2><![CDATA[SELECT TOP 2 * FROM colors WHERE UPPER(color) = 'RED' ORDER BY color;]]></example2>
+  </command>
+  
+  <!--
+  <command>
+    <keyword><![CDATA[dd]]></keyword>
+    <description><![CDATA[dd]]></description>
+    <usage><![CDATA[dd;]]></usage>
+    <example1><![CDATA[dd;]]></example1>
+    <example2><![CDATA[dd;]]></example2>
+  </command>
+  -->
+  
+</usages>

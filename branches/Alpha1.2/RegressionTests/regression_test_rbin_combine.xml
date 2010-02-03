@@ -1,0 +1,139 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_combine_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_rbin_combine_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_combine_Output*.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_rbin_combine_CreateSampleData - whole</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_rbin_combine_Input.gensort@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nAB"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nCD"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nEF"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nGH"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nIJ"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nKL"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nMN"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_rbin_combine_CreateSampleData - first half</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_rbin_combine_Output1.gensort@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nAB"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nCD"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nEF"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_rbin_combine_CreateSampleData - second half</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_rbin_combine_Output2.gensort@4</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nGH"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nIJ"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nKL"));
+                dfsoutput.WriteRecord(Encoding.UTF8.GetBytes("\0\nMN"));
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_combine COMBINE!</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt combine regression_test_rbin_combine_Output1.gensort regression_test_rbin_combine_Output2.gensort + regression_test_rbin_combine_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_rbin_combine_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml regression_test_rbin_combine_Input.gensort regression_test_rbin_combine_Output.gensort regression_test_rbin_combine.xml");          
+            
+            Shell(@"Qizmt del regression_test_rbin_combine_Input.gensort");
+            Shell(@"Qizmt del regression_test_rbin_combine_Output.gensort");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

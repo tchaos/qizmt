@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<slave>
+  <log enabled="false" />
+
+  <!-- addkeybuffersize,addvaluebuffersize,readkeybuffersize,readvaluebuffersize overrides available for ArrayComboList -->
+  <zblocks count="139" addbuffersize="128KB" readbuffersize="1MB" />
+
+</slave>

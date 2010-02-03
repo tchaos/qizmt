@@ -1,0 +1,27 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="regression_test_writePASSFAIL_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            
+            string mr = Qizmt_ExecArgs[0];
+            string pass = mr+ ".PASSED";
+            string fail = mr + ".FAILED";
+            string fn = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+            System.IO.File.WriteAllText(fn, "x");
+            string output = Qizmt_ExecArgs[1] == "1" ? pass : fail;
+            
+            Shell(@"Qizmt del " + pass);
+            Shell(@"Qizmt del " + fail);
+            Shell(@"Qizmt put " + fn + " " + output);
+            System.IO.File.Delete(fn);
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
