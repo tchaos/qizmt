@@ -3160,12 +3160,12 @@ Qizmt exec Qizmt-ClusterLock.xml -c
         ]]>
       </Local>
     </Job>
-    <Job Name=`HeteroInputOutputFiles_CreateSampleDataText` Custodian=`` Email=`` Description=`Create sample text data`>
+    <Job Name=`HeteroInputOutputFiles_CreateSampleData` Custodian=`` Email=`` Description=`Create sample text data`>
       <IOSettings>
         <JobType>remote</JobType>
         <DFS_IO>
           <DFSReader></DFSReader>
-          <DFSWriter>dfs://HeteroInputOutputFiles_Input1</DFSWriter>
+          <DFSWriter>dfs://HeteroInputOutputFiles_Input1;HeteroInputOutputFiles_Input2@4</DFSWriter>
         </DFS_IO>
       </IOSettings>
       <Remote>
@@ -3173,26 +3173,11 @@ Qizmt exec Qizmt-ClusterLock.xml -c
             public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
             {
                 //Create sample text data.
-                dfsoutput.WriteLine(`1498,The Last Supper,100.45,374000000`);
-                dfsoutput.WriteLine(`1503,Mona Lisa,4.75,600000000`);
-                dfsoutput.WriteLine(`1501,Study for a portrait of Isabella d'Este,1.5,100000000`);
-                dfsoutput.WriteLine(`1501,Study of horse,1.5,100000000`);
-            }
-        ]]>
-      </Remote>
-    </Job>
-    <Job Name=`HeteroInputOutputFiles_CreateSampleDataBinary` Custodian=`` Email=`` Description=`Create sample binary data`>
-      <IOSettings>
-        <JobType>remote</JobType>
-        <DFS_IO>
-          <DFSReader></DFSReader>
-          <DFSWriter>dfs://HeteroInputOutputFiles_Input2@4</DFSWriter>
-        </DFS_IO>
-      </IOSettings>
-      <Remote>
-        <![CDATA[
-            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
-            {
+                dfsoutput.GetOutputByIndex(0).WriteLine(`1498,The Last Supper,100.45,374000000`);
+                dfsoutput.GetOutputByIndex(0).WriteLine(`1503,Mona Lisa,4.75,600000000`);
+                dfsoutput.GetOutputByIndex(0).WriteLine(`1501,Study for a portrait of Isabella d'Este,1.5,100000000`);
+                dfsoutput.GetOutputByIndex(0).WriteLine(`1501,Study of horse,1.5,100000000`);
+
                 //Create sample binary data.
                 List<byte> buf = new List<byte>();
                 for(int i = 1500; i <= 1504; i++)
@@ -3202,12 +3187,12 @@ Qizmt exec Qizmt-ClusterLock.xml -c
                     buf.Clear();
                     rs.ToByteSlice().AppendTo(buf);
                     int buflen = buf.Count;
-                    dfsoutput.WriteRecord(buf);
+                    dfsoutput.GetOutputByIndex(1).WriteRecord(buf);
                 }
             }
         ]]>
       </Remote>
-    </Job>
+    </Job>    
     <Job Name=`HeteroInputOutputFiles` Custodian=`` Email=``>
       <IOSettings>
         <JobType>mapreduce</JobType>

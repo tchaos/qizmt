@@ -70,6 +70,10 @@ namespace RDBMS_Admin
                     Health(args);
                     break;
 
+                case "callstack":
+                    Callstack(args);
+                    break;
+
                 default:
                     Console.Error.WriteLine("Not valid: RDBMS_Admin {0}", action);
                     break;

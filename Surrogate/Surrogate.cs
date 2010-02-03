@@ -2168,6 +2168,26 @@ namespace MySpace.DataMining.AELight
                             int corecount = Surrogate.NumberOfProcessors;
                             value = Surrogate.NearestPrimeLE(machinecount * corecount * 2).ToString();
                         }
+                        else if (value == "NearPrimeBelowCoreCount")
+                        {
+                            dfs thisdfs = Surrogate.ReadMasterDfsConfig();
+                            int machinecount = thisdfs.Slaves.SlaveList.Split(';').Length;
+                            int corecount = Surrogate.NumberOfProcessors;
+                            value = Surrogate.NearestPrimeLE(machinecount * corecount).ToString();
+                        }
+                        else if (value == "ClusterCoreCount")
+                        {
+                            dfs thisdfs = Surrogate.ReadMasterDfsConfig();
+                            int machinecount = thisdfs.Slaves.SlaveList.Split(';').Length;
+                            int corecount = Surrogate.NumberOfProcessors;
+                            value = (machinecount * corecount).ToString();
+                        }
+                        else if (value == "ClusterMachineCount")
+                        {
+                            dfs thisdfs = Surrogate.ReadMasterDfsConfig();
+                            int machinecount = thisdfs.Slaves.SlaveList.Split(';').Length;
+                            value = (machinecount).ToString();
+                        }
                         result[i * 2 + 1] = value;
                     }
                     return result;

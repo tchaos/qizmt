@@ -1,0 +1,7 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_Protocol.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\QueryAnalyzer_Protocol.pdb
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Release\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Release\QueryAnalyzer_Protocol.ProjectInstaller.resources
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Release\QueryAnalyzer_Protocol.csproj.GenerateResource.Cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Release\QueryAnalyzer_Protocol.exe
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Protocol\obj\Release\QueryAnalyzer_Protocol.pdb

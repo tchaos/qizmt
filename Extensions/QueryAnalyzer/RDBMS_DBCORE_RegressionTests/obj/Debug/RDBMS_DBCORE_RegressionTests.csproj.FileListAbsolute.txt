@@ -1,0 +1,1 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\RDBMS_DBCORE_RegressionTests\obj\Debug\ResolveAssemblyReference.cache

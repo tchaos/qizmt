@@ -1,0 +1,5 @@
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\RDBMS_DBCORE.dll
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\QueryAnalyzer_Setup\RDBMS_DBCORE.pdb
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\RDBMS_DBCORE\obj\Release\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\RDBMS_DBCORE\obj\Release\RDBMS_DBCORE.dll
+C:\SimpleSolutions\DataMining\Open\Extensions\QueryAnalyzer\RDBMS_DBCORE\obj\Release\RDBMS_DBCORE.pdb

@@ -124,13 +124,23 @@ namespace MySpace.DataMining.AELight
 
 
         // file is a dfs file name without dfs://
-        public static bool ReplicationPhase(string file, bool verbose, int NumberOfCores, IList<string> TheseServersOnly)
+        public static bool ReplicationPhase(bool verbose, int NumberOfCores, IList<string> TheseServersOnly, IList<string> files)
         {
 
 #if DEBUG_REPL
-            if (null != file && file.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+            if (null != files)
             {
-                throw new Exception("DEBUG: ReplicationPhase file starts with dfs://");
+                foreach (string file in files)
+                {
+                    if (string.IsNullOrEmpty(file))
+                    {
+                        throw new Exception("DEBUG:  ReplicationPhase: DFS file is null or empty");
+                    }
+                    if (file.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new Exception("DEBUG:  ReplicationPhase: DFS file '" + file + "' starts with dfs://");
+                    }
+                }
             }
 #endif
             if (ReplicationDebugVerbose)
@@ -219,9 +229,18 @@ namespace MySpace.DataMining.AELight
                     // Build lists of which hosts pull which chunks...
                     foreach (dfs.DfsFile df in dc.Files)
                     {
-                        if (null != file)
+                        if (null != files)
                         {
-                            if (0 != string.Compare(file, df.Name, StringComparison.OrdinalIgnoreCase))
+                            bool includefile = false;
+                            for (int fi = 0; fi < files.Count; fi++)
+                            {
+                                if (0 == string.Compare(files[fi], df.Name, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    includefile = true;
+                                    break;
+                                }
+                            }
+                            if (!includefile)
                             {
                                 continue;
                             }
@@ -632,6 +651,20 @@ namespace MySpace.DataMining.AELight
             }
 #endif
             return anywork;
+        }
+
+        public static bool ReplicationPhase(string file, bool verbose, int NumberOfCores, IList<string> TheseServersOnly)
+        {
+            string[] files;
+            if (null == file)
+            {
+                files = null;
+            }
+            else
+            {
+                files = new string[] { file };
+            }
+            return ReplicationPhase(verbose, NumberOfCores, TheseServersOnly, files);
         }
 
 

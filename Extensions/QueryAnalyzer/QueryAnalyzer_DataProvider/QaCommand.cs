@@ -1267,6 +1267,7 @@ namespace QueryAnalyzer_DataProvider
                 conn.FlushBatchNqData();
 
                 conn.islocked = true;
+                conn.lockedby = this;
 
                 conn.netstm.WriteByte((byte)'q'); //query
 
