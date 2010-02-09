@@ -5,7 +5,6 @@
 
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQSQLReference MySpace QSQL Reference]
 
-<wiki:toc max_depth="2" />
 
 =Getting Help on Qizmt SQL Commands=
 
