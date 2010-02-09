@@ -33,7 +33,7 @@ SELECT statements are translated into a series of mapreducers on the tables. For
 
 It is often better to write custom mapreducers when a SQL query is going to create many of them as the mapreduce solution will likely be more optimal. See the Qizmt Quick Start Guide for a walkthrough on Qizmt mapreduce development.
 
-===Example===
+===Examples===
 
 {{{
 SELECT TOP 10 Name FROM Employees WHERE Years = 4 ORDER BY Name;
@@ -92,5 +92,3 @@ SELECT TOP 100
 
 }}}
    
-
-
