@@ -5,6 +5,7 @@
 
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
+
+ * [MySpaceQSQLReferenceGettingHelp Getting Help on Qizmt SQL Commands]
  * a
   * b
- * [MySpaceQSQLReferenceGettingHelp Getting Help on Qizmt SQL Commands]
