@@ -8,7 +8,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
  * [MySpaceQizmtSQLReferenceGettingHelp Getting Help on Qizmt SQL Commands]
  * Qizmt SQL Commands
-  * [MySpaceQizmtSQLReferenceCommandsSelect Select]
-  * [MySpaceQizmtSQLReferenceCommandsCreateTable Create Table]
-  * [MySpaceQizmtSQLReferenceCommandsInsert Insert]
-  * [MySpaceQizmtSQLReferenceCommandsInsertImport Insert Import]
+  * [MySpaceQizmtSQLReferenceCommandsSelect SELECT]
+  * [MySpaceQizmtSQLReferenceCommandsCreateTable CREATE TABLE]
+  * [MySpaceQizmtSQLReferenceCommandsInsert INSERT]
+  * [MySpaceQizmtSQLReferenceCommandsInsertImport INSERT IMPORT]
