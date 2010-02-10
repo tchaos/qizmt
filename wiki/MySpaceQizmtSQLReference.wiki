@@ -17,3 +17,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
   * [MySpaceQizmtSQLReferenceCommandsAlterTableRenameSwap ALTER TABLE RENAME SWAP]
   * [MySpaceQizmtSQLReferenceCommandsDelete DELETE]
   * [MySpaceQizmtSQLReferenceCommandsTruncateTable TRUNCATE TABLE]
+  * [MySpaceQizmtSQLReferenceCommandsDropTable DROP TABLE]
+
+
