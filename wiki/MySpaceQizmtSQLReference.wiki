@@ -10,3 +10,4 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
  * Qizmt SQL Commands
   * [MySpaceQizmtSQLReferenceCommandsSelect Select]
   * [MySpaceQizmtSQLReferenceCommandsCreateTable Create Table]
+  * [MySpaceQizmtSQLReferenceCommandsInsert Insert]
