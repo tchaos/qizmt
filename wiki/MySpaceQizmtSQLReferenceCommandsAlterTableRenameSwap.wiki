@@ -1,0 +1,27 @@
+#summary Qizmt SQL Reference Commands ALTER TABLE RENAME SWAP
+#labels Qizmt,SQL,Reference,Commands,Alter,Table,Rename,Swap
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=`ALTER TABLE RENAME SWAP`=
+
+{{{
+ALTER TABLE <table1> RENAME SWAP <table2>;
+}}}
+
+===Remarks===
+
+Fast way to swap the names of two tables which have identical schema. If a table is produced by offline sequence, this is a fast way to swap its name with the name of its predecessor which is already serving data.
+
+===Examples===
+
+{{{
+ALTER TABLE Employees RENAME SWAP Employees_alt;
+}}}
+
+
+
+   
