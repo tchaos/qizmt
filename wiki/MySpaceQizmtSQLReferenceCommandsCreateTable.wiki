@@ -6,7 +6,7 @@
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
 
 
-=`Create Table`=
+=`CREATE TABLE`=
 
 {{{
 CREATE TABLE <table_name> (<column_name> <type> [, ...]);
