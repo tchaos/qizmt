@@ -1,0 +1,27 @@
+#summary Qizmt SQL Reference Commands INSERT BIND
+#labels Qizmt,SQL,Reference,Commands,Insert,Bind
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=`INSERT BIND`=
+
+{{{
+INSERT INTO <table_name> BIND <dfs_file>;
+}}}
+
+===Remarks===
+
+Bind data into a table using a MR.DFS rectangular binary data file created using the DbRecordset object. The file is directly bound into the table, leaving the original file name inaccessible. This operation incurs no mapreducers and is used for re-casting MR.DFS data as a SQL table. See the Qizmt SQL Quick Start Guide for more information on DbRecordset.
+
+===Examples===
+
+{{{
+INSERT INTO Employees BIND 'dfs://db-company-roster';
+}}}
+
+
+
+   
