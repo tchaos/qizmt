@@ -1,0 +1,27 @@
+#summary Qizmt SQL Reference Commands DELETE
+#labels Qizmt,SQL,Reference,Commands,Delete
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=`DELETE`=
+
+{{{
+DELETE FROM <table_name> WHERE <comparison> [[AND | OR] <...>];
+}}}
+
+===Remarks===
+
+Delete rows from a table under certain conditions. See SELECT WHERE for more information on the WHERE clause. This operation performs a full mapreduce on the table but only maps the tuples which match the WHERE clause. For ad-hoc deletes see the BULK UPDATE command.
+
+===Examples===
+
+{{{
+DELETE FROM Employees WHERE ISLIKE ‘%ferson';
+}}}
+
+
+
+   
