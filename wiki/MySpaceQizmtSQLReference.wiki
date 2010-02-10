@@ -18,5 +18,4 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
   * [MySpaceQizmtSQLReferenceCommandsDelete DELETE]
   * [MySpaceQizmtSQLReferenceCommandsTruncateTable TRUNCATE TABLE]
   * [MySpaceQizmtSQLReferenceCommandsDropTable DROP TABLE]
-
-
+  * [MySpaceQizmtSQLReferenceCommandsShell SHELL]
