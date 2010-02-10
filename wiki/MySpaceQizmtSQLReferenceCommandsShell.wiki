@@ -1,0 +1,27 @@
+#summary Qizmt SQL Reference Commands SHELL
+#labels Qizmt,SQL,Reference,Commands,Shell
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=`SHELL`=
+
+{{{
+SHELL '<program> [<arguments...>]';
+}}}
+
+===Remarks===
+
+Executes a command on the cluster. Typically, this is used to execute Qizmt commands remotely or as part of a sequence of SQL statements. Newlines from the standard out are persisted and the loss-less standard out may be obtained by concatenating all of the resulting tuples. See the Qizmt documentation for available commands.
+
+===Examples===
+
+{{{
+SHELL 'qizmt ps’;
+}}}
+
+
+
+   
