@@ -1,0 +1,27 @@
+#summary Qizmt SQL Reference Commands DROP TABLE
+#labels Qizmt,SQL,Reference,Commands,Drop,Table
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=`DROP TABLE`=
+
+{{{
+DROP TABLE <table_name>;
+}}}
+
+===Remarks===
+
+Remove all rows from the table and remove the table from sys.tables. No mapreduce overhead, all tuples are deleted in parallel across the cluster.
+
+===Examples===
+
+{{{
+DROP TABLE archive_data;
+}}}
+
+
+
+   
