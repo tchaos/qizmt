@@ -66,5 +66,16 @@ Creates a table with application specific schema of columns. Data types supporte
 
 *Example 2:*  `'8/7/2009 12:38:15 PM'`
 
+===Examples===
+
+{{{
+CREATE TABLE Employees (Name char(200), Years int);
+}}}
+
+{{{
+CREATE TABLE colors (color char(50), red int, green int, blue int);
+}}}
+
+
 
    
