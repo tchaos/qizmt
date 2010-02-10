@@ -1,0 +1,27 @@
+#summary Qizmt SQL Reference Commands INSERT IMPORT
+#labels Qizmt,SQL,Reference,Commands,Insert,Import
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=`INSERT IMPORT`=
+
+{{{
+INSERT INTO <table_name> IMPORT <dfs_file>;
+}}}
+
+===Remarks===
+
+Insert data into a table from a MR.DFS rectangular binary data file. The rectangular binary file must have the same schema as the target table for import. This operation translates to a single mapreducer.
+
+===Examples===
+
+{{{
+INSERT INTO Employees IMPORT 'dfs://company-roster';
+}}}
+
+
+
+   
