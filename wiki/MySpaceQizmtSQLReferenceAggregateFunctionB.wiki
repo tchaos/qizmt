@@ -25,6 +25,42 @@ SELECT angle, BIT_AND(length) FROM Triangles GROUP BY angle;
 SELECT angle, BIT_AND(base) FROM Trapezoids GROUP BY angle;
 }}}
 
+=`BIT_OR`=
+
+{{{
+BIT_OR(expression)
+}}}
+
+Performs bitwise OR operations on the values in a group.
+
+===Examples===
+
+{{{
+SELECT angle, BIT_OR(length) FROM Triangles GROUP BY angle;
+}}}
+
+{{{
+SELECT angle, BIT_OR(base) FROM Trapezoids GROUP BY angle;
+}}}
+
+=`BIT_XOR`=
+
+{{{
+BIT_XOR(expression)
+}}}
+
+Performs bitwise exclusive OR operations on the values in a group.
+
+===Examples===
+
+{{{
+SELECT angle, BIT_XOR(length) FROM Triangles GROUP BY angle;
+}}}
+
+{{{
+SELECT angle, BIT_XOR(base) FROM Trapezoids GROUP BY angle;
+}}}
+
 
 
    
