@@ -42,10 +42,8 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionL#LOWER LOWER]
  * [MySpaceQizmtSQLReferenceFunctionL#LPAD LPAD]
  * [MySpaceQizmtSQLReferenceFunctionL#LTRIM LTRIM]
-
-
-
-
+ * [MySpaceQizmtSQLReferenceFunctionM#MOD MOD]
+ * [MySpaceQizmtSQLReferenceFunctionM#MONTHS_BETWEEN MONTHS_BETWEEN]
 
 
 
