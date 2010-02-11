@@ -16,5 +16,5 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceAggregateFunctionC#COUNTDISTINCT COUNTDISTINCT]
  * [MySpaceQizmtSQLReferenceAggregateFunctionF#FIRST FIRST]
  * [MySpaceQizmtSQLReferenceAggregateFunctionL#LAST LAST]
-
-   
+ * [MySpaceQizmtSQLReferenceAggregateFunctionM#MAX MAX]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionM#MIN MIN]
