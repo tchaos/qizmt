@@ -27,6 +27,15 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionE#EXP EXP]
  * [MySpaceQizmtSQLReferenceFunctionF#FLOOR FLOOR]
  * [MySpaceQizmtSQLReferenceFunctionF#FORMAT FORMAT]
+ * [MySpaceQizmtSQLReferenceFunctionG#GREATER GREATER]
+ * [MySpaceQizmtSQLReferenceFunctionG#GREATEREQUAL GREATEREQUAL]
+
+
+
+
+
+
+
 
 
 
