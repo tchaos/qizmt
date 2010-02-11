@@ -12,7 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 DELETE FROM <table_name> WHERE <comparison> [[AND | OR] <...>];
 }}}
 
-===Remarks===
 
 Delete rows from a table under certain conditions. See SELECT WHERE for more information on the WHERE clause. This operation performs a full mapreduce on the table but only maps the tuples which match the WHERE clause. For ad-hoc deletes see the BULK UPDATE command.
 
