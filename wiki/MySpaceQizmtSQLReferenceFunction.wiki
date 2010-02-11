@@ -68,10 +68,8 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionS#SQUARE SQUARE]
  * [MySpaceQizmtSQLReferenceFunctionS#SUBSTRING SUBSTRING]
  * [MySpaceQizmtSQLReferenceFunctionS#SYSDATE SYSDATE]
-
-
-
-
+ * [MySpaceQizmtSQLReferenceFunctionT#TAN TAN]
+ * [MySpaceQizmtSQLReferenceFunctionT#TRUNC TRUNC]
 
 
 
