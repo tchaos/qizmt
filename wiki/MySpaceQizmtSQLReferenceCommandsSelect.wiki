@@ -18,7 +18,6 @@ SELECT  [TOP <limit>]
         [[ORDER BY <[table.]columns>] | [ORDER BY <[table.]columns>]…];
 }}}
 
-===Remarks===
 
 SELECT statements are translated into a series of mapreducers on the tables. For example, if performing a complex select on 10TB of data to obtain the top 10 rows, the generated mapreducers will apply the operation on the entire 10TB of data. Indexes, etc. are not considered when executing this statement. It is simple translation to brute force mapreduce.
 
