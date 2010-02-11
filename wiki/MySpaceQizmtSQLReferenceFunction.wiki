@@ -29,9 +29,9 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionF#FORMAT FORMAT]
  * [MySpaceQizmtSQLReferenceFunctionG#GREATER GREATER]
  * [MySpaceQizmtSQLReferenceFunctionG#GREATEREQUAL GREATEREQUAL]
-
-
-
+ * [MySpaceQizmtSQLReferenceFunctionI#INSTR INSTR]
+ * [MySpaceQizmtSQLReferenceFunctionI#ISNOTNULL ISNOTNULL]
+ * [MySpaceQizmtSQLReferenceFunctionI#ISNULL ISNULL]
 
 
 
