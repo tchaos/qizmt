@@ -1,0 +1,64 @@
+#summary Qizmt SQL Reference Aggregate Function
+#labels Qizmt,SQL,Reference,Aggregate,Function
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference] / [MySpaceQizmtSQLReferenceAggregateFunction MySpace Qizmt SQL Aggregate Function]
+
+<wiki:toc max_depth="2" />
+
+=`CHOOSERND`=
+
+{{{
+CHOOSERND(expression)
+}}}
+
+Returns a random value from a group.
+
+===Examples===
+
+{{{
+SELECT CHOOSERND(year) FROM Employees GROUP BY deptID;
+}}}
+
+{{{
+SELECT CHOOSERND(red) FROM colors GROUP BY blue;
+}}}
+
+=`COUNT`=
+
+{{{
+COUNT(expression)
+}}}
+
+Returns the number of items in a group.
+
+===Examples===
+
+{{{
+SELECT year, COUNT(year) FROM Employees GROUP BY year;
+}}}
+
+{{{
+SELECT year, COUNT(year) FROM Employees GROUP BY year;
+}}}
+
+=`COUNTDISTINCT`=
+
+{{{
+COUNTDISTINCT(expression)
+}}}
+
+Returns the number of distinct items in a group.
+
+===Examples===
+
+{{{
+SELECT year, COUNTDISTINCT(year) FROM Employees GROUP BY year;
+}}}
+
+{{{
+SELECT blue, COUNTDISTINCT(blue) FROM colors GROUP BY blue;
+}}}
+
+   
