@@ -12,7 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 DROP TABLE <table_name>;
 }}}
 
-===Remarks===
 
 Remove all rows from the table and remove the table from sys.tables. No mapreduce overhead, all tuples are deleted in parallel across the cluster.
 
