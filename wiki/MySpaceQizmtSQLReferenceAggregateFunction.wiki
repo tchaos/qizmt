@@ -8,7 +8,9 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 =Qizmt SQL Reference Aggregate Function=
 
  * [MySpaceQizmtSQLReferenceAggregateFunctionA#AVG AVG]
- 
+ * [MySpaceQizmtSQLReferenceAggregateFunctionB#BIT_AND BIT_AND]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionB#BIT_OR BIT_OR]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionB#BIT_XOR BIT_XOR]
 
 
 
