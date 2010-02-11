@@ -16,7 +16,6 @@ INSERT  INTO <table_name>
         [ORDER BY <order_columns>];
 }}}
 
-===Remarks===
 
 Copy tuples from one or more tables or literal into another table. For inserting literals into another table ad-hoc, see BULK UPDATE. If you have a large amount of data to put into a table, first put it into MR.DFS with then bind it into a table. See fput in qizmt documentation and INSERT BIND commands.
         
