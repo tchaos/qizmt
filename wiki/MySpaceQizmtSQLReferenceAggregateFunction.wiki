@@ -18,3 +18,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceAggregateFunctionL#LAST LAST]
  * [MySpaceQizmtSQLReferenceAggregateFunctionM#MAX MAX]
  * [MySpaceQizmtSQLReferenceAggregateFunctionM#MIN MIN]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionS#STD STD]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionS#STD_SAMP STD_SAMP]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionS#SUM SUM]
