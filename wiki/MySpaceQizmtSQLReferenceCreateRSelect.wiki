@@ -16,7 +16,7 @@ RSELECT *
         [OR KEY = <keyValue>]
 }}}
 
-===Remarks===
+
 
 This is a very low latency way to perform ad-hoc queries on very large tables. This can only be done on an RINDEX and the RINDEX can only be created on an already sorted table. (Usually created with a sorted mapreducer job or a SQL with an ORDER BY statement.
 
