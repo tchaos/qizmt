@@ -20,4 +20,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionC#CONCAT CONCAT]
  * [MySpaceQizmtSQLReferenceFunctionC#COS COS]
  * [MySpaceQizmtSQLReferenceFunctionC#COT COT]
- * [MySpaceQizmtSQLReferenceFunctionD#]
+ * [MySpaceQizmtSQLReferenceFunctionD#DATEADD DATEADD]
+ * [MySpaceQizmtSQLReferenceFunctionD#DATEDIFF DATEDIFF]
+ * [MySpaceQizmtSQLReferenceFunctionD#DEGREES DEGREES]
