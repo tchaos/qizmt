@@ -14,7 +14,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceAggregateFunctionC#CHOOSERND CHOOSERND]
  * [MySpaceQizmtSQLReferenceAggregateFunctionC#COUNT COUNT]
  * [MySpaceQizmtSQLReferenceAggregateFunctionC#COUNTDISTINCT COUNTDISTINCT]
-
+ * [MySpaceQizmtSQLReferenceAggregateFunctionF#FIRST FIRST]
 
 
    
