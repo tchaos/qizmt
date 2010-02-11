@@ -25,6 +25,39 @@ SELECT * FROM Employees WHERE GREATER(INSTR(Title, 'Manager'), -1) = 1;
 SELECT * FROM colors WHERE GREATER(INSTR(Name, 'purple'), -1) = 1;
 }}}
 
+=`ISLIKE`=
+
+{{{
+ISLIKE(char(n) text, char(n) pattern) 
+}}}
+
+Determines whether a specific character string matches a specified pattern. 
+
+A pattern can include regular characters and wildcard characters. 
+
+Wildcard character (%): Matches any string of zero or more characters. 
+
+
+Wildcard character(_): Matches any single character. 
+
+
+Wildcard character([]): Matches any single character within the specified range ([a-f]) or set ([abcdef]).
+
+
+Wildcard character([^]): Matches any single character not within the specified range ([^a-f]) or set ([^abcdef]).Returns 1 if a match is found, otherwise, returns 0.Return type is int.
+
+
+===Examples===
+
+{{{
+SELECT TOP 10 * FROM Employees WHERE ISLIKE(Name, 'john%') = 1 ORDER BY Name;
+}}}
+
+{{{
+SELECT TOP 10 * FROM Employees WHERE ISLIKE(Name, 'john%') = 1 ORDER BY Name;
+}}}
+
+
 =`ISNOTNULL`=
 
 {{{
