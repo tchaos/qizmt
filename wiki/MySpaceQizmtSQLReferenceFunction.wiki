@@ -44,6 +44,14 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionL#LTRIM LTRIM]
  * [MySpaceQizmtSQLReferenceFunctionM#MOD MOD]
  * [MySpaceQizmtSQLReferenceFunctionM#MONTHS_BETWEEN MONTHS_BETWEEN]
+ * [MySpaceQizmtSQLReferenceFunctionN#NEXT_DAY NEXT_DAY]
+ * [MySpaceQizmtSQLReferenceFunctionN#NOTEQUAL NOTEQUAL]
+ * [MySpaceQizmtSQLReferenceFunctionN#NULLIF NULLIF]
+ * [MySpaceQizmtSQLReferenceFunctionN#NVL NVL]
+ * [MySpaceQizmtSQLReferenceFunctionN#NVL2 NVL2] 
+
+
+
 
 
 
