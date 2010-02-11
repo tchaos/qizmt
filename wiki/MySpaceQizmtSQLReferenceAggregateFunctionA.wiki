@@ -13,7 +13,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 AVG(numeric_expression) 
 }}}
 
-===Remarks===
 
 Returns the average of the values in a group.
 
