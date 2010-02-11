@@ -1,0 +1,19 @@
+#summary Qizmt SQL Quick Start Guide - Walkthrough Continues
+#labels Qizmt,SQL,Guide,Walkthrough
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide]
+
+
+=Walkthrough: Qizmt SQL Extension Continues=
+
+32.	Modify the SQL to select the top 100 rows from the paintings_wordcount table. The data was already sorted by the word column in the mapreducer so you do not need an *ORDER BY* clause unless you want to resort rows before displaying the results.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_SelectTopWindow.png" alt="Select Top" />
+
+----
+
+33.	Press *F5* or click the *Run* button to execute the query.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_RunSelectTop.png" alt="Select Top" />
