@@ -25,10 +25,8 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionD#DEGREES DEGREES]
  * [MySpaceQizmtSQLReferenceFunctionE#EQUAL EQUAL]
  * [MySpaceQizmtSQLReferenceFunctionE#EXP EXP]
-
-
-
-
+ * [MySpaceQizmtSQLReferenceFunctionF#FLOOR FLOOR]
+ * [MySpaceQizmtSQLReferenceFunctionF#FORMAT FORMAT]
 
 
 
