@@ -7,7 +7,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
 
  * [MySpaceQizmtSQLQuickStartGuideOverview Overview]
- 
+ * [MySpaceQizmtSQLQuickStartGuideFocus Qizmt SQL Focus]
  * x
   * [xx] 
   
