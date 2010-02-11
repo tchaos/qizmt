@@ -1,0 +1,30 @@
+#summary Qizmt SQL Reference Aggregate Function
+#labels Qizmt,SQL,Reference,Aggregate,Function
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference] / [MySpaceQizmtSQLReferenceAggregateFunction MySpace Qizmt SQL Aggregate Function]
+
+<wiki:toc max_depth="2" />
+
+=`BIT_AND`=
+
+{{{
+BIT_AND(expression)
+}}}
+
+Performs bitwise AND operations on the values in a group.
+
+===Examples===
+
+{{{
+SELECT angle, BIT_AND(length) FROM Triangles GROUP BY angle;
+}}}
+
+{{{
+SELECT angle, BIT_AND(base) FROM Trapezoids GROUP BY angle;
+}}}
+
+
+
+   
