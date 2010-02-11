@@ -49,10 +49,9 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionN#NULLIF NULLIF]
  * [MySpaceQizmtSQLReferenceFunctionN#NVL NVL]
  * [MySpaceQizmtSQLReferenceFunctionN#NVL2 NVL2] 
-
-
-
-
+ * [MySpaceQizmtSQLReferenceFunctionP#PI PI]
+ * [MySpaceQizmtSQLReferenceFunctionP#POWER POWER]
+ * [MySpaceQizmtSQLReferenceFunctionP#]
 
 
 
