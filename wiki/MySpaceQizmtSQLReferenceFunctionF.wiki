@@ -35,7 +35,7 @@ Returns a string representation of the datetime.
 
 ===Valid Format===
 
-This is the same used for C# DateTime format.
+This is the same used for C# `DateTime` format.
 
 ===Examples===
 
