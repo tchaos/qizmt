@@ -12,7 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 INSERT INTO <table_name> IMPORT <dfs_file>;
 }}}
 
-===Remarks===
 
 Insert data into a table from a MR.DFS rectangular binary data file. The rectangular binary file must have the same schema as the target table for import. This operation translates to a single mapreducer.
 
