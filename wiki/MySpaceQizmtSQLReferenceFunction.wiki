@@ -61,6 +61,13 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionR#ROUND ROUND]
  * [MySpaceQizmtSQLReferenceFunctionR#RPAD RPAD]
  * [MySpaceQizmtSQLReferenceFunctionR#RTRIM RTRIM]
+ * [MySpaceQizmtSQLReferenceFunctionS#SIGN SIGN]
+ * [MySpaceQizmtSQLReferenceFunctionS#SIN SIN]
+ * [MySpaceQizmtSQLReferenceFunctionS#SPACE SPACE]
+ * [MySpaceQizmtSQLReferenceFunctionS#SQRT SQRT]
+ * [MySpaceQizmtSQLReferenceFunctionS#SQUARE SQUARE]
+ * [MySpaceQizmtSQLReferenceFunctionS#SUBSTRING SUBSTRING]
+ * [MySpaceQizmtSQLReferenceFunctionS#SYSDATE SYSDATE]
 
 
 
