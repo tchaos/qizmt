@@ -6,4 +6,15 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 
 =Qizmt SQL Commands=
 
- * [x]
+
+ * [MySpaceQizmtSQLReferenceCommandsSelect SELECT]
+ * [MySpaceQizmtSQLReferenceCommandsCreateTable CREATE TABLE]
+ * [MySpaceQizmtSQLReferenceCommandsInsert INSERT]
+ * [MySpaceQizmtSQLReferenceCommandsInsertImport INSERT IMPORT]
+ * [MySpaceQizmtSQLReferenceCommandsInsertBind INSERT BIND]
+ * [MySpaceQizmtSQLReferenceCommandsInsertImportLines INSERT IMPORTLINES]
+ * [MySpaceQizmtSQLReferenceCommandsAlterTableRenameSwap ALTER TABLE RENAME SWAP]
+ * [MySpaceQizmtSQLReferenceCommandsDelete DELETE]
+ * [MySpaceQizmtSQLReferenceCommandsTruncateTable TRUNCATE TABLE]
+ * [MySpaceQizmtSQLReferenceCommandsDropTable DROP TABLE]
+ * [MySpaceQizmtSQLReferenceCommandsShell SHELL]
