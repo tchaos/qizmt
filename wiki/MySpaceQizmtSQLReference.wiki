@@ -14,7 +14,5 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
   * [MySpaceQizmtSQLReferenceCreateRIndex CREATE RINDEX] 
   * [MySpaceQizmtSQLReferenceCreateRSelect RSELECT]
   * [MySpaceQizmtSQLReferenceCreateBulkUpdate BULKUPDATE]
-
-
-
+  * [MySpaceQizmtSQLReferenceCreateDropRIndex DROP RINDEX]
 
