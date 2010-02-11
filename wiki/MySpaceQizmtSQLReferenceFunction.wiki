@@ -30,6 +30,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionG#GREATER GREATER]
  * [MySpaceQizmtSQLReferenceFunctionG#GREATEREQUAL GREATEREQUAL]
  * [MySpaceQizmtSQLReferenceFunctionI#INSTR INSTR]
+ * [MySpaceQizmtSQLReferenceFunctionI#ISLIKE ISLIKE ]
  * [MySpaceQizmtSQLReferenceFunctionI#ISNOTNULL ISNOTNULL]
  * [MySpaceQizmtSQLReferenceFunctionI#ISNULL ISNULL]
  * [MySpaceQizmtSQLReferenceFunctionL#LAST_DAY LAST_DAY]
@@ -53,8 +54,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionP#PI PI]
  * [MySpaceQizmtSQLReferenceFunctionP#POWER POWER]
  * [MySpaceQizmtSQLReferenceFunctionP#]
-
-
 
 
 
