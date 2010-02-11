@@ -12,7 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 TRUNCATE TABLE <table_name>;
 }}}
 
-===Remarks===
 
 Remove all rows from the table. All tuples are deleted in parallel across the cluster. Much faster then DELETE command as no mapreduce overhead is incurred.
 
