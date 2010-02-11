@@ -12,8 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 SHELL '<program> [<arguments...>]';
 }}}
 
-===Remarks===
-
 Executes a command on the cluster. Typically, this is used to execute Qizmt commands remotely or as part of a sequence of SQL statements. Newlines from the standard out are persisted and the loss-less standard out may be obtained by concatenating all of the resulting tuples. See the Qizmt documentation for available commands.
 
 ===Examples===
