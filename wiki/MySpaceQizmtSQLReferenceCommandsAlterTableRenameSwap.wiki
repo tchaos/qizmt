@@ -12,7 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 ALTER TABLE <table1> RENAME SWAP <table2>;
 }}}
 
-===Remarks===
 
 Fast way to swap the names of two tables which have identical schema. If a table is produced by offline sequence, this is a fast way to swap its name with the name of its predecessor which is already serving data.
 
