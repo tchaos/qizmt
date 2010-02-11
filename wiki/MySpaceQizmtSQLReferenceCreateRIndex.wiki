@@ -17,7 +17,6 @@ CREATE RINDEX <indexName>
        ON <KeyColumnName>
 }}}
 
-===Remarks===
 
 Create an RINDEX for the specified table. This command requires the table to already be sorted across the cluster on KeyColumnName. This is usefully when you need to making low latency queries and updates on a very large amount of data without incurring mapreducer overhead.
 
