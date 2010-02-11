@@ -53,7 +53,16 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionP#PATINDEX PATINDEX]
  * [MySpaceQizmtSQLReferenceFunctionP#PI PI]
  * [MySpaceQizmtSQLReferenceFunctionP#POWER POWER]
- * [MySpaceQizmtSQLReferenceFunctionP#]
+ * [MySpaceQizmtSQLReferenceFunctionR#RADIANS RADIANS]
+ * [MySpaceQizmtSQLReferenceFunctionR#RAND RAND]
+ * [MySpaceQizmtSQLReferenceFunctionR#REPLACE REPLACE]
+ * [MySpaceQizmtSQLReferenceFunctionR#REVERSE REVERSE]
+ * [MySpaceQizmtSQLReferenceFunctionR#RIGHT RIGHT]
+ * [MySpaceQizmtSQLReferenceFunctionR#ROUND ROUND]
+ * [MySpaceQizmtSQLReferenceFunctionR#RPAD RPAD]
+ * [MySpaceQizmtSQLReferenceFunctionR#RTRIM RTRIM]
+
+
 
 
 
