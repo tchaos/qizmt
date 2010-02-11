@@ -19,4 +19,4 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
   * [MySpaceQizmtSQLReferenceCommandsTruncateTable TRUNCATE TABLE]
   * [MySpaceQizmtSQLReferenceCommandsDropTable DROP TABLE]
   * [MySpaceQizmtSQLReferenceCommandsShell SHELL]
- * Qizmt SQL Aggregate Function
+ * [MySpaceQizmtSQLReferenceAggregateFunction Qizmt SQL Aggregate Function]
