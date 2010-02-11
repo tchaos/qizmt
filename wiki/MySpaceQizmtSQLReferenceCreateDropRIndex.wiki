@@ -1,0 +1,28 @@
+#summary Qizmt SQL DROP RINDEX
+#labels Qizmt,SQL,Reference,Drop,RIndex
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=`DROP RINDEX`=
+
+{{{
+DROP RINDEX <rindex name>
+}}}
+
+
+This command drops the RINDEX on a table but does not delete the table’s data. For deleting the tables data see DROP TABLE.
+
+===Examples===
+
+{{{
+DROP RINDEX idxGraph
+}}}
+
+
+
+
+
+   
