@@ -1,0 +1,15 @@
+#summary Qizmt SQL Reference Aggregate Function
+#labels Qizmt,SQL,Reference,Aggregate,Function
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+=Qizmt SQL Reference Aggregate Function=
+
+ * [MySpaceQizmtSQLReferenceAggregateFunctionA#AVG AVG]
+ 
+
+
+
+   
