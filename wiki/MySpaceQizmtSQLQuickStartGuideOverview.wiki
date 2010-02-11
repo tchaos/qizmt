@@ -1,0 +1,15 @@
+#summary Qizmt SQL Quick Start Guide Overview
+#labels Qizmt,SQL,Guide,Overview
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
+
+
+=Overview=
+
+Qizmt SQL extends the functionality of Qizmt to include SQL operations which speed up the development process for application developers to write comprehensive business logic for large amounts of data in Qizmt clusters. With Qizmt alone, the developer is limited to the mapreduce paradigm and problems that fit into that paradigm. With the Qizmt SQL extension application developers may integrate other commonly useful tasks into their mapreduce pipelines such as massive deep graph processing; delta-only index, and index subset calculations and even distributed memory access from within map and reduce functions.
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_Quickstart_Overview.png" alt="QSQL Overview" />
+
+   
