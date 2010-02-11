@@ -3,7 +3,7 @@
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
 
-Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide]
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide] / [MySpaceQizmtSQLQuickStartGuideWalkthrough Walkthrough]
 
 
 =Walkthrough: Qizmt SQL Extension Continues=
@@ -25,4 +25,5 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 24.	Once the mapreducer finishes executing in debug mode, the resulting _MR.DFS file dfs://MyPaintingsWordCount_Output_ is created containing the resulting words and number of occurrences for each word.
 
+[MySpaceQizmtSQLQuickStartGuideWalkthrough8 < PREV]
 [MySpaceQizmtSQLQuickStartGuideWalkthrough10 NEXT >]
