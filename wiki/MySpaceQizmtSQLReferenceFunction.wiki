@@ -70,7 +70,5 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionS#SYSDATE SYSDATE]
  * [MySpaceQizmtSQLReferenceFunctionT#TAN TAN]
  * [MySpaceQizmtSQLReferenceFunctionT#TRUNC TRUNC]
-
-
-
+ * [MySpaceQizmtSQLReferenceFunctionU#UPPER UPPER]
 
