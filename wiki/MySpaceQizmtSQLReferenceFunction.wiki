@@ -32,6 +32,24 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionI#INSTR INSTR]
  * [MySpaceQizmtSQLReferenceFunctionI#ISNOTNULL ISNOTNULL]
  * [MySpaceQizmtSQLReferenceFunctionI#ISNULL ISNULL]
+ * [MySpaceQizmtSQLReferenceFunctionL#LAST_DAY LAST_DAY]
+ * [MySpaceQizmtSQLReferenceFunctionL#LEFT LEFT]
+ * [MySpaceQizmtSQLReferenceFunctionL#LEN LEN]
+ * [MySpaceQizmtSQLReferenceFunctionL#LESSER LESSER]
+ * [MySpaceQizmtSQLReferenceFunctionL#LESSEREQUAL LESSEREQUAL]
+ * [MySpaceQizmtSQLReferenceFunctionL#LOG LOG]
+ * [MySpaceQizmtSQLReferenceFunctionL#LOG10 LOG10]
+ * [MySpaceQizmtSQLReferenceFunctionL#LOWER LOWER]
+ * [MySpaceQizmtSQLReferenceFunctionL#LPAD LPAD]
+ * [MySpaceQizmtSQLReferenceFunctionL#LTRIM LTRIM]
+
+
+
+
+
+
+
+
 
 
 
