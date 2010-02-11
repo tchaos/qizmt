@@ -12,4 +12,9 @@ Qizmt SQL extends the functionality of Qizmt to include SQL operations which spe
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_Quickstart_Overview.png" alt="QSQL Overview" />
 
-   
+=Qizmt SQL Focus=
+
+ * Massively distributed applications with easy development with SQL & C# mapreduce
+ * Leverages the stability of Windows Servers, lower overall development costs then POSIX centric solutions
+ * Leverages thousands of servers with virtually 0 development cost. For the most part, application developers can abstract the cluster as a single machine with many cores, disk space and memory
+ * No special tools or skills required other then C# and SQL knowledge 
