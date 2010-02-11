@@ -12,3 +12,11 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
  * [MySpaceQizmtSQLReferenceFunction Qizmt SQL Functions]
  * RINDEX
   * [MySpaceQizmtSQLReferenceCreateRIndex CREATE RINDEX] 
+  * [MySpaceQizmtSQLReferenceCreateRSelect RSELECT]
+
+
+
+
+
+
+
