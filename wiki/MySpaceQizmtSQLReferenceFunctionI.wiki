@@ -1,0 +1,65 @@
+#summary Qizmt SQL Functions
+#labels Qizmt,SQL,Reference,Function
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference] / [MySpaceQizmtSQLReferenceFunction MySpace Qizmt SQL Functions]
+
+<wiki:toc max_depth="2" />
+
+=`INSTR`=
+
+{{{
+INSTR(str, substr) 
+}}}
+
+Returns the index of the first occurrence of the substring substr in string str.
+
+===Examples===
+
+{{{
+SELECT * FROM Employees WHERE GREATER(INSTR(Title, 'Manager'), -1) = 1;
+}}}
+
+{{{
+SELECT * FROM colors WHERE GREATER(INSTR(Name, 'purple'), -1) = 1;
+}}}
+
+=`ISNOTNULL`=
+
+{{{
+ISNOTNULL(expression) 
+}}}
+
+Returns 1 if the expression is not null, returns 0 otherwise.
+
+===Examples===
+
+{{{
+SELECT TOP 100 * FROM Employees WHERE ISNOTNULL(terminateDate) = 1;
+}}}
+
+{{{
+SELECT TOP 10 * FROM colors WHERE ISNOTNULL(Name) = 0;
+}}}
+
+=`ISNULL`=
+
+{{{
+ISNULL(expression) 
+}}}
+
+Returns 1 if the expression is null, returns 0 otherwise.
+
+===Examples===
+
+{{{
+SELECT TOP 100 * FROM Employees WHERE ISNULL(terminateDate) = 0;
+}}}
+
+{{{
+SELECT TOP 10 * FROM colors WHERE ISNULL(Name) = 1;
+}}}
+
+
+   
