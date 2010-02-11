@@ -10,4 +10,4 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
  * [MySpaceQizmtSQLQuickStartGuideFocus Qizmt SQL Focus]
  * [MySpaceQizmtSQLQuickStartGuideMapreducePrereq Qizmt Mapreduce Prerequisite]
  * [MySpaceQizmtSQLQuickStartGuideQSQL Qizmt SQL]
-  
+ * [MySpaceQizmtSQLQuickStartGuideQSQLTranslation Qizmt SQL Translation] 
