@@ -12,7 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 INSERT INTO <table_name> BIND <dfs_file>;
 }}}
 
-===Remarks===
 
 Bind data into a table using a MR.DFS rectangular binary data file created using the DbRecordset object. The file is directly bound into the table, leaving the original file name inaccessible. This operation incurs no mapreducers and is used for re-casting MR.DFS data as a SQL table. See the Qizmt SQL Quick Start Guide for more information on DbRecordset.
 
