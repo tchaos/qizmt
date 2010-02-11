@@ -21,3 +21,5 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceAggregateFunctionS#STD STD]
  * [MySpaceQizmtSQLReferenceAggregateFunctionS#STD_SAMP STD_SAMP]
  * [MySpaceQizmtSQLReferenceAggregateFunctionS#SUM SUM]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionV#VAR_POP VAR_POP]
+ * [MySpaceQizmtSQLReferenceAggregateFunctionV#VAR_SAMP VAR_SAMP]
