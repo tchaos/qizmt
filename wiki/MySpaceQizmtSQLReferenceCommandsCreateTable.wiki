@@ -12,8 +12,6 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 CREATE TABLE <table_name> (<column_name> <type> [, ...]);
 }}}
 
-===Remarks===
-
 Creates a table with application specific schema of columns. Data types supported include:
 
 ===CHAR(N)===
