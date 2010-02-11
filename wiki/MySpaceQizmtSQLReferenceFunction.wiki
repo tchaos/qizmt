@@ -7,4 +7,9 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
 
 =Qizmt SQL Functions=
 
- * [xxxx]
+ * [MySpaceQizmtSQLReferenceFunctionA#ABS ABS]
+ * [MySpaceQizmtSQLReferenceFunctionA#ACOS ACOS]
+ * [MySpaceQizmtSQLReferenceFunctionA#ADD_MONTHS ADD_MONTHS]
+ * [MySpaceQizmtSQLReferenceFunctionA#ASIN ASIN]
+ * [MySpaceQizmtSQLReferenceFunctionA#ATAN ATAN]
+ * [MySpaceQizmtSQLReferenceFunctionA#ATN2 ATN2]
