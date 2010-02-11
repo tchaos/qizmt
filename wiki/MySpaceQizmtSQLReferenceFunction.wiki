@@ -23,3 +23,12 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLRef
  * [MySpaceQizmtSQLReferenceFunctionD#DATEADD DATEADD]
  * [MySpaceQizmtSQLReferenceFunctionD#DATEDIFF DATEDIFF]
  * [MySpaceQizmtSQLReferenceFunctionD#DEGREES DEGREES]
+ * [MySpaceQizmtSQLReferenceFunctionE#EQUAL EQUAL]
+ * [MySpaceQizmtSQLReferenceFunctionE#EXP EXP]
+
+
+
+
+
+
+
