@@ -6,7 +6,7 @@
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide] / [MySpaceQizmtSQLQuickStartGuideWalkthroughContents Walkthrough]
 
 
-=Walkthrough: Qizmt SQL Extension Continues=
+=Walkthrough: Qizmt SQL Extension (contd)=
 
 16.	Now that the name of the _underlying rectangular binary MR.DFS file_ is known to be _dfs://RDBMS_Table_paintings@644_, a mapreducer can be written to produce another MR.DFS file containing the count of each unique word in the _title_ field of every tuple of the _paintings_ table.
 
