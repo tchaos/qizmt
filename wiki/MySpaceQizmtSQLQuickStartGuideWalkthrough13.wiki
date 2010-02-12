@@ -6,7 +6,7 @@
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide] / [MySpaceQizmtSQLQuickStartGuideWalkthroughContents Walkthrough]
 
 
-=Walkthrough: Qizmt SQL Extension Continues=
+=Walkthrough: Qizmt SQL Extension (contd)=
 
 32.	Modify the SQL to select the top 100 rows from the paintings_wordcount table. The data was already sorted by the word column in the mapreducer so you do not need an *ORDER BY* clause unless you want to resort rows before displaying the results.
 
