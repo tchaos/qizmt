@@ -10,7 +10,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 <wiki:toc max_depth="2" />
 
-==1.  Install the latest Qizmt==
+==1.  Install the Latest Qizmt==
 
 Install the latest Qizmt on every machine in the cluster. (Note there is an install.js which may be used to avoid having to run the .msi installer on every machine of the cluster)
 
@@ -19,7 +19,7 @@ The latest mainline source may be found under:
 */trunk*
 
 
-==2. Build and Zip Qizmt SQL Extension==
+==2. Build Qizmt SQL Extension==
 
 Build the Qizmt SQL Extension solution then zip the QueryAnalyzer_Setup folder as QSQLExtension.zip
 
