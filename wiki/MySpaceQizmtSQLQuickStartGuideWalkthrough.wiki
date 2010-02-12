@@ -10,7 +10,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 <wiki:toc max_depth="2" />
 
-==1.  Install the Latest Qizmt==
+==1.  Install Qizmt==
 
 Install the latest Qizmt on every machine in the cluster. (Note there is an install.js which may be used to avoid having to run the .msi installer on every machine of the cluster)
 
