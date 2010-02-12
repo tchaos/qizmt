@@ -6,7 +6,7 @@
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide] / [MySpaceQizmtSQLQuickStartGuideWalkthroughContents Walkthrough]
 
 
-=Walkthrough: Qizmt SQL Extension Continues=
+=Walkthrough: Qizmt SQL Extension (contd)=
 
 21.	Run the mapreducer in debug mode by pressing *F5* or by clicking on the <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_StartDebugButton.png" alt="Start Debug Button" />  button.
 
