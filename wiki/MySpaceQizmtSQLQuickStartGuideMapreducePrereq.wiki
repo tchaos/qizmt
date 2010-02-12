@@ -12,5 +12,5 @@ Mapreduce commonly refers to an easy way to optimally process very large amounts
 
 Here are some guides which may be used to master basic Qizmt mapreduce development:
 
-|| [MySpaceQizmtSQLQuickStartGuide Qizmt Tutorial] || So you are ready to install Qizmt on your development machine? <Br/>This tutorial will walk you through every step of installing Qizmt on your development machine, creating and executing mapreducer jobs, as well as specifications on the tools used to develop Qizmt mapreducers, and strategies for optimizing mapreducer pipelines for common data processing tasks. ||
-|| [MySpaceQizmtSQLReference Qizmt Reference Guide] || This guide is a listing of all the objects available to mapreducer jobs which make writing highly efficient mapreducers easy. ||
+|| [MySpaceQizmtTutorial MySpace Qizmt Tutorial] || So you are ready to install Qizmt on your development machine? <Br/>This tutorial will walk you through every step of installing Qizmt on your development machine, creating and executing mapreducer jobs, as well as specifications on the tools used to develop Qizmt mapreducers, and strategies for optimizing mapreducer pipelines for common data processing tasks. ||
+|| [MySpaceQizmtReference MySpace Qizmt Reference] || This guide is a listing of all the objects available to mapreducer jobs which make writing highly efficient mapreducers easy. ||
