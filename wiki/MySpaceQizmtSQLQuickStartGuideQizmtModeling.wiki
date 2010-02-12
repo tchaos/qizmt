@@ -31,6 +31,13 @@ Often when applications developers are designing pipelines, it is helpful to dra
 || <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_ModelingADONET.png" alt="Modeling ADO.NET" /> || All other ADO.NET operations besides RSELECT and BULK UPDATE. ||
 
 
+==Qizmt Modeling Example==
+
+A simplified model to quickly describe the business logic of the Distributed Memory Performance Test might look something like this:
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_ModelingExample.png" alt="Modeling Example" />
+
+
 
 
    
