@@ -8,13 +8,17 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 =Walkthrough: Qizmt SQL Extension (contd)=
 
-16.	Now that the name of the _underlying rectangular binary MR.DFS file_ is known to be _dfs://RDBMS_Table_paintings@644_, a mapreducer can be written to produce another MR.DFS file containing the count of each unique word in the _title_ field of every tuple of the _paintings_ table.
+<wiki:toc max_depth="2" />
+
+==16.  Naming of Rectangular Binary MR.DFS File==
+
+Now that the name of the _underlying rectangular binary MR.DFS file_ is known to be _dfs://RDBMS_Table_paintings@644_, a mapreducer can be written to produce another MR.DFS file containing the count of each unique word in the _title_ field of every tuple of the _paintings_ table.
 
 
-----
+==17.  Launch the Qizmt IDE/Debugger==
 
 
-17.	Launch the _Qizmt IDE/Debugger_ with a new job file called MyPaintingsWordCount.xml by issuing the following command at the windows command prompt: 
+Launch the _Qizmt IDE/Debugger_ with a new job file called MyPaintingsWordCount.xml by issuing the following command at the windows command prompt: 
 
 *qizmt edit MyPaintingsWordCount.xml*
 
@@ -22,10 +26,10 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_EditPaintingsWordCount.png" alt="Qizmt edit" />
 
 
-----
+==18.  Qizmt IDE/Debugger==
 
 
-18.	This will bring up the _Qizmt IDE/Debugger_ with a default mapreduce example, unless MyPaintingsWordCount.xml already exists in the _MR.DFS_.
+This will bring up the _Qizmt IDE/Debugger_ with a default mapreduce example, unless MyPaintingsWordCount.xml already exists in the _MR.DFS_.
 
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_EditorPaintingsWordCount.png" alt="Qizmt edit" />
