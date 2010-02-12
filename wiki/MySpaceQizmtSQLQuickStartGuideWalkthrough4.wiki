@@ -6,7 +6,7 @@
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide] / [MySpaceQizmtSQLQuickStartGuideWalkthroughContents Walkthrough]
 
 
-=Walkthrough: Qizmt SQL Extension Continues=
+=Walkthrough: Qizmt SQL Extension (contd)=
 
 10.  This will create an example SQL statement in a new sub-window on the right with a randomly generated *WHERE* clause.
 
