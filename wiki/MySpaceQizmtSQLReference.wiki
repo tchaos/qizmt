@@ -10,9 +10,8 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
  * [MySpaceQizmtSQLReferenceCommand Qizmt SQL Commands]
  * [MySpaceQizmtSQLReferenceAggregateFunction Qizmt SQL Aggregate Functions]
  * [MySpaceQizmtSQLReferenceFunction Qizmt SQL Functions]
- * RINDEX
+ * Distributed Memory 
   * [MySpaceQizmtSQLReferenceCreateRIndex CREATE RINDEX] 
   * [MySpaceQizmtSQLReferenceCreateRSelect RSELECT]
   * [MySpaceQizmtSQLReferenceCreateBulkUpdate BULKUPDATE]
   * [MySpaceQizmtSQLReferenceCreateDropRIndex DROP RINDEX]
-
