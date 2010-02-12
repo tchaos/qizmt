@@ -8,26 +8,31 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 =Walkthrough: Qizmt SQL Extension (contd)=
 
-5.  Once installation is complete, log off the machine and log back in to any machine of the cluster and connect with the _Query Analyzer_ by opening the windows command-line and entering: *RDBMS_qa.exe*
+<wiki:toc max_depth="2" />
+
+==5.  Open Query Analyzer==
+
+Once installation is complete, log off the machine and log back in to any machine of the cluster and connect with the _Query Analyzer_ by opening the windows command-line and entering: *RDBMS_qa.exe*
 
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_RDBMSQa.png" alt="QSQL RDBMS_Qa" />
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_Qa.png" alt="QSQL Qa" />
 
-----
 
-6.  Select File->Connection->Open
+==6. Open Connection== 
+
+Select File->Connection->Open
 
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_QaOpenConnection.png" alt="QSQL Qa Open Connection" />
 
 
 
-----
+==7. Test Connection==
 
 
-7.  The connection window will default to your current computer, listing in the Data Source both localhost and the name of your computer’s hostname. Test the connection by clicking *Test Connection* then click *Connect* to connect to the single-machine Qizmt cluster on your desktop.
+The connection window will default to your current computer, listing in the Data Source both localhost and the name of your computer’s hostname. Test the connection by clicking *Test Connection* then click *Connect* to connect to the single-machine Qizmt cluster on your desktop.
 
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_QaTestConnection.png" alt="QSQL Qa Test Connection" />
