@@ -19,13 +19,11 @@ This walkthrough will demonstrate the interoperability of mapreduce and Qizmt SQ
 || [MySpaceQizmtSQLQuickStartGuideWalkthrough6 Steps 14 - 15] || Rectangular binary MR.DFS file ||
 || [MySpaceQizmtSQLQuickStartGuideWalkthrough7 Steps 16 - 18] || Qizmt IDE/Debugger ||
 || [MySpaceQizmtSQLQuickStartGuideWalkthrough8 Steps 19 - 20] || Sample Mapreduce code to generate a rectangular binary MR.DFS file||
-|| [MySpaceQizmtSQLQuickStartGuideWalkthrough9 Steps 21 - 24] || Run the mapreducer ||
+|| [MySpaceQizmtSQLQuickStartGuideWalkthrough9 Steps 21 - 24] || Run a mapreducer ||
 || [MySpaceQizmtSQLQuickStartGuideWalkthrough10 Steps 25 - 26] || Create a new table ||
-|| [MySpaceQizmtSQLQuickStartGuideWalkthrough11 Steps 27 - 29] || Use INSERT BIND to import from rectangular binary MR.DFS file into the new table ||
-|| [MySpaceQizmtSQLQuickStartGuideWalkthrough12 Steps 30 - 31] || Execute the import ||
-|| [MySpaceQizmtSQLQuickStartGuideWalkthrough13 Steps 32 - 33] || SELECT from the new table ||
-
-
+|| [MySpaceQizmtSQLQuickStartGuideWalkthrough11 Steps 27 - 29] || Use INSERT BIND to import from rectangular binary MR.DFS file into a table ||
+|| [MySpaceQizmtSQLQuickStartGuideWalkthrough12 Steps 30 - 31] || Execute import ||
+|| [MySpaceQizmtSQLQuickStartGuideWalkthrough13 Steps 32 - 33] || SELECT from table ||
 
 
 
