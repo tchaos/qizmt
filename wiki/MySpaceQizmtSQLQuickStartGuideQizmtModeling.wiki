@@ -5,6 +5,7 @@
 
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide]
 
+<wiki:toc max_depth="2" />
 
 =Qizmt Modeling=
 
