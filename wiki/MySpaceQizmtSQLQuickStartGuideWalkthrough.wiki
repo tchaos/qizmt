@@ -8,33 +8,38 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 =Walkthrough: Qizmt SQL Extension=
 
+<wiki:toc max_depth="2" />
 
-1.  Install the latest Qizmt on every machine in the cluster. (Note there is an install.js which may be used to avoid having to run the .msi installer on every machine of the cluster)
+==1.  Install the latest Qizmt===
+
+Install the latest Qizmt on every machine in the cluster. (Note there is an install.js which may be used to avoid having to run the .msi installer on every machine of the cluster)
 
 The latest mainline source may be found under:
 
 */trunk*
 
-----
 
-2.  Build the Qizmt SQL Extension solution then zip the QueryAnalyzer_Setup folder as QSQLExtension.zip
+===2. Build and Zip Qizmt SQL Extension===
 
--	This folder contains all of the Qizmt Jobs, assemblies, services, etc. of the Qizmt SQL Extension.
+Build the Qizmt SQL Extension solution then zip the QueryAnalyzer_Setup folder as QSQLExtension.zip
+
+This folder contains all of the Qizmt Jobs, assemblies, services, etc. of the Qizmt SQL Extension.
 
 The latest mainline source may be found under:
 
 */trunk/Extensions/QueryAnalyzer*
 
 
-----
+===3.  Unzip Qizmt SQL Extension===
 
-3.  Unzip QSQLExtension.zip on any machine in the cluster and navigate to the unzipped folder at the command line. It does not matter which machine in the cluster you use to install, once it is installed it will be available to the entire cluster.
+Unzip QSQLExtension.zip on any machine in the cluster and navigate to the unzipped folder at the command line. It does not matter which machine in the cluster you use to install, once it is installed it will be available to the entire cluster.
 
-----
 
-4.  Issue the command: `RDBMS_Install.js “<username>” “<password>”`
+===4.  Install Qizmt SQL Extension===
 
-- (use the same windows credentials which Qizmt was installed with)
+Issue the command: `RDBMS_Install.js “<username>” “<password>”`
+
+(use the same windows credentials which Qizmt was installed with)
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_RDBMSIntall.png" alt="RDBMS_Install.js" />
 
