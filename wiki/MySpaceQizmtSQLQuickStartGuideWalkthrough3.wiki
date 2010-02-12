@@ -18,7 +18,7 @@ Once connected, you will see *System* tables and some sample user tables; *paint
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_QaEmptyWindow.png" alt="QSQL Qa Empty Query Window" />
 
 
-==9.  Select from a Table==
+==9.  SELECT from a Table==
 
 
 View the first three entries in the *paintings* table by right clicking it and navigating *SELECT…->SELECT ORDER BY*
