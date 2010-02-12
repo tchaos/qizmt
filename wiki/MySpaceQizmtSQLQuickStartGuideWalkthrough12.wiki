@@ -10,13 +10,13 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 <wiki:toc max_depth="2" />
 
-==30.  Execute the Import==
+==30.  Execute Import==
 
 Press *F5* or click on the *Run* button to execute the import.
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_RunImport.png" alt="Run" />
 
-==31.  SELECT TOP from the New Table==
+==31.  SELECT TOP from Table==
 
 View the new contents of the *paintings_wordcount* table by right clicking on it in the Database Objects Tree and navigating to *SELECT…* then to *SELECT TOP*.
 
