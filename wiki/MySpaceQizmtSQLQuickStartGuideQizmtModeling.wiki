@@ -1,0 +1,28 @@
+#summary Qizmt SQL Quick Start Guide - Overview
+#labels Qizmt,SQL,Guide,Modeling
+
+<wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
+
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide]
+
+
+=Qizmt Modeling=
+
+Often when applications developers are designing pipelines, it is helpful to draw up a design for the pipeline. In order to facilitate this we have settled on a simple modeling technique for this. These models are often hand-drawn or created with Microsoft Visio. Qizmt modeling is often used to:
+
+ * Design new pipelines
+ * Communicate design of pipelines already created
+ * Help achieve capability maturity certifications
+
+==Qizmt Modeling Syntax==
+
+|| *Concept* || *Narrative* ||
+|| <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_ModelingGroupedMR.png" alt="Modeling Grouped MR" /> || Grouped mapreduce, often used to re-pivot a large amount of data on some column of its tuples. Applying logic both before and after the data is pivoted on a field in its tuples. (Note: arrows always point to data in this methodology) ||
+|| <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_ModelingSortedMR.png" alt="Modeling Sorted MR" /> || Like grouped mapreducer, but data is fully sorted instead of hashed on the keys such that each reducer gets an even range of sorted data. Often used to sort data into an index for RINDEX creation, however this may also be done with INSERT INTO SELECT which will translate to a sorted mapreducer execution. ||
+|| <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_ModelingLocal.png" alt="Modeling Local" /> || Function that executes on a single core in the cluster. ||
+|| <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_ModelingRemote.png" alt="Modeling Remote" /> || Function that executes on a single or multiple cores in the cluster and has a stream both into and out of and MR.DFS file. ||
+|| <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_ModelingContent.png" alt="Modeling Content" /> || An MR.DFS file or SQL table that has an underlying MR.DFS file. ||
+
+
+
+   
