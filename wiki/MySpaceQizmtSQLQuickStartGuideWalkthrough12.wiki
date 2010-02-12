@@ -8,13 +8,17 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 =Walkthrough: Qizmt SQL Extension (contd)=
 
-30.	Press *F5* or click on the *Run* button to execute the import.
+<wiki:toc max_depth="2" />
+
+==30.  Execute the Import==
+
+Press *F5* or click on the *Run* button to execute the import.
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_RunImport.png" alt="Run" />
 
-----
+==31.  SELECT TOP from New Table==
 
-31.	View the new contents of the *paintings_wordcount* table by right clicking on it in the Database Objects Tree and navigating to *SELECT…* then to *SELECT TOP*.
+View the new contents of the *paintings_wordcount* table by right clicking on it in the Database Objects Tree and navigating to *SELECT…* then to *SELECT TOP*.
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_SelectTop.png" alt="Select Top" />
 
