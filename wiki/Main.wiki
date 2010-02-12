@@ -17,7 +17,7 @@ MySpace Qizmt is a mapreduce framework for executing and developing distributed 
 
 == Qizmt SQL Documentation ==
 
-[MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide]
+[MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Tutorial]
 
 [MySpaceQizmtSQLReference MySpace Qizmt SQL Reference]
 
