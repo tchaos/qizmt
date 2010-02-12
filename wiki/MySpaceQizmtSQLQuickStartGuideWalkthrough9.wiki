@@ -8,22 +8,26 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 =Walkthrough: Qizmt SQL Extension (contd)=
 
-21.	Run the mapreducer in debug mode by pressing *F5* or by clicking on the <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_StartDebugButton.png" alt="Start Debug Button" />  button.
+<wiki:toc max_depth="2" />
+
+==21.  Run the Mapreducer==
+
+Run the mapreducer in debug mode by pressing *F5* or by clicking on the <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_StartDebugButton.png" alt="Start Debug Button" />  button.
 
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_StartDebug.png" alt="Start Debug" />
 
-----
+==22.  Observe Locals / Call Stack==
 
-22.	In _Locals / Call Stack_ box you can see the values of the current reducer iteration each time you press *F5*. 
+In _Locals / Call Stack_ box you can see the values of the current reducer iteration each time you press *F5*. 
 
-----
+==23.  Remove Breakpoint==
 
-23.	Click on <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_RemoveBreakPoint.png" alt="Remove Breakpoint" />  to remove the break point and then press F5 again to let the mapreducer finish executing in debug mode.
+Click on <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/QSQL_RemoveBreakPoint.png" alt="Remove Breakpoint" />  to remove the break point and then press F5 again to let the mapreducer finish executing in debug mode.
 
-----
+==24.  Output File==
 
-24.	Once the mapreducer finishes executing in debug mode, the resulting _MR.DFS file dfs://MyPaintingsWordCount_Output_ is created containing the resulting words and number of occurrences for each word.
+Once the mapreducer finishes executing in debug mode, the resulting _MR.DFS file dfs://MyPaintingsWordCount_Output_ is created containing the resulting words and number of occurrences for each word.
 
 [MySpaceQizmtSQLQuickStartGuideWalkthrough8 < PREV]
 [MySpaceQizmtSQLQuickStartGuideWalkthrough10 NEXT >]
