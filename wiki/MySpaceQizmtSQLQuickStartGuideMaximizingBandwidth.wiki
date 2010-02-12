@@ -1,9 +1,9 @@
-#summary Qizmt SQL Quick Start Guide - Maximizing Bandwidth Usage between Data Centers with ADO.NET
+#summary Qizmt SQL Tutorial - Maximizing Bandwidth Usage between Data Centers with ADO.NET
 #labels Qizmt,SQL,Guide,Maximizing,Bandwidth
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
 
-Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide]
+Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Tutorial]
 
 
 =Maximizing Bandwidth Usage between Data Centers with ADO.NET=
