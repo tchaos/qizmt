@@ -8,7 +8,11 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQui
 
 =Walkthrough: Qizmt SQL Extension (contd)=
 
-14.	Use regular ADO.NET to connect to the cluster an execute SQL from your Main() function.
+<wiki:toc max_depth="2" />
+
+==14.  Sample Code to Connect via ADO.NET==
+
+Use regular ADO.NET to connect to the cluster an execute SQL from your Main() function.
 
 {{{
 public static void Main(string[] args)
@@ -42,9 +46,10 @@ public static void Main(string[] args)
 
 }}}
 
-----
 
-15.	Next, to write a _Qizmt mapreducer_ to count the words in all the _title_ field of every tuple of the _paintings_ table. Although mapreduce development is outside the scope of this Guide, it is included in this tutorial for completeness and the steps can be followed as an introduction to mapreduce development. To start, find the _underlying rectangular binary MR.DFS file_ for the _paintings_ table. Do this by issuing the command:
+==15.  Rectangular Binary MR.DFS File==
+
+Next, to write a _Qizmt mapreducer_ to count the words in all the _title_ field of every tuple of the _paintings_ table. Although mapreduce development is outside the scope of this Guide, it is included in this tutorial for completeness and the steps can be followed as an introduction to mapreduce development. To start, find the _underlying rectangular binary MR.DFS file_ for the _paintings_ table. Do this by issuing the command:
 
  
 *qizmt dir RDBMS_Table_paintings`*`*
