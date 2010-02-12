@@ -6,7 +6,7 @@
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / [MySpaceQizmtSQLQuickStartGuide MySpace Qizmt SQL Quick Start Guide] / [MySpaceQizmtSQLQuickStartGuideWalkthroughContents Walkthrough]
 
 
-=Walkthrough: Qizmt SQL Extension Continues=
+=Walkthrough: Qizmt SQL Extension (contd)=
 
 19.	Replace the entire contents of the mapreducer with the following code:
 _(Note: key length may contain any combination of comma separated null-able types_
