@@ -7,7 +7,7 @@ Back to <wiki:comment>Link:</wiki:comment>[MySpaceQizmtTutorial Qizmt Tutorial] 
 <wiki:toc />
 
 
-= Single Machine Qick-Start =
+= Single Machine Quick-Start =
 
 == Run MSI to install driver on development machine ==
 
