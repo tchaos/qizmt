@@ -6,7 +6,7 @@
 Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 
 
- * [MySpaceQizmtSingleMachineQuickStart Single Machine Qick-Start]
+ * [MySpaceQizmtSingleMachineQuickStart Single Machine Quick-Start]
  * [MySpaceQizmtMoreExamples More Examples]
  * [MySpaceQizmtTopDownCollaborativeFiltering Top-Down Collaborative Filtering]
  * [MySpaceQizmtJobTypes Job Types]
