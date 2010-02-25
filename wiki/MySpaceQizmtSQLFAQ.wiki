@@ -1,4 +1,4 @@
-#summary Qizmt FAQ - Installation
+#summary Qizmt FAQ - Qizmt SQL Extension
 
 <wiki:comment>Image:</wiki:comment><img src="http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png" alt="Qizmt logo (small)" />
 
@@ -6,7 +6,7 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / <wiki:comment>Link:
 
 <wiki:toc/>
 
-= Qizmt FAQ - Installation =
+= Qizmt FAQ - Qizmt SQL Extension =
 
 ==After I install Qizmt and run the format command from one of the machines in the cluster, I am still unable to run any mapreducers jobs.==
 ----
