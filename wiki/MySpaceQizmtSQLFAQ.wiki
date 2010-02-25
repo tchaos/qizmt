@@ -8,9 +8,8 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main] / <wiki:comment>Link:
 
 = Qizmt FAQ - Qizmt SQL Extension =
 
-==After I install Qizmt and run the format command from one of the machines in the cluster, I am still unable to run any mapreducers jobs.==
+==Where can I get Qizmt SQL extension examples?==
 ----
 
-Are there any errors when issue the command {{{health –a}}}?
-
-Are there any firewalls between the machines of the cluster? Qizmt clusters should not have any firewall between the machines of the cluster.
+QSQL examples can be generated with:
+RDBMS_admin examples
