@@ -53,6 +53,7 @@
     <Compile Include="KillAll.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RIndexes.cs" />
     <Compile Include="RIndexStressTests.cs" />
     <Compile Include="RunRegressionTests.cs" />
     <Compile Include="StartAll.cs" />

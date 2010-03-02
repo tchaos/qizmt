@@ -74,6 +74,14 @@ namespace RDBMS_Admin
                     Callstack(args);
                     break;
 
+                case "deleterindexes":
+                    DeleteRIndexes(args);
+                    break;
+
+                case "verifyrindexes":
+                    VerifyRIndexes(args);
+                    break;
+
                 default:
                     Console.Error.WriteLine("Not valid: RDBMS_Admin {0}", action);
                     break;
@@ -99,6 +107,8 @@ namespace RDBMS_Admin
             Console.WriteLine("                            generate and run rindex filtering stress test");
             Console.WriteLine("    rindexbasicstresstest   generate a basic rindex stress test");
             Console.WriteLine("    health   check health of protocol services");
+            Console.WriteLine("    deleterindexes                   delete all rindexes");
+            Console.WriteLine("    verifyrindexes [-v verbose]      check health of all rindexes");
         }
 
         static void GetRawBuildInfo(out int bn, out int rv)

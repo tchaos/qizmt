@@ -184,7 +184,11 @@ namespace MySpace.DataMining.AELight
                             System.Xml.Serialization.XmlSerializer xs = new System.Xml.Serialization.XmlSerializer(typeof(dfs));
                             //xs.Serialize(fdc, dc);
                             System.Xml.XmlTextWriter xw = new System.Xml.XmlTextWriter(fdc, null); // null=UTF-8
+#if DEBUG
+                            xw.Formatting = System.Xml.Formatting.Indented;
+#else
                             xw.Formatting = System.Xml.Formatting.None;
+#endif
                             xs.Serialize(xw, dc);
                         }
                         //+++metabackup+++
@@ -301,6 +305,75 @@ namespace MySpace.DataMining.AELight
                 //+++metabackup+++
                 if (null != backupdir)
                 {
+#if DEBUG
+                    //System.Diagnostics.Debugger.Launch();
+#endif
+                    try
+                    {
+                        if (System.IO.File.Exists(oldbackupfile))
+                        {
+                            long lastprevid;
+                            System.IO.FileInfo bfi = new System.IO.FileInfo(backupfile);
+                            {
+                                System.IO.FileInfo[] prevfiles = bfi.Directory.GetFiles(bfi.Name + ".*.prev");
+                                Func<string, long> OrdFromXmlPrev = delegate(string fp)
+                                    {
+                                        int d = fp.LastIndexOf('.', fp.Length - 5 - 1) + 1;
+                                        string snum = fp.Substring(d, (fp.Length - 5) - d);
+                                        return long.Parse(snum);
+                                    };
+                                Array.Sort<System.IO.FileInfo>(prevfiles, new Comparison<System.IO.FileInfo>(
+                                    delegate(System.IO.FileInfo fi1, System.IO.FileInfo fi2)
+                                    {
+                                        long ord1 = OrdFromXmlPrev(fi1.ToString());
+                                        long ord2 = OrdFromXmlPrev(fi2.ToString());
+                                        if (ord1 < ord2)
+                                        {
+                                            return -1;
+                                        }
+                                        if (ord1 > ord2)
+                                        {
+                                            return +1;
+                                        }
+                                        return 0;
+                                    }));
+                                const int DFSXMLPREVMAXCOUNT = 10;
+                                for (int i = 0; i < prevfiles.Length - (DFSXMLPREVMAXCOUNT - 1); i++)
+                                {
+                                    try
+                                    {
+                                        System.IO.File.Delete(prevfiles[i].FullName);
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
+                                if (prevfiles.Length > 0)
+                                {
+                                    lastprevid = OrdFromXmlPrev(prevfiles[prevfiles.Length - 1].ToString());
+                                }
+                                else
+                                {
+                                    lastprevid = 0;
+                                }
+                            }
+
+                            long newprevid;
+                            if (lastprevid == long.MaxValue)
+                            {
+                                newprevid = 1;
+                            }
+                            else
+                            {
+                                newprevid = lastprevid + 1;
+                            }
+                            System.IO.File.Move(oldbackupfile, bfi.FullName + "." + newprevid + ".prev");
+
+                        }
+                    }
+                    catch
+                    {
+                    }
                     try
                     {
                         System.IO.File.Delete(oldbackupfile);

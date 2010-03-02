@@ -43,6 +43,11 @@ namespace RegressionTest2
                         RemoveMachine(args);
                         break;
 
+                    case "metaremove":
+                    case "metaremovemachine":
+                        MetaRemoveMachine(args);
+                        break;
+
                     case "enablereplication":
                     case "enablereplicationwithcache":
                         EnableReplication(args);
@@ -168,6 +173,7 @@ namespace RegressionTest2
             Console.WriteLine("    ReplicationChecks <dfsxmlpath>");
             Console.WriteLine("    SortedCache <dfsxmlpath>");
             Console.WriteLine("    GlobalCriticalSectionKillall <dfsxmlpath>");
+            Console.WriteLine("    MetaRemove <dfsxmlpath>");
         }
 
 

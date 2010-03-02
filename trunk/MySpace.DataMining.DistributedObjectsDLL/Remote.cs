@@ -561,7 +561,7 @@ namespace RemoteExec
                     return curpartfulllength - curpartheadersize;
                 }
                 //return curseqfile.Position - curpartheadersize;
-#if DEBUG
+#if DEBUGmore
                 if(curseqfile.Position != curpartpos)
                 {
                     throw new Exception(`DEBUG:  CurrentPartPosition: (curseqfile.Position != curpartpos)`);
@@ -627,7 +627,7 @@ namespace RemoteExec
             {
                 // Suppress error message. To-do: fix.
             }
-#if DEBUG
+#if DEBUGmore
             if(null != curseqfile)
             {
                 if(curpartpos != curseqfile.Position)

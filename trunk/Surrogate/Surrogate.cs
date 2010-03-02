@@ -126,6 +126,9 @@ namespace MySpace.DataMining.AELight
         }
 
 
+        public int AddMachineMinThreads = 20;
+
+
         public static string FixXPath(string userfriendlyxpath)
         {
             string result = userfriendlyxpath;
@@ -481,17 +484,20 @@ namespace MySpace.DataMining.AELight
             MapNodesToNetworkPaths(nodes, netpaths, false);
         }
 
-
-        public static string MapNodeToNetworkStarPath(dfs.DfsFile.FileNode node, bool samples)
+        public static string MapNodeToNetworkStarPath(dfs.DfsFile.FileNode node, bool samples, int startinghost)
         {
             string[] chosts = node.Host.Split(';');
             StringBuilder sb = new StringBuilder();
             Exception laste = null;
-            for(int ci = 0; ci < chosts.Length; ci++)
+            for (int ci = 0; ci < chosts.Length; ci++)
             {
+                if (startinghost >= chosts.Length)
+                {
+                    startinghost = 0;
+                }
                 try
                 {
-                    string netdir = Surrogate.NetworkPathForHost(chosts[ci]);
+                    string netdir = Surrogate.NetworkPathForHost(chosts[startinghost++]);
                     if (0 != sb.Length)
                     {
                         sb.Append('*');
@@ -505,7 +511,7 @@ namespace MySpace.DataMining.AELight
                         sb.Append(netdir + @"\" + node.Name);
                     }
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     laste = e;
                 }
@@ -519,6 +525,11 @@ namespace MySpace.DataMining.AELight
                 throw new Exception("No valid paths found", laste);
             }
             return sb.ToString();
+        }
+
+        public static string MapNodeToNetworkStarPath(dfs.DfsFile.FileNode node, bool samples)
+        {
+            return MapNodeToNetworkStarPath(node, samples, 0);
         }
 
         public static string MapNodeToNetworkStarPath(dfs.DfsFile.FileNode node)
@@ -2030,6 +2041,13 @@ namespace MySpace.DataMining.AELight
                 }
             }
 
+            public ComputingConfig Computing;
+
+            public class ComputingConfig
+            {
+                public string Mode = "";
+                public string InputOrder = "next";
+            }
 
             public class ConfigIOSettings
             {
