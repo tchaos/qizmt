@@ -1334,6 +1334,11 @@ namespace MySpace.DataMining.AELight
         protected internal static void AELight_JoinTraceThread(System.Threading.Thread thd)
         {
             thd.Join();
+            AELight_RemoveTraceThread(thd);
+        }
+
+        protected internal static void AELight_RemoveTraceThread(System.Threading.Thread thd)
+        {
 #if AELIGHT_TRACE
             lock (AELight_TraceThreads)
             {
@@ -1351,17 +1356,155 @@ namespace MySpace.DataMining.AELight
             {
                 System.IO.FileStream jsostm = new System.IO.FileStream(AELight_Dir + @"\stdout.jid" + sjid + ".jso",
                     System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
-                Console.SetOut(new StdoutLog(Console.Out, new System.IO.StreamWriter(jsostm)));
+                // Note: SetOut synchronizes access to this class.
+                System.IO.StreamWriter jsostmw = new System.IO.StreamWriter(jsostm);
+                Console.SetOut(new StdoutLog(Console.Out, jsostmw));
+                Console.SetError(new StdoutLog(Console.Error, jsostmw));
+            }
+
+            static bool exiting = false;
+
+            public static void FinalFlush()
+            {
+                try
+                {
+                    exiting = true;
+                    Console.Error.Flush();
+                    Console.Out.Flush();
+                }
+                catch
+                {
+                }
             }
 
 
+            struct WriteInfo
+            {
+                internal string str;
+                internal char ch;
+                internal bool isline;
+                internal bool flush;
+            }
+
             System.IO.TextWriter conout;
             System.IO.StreamWriter logfile;
+            System.Threading.AutoResetEvent writeevent;
+            Queue<WriteInfo> writes;
+            System.Threading.Thread writethd;
+            DateTime lastwrite;
 
             internal StdoutLog(System.IO.TextWriter conout, System.IO.StreamWriter logfile)
             {
+                lastwrite = DateTime.MaxValue;
+                writeevent = new System.Threading.AutoResetEvent(false);
+                writes = new Queue<WriteInfo>(100);
                 this.conout = conout;
                 this.logfile = logfile;
+                writethd = new System.Threading.Thread(new System.Threading.ThreadStart(writethreadproc));
+                writethd.IsBackground = true;
+                writethd.Start();
+            }
+
+            bool healthyconout()
+            {
+                if (null == conout)
+                {
+                    return false;
+                }
+                lock (writes)
+                {
+                    if (lastwrite < DateTime.Now - TimeSpan.FromMinutes(2))
+                    {
+                        conout = null;
+                        try
+                        {
+                            writes.Clear();
+                        }
+                        catch
+                        {
+                        }
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            void writethreadproc()
+            {
+                for (; ; )
+                {
+                    try
+                    {
+                        if (exiting)
+                        {
+                            break;
+                        }
+                        writeevent.WaitOne();
+                        while (writes.Count > 0)
+                        {
+                            WriteInfo wi;
+                            lock (writes)
+                            {
+                                wi = writes.Dequeue();
+                                lastwrite = DateTime.Now;
+                            }
+                            // Note: healthyconout can null out conout,
+                            // and we'll just throw and abort from here.
+#if DEBUGhungconout
+                            if (wi.str != null
+                                && -1 != wi.str.IndexOf("Duration"))
+                            {
+                                System.Threading.Thread.Sleep(1000 * 60 * 3);
+                            }
+#endif
+                            if (null != wi.str)
+                            {
+                                if (wi.isline)
+                                {
+                                    conout.WriteLine(wi.str);
+                                }
+                                else
+                                {
+                                    conout.Write(wi.str);
+                                }
+                            }
+                            else
+                            {
+                                if (wi.flush)
+                                {
+                                    conout.Flush();
+                                }
+                                else if (wi.isline)
+                                {
+                                    conout.WriteLine();
+                                }
+                                else
+                                {
+                                    conout.Write(wi.ch);
+                                }
+                            }
+                        }
+                        lock (writes)
+                        {
+                            lastwrite = DateTime.MaxValue;
+                        }
+                    }
+                    catch (System.Threading.ThreadInterruptedException)
+                    {
+                        break;
+                    }
+                    catch (System.Threading.ThreadAbortException)
+                    {
+                        break;
+                    }
+                    catch(Exception e)
+                    {
+                        //
+                        break;
+                    }
+                }
+                conout = null;
+                writethd = null;
             }
 
             public override Encoding Encoding
@@ -1371,40 +1514,251 @@ namespace MySpace.DataMining.AELight
 
             public override void Write(char value)
             {
-                conout.Write(value);
                 try
                 {
-                    logfile.Write(value);
+                    lock (logfile)
+                    {
+                        logfile.Write(value);
+                    }
                 }
                 catch
                 {
                 }
+                if (!healthyconout())
+                {
+                    return;
+                }
+                WriteInfo wi;
+                wi.str = null;
+                wi.ch = value;
+                wi.isline = false;
+                wi.flush = false;
+                lock (writes)
+                {
+                    if (null == conout)
+                    {
+                        return;
+                    }
+                    writes.Enqueue(wi);
+                }
+                writeevent.Set();
             }
 
             public override void WriteLine(string value)
             {
-                conout.WriteLine(value);
                 try
                 {
-                    logfile.WriteLine(value);
-                    logfile.Flush();
+                    lock (logfile)
+                    {
+                        logfile.WriteLine(value);
+                    }
                 }
                 catch
                 {
                 }
+                if (!healthyconout())
+                {
+                    return;
+                }
+                WriteInfo wi;
+                wi.str = value;
+                wi.ch = '\0';
+                wi.isline = true;
+                wi.flush = false;
+                lock (writes)
+                {
+                    if (null == conout)
+                    {
+                        return;
+                    }
+                    writes.Enqueue(wi);
+                }
+                writeevent.Set();
+            }
+
+            public override void Write(string value)
+            {
+                try
+                {
+                    lock (logfile)
+                    {
+                        logfile.Write(value);
+                    }
+                }
+                catch
+                {
+                }
+                if (!healthyconout())
+                {
+                    return;
+                }
+                WriteInfo wi;
+                wi.str = value;
+                wi.ch = '\0';
+                wi.isline = false;
+                wi.flush = false;
+                lock (writes)
+                {
+                    if (null == conout)
+                    {
+                        return;
+                    }
+                    writes.Enqueue(wi);
+                }
+                writeevent.Set();
+            }
+
+            public override void Write(char[] value)
+            {
+                try
+                {
+                    lock (logfile)
+                    {
+                        logfile.Write(value);
+                    }
+                }
+                catch
+                {
+                }
+                if (!healthyconout())
+                {
+                    return;
+                }
+                WriteInfo wi;
+                wi.str = new string(value);
+                wi.ch = '\0';
+                wi.isline = false;
+                wi.flush = false;
+                lock (writes)
+                {
+                    if (null == conout)
+                    {
+                        return;
+                    }
+                    writes.Enqueue(wi);
+                }
+                writeevent.Set();
+            }
+
+            public override void Write(char[] value, int index, int count)
+            {
+                try
+                {
+                    lock (logfile)
+                    {
+                        logfile.Write(value, index, count);
+                    }
+                }
+                catch
+                {
+                }
+                if (!healthyconout())
+                {
+                    return;
+                }
+                WriteInfo wi;
+                wi.str = new string(value, index, count);
+                wi.ch = '\0';
+                wi.isline = false;
+                wi.flush = false;
+                lock (writes)
+                {
+                    if (null == conout)
+                    {
+                        return;
+                    }
+                    writes.Enqueue(wi);
+                }
+                writeevent.Set();
+            }
+
+            public override void WriteLine()
+            {
+                try
+                {
+                    lock (logfile)
+                    {
+                        logfile.WriteLine();
+                    }
+                }
+                catch
+                {
+                }
+                if (!healthyconout())
+                {
+                    return;
+                }
+                WriteInfo wi;
+                wi.str = null;
+                wi.ch = '\0';
+                wi.isline = true;
+                wi.flush = false;
+                lock (writes)
+                {
+                    if (null == conout)
+                    {
+                        return;
+                    }
+                    writes.Enqueue(wi);
+                }
+                writeevent.Set();
             }
 
             public override void Flush()
             {
-                conout.Flush();
                 try
                 {
-                    logfile.Flush();
+                    lock (logfile)
+                    {
+                        logfile.Flush();
+                    }
                 }
                 catch
                 {
                 }
+                if (!healthyconout())
+                {
+                    return;
+                }
+                WriteInfo wi;
+                wi.str = null;
+                wi.ch = '\0';
+                wi.isline = false;
+                wi.flush = true;
+                lock (writes)
+                {
+                    if (null == conout)
+                    {
+                        return;
+                    }
+                    writes.Enqueue(wi);
+                }
+                writeevent.Set();
+
+                if (exiting)
+                {
+                    try
+                    {
+                        if (null != writethd)
+                        {
+                            int writesCount;
+                            lock (writes)
+                            {
+                                writesCount = writes.Count;
+                            }
+                            if (writesCount > 0)
+                            {
+                                writethd.Join(1000 * 60 * 2);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
             }
+
         }
 #endif
 
@@ -1670,6 +2024,7 @@ namespace MySpace.DataMining.AELight
                     }
                 }
             }
+            StdoutLog.FinalFlush();
             if (setfailure)
             {
                 Environment.Exit(0xf00);
@@ -3699,9 +4054,40 @@ namespace MySpace.DataMining.AELight
                     else
                     {
                         EnterAdminCmd();
-                        string RMHost = args[1];
-                        bool DontTouchRMHost = (args.Length > 2 && "-s" == args[2]);
-                        MetaRemoveMachine(RMHost, DontTouchRMHost);
+                        string RMHost = null;
+                        bool DontTouchRMHost = false;
+                        bool RMForce = false;
+                        for (int iarg = 1; iarg < args.Length; iarg++)
+                        {
+                            if (args[iarg][0] == '-')
+                            {
+                                switch (args[iarg])
+                                {
+                                    case "-s":
+                                        DontTouchRMHost = true;
+                                        break;
+
+                                    case "-f":
+                                        RMForce = true;
+                                        break;
+
+                                    default:
+                                        Console.Error.WriteLine("Warning: Unknown switch: {0}", args[iarg]);
+                                        break;
+                                }
+                            }
+                            else
+                            {
+                                if (null != RMHost)
+                                {
+                                    Console.Error.WriteLine("Too many hosts specified: {0} and {1}", RMHost, args[iarg]);
+                                    SetFailure();
+                                    return;
+                                }
+                                RMHost = args[iarg];
+                            }
+                        }
+                        MetaRemoveMachine(RMHost, DontTouchRMHost, RMForce);
                     }
                     break;
 

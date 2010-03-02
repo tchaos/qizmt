@@ -410,11 +410,11 @@ namespace QueryAnalyzer_Protocol
 
                                     if (samplesize == 0)
                                     {
-                                        recordbuf = new byte[rowlen + (0x400 * 0x400 * 20)];
+                                        recordbuf = new byte[rowlen + (0x400 * 0x400 * 1)];
                                     }
                                     else
                                     {
-                                        recordbuf = new byte[(rowlen * samplesize) + (0x400 * 0x400 * 20)];                                        
+                                        recordbuf = new byte[(rowlen * samplesize) + (0x400 * 0x400 * 1)];                                        
 
                                         if (pseudorand == null)
                                         {

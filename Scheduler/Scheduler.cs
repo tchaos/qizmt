@@ -9,8 +9,12 @@ namespace MySpace.DataMining.DistributedObjects
     {
 
 
+        public static Queue<string> LastQueueActions;
+
         public static void RunQueueService()
         {
+            LastQueueActions = new Queue<string>(5);
+            LastQueueActions.Enqueue("Starting queue service thread");
             for (bool wait = true; ; )
             {
                 if (wait)
@@ -19,7 +23,7 @@ namespace MySpace.DataMining.DistributedObjects
                 }
                 else
                 {
-                    System.Threading.Thread.Sleep(1000 * 3);
+                    System.Threading.Thread.Sleep(1000 * 10);
                 }
                 wait = true;
 
@@ -52,7 +56,15 @@ namespace MySpace.DataMining.DistributedObjects
                     }
                 }
 
-                if (null != qe)
+                if (null == qe)
+                {
+                    if (LastQueueActions.Count >= 5)
+                    {
+                        LastQueueActions.Dequeue();
+                    }
+                    LastQueueActions.Enqueue("Queue is empty; waiting for queue entry");
+                }
+                else
                 {
                     wait = false;
                     int WaitForProcessTimeout;
@@ -66,7 +78,7 @@ namespace MySpace.DataMining.DistributedObjects
                     }
                     try
                     {
-                        RunCommand(qe.GetCommand(), qe.GetOut(), qe.GetError(), WaitForProcessTimeout);
+                        RunQizmtExec(qe.GetCommand(), qe.GetOut(), qe.GetError(), WaitForProcessTimeout, LastQueueActions);
                     }
                     catch (RunCommandTimeout rct)
                     {
@@ -83,7 +95,7 @@ namespace MySpace.DataMining.DistributedObjects
                                 }
                                 tcmd = tcmd.Substring(0, ij) + rct.JID + tcmd.Substring(ij + JIDREPL.Length);
                             }
-                            RunCommand(tcmd);
+                            RunQizmtExec(tcmd);
                         }
 
                     }
@@ -209,7 +221,7 @@ namespace MySpace.DataMining.DistributedObjects
                         new System.Threading.ThreadStart(
                         delegate
                         {
-                            rse.result = RunCommand(se.GetCommand(), se.GetOut(), se.GetError());
+                            rse.result = RunQizmtExec(se.GetCommand(), se.GetOut(), se.GetError());
                         }));
                     rse.thread.IsBackground = true;
                     rse.thread.Name = "_ScheduledRunCommand" + se.GetCommand().GetHashCode().ToString();
@@ -256,22 +268,26 @@ namespace MySpace.DataMining.DistributedObjects
             public long JID;
         }
 
-        public static int RunCommand(string Cmd)
+        public static int RunQizmtExec(string Cmd)
         {
-            return RunCommand(Cmd, null, null);
+            return RunQizmtExec(Cmd, null, null);
         }
 
-        public static int RunCommand(string Cmd, string Out, string Err)
+        public static int RunQizmtExec(string Cmd, string Out, string Err)
         {
-            return RunCommand(Cmd, Out, Err, int.MaxValue);
+            return RunQizmtExec(Cmd, Out, Err, int.MaxValue, null);
         }
 
-        public static int RunCommand(string Cmd, string Out, string Err, int WaitForProcessTimeout)
+        public static int RunQizmtExec(string Cmd, string Out, string Err, int WaitForProcessTimeout, Queue<string> StatusQueue)
         {
             try
             {
                 long jid = -1;
                 bool IsQizmtExec = IsQizmtExecCommand(Cmd);
+                if (!IsQizmtExec)
+                {
+                    throw new Exception("Must be qizmt exec: " + Cmd);
+                }
 
                 System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", @"/C " + Cmd);
                 psi.CreateNoWindow = true;
@@ -437,28 +453,83 @@ namespace MySpace.DataMining.DistributedObjects
                         errthd.IsBackground = true;
                         errthd.Start();
                     }
-                    if (!proc.WaitForExit(WaitForProcessTimeout))
+                    string jidfile = null;
+                    for (int ijidtries = 0; ijidtries < 30; ijidtries++)
                     {
-                        try
+                        lock (proc)
                         {
-                            errthd.Abort();
+                            if (-1 != jid)
+                            {
+                                jidfile = jid.ToString() + ".jid";
+                                break;
+                            }
                         }
-                        catch
-                        {
-                        }
-                        try
-                        {
-                            outthd.Abort();
-                        }
-                        catch
-                        {
-                        }
-                        // Don't actually Kill the process,
-                        // just notify that it took longer than expected.
-                        // Plus, it would only kill cmd.exe
-                        throw new RunCommandTimeout(proc, jid);
+                        System.Threading.Thread.Sleep(1000);
                     }
-                    result = proc.ExitCode;
+                    for (; ; )
+                    {
+                        if (null != StatusQueue)
+                        {
+                            if (StatusQueue.Count >= 5)
+                            {
+                                StatusQueue.Dequeue();
+                            }
+                            StatusQueue.Enqueue("Waiting on JID " + jid);
+                        }
+                        if (proc.WaitForExit(1000 * 10))
+                        {
+                            result = proc.ExitCode;
+                            break;
+                        }
+                        if (-1 != jid)
+                        {
+                            if (!System.IO.File.Exists(jidfile))
+                            {
+                                // Give it 10 more secs to finish cleanly...
+                                if (proc.WaitForExit(1000 * 10))
+                                {
+                                    result = proc.ExitCode;
+                                }
+                                else
+                                {
+                                    result = 42842;
+                                }
+                                break;
+                            }
+                        }
+                        {
+                            bool timeout = false;
+                            if (WaitForProcessTimeout != int.MaxValue && WaitForProcessTimeout >= 0)
+                            {
+                                WaitForProcessTimeout -= 1000 * 10;
+                                if (WaitForProcessTimeout <= 0)
+                                {
+                                    timeout = true;
+                                }
+                            }
+                            if (timeout)
+                            {
+                                try
+                                {
+                                    errthd.Abort();
+                                }
+                                catch
+                                {
+                                }
+                                try
+                                {
+                                    outthd.Abort();
+                                }
+                                catch
+                                {
+                                }
+                                // Don't actually Kill the process,
+                                // just notify that it took longer than expected.
+                                // Plus, it would only kill cmd.exe
+                                throw new RunCommandTimeout(proc, jid);
+                            }
+                        }
+                    }
                 }
                 if (null != outthd)
                 {
@@ -1470,6 +1541,10 @@ namespace MySpace.DataMining.DistributedObjects
                 {
                     throw new InvalidOperationException("Expected start=<time> (where time is <" + SEntry.TimeSpec.DATE_TIME_FORMAT + "> or now)");
                 }
+                if (!IsQizmtExecCommand(se.Command))
+                {
+                    throw new InvalidOperationException("Command=<value> must be a Qizmt exec");
+                }
                 if (0 == string.Compare(sstart, "now", true))
                 {
                     se.CalculateFirstRun(DateTime.Now);
@@ -1596,6 +1671,10 @@ namespace MySpace.DataMining.DistributedObjects
                     {
                         throw new InvalidOperationException("Command=<value> must be a Qizmt exec for OnTimeout");
                     }
+                }
+                if (!IsQizmtExecCommand(qe.Command))
+                {
+                    throw new InvalidOperationException("Command=<value> must be a Qizmt exec");
                 }
                 if (qe.Timeout > 0)
                 {

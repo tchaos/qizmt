@@ -629,7 +629,7 @@ namespace RDBMS_Admin
             }
             #endregion
 
-            Exec.Shell(@"Qizmt importdir " + tempdir);
+            Exec.Shell("Qizmt importdir \"" + tempdir + "\"");
             System.IO.Directory.Delete(tempdir, true);
             Console.WriteLine("Stress tests generated.");
 
@@ -1039,7 +1039,7 @@ namespace RDBMS_Admin
             }
             #endregion
 
-            Exec.Shell(@"Qizmt importdir " + tempdir);
+            Exec.Shell("Qizmt importdir \"" + tempdir + "\"");
             System.IO.Directory.Delete(tempdir, true);
 
             foreach (string job in alljobfiles)

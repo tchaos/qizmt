@@ -575,6 +575,20 @@ namespace MySpace.DataMining.DistributedObjects5
 
                                         if (null != traceout)
                                         {
+                                            {
+                                                traceout.WriteLine("LastQueueActions:");
+                                                if (null == MySpace.DataMining.DistributedObjects.Scheduler.LastQueueActions)
+                                                {
+                                                    traceout.WriteLine("    null");
+                                                }
+                                                else
+                                                {
+                                                    foreach (string qa in MySpace.DataMining.DistributedObjects.Scheduler.LastQueueActions)
+                                                    {
+                                                        traceout.WriteLine("    {0}", qa);
+                                                    }
+                                                }
+                                            }
                                             traceout.Write(tracefiledelim);
                                             traceout.WriteLine(":END");
                                             traceout.Close();

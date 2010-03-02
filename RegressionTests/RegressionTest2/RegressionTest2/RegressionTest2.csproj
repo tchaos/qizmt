@@ -61,6 +61,7 @@
     <Compile Include="Killall.cs" />
     <Compile Include="MetaDataComplexity.cs" />
     <Compile Include="MetaPath.cs" />
+    <Compile Include="MetaRemove.cs" />
     <Compile Include="Mrdebug.cs" />
     <Compile Include="NewDFS.cs" />
     <Compile Include="Program.cs" />

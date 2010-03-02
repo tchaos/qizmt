@@ -98,6 +98,7 @@ namespace QueryAnalyzer_DataProvider
             }
         }
 
+#if _NOTUSED
         private bool _ReadRIndex()
         {
             if (isFirstRead)
@@ -173,6 +174,7 @@ namespace QueryAnalyzer_DataProvider
             }
             return true;
         }
+#endif
 
 
         byte[] recordbuf = null;
@@ -224,6 +226,10 @@ namespace QueryAnalyzer_DataProvider
                     {
                         //currow[i] = null;
                         currow[i] = DBNull.Value;
+                        if (isRindexEnabled)
+                        {
+                            throw new Exception("TCP distributed memory buffer corrupted, one or more machines may be out of memory");
+                        }
                     }
                     else
                     {

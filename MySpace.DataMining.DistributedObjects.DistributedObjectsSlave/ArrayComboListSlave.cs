@@ -52,7 +52,7 @@ namespace MySpace.DataMining.DistributedObjects5
             public const int ZFILE_SPLITBY_SIZE = ZFILE_SPLIT_SIZE;
 
             // Need extra space to account for bytes encoding lengths.
-            public const int MAXKVBUFSIZE = 0x400 * 0x400 * 40; // Testing.
+            public const int MAXKVBUFSIZE = 0x400 * 0x400; // Testing.
 #else
             public const int ZFILE_SPLIT_SIZE = 0x400 * 0x400 * 0x400; // 1 GB
             public const int ZFILE_SPLITBY_SIZE = 0x400 * 0x400 * 200;
@@ -71,6 +71,7 @@ namespace MySpace.DataMining.DistributedObjects5
             System.IO.FileStream fzvalueblock;
             string fzkeyblockfilename;
             string fzvalueblockfilename;
+            internal string fzkvblockfilename; // Only if split sort; name of large key+value file.
             long zvalueblocksize = 0;
             long zkeyblocksize = 0;
             long numadded = 0;
@@ -700,405 +701,6 @@ namespace MySpace.DataMining.DistributedObjects5
             }
 
 
-            internal struct KvSplit
-            {
-                internal ByteSlice Key;
-
-                const IList<byte> vbuf_novalue = null;
-                IList<byte> vbuf;
-                int v1;
-                int v2;
-
-                internal bool IsValueSet
-                {
-                    get
-                    {
-                        return !object.ReferenceEquals(vbuf_novalue, this.vbuf);
-                    }
-                }
-
-                internal long ValueOffset
-                {
-                    get
-                    {
-                        return (long)((ulong)(uint)v1 | ((ulong)(uint)v2 << 32));
-                    }
-
-                    set
-                    {
-                        this.vbuf = vbuf_novalue;
-                        this.v1 = (int)(ulong)value;
-                        this.v2 = (int)((ulong)value >> 32);
-                    }
-                }
-
-                internal ByteSlice Value
-                {
-                    get
-                    {
-                        return ByteSlice.Prepare(this.vbuf, (int)this.v1, this.v2);
-                    }
-
-                    set
-                    {
-                        value.GetComponents(out this.vbuf, out this.v1, out this.v2);
-                        if (this.vbuf == null)
-                        {
-                            throw new Exception("DEBUG:  KvSplit.Value: (this.vbuf == null)");
-                        }
-                    }
-                }
-
-                internal static KvSplit Prepare(ByteSlice key)
-                {
-                    KvSplit result;
-                    result.Key = key;
-                    result.vbuf = vbuf_novalue;
-                    result.v1 = 0;
-                    result.v2 = 0;
-                    return result;
-                }
-
-            }
-
-
-            internal void _CreateLargeResultFile(string createfilename, List<KvSplit> kvsbuf,
-                ref byte[] ebuf, ref byte[] evaluesbuf)
-            {
-                using (System.IO.Stream result = new System.IO.FileStream(createfilename,
-                    System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None))
-                {
-                    int avgvaluespace = checked((int)(zvalueblocksize / numadded)); // Includes value header.
-                    int xvaluespace = avgvaluespace + avgvaluespace / 8 + 4; // Adjust a bit for larger values.
-                    int maxkeyspersplit = checked((int)((ZFILE_SPLITBY_SIZE / 2) / (parent.keylen + TValueOffset_Size)));
-                    int maxvaluespersplit = checked((int)((ZFILE_SPLITBY_SIZE / 2) / (xvaluespace)));
-                    
-                    int numkeyspersplit = Math.Min(maxkeyspersplit, maxvaluespersplit);
-
-                    ensurefzblock(false);
-
-                    if (evaluesbuf.LongLength < ZFILE_SPLITBY_SIZE)
-                    {
-                        evaluesbuf = null;
-                        //long lnew = Entry.Round2PowerLong(ZFILE_SPLITBY_SIZE);
-                        long lnew = ZFILE_SPLITBY_SIZE;
-                        evaluesbuf = new byte[lnew];
-                    }
-                    byte[] valuesbuf = evaluesbuf;
-
-                    if (ebuf.LongLength < ZFILE_SPLITBY_SIZE)
-                    {
-                        try
-                        {
-                            ebuf = null;
-                            long lnew = Entry.Round2PowerLong(ZFILE_SPLITBY_SIZE);
-                            if (lnew > Int32.MaxValue)
-                            {
-                                lnew = Int32.MaxValue;
-                            }
-                            ebuf = new byte[lnew];
-                        }
-                        catch (Exception e)
-                        {
-                            unchecked
-                            {
-                                string better_error = e.ToString();
-                                better_error += System.Environment.NewLine;
-                                better_error += "----------------------------------------------------" + System.Environment.NewLine;
-                                better_error += "ebuf length: " + ebuf.LongLength.ToString() + System.Environment.NewLine;
-                                better_error += "----------------------------------------------------" + System.Environment.NewLine;
-                                throw new Exception(better_error);
-                            }
-                        }
-                    }
-                    byte[] buf = ebuf;
-
-                    int newcap = numkeyspersplit;
-                    /*if (isfirstlist)
-                    {
-                        isfirstlist = false;
-                        newcap *= 2;
-                    }*/
-                    if (newcap > kvsbuf.Capacity)
-                    {
-                        kvsbuf.Capacity = newcap;
-                    }
-
-                    //----------------------------COOKING--------------------------------
-                    int cooking_cooksremain = parent.CookRetries;
-                    bool cooking_inIO = false;
-                    long cooking_seekpos = 0;
-                    //----------------------------COOKING--------------------------------
-
-                    long keyblocksofar = 0;
-                    byte[] xbuf = buf;
-                    int xoffset = 0;
-                    int keylen = parent.keylen;
-
-                    for (; ; )
-                    {
-                        try
-                        {
-
-                            // Read from existing unsorted zblock file into buffer.
-                            cooking_inIO = true;
-                            fzkeyblock.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
-                            cooking_inIO = false;
-
-                            // If cooking, this loop should continue where it left off.
-                            for (;
-                                keyblocksofar < zkeyblocksize;
-                                kvsbuf.Clear(), xoffset = 0, xbuf = buf)
-                            {
-
-                                for (int ik = 0; ik < numkeyspersplit; ik++)
-                                {
-                                    {
-                                        int morespace = xoffset + keylen + TValueOffset_Size;
-                                        if (morespace < xoffset || morespace > xbuf.Length)
-                                        {
-                                            throw new Exception("DEBUG:  _CreateLargeResultFile: buffer not large enough for keys");
-                                            //xoffset = 0;
-                                            //xbuf = new byte[ZFILE_SPLITBY_SIZE];
-                                        }
-                                    }
-
-                                    cooking_inIO = true;
-                                    int read8291 = fzkeyblock.Read(xbuf, xoffset, keylen + TValueOffset_Size);
-                                    if (0 == read8291)
-                                    {
-                                        cooking_inIO = false;
-                                        break;
-                                    }
-#if DEBUG
-                                    if (read8291 != keylen + TValueOffset_Size)
-                                    {
-                                        throw new Exception("DEBUG:  (read8291 != keylen + TValueOffset_Size)");
-                                    }
-#endif
-                                    cooking_inIO = false;
-                                    cooking_seekpos += keylen + TValueOffset_Size;
-
-                                    KvSplit kvs = KvSplit.Prepare(ByteSlice.Prepare(xbuf, xoffset, keylen));
-                                    if (8 == TValueOffset_Size)
-                                    {
-                                        kvs.ValueOffset = Entry.BytesToLong(xbuf, xoffset + keylen);
-                                    }
-                                    else
-                                    {
-                                        kvs.ValueOffset = Entry.BytesToUInt32(xbuf, xoffset + keylen);
-                                    }
-#if DEBUG
-                                    if (kvs.ValueOffset >= zvalueblocksize)
-                                    {
-                                        throw new Exception("DEBUG:  _CreateLargeResultFile: (kvs.ValueOffset >= zvalueblocksize)");
-                                    }
-#endif
-                                    xoffset += keylen; // Excluding the +N for value offset.
-                                    keyblocksofar += keylen + TValueOffset_Size;
-                                    kvsbuf.Add(kvs);
-                                }
-                                int kvsbufCount = kvsbuf.Count;
-
-                                // If cooking, this whole loop can be started over.
-                                for (long valueblockoffset = 0; valueblockoffset < zvalueblocksize; )
-                                {
-                                    cooking_inIO = true;
-                                    fzvalueblock.Seek(valueblockoffset, System.IO.SeekOrigin.Begin);
-                                    int read = fzvalueblock.Read(valuesbuf, 0, ZFILE_SPLITBY_SIZE);
-                                    cooking_inIO = false;
-                                    long vstart = valueblockoffset;
-                                    long vstop = vstart + read;
-                                    for (int ik = 0; ik < kvsbufCount; ik++)
-                                    {
-                                        KvSplit kvs = kvsbuf[ik];
-                                        if (!kvs.IsValueSet)
-                                        {
-                                            long kvsValueOffset = kvs.ValueOffset;
-                                            if (kvsValueOffset >= vstart
-                                                && kvsValueOffset < vstop)
-                                            {
-                                                int valuesbufoffset = (int)(kvsValueOffset - vstart);
-#if DEBUG
-                                                if (valuesbufoffset < 0)
-                                                {
-                                                    throw new Exception("DEBUG:  _CreateLargeResultFile: (valuebufoffset < 0) (long->int overflow)");
-                                                }
-#endif
-                                                if (valuesbufoffset + 4 > read)
-                                                {
-                                                    // Wasn't even enough in the valuesbuf to get the length.
-                                                    read -= ((valuesbufoffset + 4) - read); // Read it next time.
-                                                }
-                                                else
-                                                {
-                                                    int valuelen = Entry.BytesToInt(valuesbuf, valuesbufoffset);
-                                                    if (valuesbufoffset + 4 + valuelen > read)
-                                                    {
-                                                        // Entire value not in valuesbuf.
-                                                        read = valuesbufoffset; // Read it next time.
-                                                    }
-                                                    else
-                                                    {
-                                                        {
-                                                            int morespace = xoffset + valuelen;
-                                                            if (morespace < xoffset || morespace > xbuf.Length)
-                                                            {
-                                                                xoffset = 0;
-                                                                //xbuf = new byte[Math.Min(ZFILE_SPLITBY_SIZE, (valuelen + 8) * 4)];
-                                                                {
-                                                                    try
-                                                                    {
-                                                                        int xoldlen = xbuf.Length;
-                                                                        ebuf = null;
-                                                                        buf = null;
-                                                                        xbuf = null;
-                                                                        long lnew = Math.Max(xoldlen + valuelen * 2 + 16, xoldlen + xoldlen / 3);
-                                                                        lnew = Entry.Round2PowerLong(lnew);
-                                                                        if (lnew > Int32.MaxValue)
-                                                                        {
-                                                                            lnew = Int32.MaxValue;
-                                                                        }
-                                                                        ebuf = new byte[lnew];
-                                                                    }
-                                                                    catch (Exception e)
-                                                                    {
-                                                                        unchecked
-                                                                        {
-                                                                            string better_error = e.ToString();
-                                                                            better_error += System.Environment.NewLine;
-                                                                            better_error += "----------------------------------------------------" + System.Environment.NewLine;
-                                                                            better_error += "ebuf length: " + ebuf.LongLength.ToString() + System.Environment.NewLine;
-                                                                            better_error += "----------------------------------------------------" + System.Environment.NewLine;
-                                                                            throw new Exception(better_error);
-                                                                        }
-                                                                    }
-                                                                }
-                                                                buf = ebuf;
-                                                                xbuf = buf;
-                                                                XLog.log("Warning: _CreateLargeResultFile: created new value buffer of length " + xbuf.Length
-                                                                    + " (for value of length " + valuelen + ")");
-                                                            }
-                                                        }
-                                                        Buffer.BlockCopy(valuesbuf, valuesbufoffset + 4, xbuf, xoffset, valuelen);
-                                                        kvs.Value = ByteSlice.Prepare(xbuf, xoffset, valuelen);
-                                                        kvsbuf[ik] = kvs;
-                                                        xoffset += valuelen;
-
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    valueblockoffset += read;
-                                }
-
-                                byte[] rbuf = null;
-                                for (int ik = 0; ik < kvsbufCount; ik++)
-                                {
-                                    KvSplit kvs = kvsbuf[ik];
-                                    if (!kvs.IsValueSet)
-                                    {
-                                        throw new Exception("DEBUG:  _CreateLargeResultFile: (!kvs.IsValueSet) (not all values loaded)");
-                                    }
-                                    IList<byte> rlist;
-                                    int roffset;
-                                    int rlength;
-                                    {
-                                        ByteSlice bs = kvs.Key;
-                                        bs.GetComponents(out rlist, out roffset, out rlength);
-                                        if (!object.ReferenceEquals(rlist, rbuf))
-                                        {
-                                            rbuf = rlist as byte[];
-#if DEBUG
-                                            if (null == rbuf)
-                                            {
-                                                throw new Exception("DEBUG:  _CreateLargeResultFile: (null == rbuf) (expected KvSplit.Key to be byte[])");
-                                            }
-#endif
-                                        }
-                                        result.Write(rbuf, roffset, rlength);
-                                    }
-
-                                    {
-                                        ByteSlice bs = kvs.Value;
-                                        bs.GetComponents(out rlist, out roffset, out rlength);
-                                        if (!object.ReferenceEquals(rlist, rbuf))
-                                        {
-                                            rbuf = rlist as byte[];
-#if DEBUG
-                                            if (null == rbuf)
-                                            {
-                                                throw new Exception("DEBUG:  _CreateLargeResultFile: (null == rbuf) (expected KvSplit.Value to be byte[])");
-                                            }
-#endif
-                                        }
-                                        {
-                                            Entry.ToBytes(rlength, parent._smallbuf, 0);
-                                            result.Write(parent._smallbuf, 0, 4);
-                                        }
-                                        result.Write(rbuf, roffset, rlength);
-                                    }
-
-                                }
-
-#if REDUCE_SPLIT_CALLS_GC
-                                System.GC.Collect();
-                                System.GC.WaitForPendingFinalizers();
-#endif
-
-                            }
-
-                        }
-                        catch (Exception e)
-                        {
-                            if (!cooking_inIO)
-                            {
-                                throw;
-                            }
-                            //----------------------------COOKING--------------------------------
-                            bool firstcook = cooking_cooksremain == parent.CookRetries;
-                            if (cooking_cooksremain-- <= 0)
-                            {
-                                string ns = " (unable to get connection count)";
-                                try
-                                {
-                                    ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
-                                        + " total connections on this machine)";
-                                }
-                                catch
-                                {
-                                }
-                                throw new System.IO.IOException("cooked too many times (retries="
-                                    + parent.CookRetries.ToString()
-                                    + "; timeout=" + parent.CookTimeout.ToString()
-                                    + ") on " + System.Net.Dns.GetHostName() + ns, e);
-                            }
-                            System.Threading.Thread.Sleep(parent.CookTimeout);
-                            if (firstcook)
-                            {
-                                try
-                                {
-                                    XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
-                                        + "; timeout=" + parent.CookTimeout.ToString()
-                                        + ") on " + System.Net.Dns.GetHostName()
-                                        + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
-                                }
-                                catch
-                                {
-                                }
-                            }
-                            continue;
-                            //----------------------------COOKING--------------------------------
-                        }
-                        break;
-                    }
-
-                }
-
-            }
-
-
             internal interface IKeyBlockEntry
             {
                 ByteSlice GetKey();
@@ -1468,11 +1070,11 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
 
 
-                int _kcmp(TKeyBlockEntry x, TKeyBlockEntry y)
+                static int _kcmp(TKeyBlockEntry x, TKeyBlockEntry y)
                 {
-                    int keylen = acl.keylen;
                     ByteSlice xkey = x.GetKey();
                     ByteSlice ykey = y.GetKey();
+                    int keylen = xkey.Length;
                     for (int i = 0; i != keylen; i++)
                     {
                         int diff = (int)xkey[i] - (int)ykey[i];
@@ -1482,6 +1084,14 @@ namespace MySpace.DataMining.DistributedObjects5
                         }
                     }
                     return 0;
+                }
+
+                class _kcmpComparer : IComparer<TKeyBlockEntry>
+                {
+                    public int Compare(TKeyBlockEntry x, TKeyBlockEntry y)
+                    {
+                        return _kcmp(x, y);
+                    }
                 }
 
 
@@ -1570,7 +1180,83 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
 
 
-                internal void _writezblockpart(string zblockpartbasename, int partnum, List<TKeyBlockEntry> kentries)
+                // Returns the offset after the last value.
+                // Throws NeedCookingException on read IO exception.
+                internal long _loadvaluesinclusive_needcooking(System.IO.Stream stm, long currentpos,
+                    long lastvalueoffset, ref byte[] evaluesbuf)
+                {
+                    {
+                        // Need extra space for the last value.
+                        int needbufsize = checked((int)(lastvalueoffset - currentpos) + 4 + ZFILE_SPLITBY_SIZE);
+                        if (null == evaluesbuf || needbufsize > evaluesbuf.Length)
+                        {
+                            int newbufsize = Entry.Round2Power(needbufsize);
+                            if (newbufsize < 0 || newbufsize > 1342177280)
+                            {
+                                newbufsize = 1342177280;
+                            }
+                            evaluesbuf = new byte[newbufsize];
+                        }
+                    }
+                    byte[] valuesbuf = evaluesbuf;
+                    bool cooking_inIO = false;
+                    try
+                    {
+                        int index = 0;
+                        int needread = (int)(lastvalueoffset - currentpos) + 4; // +4 for the last value's length.
+                        cooking_inIO = true;
+                        while (index < needread)
+                        {
+                            int x = stm.Read(valuesbuf, index, needread - index);
+                            if (x < 1)
+                            {
+                                throw new Exception("Unable to read all values; Read returned " + x); // Causes cooking.
+                            }
+                            index += x;
+                        }
+                        cooking_inIO = false;
+                        // Now the last value.
+                        int lastvaluelength = Entry.BytesToInt(valuesbuf, needread - 4);
+//#if DEBUG
+                        if (lastvaluelength < 0)
+                        {
+                            throw new Exception("Value of invalid length "
+                                + lastvaluelength + " at the end of values-buffer of length " + valuesbuf.Length);
+                        }
+//#endif
+                        if (needread + lastvaluelength > valuesbuf.Length)
+                        {
+                            throw new Exception("Value does not fit in values-buffer; value of length "
+                                + lastvaluelength + " at the end of values-buffer of length " + valuesbuf.Length);
+                        }
+                        needread += lastvaluelength;
+                        cooking_inIO = true;
+                        while (index < needread)
+                        {
+                            int x = stm.Read(valuesbuf, index, needread - index);
+                            if (x < 1)
+                            {
+                                throw new Exception("Unable to read all values; Read returned " + x); // Causes cooking.
+                            }
+                            index += x;
+                        }
+                        cooking_inIO = false;
+                        return lastvalueoffset + 4 + lastvaluelength;
+                    }
+                    catch (Exception e)
+                    {
+                        if (cooking_inIO)
+                        {
+                            throw new NeedCookingException(e);
+                        }
+                        throw;
+                    }
+                }
+
+
+                internal void _writezblockpart(string zblockpartbasename, int partnum,
+                    List<TKeyBlockEntry> kentries, int kentriesstart, int kentriesend,
+                    byte[] valuesbuf, long valuesbaseoffset)
                 {
                     System.IO.Stream outstm;
                     //----------------------------COOKING--------------------------------
@@ -1581,7 +1267,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         try
                         {
-                            outstm = new System.IO.FileStream(CreateZBlockFileName(zblock.zblockID, "key_part" + partnum.ToString()),
+                            outstm = new System.IO.FileStream(CreateZBlockFileName(zblock.zblockID, "kv_part" + partnum.ToString()),
                                 System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
                         }
                         catch (Exception e)
@@ -1630,18 +1316,26 @@ namespace MySpace.DataMining.DistributedObjects5
                     try
                     {
                         // From (sorted) sortbuffer write into new sorted zblock file.
-                        foreach (TKeyBlockEntry kent in kentries)
+                        for(int ikent = kentriesstart; ikent < kentriesend; ikent++)
                         {
+                            TKeyBlockEntry kent = kentries[ikent];
                             kent.GetKey().CopyTo(acl._smallbuf);
                             outstm.Write(acl._smallbuf, 0, acl.keylen);
-                            int sz8812 = kent.GetValueOffsetToBytes(acl._smallbuf, 0);
+                            int valuesbufoffset = checked((int)(kent.GetValueOffset64() - valuesbaseoffset));
 #if DEBUG
-                            if (sz8812 != TValueOffset_Size)
+                            if (valuesbufoffset < 0 || valuesbufoffset >= valuesbuf.Length)
                             {
-                                throw new Exception("DEBUG:  (sz8812 != TValueOffset_Size)");
+                                throw new Exception("DEBUG:  _writezblockpart: (valuesbufoffset < 0 || valuesbufoffset >= valuesbuf.Length)"
+                                    + " where valuesbufoffset=" + valuesbufoffset + " and valuesbuf.Length=" + valuesbuf.Length);
                             }
 #endif
-                            outstm.Write(acl._smallbuf, 0, TValueOffset_Size);
+                            int valuelen = Entry.BytesToInt(valuesbuf, valuesbufoffset);
+                            if (valuelen < 0 || valuelen > 1342177280)
+                            {
+                                throw new Exception("Split sort value miscalculation; value reported length of "
+                                    + valuelen + " at offset " + kent.GetValueOffset64());
+                            }
+                            outstm.Write(valuesbuf, valuesbufoffset, 4 + valuelen);
                         }
                     }
                     finally
@@ -1653,14 +1347,31 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                 }
 
-                internal class _ZBlockPartReader : IEnumerator<byte[]>
+                internal class _ZBlockPartReader : IEnumerator<ByteSlice>
                 {
-                    internal _ZBlockPartReader(int zblockID, int partnum, ZBlock parent)
+                    bool kv;
+
+                    // buffer can be null.
+                    internal _ZBlockPartReader(int zblockID, int partnum, ZBlock parent, bool kv)
                     {
-                        this.zbpfn = CreateZBlockFileName(zblockID, "key_part" + partnum.ToString());
+                        this.kv = kv;
+                        if (kv)
+                        {
+                            this.zbpfn = CreateZBlockFileName(zblockID, "kv_part" + partnum.ToString());
+                        }
+                        else
+                        {
+                            this.zbpfn = CreateZBlockFileName(zblockID, "key_part" + partnum.ToString());
+                        }
+                        this.buf = null;
                         this.parent = parent;
                         this.keylen = parent.parent.keylen;
                         this.TValueOffset_Size = parent.TValueOffset_Size;
+                    }
+
+                    internal _ZBlockPartReader(int zblockID, int partnum, ZBlock parent)
+                        : this(zblockID, partnum, parent, false)
+                    {
                     }
 
                     public void Delete()
@@ -1685,9 +1396,9 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
 
 
-                    // Consistently returns null at end-of-file.
+                    // Consistently returns empty at end-of-file.
                     // Returns buffer of same memory, overwritten.
-                    public byte[] Current
+                    public ByteSlice Current
                     {
                         get
                         {
@@ -1697,9 +1408,9 @@ namespace MySpace.DataMining.DistributedObjects5
                             }
                             if (eof)
                             {
-                                return null;
+                                return ByteSlice.Prepare();
                             }
-                            return buf;
+                            return cur;
                         }
                     }
 
@@ -1707,7 +1418,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         get
                         {
-                            byte[] result = Current;
+                            ByteSlice result = Current;
                             return result;
                         }
                     }
@@ -1752,6 +1463,32 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
 
 
+                    public void WriteCurrent(System.IO.Stream stm)
+                    {
+                        ByteSlice bs = this.Current;
+                        IList<byte> bsibuf;
+                        int bsoffset, bslength;
+                        bs.GetComponents(out bsibuf, out bsoffset, out bslength);
+//#if DEBUG
+                        if (!object.ReferenceEquals(this.buf, bsibuf))
+                        {
+                            if (0 == bslength)
+                            {
+                                return;
+                            }
+                            throw new Exception("DEBUG:  _ZBlockPartReader.WriteCurrent: unexpected Current reference");
+                        }
+//#endif
+#if DEBUG
+                        if (0 != bsoffset || cur.Length != bslength)
+                        {
+                            throw new Exception("DEBUG:  _ZBlockPartReader.WriteCurrent: unexpected Current offset/length");
+                        }
+#endif
+                        stm.Write(this.buf, bsoffset, bslength);
+                    }
+
+
                     //----------------------------COOKING--------------------------------
                     long cooking_seekpos = 0;
                     //----------------------------COOKING--------------------------------
@@ -1769,7 +1506,15 @@ namespace MySpace.DataMining.DistributedObjects5
                             {
                                 if (null == stm)
                                 {
-                                    buf = new byte[keylen + TValueOffset_Size];
+                                    if (null == buf || buf.Length < (keylen + TValueOffset_Size))
+                                    {
+                                        int initbufsz = keylen + TValueOffset_Size;
+                                        if (kv)
+                                        {
+                                            initbufsz += 0x400 * 4;
+                                        }
+                                        buf = new byte[initbufsz];
+                                    }
                                     cooking_inIO = true;
                                     stm = new System.IO.FileStream(zbpfn, System.IO.FileMode.Open,
                                         System.IO.FileAccess.Read, System.IO.FileShare.Read);
@@ -1780,13 +1525,56 @@ namespace MySpace.DataMining.DistributedObjects5
                                     cooking_inIO = false;
                                 }
 
-                                cooking_inIO = true;
-                                bool readwhole = ((keylen + TValueOffset_Size) == StreamReadLoop(stm, buf, keylen + TValueOffset_Size));
-                                cooking_inIO = false;
-                                cooking_seekpos += keylen + TValueOffset_Size;
+                                bool readwhole;
+                                int readlen;
+                                {
+                                    if (kv)
+                                    {
+                                        int len = keylen + 4;
+                                        cooking_inIO = true;
+                                        readwhole = (len == StreamReadLoop(stm, buf, len));
+                                        cooking_inIO = false;
+                                        if (readwhole)
+                                        {
+                                            int valuelen = Entry.BytesToInt(buf, keylen);
+                                            if (valuelen < 0 || valuelen > 1342177280)
+                                            {
+                                                throw new Exception("Invalid value length of " + valuelen
+                                                    + " read from kv zblock file at offset " + (cooking_seekpos + keylen));
+                                            }
+                                            readlen = len + valuelen;
+                                            if (buf.Length < readlen)
+                                            {
+                                                byte[] newbuf = new byte[Entry.Round2Power(readlen)];
+                                                Buffer.BlockCopy(buf, 0, newbuf, 0, len);
+                                                buf = newbuf;
+                                            }
+                                            cooking_inIO = true;
+                                            if (valuelen != StreamReadLoop(stm, buf, len, valuelen))
+                                            {
+                                                throw new Exception("Unable to read entire value of length " + valuelen);
+                                            }
+                                            cooking_inIO = false;
+                                        }
+                                        else
+                                        {
+                                            readlen = 0;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        readlen = keylen + TValueOffset_Size;
+                                        cooking_inIO = true;
+                                        readwhole = (readlen == StreamReadLoop(stm, buf, readlen));
+                                        cooking_inIO = false;
+                                    }
+                                }
+                                cooking_seekpos += readlen;
+                                cur = ByteSlice.Prepare(buf, 0, readlen);
                                 if (!readwhole)
                                 {
                                     eof = true;
+                                    cur = ByteSlice.Prepare();
                                 }
 
                             }
@@ -1844,9 +1632,10 @@ namespace MySpace.DataMining.DistributedObjects5
                     int keylen;
                     int TValueOffset_Size;
                     byte[] buf;
+                    ByteSlice cur;
 
 
-                    internal static int CompareKeys(byte[] x, byte[] y, int keylen)
+                    internal static int CompareKeys(ByteSlice x, ByteSlice y, int keylen)
                     {
                         for (int i = 0; i != keylen; i++)
                         {
@@ -1862,7 +1651,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
                 }
 
-                public void _SplitSort(List<TKeyBlockEntry> kentries, ref byte[] ebuf)
+                public void _SplitSort(List<TKeyBlockEntry> kentries, ref byte[] ebuf, ref byte[] evaluesbuf)
                 {
                     zblock.ensurefzblock(false);
 
@@ -1896,7 +1685,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                 throw new Exception("Split-sort key count miscalculation");
                             }
 
-                            if (zblock.splitzkeyfile)
+                            if (zblock.ZBlockSplit)
                             {
                                 //----------------------------COOKING--------------------------------
                                 int cooking_cooksremain = acl.CookRetries;
@@ -1904,45 +1693,95 @@ namespace MySpace.DataMining.DistributedObjects5
                                 long cooking_seekpos = 0;
                                 //----------------------------COOKING--------------------------------
                                 string keyblockfilename = zblock.fzkeyblockfilename;
-                                System.IO.Stream stm = null;
+                                string valueblockfilename = zblock.fzvalueblockfilename;
+                                System.IO.Stream keystm = null;
+                                System.IO.Stream valuestm = null;
                                 int zbpCount = 0; // zblock part count.
                                 string zblockpartbasename = zblock.fzkeyblockfilename;
+                                long valuefileoffset = 0;
                                 for (; ; )
                                 {
                                     try
                                     {
                                         for (bool again = true; again; )
                                         {
-                                            if (null == stm)
+                                            if (null == keystm)
                                             {
                                                 cooking_inIO = true;
-                                                stm = new System.IO.FileStream(keyblockfilename, System.IO.FileMode.Open,
+                                                keystm = new System.IO.FileStream(keyblockfilename, System.IO.FileMode.Open,
                                                     System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
                                                 if (0 != cooking_seekpos)
                                                 {
-                                                    stm.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
+                                                    keystm.Seek(cooking_seekpos, System.IO.SeekOrigin.Begin);
                                                 }
                                                 cooking_inIO = false;
                                             }
-                                            again = _XCopyLimitInto_needcooking(stm, keyspersplit, kentries, ref ebuf);
-                                            cooking_seekpos = stm.Position;
-
+                                            if (null == valuestm)
                                             {
-                                                // Sort the sortbuffer.
-                                                kentries.Sort(new System.Comparison<TKeyBlockEntry>(_kcmp));
+                                                cooking_inIO = true;
+                                                valuestm = new System.IO.FileStream(valueblockfilename, System.IO.FileMode.Open,
+                                                    System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
+                                                if (0 != valuefileoffset)
+                                                {
+                                                    valuestm.Seek(valuefileoffset, System.IO.SeekOrigin.Begin);
+                                                }
+                                                cooking_inIO = false;
                                             }
 
-                                            _writezblockpart(zblockpartbasename, zbpCount++, kentries);
+                                            again = _XCopyLimitInto_needcooking(keystm, keyspersplit, kentries, ref ebuf);
+                                            cooking_seekpos = keystm.Position;
+
+                                            int kentriesstart = 0;
+                                            int kentriesend = kentries.Count;
+                                            while (kentriesstart < kentries.Count)
+                                            {
+                                                {
+                                                    int chopsize = 2;
+                                                    while (kentries[kentriesend - 1].GetValueOffset64() - valuefileoffset
+                                                        > ((long)ZFILE_SPLIT_SIZE) - ZFILE_SPLITBY_SIZE)
+                                                    {
+                                                        // Values for these keys are over ZFILE_SPLIT_SIZE-ZFILE_SPLITBY_SIZE, so chop it down!
+                                                        int newkentriesend = kentriesstart + (kentriesend - kentriesstart) / chopsize;
+                                                        if (newkentriesend == kentriesend)
+                                                        {
+                                                            // This should only happen with huge values.
+                                                            throw new Exception("ZBlock split error; given (newkentriesend = kentriesstart + (kentriesend - kentriesstart) / chopsize) where chopsize="
+                                                                + chopsize + ", (newkentriesend == kentriesend); unable to chop; possibly a value is too large");
+                                                        }
+                                                        kentriesend = newkentriesend;
+                                                        chopsize *= 2;
+                                                    }
+                                                }
+
+                                                long newvaluefileoffset = _loadvaluesinclusive_needcooking(valuestm, valuefileoffset,
+                                                    kentries[kentriesend - 1].GetValueOffset64(), ref evaluesbuf);
+
+                                                kentries.Sort(kentriesstart, kentriesend - kentriesstart, new _kcmpComparer());
+
+                                                _writezblockpart(zblockpartbasename, zbpCount++,
+                                                    kentries, kentriesstart, kentriesend,
+                                                    evaluesbuf, valuefileoffset);
+
+                                                valuefileoffset = newvaluefileoffset;
+                                                kentriesstart = kentriesend;
+                                                kentriesend = kentries.Count;
+                                            }
+
 
                                         }
-                                        if (null != stm)
+                                        if (null != keystm)
                                         {
-                                            stm.Close();
+                                            keystm.Close();
+                                        }
+                                        if (null != valuestm)
+                                        {
+                                            keystm.Close();
                                         }
                                     }
                                     catch (NeedCookingException e)
                                     {
-                                        stm = null; // Reopen.
+                                        keystm = null; // Reopen.
+                                        valuestm = null; // Reopen.
                                         //----------------------------COOKING--------------------------------
                                         bool firstcook = cooking_cooksremain == acl.CookRetries;
                                         if (cooking_cooksremain-- <= 0)
@@ -1984,7 +1823,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                         {
                                             throw;
                                         }
-                                        stm = null; // Reopen.
+                                        keystm = null; // Reopen.
                                         //----------------------------COOKING--------------------------------
                                         bool firstcook = cooking_cooksremain == acl.CookRetries;
                                         if (cooking_cooksremain-- <= 0)
@@ -2024,17 +1863,18 @@ namespace MySpace.DataMining.DistributedObjects5
                                 }
 
                                 // Delete old (unsorted) file; prepare new (sorted) one.
-                                // Keep these together so that there's always one on file; so cleanup sees it and continues.
                                 zblock._justclose();
                                 System.IO.File.Delete(zblock.fzkeyblockfilename);
-                                zblock.fzkeyblockfilename = CreateZBlockFileName(zblock.zblockID, "key_sorted");
-                                zblock.ensurefzblock(true);
+                                zblock.fzkeyblockfilename = null;
+                                zblock.fzkvblockfilename = CreateZBlockFileName(zblock.zblockID, "kv_sorted");
+                                System.IO.Stream kvstm = zblock.parent.openfilewithcooking(zblock.fzkvblockfilename,
+                                    System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
                                 try
                                 {
                                     _ZBlockPartReader[] zbparts = new _ZBlockPartReader[zbpCount];
                                     for (int partnum = 0; partnum < zbpCount; partnum++)
                                     {
-                                        zbparts[partnum] = new _ZBlockPartReader(zblock.zblockID, partnum, zblock);
+                                        zbparts[partnum] = new _ZBlockPartReader(zblock.zblockID, partnum, zblock, true);
                                         if (!zbparts[partnum].MoveNext()) // Get it ready for first key.
                                         {
                                             throw new Exception("Expected at least one key in zblock-part file"
@@ -2052,10 +1892,10 @@ namespace MySpace.DataMining.DistributedObjects5
                                                 break;
                                             }
                                             int lowestindex = 0;
-                                            byte[] lowestbuf = zbpRemain[0].Current;
+                                            ByteSlice lowestbuf = zbpRemain[0].Current;
                                             for (int pi = 1; pi < zbpRemainCount; pi++)
                                             {
-                                                byte[] curbuf = zbpRemain[pi].Current;
+                                                ByteSlice curbuf = zbpRemain[pi].Current;
                                                 if (_ZBlockPartReader.CompareKeys(curbuf, lowestbuf, keylen) < 0)
                                                 {
                                                     lowestindex = pi;
@@ -2063,7 +1903,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                                 }
                                             }
                                             {
-                                                zblock.fzkeyblock.Write(lowestbuf, 0, keylen + TValueOffset_Size);
+                                                zbpRemain[lowestindex].WriteCurrent(kvstm);
                                                 if (!zbpRemain[lowestindex].MoveNext())
                                                 {
                                                     zbpRemain.RemoveAt(lowestindex);
@@ -2088,7 +1928,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                 }
                                 finally
                                 {
-                                    zblock._justclose();
+                                    kvstm.Close();
                                 }
 
                             }
@@ -2107,11 +1947,11 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                 }
 
-                public void Sort(List<TKeyBlockEntry> kentries, ref byte[] ebuf)
+                public void Sort(List<TKeyBlockEntry> kentries, ref byte[] ebuf, ref byte[] evaluesbuf)
                 {
-                    if (zblock.splitzkeyfile)
+                    if (zblock.ZBlockSplit)
                     {
-                        _SplitSort(kentries, ref ebuf);
+                        _SplitSort(kentries, ref ebuf, ref evaluesbuf);
                     }
                     else
                     {
@@ -2135,6 +1975,11 @@ namespace MySpace.DataMining.DistributedObjects5
             // keepzblocks==false is faster if enum/reduce isn't needed.
             internal void CommitZBall(string cachename, string sBlockID, bool keepzblock)
             {
+                if (ZBlockSplit)
+                {
+                    throw new Exception("Cache cannot be used when splits occur (rogue intermediate block); cache file is now likely damaged");
+                }
+
                 _justclose();
 
                 string zkeyballname = CreateZBallFileName(zblockID, cachename, sBlockID.PadLeft(4, '0') + "key");
@@ -2167,6 +2012,11 @@ namespace MySpace.DataMining.DistributedObjects5
             // Only valid right after sort!
             internal bool IntegrateZBall(string cachename, string sBlockID, ref byte[] evaluesbuf)
             {
+                if (ZBlockSplit)
+                {
+                    throw new Exception("Cache cannot be used when splits occur (rogue intermediate block); cache file is now likely damaged");
+                }
+
                 string zkeyballname = CreateZBallFileName(zblockID, cachename, sBlockID.PadLeft(4, '0') + "key");
                 string zvalueballname = CreateZBallFileName(zblockID, cachename, sBlockID.PadLeft(4, '0') + "value");
 
@@ -2544,6 +2394,62 @@ namespace MySpace.DataMining.DistributedObjects5
             }
 
 
+        }
+
+
+        internal System.IO.FileStream openfilewithcooking(string fp, System.IO.FileMode mode,
+                System.IO.FileAccess access, System.IO.FileShare share)
+        {
+            //----------------------------COOKING--------------------------------
+            int cooking_cooksremain = CookRetries;
+            for (; ; )
+            {
+                try
+                {
+                    //----------------------------COOKING--------------------------------
+
+                    return new System.IO.FileStream(fp, mode, access, share, FILE_BUFFER_SIZE);
+
+                    //----------------------------COOKING--------------------------------
+                }
+                catch (Exception e)
+                {
+                    bool firstcook = cooking_cooksremain == CookRetries;
+                    if (cooking_cooksremain-- <= 0)
+                    {
+                        string ns = " (unable to get connection count)";
+                        try
+                        {
+                            ns = " (" + NetUtils.GetActiveConnections().Length.ToString()
+                                + " total connections on this machine)";
+                        }
+                        catch
+                        {
+                        }
+                        throw new System.IO.IOException("cooked too many times (retries="
+                            + CookRetries.ToString()
+                            + "; timeout=" + CookTimeout.ToString()
+                            + ") on " + System.Net.Dns.GetHostName() + ns, e);
+                    }
+                    System.Threading.Thread.Sleep(CookTimeout);
+                    if (firstcook)
+                    {
+                        try
+                        {
+                            XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
+                                + "; timeout=" + CookTimeout.ToString()
+                                + ") on " + System.Net.Dns.GetHostName()
+                                + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                        }
+                        catch
+                        {
+                        }
+                    }
+                    continue; // !
+                }
+                break;
+            }
+            //----------------------------COOKING--------------------------------
         }
 
 
@@ -4806,7 +4712,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                             foreach (ZBlock zb in zblocks)
                             {
-                                zb.block64.Sort(kentries64, ref ebytes);
+                                zb.block64.Sort(kentries64, ref ebytes, ref evaluesbuf);
                             }
                             kentries64 = new List<ZBlock.KeyBlockEntry64v>(1);
                         }
@@ -4814,7 +4720,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                             foreach (ZBlock zb in zblocks)
                             {
-                                zb.block32.Sort(kentries32, ref ebytes);
+                                zb.block32.Sort(kentries32, ref ebytes, ref evaluesbuf);
                             }
                             kentries32 = new List<ZBlock.KeyBlockEntry32v>(1);
                         }
@@ -5288,6 +5194,21 @@ namespace MySpace.DataMining.DistributedObjects5
             return sofar;
         }
 
+        internal static int StreamReadLoop(System.IO.Stream stm, byte[] buf, int startoffset, int len)
+        {
+            int sofar = 0;
+            while (sofar < len)
+            {
+                int xread = stm.Read(buf, startoffset + sofar, len - sofar);
+                if (xread <= 0)
+                {
+                    break;
+                }
+                sofar += xread;
+            }
+            return sofar;
+        }
+
         internal static void StreamReadExact(System.IO.Stream stm, byte[] buf, int len)
         {
             if (len != StreamReadLoop(stm, buf, len))
@@ -5686,8 +5607,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
         System.IO.Stream _largezblockresultfile = null;
         string _largezblockresultfilename = null;
-        List<ArrayComboListPart.ZBlock.KvSplit> _largekvsbuf = null;
-        ByteSlice _laregezblockprevinfo;
+        List<byte> _laregezblockprevinfo = null;
 
         // Now with zblock splitting, this loads the next virtual zblock, not necessarily physical.
         bool LoadNextZBlock()
@@ -5697,12 +5617,6 @@ namespace MySpace.DataMining.DistributedObjects5
                 ArrayComboListPart.ZBlock zb;
                 if (null == _largezblockresultfile)
                 {
-#if DEBUG
-                    if (0 != _laregezblockprevinfo.Length)
-                    {
-                        throw new Exception("DEBUG:  LoadNextZBlock: (0 != _laregezblockprevinfo.Length) upon loading next physical zblock");
-                    }
-#endif
                     if (curzblock + 1 >= acl.zblocks.Length)
                     {
                         input.entries.Clear();
@@ -5711,15 +5625,13 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     curzblock++;
                     zb = acl.zblocks[curzblock];
-                    if (zb.splitzblocks)
+                    if (null != zb.fzkvblockfilename)
                     {
-                        _largezblockresultfilename = ArrayComboListPart.ZBlock.CreateZBlockFileName(
-                            zb.zblockID, "LargeResult");
-                        if (null == _largekvsbuf)
+                        if (null == _laregezblockprevinfo)
                         {
-                            _largekvsbuf = new List<ArrayComboListPart.ZBlock.KvSplit>();
+                            _laregezblockprevinfo = new List<byte>(acl.keylen + 4);
                         }
-                        zb._CreateLargeResultFile(_largezblockresultfilename, _largekvsbuf, ref acl.ebytes, ref acl.evaluesbuf);
+                        _largezblockresultfilename = zb.fzkvblockfilename;
                         _largezblockresultfile = new System.IO.FileStream(_largezblockresultfilename,
                             System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
                         // Continues down to Reading a large zblock result file...
@@ -5745,9 +5657,10 @@ namespace MySpace.DataMining.DistributedObjects5
 
                         int keylen = acl.keylen;
 
-                        if (acl.ebytes.Length < ArrayComboListPart.ZBlock.MAXKVBUFSIZE)
+                        const int bufsize = ArrayComboListPart.ZBlock.ZFILE_SPLIT_SIZE + ArrayComboListPart.ZBlock.MAXKVBUFSIZE;
+                        if (acl.ebytes.Length < bufsize)
                         {
-                            acl.ebytes = new byte[ArrayComboListPart.ZBlock.MAXKVBUFSIZE];
+                            acl.ebytes = new byte[bufsize];
                         }
                         byte[] buf = acl.ebytes;
 
@@ -5777,7 +5690,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                     cooking_inIO = false;
                                 }
 
-                                bool needread = (0 == _laregezblockprevinfo.Length);
+                                bool needread = (0 == _laregezblockprevinfo.Count);
 
                                 cooking_inIO = true;
                                 if (needread
@@ -5794,19 +5707,19 @@ namespace MySpace.DataMining.DistributedObjects5
                                         // Add to seekpos if read this time, otherwise it was added last time.
                                         cooking_seekpos += keylen + 4;
                                     }
-                                    else //if (0 != _laregezblockprevinfo.Length)
+                                    else //if (0 != _laregezblockprevinfo.Count)
                                     {
 #if DEBUG
-                                        if (0 == _laregezblockprevinfo.Length)
+                                        if (0 == _laregezblockprevinfo.Count)
                                         {
-                                            throw new Exception("DEBUG:  LoadNextZBlock: (0 == _laregezblockprevinfo.Length) && (!needread)");
+                                            throw new Exception("DEBUG:  LoadNextZBlock: (0 == _laregezblockprevinfo.Count) && (!needread)");
                                         }
 #endif
                                         for (int ip = 0; ip < keylen + 4; ip++)
                                         {
                                             buf[ip] = _laregezblockprevinfo[ip];
                                         }
-                                        _laregezblockprevinfo = ByteSlice.Prepare();
+                                        _laregezblockprevinfo.Clear();
                                     }
                                     int netbuflen = 0;
                                     for (; ; )
@@ -5825,9 +5738,10 @@ namespace MySpace.DataMining.DistributedObjects5
                                         }
 #endif
                                         int newnetbuflen = netbuflen + keylen + 4 + valuelen;
-                                        if (newnetbuflen > buf.Length)
+                                        if (newnetbuflen > bufsize)
                                         {
-                                            _laregezblockprevinfo = ByteSlice.Prepare(buf, netbuflen, keylen + 4);
+                                            _laregezblockprevinfo.Clear();
+                                            ByteSlice.Prepare(buf, netbuflen, keylen + 4).AppendTo(_laregezblockprevinfo);
                                             break;
                                         }
                                         // Current key is at index 0 of buf; check against it.
@@ -5844,7 +5758,8 @@ namespace MySpace.DataMining.DistributedObjects5
                                             }
                                             if (!samekey)
                                             {
-                                                _laregezblockprevinfo = ByteSlice.Prepare(buf, netbuflen, keylen + 4);
+                                                _laregezblockprevinfo.Clear();
+                                                ByteSlice.Prepare(buf, netbuflen, keylen + 4).AppendTo(_laregezblockprevinfo);
                                                 break;
                                             }
                                         }
@@ -5866,7 +5781,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                         netbuflen = newnetbuflen;
 
                                         // Next key?
-                                        if (netbuflen + keylen + 4 > buf.Length)
+                                        if (netbuflen + keylen + 4 > bufsize)
                                         {
                                             // Doesn't fit!
                                             break;

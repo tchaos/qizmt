@@ -878,7 +878,7 @@ namespace MySpace.DataMining.AELight
         }
 
 
-        public static void MetaRemoveMachine(string oldhost, bool DontTouchOldHost)
+        public static void MetaRemoveMachine(string oldhost, bool DontTouchOldHost, bool force)
         {
 #if DEBUG_REPL
             if (!IsAdminCmd)
@@ -903,25 +903,50 @@ namespace MySpace.DataMining.AELight
                     dc.Slaves.SlaveList = RemoveFromHosts(oldies, dc.Slaves.SlaveList);
                 }
 
-                List<dfs.DfsFile> goodfiles = new List<dfs.DfsFile>(dc.Files.Count);
+                bool needforce = false;
                 foreach (dfs.DfsFile df in dc.Files)
                 {
-                    bool keeper = true;
+                    int numbadparts = 0;
+                    long newsize = df.Size;
+                    List<dfs.DfsFile.FileNode> newnodes = new List<dfs.DfsFile.FileNode>(df.Nodes.Count);
+                    //long curposition = 0;
                     foreach (dfs.DfsFile.FileNode fn in df.Nodes)
                     {
                         fn.Host = RemoveFromHosts(oldies, fn.Host);
                         if (fn.Host.Length == 0)
                         {
-                            keeper = false;
+                            numbadparts++;
+                            needforce = true;
+                            newsize -= fn.Length;
                             break;
                         }
+                        else
+                        {
+                            //fn.Position = curposition;
+                            //curposition += fn.Length;
+                            newnodes.Add(fn);
+                        }
                     }
-                    if (keeper)
+                    if (numbadparts != 0)
                     {
-                        goodfiles.Add(df);
+                        Console.WriteLine("{4}  DFS file '{0}' will have {1} parts lost, resulting in {2} data loss from {3} {5}",
+                            df.Name,
+                            df.Nodes.Count - numbadparts,
+                            GetFriendlyByteSize(df.Size - newsize),
+                            GetFriendlyByteSize(df.Size),
+                            isdspace ? "\u00014" : "",
+                            isdspace ? "\u00010" : ""
+                            );
+                        df.Nodes = newnodes;
+                        df.Size = newsize;
                     }
                 }
-                dc.Files = goodfiles;
+                if (needforce && !force)
+                {
+                    Console.Error.WriteLine("Not performing machine removal; use -f to override");
+                    SetFailure();
+                    return;
+                }
 
                 UpdateDfsXml(dc);
 
@@ -1581,6 +1606,11 @@ namespace MySpace.DataMining.AELight
                 ConsoleFlush();
                 int nmoved = 0;
                 bool errors = false;
+                int nthreads = dc.AddMachineMinThreads;
+                if (slaves.Length > nthreads)
+                {
+                    nthreads = slaves.Length;
+                }
                 if (slaves.Length > 0) // If no slaves, nothing to copy!
                 {
                     string newhostfield = newhost;
@@ -1669,7 +1699,7 @@ namespace MySpace.DataMining.AELight
                                     }
                                 }
                             }
-                        }), newavgchunks, slaves.Length); // avgchunks == number of files to copy to the new machine!
+                        }), newavgchunks, nthreads); // avgchunks == number of files to copy to the new machine!
 
                     // Copy cac dlls from another slave.
                     {
@@ -1691,7 +1721,7 @@ namespace MySpace.DataMining.AELight
                                 delegate(System.IO.FileInfo dllfi)
                                 {
                                     System.IO.File.Copy(dllfi.FullName, newcacpath + @"\" + dllfi.Name, true);
-                                }), (new System.IO.DirectoryInfo(slavecacpath)).GetFiles("*.dll"), slaves.Length);
+                                }), (new System.IO.DirectoryInfo(slavecacpath)).GetFiles("*.dll"), nthreads);
                         }
                     }
 

@@ -137,7 +137,7 @@ namespace QueryAnalyzer_RegressionTests
   </Jobs>
 </SourceCode>
 ").Replace('`', '"'));
-                    Exec.Shell("dspace importdir " + exectempdir);
+                    Exec.Shell("dspace importdir \"" + exectempdir + "\"");
                     try
                     {
                         System.IO.File.Delete(execfp);
