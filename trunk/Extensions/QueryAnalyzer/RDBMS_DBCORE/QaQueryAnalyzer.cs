@@ -19,7 +19,14 @@ namespace RDBMS_DBCORE
 
                 //DSpace_Log("DEBUG:  args: " + args);
 
-                QaExec(args);
+                try
+                {
+                    QaExec(args);
+                }
+                finally
+                {
+                    dfsclientClose();
+                }
             }
 
 
@@ -34,6 +41,13 @@ namespace RDBMS_DBCORE
                     : base(msg)
                 {
                 }
+            }
+
+
+            protected virtual RemoteCall GetRemoteCallBlankTable()
+            {
+                //return new RemoteCallShellExec("RDBMS_BlankTable", "RDBMS_BlankTable.DBCORE");
+                return new RemoteCallInProc("RDBMS_BlankTable", new Remote());
             }
 
 
@@ -459,7 +473,13 @@ namespace RDBMS_DBCORE
 
                             if (null != DeleteDfsInputFile)
                             {
-                                Shell("qizmt del \"" + DeleteDfsInputFile + "\"");
+                                try
+                                {
+                                    dfsclient.DeleteFile(DeleteDfsInputFile);
+                                }
+                                catch
+                                {
+                                }
                                 DeleteDfsInputFile = null;
                             }
                             DeleteDfsInputFile = qr.temptable;
@@ -535,11 +555,14 @@ namespace RDBMS_DBCORE
                 {
                     if (null != DeleteDfsInputFile)
                     {
-#if DEBUG
-#else
-                        Shell("qizmt del \"" + DeleteDfsInputFile + "\"");
+                        try
+                        {
+                            dfsclient.DeleteFile(DeleteDfsInputFile);
+                        }
+                        catch
+                        {
+                        }
                         DeleteDfsInputFile = null;
-#endif
                     }
                 }
 
@@ -804,7 +827,42 @@ namespace RDBMS_DBCORE
                             }
                             if (!typesmatch)
                             {
-                                throw new Exception("Column types do not match");
+                                StringBuilder sbexpect = new StringBuilder();
+                                StringBuilder sbunexp = new StringBuilder();
+                                try
+                                {
+                                    {
+                                        System.Xml.XmlNodeList InsertTableCols = xeTable.SelectNodes("column");
+                                        for (int it = 0; it < InsertTableCols.Count; it++)
+                                        {
+                                            System.Xml.XmlNode xeInsert = InsertTableCols[it];
+                                            if (0 != it)
+                                            {
+                                                sbexpect.Append(',');
+                                            }
+                                            sbexpect.Append(xeInsert["type"].InnerText);
+                                        }
+                                    }
+                                    {
+                                        System.Xml.XmlNodeList ResultsTableCols = queryresults.SelectNodes("field");
+                                        for (int it = 0; it < ResultsTableCols.Count; it++)
+                                        {
+                                            System.Xml.XmlNode xeResults = ResultsTableCols[it];
+                                            if (0 != it)
+                                            {
+                                                sbunexp.Append(',');
+                                            }
+                                            sbunexp.Append(xeResults.Attributes["qatype"].Value);
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                }
+                                throw new Exception("Column types do not match",
+                                    new InvalidOperationException("Record mismatch; expected "
+                                        + xeTable["size"].InnerText + " byte records of " + sbexpect.ToString()
+                                        + ", not " + queryresults["recordsize"].InnerText + " byte records of " + sbunexp.ToString()));
                             }
 
                             string InsertDfsName = xeTable["file"].InnerText;
@@ -1100,11 +1158,23 @@ namespace RDBMS_DBCORE
 
                 if (PinForEnabled)
                 {
-                    Shell("dspace del \"" + DfsTableFileTemp + "\"");
+                    try
+                    {
+                        dfsclient.DeleteFile(DfsTableFileTemp);
+                    }
+                    catch
+                    {
+                    }
                 }
                 else
                 {
-                    Shell("dspace del \"" + DfsTableFile + "\"");
+                    try
+                    {
+                        dfsclient.DeleteFile(DfsTableFile);
+                    }
+                    catch
+                    {
+                    }
                 }
 
                 return true;
@@ -1144,8 +1214,18 @@ namespace RDBMS_DBCORE
                 }
                 string sRowSize = xeTable["size"].InnerText;
 
-                Shell("dspace del \"" + DfsTableFile + "\"");
-                Shell("dspace exec //Job[@Name='RDBMS_BlankTable']/IOSettings/DFS_IO/DFSWriter=" + DfsTableFile + "@" + sRowSize + " RDBMS_BlankTable.DBCORE");
+                try
+                {
+                    dfsclient.DeleteFile(DfsTableFile);
+                }
+                catch
+                {
+                }
+                {
+                    RemoteCall rc = GetRemoteCallBlankTable();
+                    rc.OverrideOutput = DfsTableFile + "@" + sRowSize;
+                    rc.Call();
+                }
 
                 return true;
             }
@@ -1325,8 +1405,18 @@ namespace RDBMS_DBCORE
                 }
 
                 string dfstablefile = "dfs://RDBMS_Table_" + TableName;
-                Shell("dspace del \"" + dfstablefile + "\"");
-                Shell("dspace exec //Job[@Name='RDBMS_BlankTable']/IOSettings/DFS_IO/DFSWriter=" + dfstablefile + "@" + totsize.ToString() + " RDBMS_BlankTable.DBCORE");
+                try
+                {
+                    dfsclient.DeleteFile(dfstablefile);
+                }
+                catch
+                {
+                }
+                {
+                    RemoteCall rc = GetRemoteCallBlankTable();
+                    rc.OverrideOutput = dfstablefile + "@" + totsize.ToString();
+                    rc.Call();
+                }
 
                 DSpace_Log("Created table '" + TableName + "' with " + colinfo.Count.ToString() + " columns");
 

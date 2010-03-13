@@ -26,21 +26,77 @@ namespace MySpace.DataMining.DistributedObjects
 {
     public struct Stack
     {
-        internal static byte[] Buffer;
+        [ThreadStatic]
+        internal static byte[] _Buffer;
+        [ThreadStatic]
         internal static int CurrentPos;
+        [ThreadStatic]
+        internal static int OwnSize;
 
-        static Stack()
+        internal const int DefaultBufferSize = 100000;
+
+        static byte[] OneBuffer;
+
+        internal static byte[] Buffer
         {
-            if (Stack.Buffer == null)
+            get
             {
-                Stack.Buffer = new byte[100000];
-                Stack.CurrentPos = 0;
+                if (_Buffer == null)
+                {
+                    if (0 == OwnSize)
+                    {
+                        lock ("StackOneBuffer{27CF77C6-E0AD-4c83-83B8-946D2B1B6D50}")
+                        {
+                            if (Stack.OneBuffer == null)
+                            {
+                                Stack.OneBuffer = new byte[DefaultBufferSize];
+                            }
+                        }
+                        Stack._Buffer = Stack.OneBuffer;
+                    }
+                    else
+                    {
+                        Stack._Buffer = new byte[Stack.OwnSize];
+                    }
+                    Stack.CurrentPos = 0;
+                }
+                return Stack._Buffer;
             }
-        }       
+        }
+
+        public static void OwnThreadStack(int buffersize)
+        {
+#if DEBUG
+            if (Stack.OwnSize != 0)
+            {
+                throw new Exception("DEBUG:  Stack.OwnThreadStack: (Stack.OwnSize != 0)");
+            }
+            if (Stack._Buffer != null)
+            {
+                throw new Exception("DEBUG:  Stack.OwnThreadStack: (_Buffer != null)");
+            }
+#endif
+            Stack.OwnSize = buffersize;
+        }
+
+        public static void OwnThreadStack()
+        {
+            OwnThreadStack(DefaultBufferSize);
+        }
 
         public static void ResetStack()
         {
             Stack.CurrentPos = 0;
+        }
+
+        public static void ResetStack(int context)
+        {
+            Stack.CurrentPos = context;
+        }
+
+        public static int StartStack()
+        {
+            return Stack.CurrentPos;
         }
 
         public static void CheckStack(int delta)
@@ -91,10 +147,10 @@ namespace MySpace.DataMining.DistributedObjects
 
                 for (int i = 0; i < Buffer.Length; i++)
                 {
-                    newBuffer[i] = Buffer[i];
+                    newBuffer[i] = _Buffer[i];
                 }
 
-                Stack.Buffer = newBuffer;
+                Stack._Buffer = newBuffer;
             }
             catch (OutOfMemoryException)
             {

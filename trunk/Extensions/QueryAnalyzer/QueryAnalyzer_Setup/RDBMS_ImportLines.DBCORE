@@ -8,7 +8,9 @@
         <DFSOutput></DFSOutput>
         <!-- OutputDfsFile -->
         <OutputMethod>grouped</OutputMethod>
+		<Setting name="Subprocess_TotalPrime" value="NearPrimeBelowCoreCount" />
       </IOSettings>
+      <DynamicFoil/>
       <IntermediateDataAddressing>64</IntermediateDataAddressing>
       <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
       <Using>RDBMS_DBCORE</Using>

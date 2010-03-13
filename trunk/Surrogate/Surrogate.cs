@@ -54,6 +54,9 @@ namespace MySpace.DataMining.AELight
         public bool UserModified = false;
 
 
+        public string ClusterName = null;
+
+
         [System.Xml.Serialization.XmlElement("DefaultDebugType")]
         public string DefaultDebugTypeTag = null;
         
@@ -126,7 +129,7 @@ namespace MySpace.DataMining.AELight
         }
 
 
-        public int AddMachineMinThreads = 20;
+        public int AddMachineMinThreads = 40;
 
 
         public static string FixXPath(string userfriendlyxpath)
@@ -146,6 +149,8 @@ namespace MySpace.DataMining.AELight
                 case "Subprocess_FoilSampleBlockSize": result = "/dfs/slave/FoilSampleBlockSize"; break;
                 case "Mrdfs_BlockBaseSize": result = "/dfs/DataNodeBaseSize"; break;
                 case "Log_ExecHistory": result = "/dfs/LogExecHistory"; break;
+                case "FailoverTimeout": result = "/dfs/FailoverTimeout"; break;
+                case "FailoverDoCheck": result = "/dfs/FailoverDoCheck"; break;
                 default:
                     if (!result.StartsWith(@"/"))
                     {
@@ -206,6 +211,8 @@ namespace MySpace.DataMining.AELight
 
             public byte CompressZMapBlocks = 0;
 
+            public string ZMapBlockFileBufferSize = "auto";
+
             public byte CompressDfsChunks = 0; // This is in here because the slave cares too (map input)
 
             //[System.Xml.Serialization.XmlIgnore]
@@ -240,6 +247,10 @@ namespace MySpace.DataMining.AELight
         public int MaxDGlobals = 64;
 
         public string DefaultSortedOutputMethod = "rsorted";
+
+        public int FailoverTimeout = 10000;
+
+        public int FailoverDoCheck = 6;
 
         public class ConfigAccountType
         {
@@ -1754,6 +1765,9 @@ namespace MySpace.DataMining.AELight
         public class Job
         {
 
+            [System.Xml.Serialization.XmlIgnore]
+            public string JobFileName = "";
+
             public class ConfigAdd
             {
                 [System.Xml.Serialization.XmlAttribute]
@@ -2236,6 +2250,7 @@ namespace MySpace.DataMining.AELight
 
             public string OpenCVExtension;
             public string Unsafe;
+            public string DynamicFoil;
 
         }
         public Job[] Jobs;
@@ -3308,7 +3323,6 @@ namespace MySpace.DataMining.AELight
                 return false;
             }
         }
-
 
         // Note: this function is not fast.
         public static bool IsHealthySlaveMachine(string host, out string reason)

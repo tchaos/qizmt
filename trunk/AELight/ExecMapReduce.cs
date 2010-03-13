@@ -23,7 +23,6 @@
 #define MR_EXCHANGE_TIME_PRINT
 #define MR_REPLICATION_TIME_PRINT
 
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,14 +40,16 @@ namespace MySpace.DataMining.AELight
             internal Dictionary<string, int> badHosts = null;
             internal Dictionary<int,int> blockStatus = null;
             internal List<string> newBadHosts = null;
-            internal List<KeyValuePair<string, Surrogate.HealthMethod>> healthPlugins = null;
+            internal MySpace.DataMining.DistributedObjects.DiskCheck diskcheck = null;
             internal Random rnd = null;
             internal int sleepCnt = 0;
             internal string inputOrder = null;
+            internal string[] healthpluginpaths = null;
 
             internal FailoverInfo(dfs dc, string inputorder)
             {
-                healthPlugins = GetHealthPlugins(dc);
+                healthpluginpaths = GetHealthPluginPaths(dc);
+                diskcheck = new MySpace.DataMining.DistributedObjects.DiskCheck(healthpluginpaths);
                 rnd = new Random(unchecked(DateTime.Now.Millisecond + System.Diagnostics.Process.GetCurrentProcess().Id));
                 inputOrder = inputorder;
             }
@@ -160,7 +161,7 @@ namespace MySpace.DataMining.AELight
                         hostToBlocks[host].Add(block);
                     }
                 }
-                                         
+                
                 foreach (MapReduceBlockInfo block in allBlocks)
                 {
                     block.jobshared = jobinfo.jobshared;
@@ -176,6 +177,7 @@ namespace MySpace.DataMining.AELight
                     block.logname = jobinfo.logname;
                     block.acl = new MySpace.DataMining.DistributedObjects5.ArrayComboList(jobinfo.cfgj.NarrativeName + "_BlockID" + block.BlockID.ToString(), jobinfo.cfgj.IOSettings.KeyLength);
                     block.acl.SetJID(jid);
+                    block.acl.HealthPluginPaths = healthpluginpaths;
                     int IntermediateDataAddressing = jobinfo.cfgj.IntermediateDataAddressing;
                     if (0 == IntermediateDataAddressing)
                     {
@@ -224,6 +226,7 @@ namespace MySpace.DataMining.AELight
                         _blocks.Add(block);
                     }
                 }
+                jobinfo.timethread.Start();
 
 #if FAILOVER_DEBUG
                 {
@@ -764,27 +767,24 @@ namespace MySpace.DataMining.AELight
                         nexthost = 0;
                     }
                 }
-            }          
-
-            internal bool CheckDiskFailure(string host)
-            {                
-                string reason = null;
-                foreach (KeyValuePair<string, Surrogate.HealthMethod> plugin in healthPlugins)
-                {
-                    Surrogate.HealthMethod hm = plugin.Value;
-                    if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
-                    {
-                        reason = null;
-                    }
-                    else
-                    {
-                        return true;
-                    }
-                }
-                return false; 
             }
 
-            internal int CheckDiskFailures()
+            internal bool CheckMachineFailure(string host)
+            {
+                bool failure = false;
+                if (IsMachinePingable(host))
+                {
+                    string reason = null;
+                    failure = diskcheck.IsDiskFailure(host, out reason);                    
+                }
+                else
+                {
+                    failure = true;
+                }
+                return failure;
+            }            
+
+            internal int CheckMachineFailures()
             {
                 int nthreads = goodHosts.Count;
                 if (nthreads > 15)
@@ -798,23 +798,13 @@ namespace MySpace.DataMining.AELight
                 new Action<string>(
                 delegate(string host)
                 {
-                    string reason = null;                        
-                    foreach (KeyValuePair<string, Surrogate.HealthMethod> plugin in healthPlugins)
+                    if (CheckMachineFailure(host))
                     {
-                        Surrogate.HealthMethod hm = plugin.Value;
-                        if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
+                        lock (newBadHosts)
                         {
-                            reason = null;
+                            newBadHosts.Add(host);
                         }
-                        else
-                        {
-                            lock (newBadHosts)
-                            {
-                                newBadHosts.Add(host);
-                            }
-                            break;
-                        }
-                    }                                                   
+                    }                                     
                 }), new List<string>(goodHosts.Keys), nthreads);
 
                 if (newBadHosts.Count > 0)
@@ -938,6 +928,7 @@ namespace MySpace.DataMining.AELight
                 internal List<string> mapfileswithnodes;
                 internal List<int> inputnodesoffsets;
                 internal List<int> inputrecordlengths;
+                internal System.Threading.Thread timethread;
             }
         }
 
@@ -956,6 +947,7 @@ namespace MySpace.DataMining.AELight
 #endif
                 internal string ExecOpts;
                 internal string noutputmethod; // Set to default when "sorted"
+                internal bool anysplits = false;
             }
 
             internal JobBlocksShared jobshared;
@@ -1032,7 +1024,23 @@ namespace MySpace.DataMining.AELight
                 {
                     for (int isplit = 0; isplit < ZBlockSplitCount; isplit++)
                     {
-                        Console.Write("(split)");
+                        bool little = true;
+                        lock (jobshared)
+                        {
+                            if (!jobshared.anysplits)
+                            {
+                                jobshared.anysplits = true;
+                                little = false;
+                            }
+                        }
+                        if (little)
+                        {
+                            Console.Write("(split)");
+                        }
+                        else
+                        {
+                            Console.Write("(split occured; consider increasing zblock count)");
+                        }
                         ConsoleFlush();
                     }
                 }
@@ -1754,7 +1762,7 @@ public void DSpace_LogResult(string name, bool passed)
                     bool donelogging = false;
                     if (failover != null)
                     {
-                        if (failover.CheckDiskFailure(SlaveHost))
+                        if (failover.CheckMachineFailure(SlaveHost))
                         {
                             LogOutput("Thread exception: (first thread): Hardware failure at " + SlaveHost);
                             LogOutputToFile("Thread exception: (first thread) " + e.ToString());
@@ -2237,6 +2245,13 @@ public void DSpace_LogResult(string name, bool passed)
 
             if (cfgj.IsDeltaSpecified)
             {
+                if (cfgj.DynamicFoil != null)
+                {
+                    Console.Error.WriteLine("DynamicFoil not supported when Delta caching is enabled");
+                    SetFailure();
+                    return;
+                }
+
                 List<dfs.DfsFile> newsnowfiles = new List<dfs.DfsFile>();
                 List<dfs.DfsFile.FileNode> newsnownodes = new List<dfs.DfsFile.FileNode>();
                 List<string> newsnowfileswithnodes = new List<string>();
@@ -2405,7 +2420,7 @@ public void DSpace_LogResult(string name, bool passed)
                 {
                     if (e.ShouldRetry)
                     {
-                        LogOutputToFile("Failing over: " + e.Message);
+                        LogOutputToFile("Failing over: " + e.ToString());
                         Console.WriteLine();
                         {
                             ConsoleColor oldc = ConsoleColor.Gray;
@@ -2430,7 +2445,7 @@ public void DSpace_LogResult(string name, bool passed)
                     }
                     else
                     {
-                        LogOutputToFile("Not failing over, failover disabled: " + e.Message);
+                        LogOutputToFile("Not failing over, failover disabled: " + e.ToString());
                     }
                 }
                 break;
@@ -2438,92 +2453,58 @@ public void DSpace_LogResult(string name, bool passed)
 
         }
 
-        static List<KeyValuePair<string, Surrogate.HealthMethod>> GetHealthPlugins(dfs dc)
+        public static string[] GetHealthPluginPaths(dfs dc)
         {
-            List<KeyValuePair<string, Surrogate.HealthMethod>> plugins = new List<KeyValuePair<string, Surrogate.HealthMethod>>();
-            try
+            string cacdir = null;
             {
-                string cacdir = null;
-                List<dfs.DfsFile> healthdlls = dc.FindAll("QizmtHealth*.dll");
-                foreach (dfs.DfsFile healthplugin in healthdlls)
-                {
-                    if (null == cacdir)
-                    {
 #if HEALTHPLUGIN_FINDCAC
-                                    foreach (string cdh in dc.Slaves.SlaveList.Split(',', ';'))
-                                    {
-                                        System.Threading.Thread cdthd = new System.Threading.Thread(
-                                            new System.Threading.ThreadStart(
-                                            delegate()
-                                            {
-                                                if (Surrogate.IsHealthySlaveMachine(cdh))
-                                                {
-                                                    string cddir = Surrogate.NetworkPathForHost(cdh) + @"\" + dfs.DLL_DIR_NAME;
-                                                    if (System.IO.Directory.Exists(cddir))
-                                                    {
-                                                        cacdir = cddir;
-                                                    }
-                                                }
-                                            }));
-                                        cdthd.Start();
-                                        cdthd.Join(1000 * 30);
-                                        if (null != cacdir)
-                                        {
-                                            break;
-                                        }
-                                    }
-#else
-                        // Needs participating surrogate.
-                        string cddir = AELight_Dir + @"\" + dfs.DLL_DIR_NAME;
-                        if (System.IO.Directory.Exists(cddir))
+                foreach (string cdh in dc.Slaves.SlaveList.Split(',', ';'))
+                {
+                    System.Threading.Thread cdthd = new System.Threading.Thread(
+                        new System.Threading.ThreadStart(
+                        delegate()
                         {
-                            cacdir = cddir;
-                        }
-                        if (null == cacdir)
-                        {
-                            throw new Exception("Unable to locate CAC directory on surrogate (must be participating surrogate for health plugins)");
-                        }
-#endif
-                    }
-                    if (null == cacdir)
-                    {
-                        throw new Exception("Unable to locate healthy CAC directory");
-                    }
-
-                    bool foundhealthmethod = false;
-                    try
-                    {
-                        System.Reflection.Assembly hasm = System.Reflection.Assembly.LoadFrom(cacdir + @"\" + healthplugin.Name);
-                        foreach (Type t in hasm.GetTypes())
-                        {
-                            if (-1 != t.Name.IndexOf("Health", StringComparison.OrdinalIgnoreCase))
+                            if (Surrogate.IsHealthySlaveMachine(cdh))
                             {
-                                System.Reflection.MethodInfo mi = t.GetMethod("CheckHealth",
-                                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                                if (null != mi)
+                                string cddir = Surrogate.NetworkPathForHost(cdh) + @"\" + dfs.DLL_DIR_NAME;
+                                if (System.IO.Directory.Exists(cddir))
                                 {
-                                    Surrogate.HealthMethod hm = (Surrogate.HealthMethod)Delegate.CreateDelegate(typeof(Surrogate.HealthMethod), mi);
-                                    plugins.Add(new KeyValuePair<string, Surrogate.HealthMethod>(healthplugin.Name + " " + t.Name, hm));
-                                    foundhealthmethod = true;
+                                    cacdir = cddir;
                                 }
                             }
-                        }
-                        if (!foundhealthmethod)
-                        {
-                            throw new Exception("Did not find a Health public class with CheckHealth public static method (HealthMethod)");
-                        }
-                    }
-                    catch (Exception epl)
+                        }));
+                    cdthd.Start();
+                    cdthd.Join(1000 * 30);
+                    if (null != cacdir)
                     {
-                        throw new Exception("Unable to use plugin " + healthplugin.Name + ": " + epl.Message, epl);
+                        break;
                     }
                 }
+#else
+                // Needs participating surrogate.
+                string cddir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + @"\" + dfs.DLL_DIR_NAME;
+                if (System.IO.Directory.Exists(cddir))
+                {
+                    cacdir = cddir;
+                }
+                if (null == cacdir)
+                {
+                    throw new Exception("Unable to locate CAC directory on surrogate (must be participating surrogate for health plugins)");
+                }
+#endif
             }
-            catch (Exception e)
+            if (null == cacdir)
             {
-                throw new Exception("Health plugin error: " + e.Message);
+                throw new Exception("Unable to locate healthy CAC directory");
             }
-            return plugins;
+
+            List<dfs.DfsFile> healthdlls = dc.FindAll("QizmtHealth*.dll");
+            string[] pluginpaths = new string[healthdlls.Count];
+            for (int pi = 0; pi < healthdlls.Count; pi++)
+            {
+                pluginpaths[pi] = cacdir + @"\" + healthdlls[pi].Name;
+            }
+            return pluginpaths;
         }
 
         // If AddCacheFiles is non-null, it's a ADD-CACHE-ONLY run!
@@ -2825,6 +2806,66 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                         }
                     }
+                    MapReduceBlockInfo.JobBlocksShared jobshared = new MapReduceBlockInfo.JobBlocksShared();
+                    if (0 == string.Compare("sorted", dc.DefaultSortedOutputMethod, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new Exception("dfs/DefaultSortedOutputMethod cannot be 'sorted'");
+                    }
+                    {
+                        jobshared.noutputmethod = cfgj.IOSettings.OutputMethod;
+                        if (0 == string.Compare("sorted", jobshared.noutputmethod, true))
+                        {
+                            jobshared.noutputmethod = dc.DefaultSortedOutputMethod;
+                        }
+                    }
+                    int FoilKeySkipFactor = -1;
+                    if (0 == string.Compare(jobshared.noutputmethod, "rsorted")
+                        || 0 == string.Compare(jobshared.noutputmethod, "fsorted"))
+                    {
+                        //FoilKeySkipFactor = blocks[0].acl.FoilKeySkipFactor;
+                        {
+                            long totinputsize = 0;
+                            for (int i = 0; i < mapinputchunks.Count; i++)
+                            {
+                                totinputsize += mapinputchunks[i].Length;
+                            }
+                            const long TENGB = 10737418240;
+                            long totinput_lines = totinputsize / cfgj.IOSettings.KeyLength;
+                            long TENGB_lines = TENGB / cfgj.IOSettings.KeyLength;
+                            long differencefactor = totinput_lines / TENGB_lines;
+                            if (differencefactor < 1)
+                            {
+                                differencefactor = 1;
+                            }
+                            FoilKeySkipFactor = (int)(dc.slave.FoilBaseSkipFactor * differencefactor);
+
+                            if (verbose)
+                            {
+                                // Foil distribution index algorithm:
+                                // FoilBaseSkipFactor * max((totinputsize / keylength) / (TENGB / keylength), 1) = result
+                                Console.WriteLine("    ({0} * max(({1} / {2}) / ({3} / {4}), 1)) = {5}",
+                                    dc.slave.FoilBaseSkipFactor, totinputsize, cfgj.IOSettings.KeyLength, TENGB, cfgj.IOSettings.KeyLength, FoilKeySkipFactor);
+
+                                int numfoilentries = checked((int)(totinputsize / cfgj.IOSettings.KeyLength / FoilKeySkipFactor));
+                                Console.WriteLine("    Foil count = ~{0}", numfoilentries);
+                                Console.WriteLine("    Foil size = ~{0}", GetFriendlyByteSize((long)numfoilentries * (long)cfgj.IOSettings.KeyLength));
+                                Console.WriteLine("    Initial ZBlock total count = {0}", dc.slave.zblocks.count * goodblockcount);
+                                if (cfgj.DynamicFoil != null)
+                                {
+                                    if (dc.slave.zblocks.count * goodblockcount < numfoilentries)
+                                    {
+                                        dc.slave.zblocks.count = numfoilentries / goodblockcount;
+                                        if (0 != (numfoilentries % goodblockcount))
+                                        {
+                                            dc.slave.zblocks.count++;
+                                        }
+                                        Console.WriteLine("    Adjusted ZBlock total count = {0}", dc.slave.zblocks.count * goodblockcount);
+                                    }
+                                }
+
+                            }
+                        }
+                    }
                     string slaveconfigxml = "";
                     {
                         System.Xml.XmlDocument pdoc = new System.Xml.XmlDocument();
@@ -2923,18 +2964,6 @@ public void DSpace_LogResult(string name, bool passed)
                         }
                     }
                     int nextslave = 0;
-                    MapReduceBlockInfo.JobBlocksShared jobshared = new MapReduceBlockInfo.JobBlocksShared();
-                    if (0 == string.Compare("sorted", dc.DefaultSortedOutputMethod, StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw new Exception("dfs/DefaultSortedOutputMethod cannot be 'sorted'");
-                    }
-                    {
-                        jobshared.noutputmethod = cfgj.IOSettings.OutputMethod;
-                        if (0 == string.Compare("sorted", jobshared.noutputmethod, true))
-                        {
-                            jobshared.noutputmethod = dc.DefaultSortedOutputMethod;
-                        }
-                    }
                     bool rangesort = 0 == string.Compare("rsorted", jobshared.noutputmethod, true)
                         || 0 == string.Compare("rhashsorted", jobshared.noutputmethod, true);
                     int perslave = 1;
@@ -2951,8 +2980,7 @@ public void DSpace_LogResult(string name, bool passed)
                     //System.Threading.Thread.Sleep(1000 * 8);
 #endif
                     jobshared.blockcount = goodblockcount;
-                    jobshared.ExecOpts = ExecOpts;
-                    timethread.Start();
+                    jobshared.ExecOpts = ExecOpts;                    
                     if (failover == null)
                     {
                         for (int BlockID = 0; BlockID < goodblockcount; BlockID++)
@@ -2990,7 +3018,7 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                             bi.logname = logname;
                             bi.acl = new MySpace.DataMining.DistributedObjects5.ArrayComboList(cfgj.NarrativeName + "_BlockID" + sblockid, cfgj.IOSettings.KeyLength);
-                            bi.acl.SetJID(jid);
+                            bi.acl.SetJID(jid, CurrentJobFileName + " MapReduce: " + cfgj.NarrativeName);
 #if DEBUG
                         //System.Threading.Thread.Sleep(1000 * 8);
 #endif
@@ -3059,7 +3087,7 @@ public void DSpace_LogResult(string name, bool passed)
                             bi.acl.AddBlock("1", "1", bi.SlaveHost + @"|" + bi.logname + @"|slaveid=0");
                             blocks.Add(bi);
                         }
-
+                        timethread.Start();
                         if (null != mapinputchunks) // Only null if DirectSlaveLoad
                         {
                             int fslavetarget = 0; // Failover target if a particular chunk doesn't 'belong' to a slave...                       
@@ -3199,6 +3227,7 @@ public void DSpace_LogResult(string name, bool passed)
                         jobinfo.outputrecordlengths = outputrecordlengths;
                         jobinfo.slaveconfigxml = slaveconfigxml;
                         jobinfo.verbose = verbose;
+                        jobinfo.timethread = timethread;
                         failover.CreateBlocks(slaves, blocks, goodblockcount, 0, jobinfo);
 #if FAILOVER_DEBUG
                         {
@@ -3224,6 +3253,7 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                             failover.Log(debugtxt);
                         }
+                        failover.Log("FailoverTimeout=" + dc.FailoverTimeout.ToString() + ";FailoverDoCheck=" + dc.FailoverDoCheck.ToString());
 #endif
                     }         
                     
@@ -3231,30 +3261,9 @@ public void DSpace_LogResult(string name, bool passed)
                         || 0 == string.Compare(jobshared.noutputmethod, "fsorted"))
                     {
                         // fsorted has another 'foil load' phase with join...
-                        int FoilKeySkipFactor = blocks[0].acl.FoilKeySkipFactor;
+                        if (-1 == FoilKeySkipFactor)
                         {
-                            long totinputsize = 0;
-                            for (int i = 0; i < mapinputchunks.Count; i++)
-                            {
-                                totinputsize += mapinputchunks[i].Length;
-                            }
-                            const long TENGB = 10737418240;
-                            long totinput_lines = totinputsize / cfgj.IOSettings.KeyLength;
-                            long TENGB_lines = TENGB / cfgj.IOSettings.KeyLength;
-                            long differencefactor = totinput_lines / TENGB_lines;
-                            if (differencefactor < 1)
-                            {
-                                differencefactor = 1;
-                            }
-                            FoilKeySkipFactor = (int)(dc.slave.FoilBaseSkipFactor * differencefactor);
-
-                            if (verbose)
-                            {
-                                // Foil distribution index algorithm:
-                                // FoilBaseSkipFactor * max((totinputsize / keylength) / (TENGB / keylength), 1) = result
-                                Console.WriteLine("    ({0} * max(({1} / {2}) / ({3} / {4}), 1)) = {5}",
-                                    dc.slave.FoilBaseSkipFactor, totinputsize, cfgj.IOSettings.KeyLength, TENGB, cfgj.IOSettings.KeyLength, FoilKeySkipFactor);
-                            }
+                            FoilKeySkipFactor = blocks[0].acl.FoilKeySkipFactor;
                         }
                         for (int i = 0; i < blocks.Count; i++)
                         {
@@ -3358,16 +3367,16 @@ public void DSpace_LogResult(string name, bool passed)
                                 break;
                             }
 
-                            System.Threading.Thread.Sleep(1000);
+                            System.Threading.Thread.Sleep(dc.FailoverTimeout);
 
-                            if (failover.sleepCnt++ > 5)
+                            if (failover.sleepCnt++ > dc.FailoverDoCheck)
                             {
                                 failover.sleepCnt = 0;
 #if FAILOVER_DEBUG
                                 failover.Log("Health check;sleepCnt=" + failover.sleepCnt.ToString());
 #endif
 
-                                if (failover.CheckDiskFailures() > 0)
+                                if (failover.CheckMachineFailures() > 0)
                                 {
 #if FAILOVER_DEBUG
                                     failover.Log("Disk failure detected...");
@@ -3378,13 +3387,18 @@ public void DSpace_LogResult(string name, bool passed)
                                     }   
 #endif
 
-                                    foreach (string badhost in failover.newBadHosts)
                                     {
-                                        Console.WriteLine("Hardware failure during map detected on {0}", badhost);
-                                        ConsoleFlush();
-                                        failover.AbortBlocksFromFailedHost(badhost);
+                                        int hoffset = (failover.badHosts.Count - failover.newBadHosts.Count) + removedslavescount;
+                                        string recovered = failover.badHosts.Count + removedslavescount >= dc.Replication ? "NoRecovery" : "Recovered";
+                                        for (int hi = 0; hi < failover.newBadHosts.Count; hi++)
+                                        {
+                                            string badhost = failover.newBadHosts[hi];
+                                            Console.WriteLine(Environment.NewLine + "HWFailure:{0}:{1}:{2}/{3}", recovered, badhost, hi + 1 + hoffset, dc.Replication);
+                                            ConsoleFlush();
+                                            failover.AbortBlocksFromFailedHost(badhost);
+                                        }
                                     }
-
+                                    
 #if FAILOVER_DEBUG                                    
                                     {
                                         failover.Log("Done removing all bad blocks");
@@ -3419,11 +3433,14 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                         }
                                          
-                        if (failover.CheckDiskFailures() > 0)
+                        if (failover.CheckMachineFailures() > 0)
                         {
-                            foreach (string badhost in failover.newBadHosts)
+                            int hoffset = (failover.badHosts.Count - failover.newBadHosts.Count) + removedslavescount;
+                            string recovered = failover.badHosts.Count + removedslavescount >= dc.Replication ? "NoRecovery" : "Recovered";
+                            for (int hi = 0; hi < failover.newBadHosts.Count; hi++)
                             {
-                                Console.WriteLine("Hardware failure after map joined detected on {0}", badhost);                                
+                                string badhost = failover.newBadHosts[hi];                                
+                                Console.WriteLine(Environment.NewLine + "HWFailure:{0}:{1}:{2}/{3}", recovered, badhost, hi + 1 + hoffset, dc.Replication);                               
                                 failover.AbortBlocksFromFailedHost(badhost);
                             }
                         }
@@ -3441,7 +3458,8 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                             ConsoleColor oldcolor = Console.ForegroundColor;
                             Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine("{0}{1} machine(s) with hardware failure during map: {2}{3}", isdspace ? "\u00014" : "", failover.badHosts.Count, sbadhosts, isdspace ? "\u00010" : "");                            
+                            Console.WriteLine(Environment.NewLine + 
+                                "{0}{1} machine(s) with hardware failure during map: {2}{3}", isdspace ? "\u00014" : "", failover.badHosts.Count, sbadhosts, isdspace ? "\u00010" : "");                            
                             Console.ForegroundColor = oldcolor;
                         }
 

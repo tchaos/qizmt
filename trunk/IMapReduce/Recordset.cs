@@ -26,19 +26,39 @@ namespace MySpace.DataMining.DistributedObjects
 {
     public struct recordset
     {
+        [ThreadStatic]
         private static List<List<byte>> Buffers;
+        [ThreadStatic]
         private static int CurrentBufPos;
-       
+        [ThreadStatic]
+        private static bool OwnBuffers;
+
+        private static List<List<byte>> OneBuffers;
+
         private int CurrentGetPos;
         public bool ContainsString;
-        internal List<byte> Buffer;        
+        internal List<byte> Buffer;
         List<char> Dummy;
 
         private static List<byte> GetBuffer()
         {
             if (Buffers == null)
             {
-                Buffers = new List<List<byte>>();
+                if (!OwnBuffers)
+                {
+                    lock ("recordsetOneBuffers{9BE31A43-0FA6-4f13-9CCA-203B5B24E62B}")
+                    {
+                        if (null == OneBuffers)
+                        {
+                            OneBuffers = new List<List<byte>>();
+                        }
+                    }
+                    Buffers = OneBuffers;
+                }
+                else
+                {
+                    Buffers = new List<List<byte>>();
+                }
                 CurrentBufPos = 0;               
             }
 
@@ -52,6 +72,21 @@ namespace MySpace.DataMining.DistributedObjects
             }
 
             return Buffers[CurrentBufPos++];
+        }
+
+        public static void OwnThreadBuffers()
+        {
+#if DEBUG
+            if (OwnBuffers)
+            {
+                throw new Exception("DEBUG:  Stack.OwnThreadBuffers: (OwnBuffers)");
+            }
+            if (Buffers != null)
+            {
+                throw new Exception("DEBUG:  recordset.OwnThreadBuffers: (Buffers != null)");
+            }
+#endif
+            OwnBuffers = true;
         }
 
         public static recordset Prepare()
@@ -121,6 +156,16 @@ namespace MySpace.DataMining.DistributedObjects
         public static void ResetBuffers()
         {
             CurrentBufPos = 0;
+        }
+
+        public static void ResetBuffers(int context)
+        {
+            CurrentBufPos = context;
+        }
+
+        public static int StartBuffers()
+        {
+            return CurrentBufPos;
         }
 
         public int Length

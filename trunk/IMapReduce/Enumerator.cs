@@ -2115,7 +2115,7 @@ namespace MySpace.DataMining.DistributedObjects
             }
             lock (_rrt)
             {
-                return _rrt.Next(timeout - timeout / 2, timeout + 1);
+                return _rrt.Next(timeout / 4, timeout + 1);
             }
         }
 

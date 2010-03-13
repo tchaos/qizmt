@@ -97,5 +97,16 @@ namespace RDBMS_qa
                 txtInfo.SelectedText = Environment.NewLine + tab + ex2 + Environment.NewLine + Environment.NewLine;
             }
         }
+
+        private void HelpBrowser_Load(object sender, EventArgs e)
+        {
+            try
+            {
+                tvTopic.Nodes[0].Expand();
+            }
+            catch
+            {
+            }
+        }
     }
 }

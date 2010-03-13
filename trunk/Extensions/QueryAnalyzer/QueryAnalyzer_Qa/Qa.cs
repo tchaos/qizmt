@@ -171,7 +171,9 @@ namespace RDBMS_qa
             string _query = query.Trim();
             return (_query.StartsWith("rselect", StringComparison.OrdinalIgnoreCase) ||
                 _query.StartsWith("rinsert", StringComparison.OrdinalIgnoreCase) ||
-                _query.StartsWith("rdelete", StringComparison.OrdinalIgnoreCase));            
+                _query.StartsWith("rdelete", StringComparison.OrdinalIgnoreCase) ||
+                _query.StartsWith("rcreate", StringComparison.OrdinalIgnoreCase) ||
+                _query.StartsWith("rdrop", StringComparison.OrdinalIgnoreCase));            
         }
 
         private void TSafe(Action act)
@@ -241,6 +243,9 @@ namespace RDBMS_qa
                 {
                     string status = "";
                     DbConnection conn = null;
+                    DateTime starttime = DateTime.MinValue;
+                    bool completed = false;
+                    bool needsaycompleted = true;
                     try
                     {
                         System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
@@ -255,6 +260,7 @@ namespace RDBMS_qa
                         }
                         conn.Open();
                         DbCommand cmd = conn.CreateCommand();
+                        starttime = DateTime.Now;
                         for (int onquery = 0; onquery < queries.Count; onquery++)
                         {
                             string thisquery = queries[onquery].Trim();
@@ -279,6 +285,7 @@ namespace RDBMS_qa
                                 thisquery.StartsWith("shell", StringComparison.OrdinalIgnoreCase) ||
                                 thisquery.StartsWith("rselect", StringComparison.OrdinalIgnoreCase))
                             {
+                                needsaycompleted = false;
                                 DbDataReader reader = cmd.ExecuteReader();
                                 TSafe(new Action(delegate()
                                     {
@@ -294,6 +301,32 @@ namespace RDBMS_qa
                                 {
                                     dt.Columns.Add(reader.GetName(i));
                                 }
+
+#if DEBUG
+                                try
+                                {
+                                    string computer_name = System.Environment.GetEnvironmentVariable("COMPUTERNAME");
+                                    if (computer_name == "MAPDCMILLER"
+                                        || computer_name == "MAPDDRULE1")
+                                    {
+                                        StringBuilder sblastschema = new StringBuilder();
+                                        for (int i = 0; i < columnCount; i++)
+                                        {
+                                            if (sblastschema.Length != 0)
+                                            {
+                                                sblastschema.Append(", ");
+                                            }
+                                            sblastschema.AppendFormat("{0} {1}",
+                                                reader.GetDataTypeName(i), reader.GetName(i));
+                                        }
+                                        sblastschema.AppendLine();
+                                        System.IO.File.AppendAllText(@"C:\temp\lastschema.txt", sblastschema.ToString());
+                                    }
+                                }
+                                catch
+                                {
+                                }
+#endif
 
                                 ds.Tables.Add(dt);
 
@@ -318,7 +351,7 @@ namespace RDBMS_qa
                                     {
                                         dgvResults.DataSource = ds.Tables[0];
                                         SetGridWidths(schema);
-                                    }));                               
+                                    }));
                             }
                             else
                             {
@@ -326,11 +359,11 @@ namespace RDBMS_qa
                                 TSafe(new Action(delegate()
                                     {
                                         ClearResults();
-                                        AddRow("Query results", "Completed");
-                                    }));                                
+                                        needsaycompleted = true;
+                                    }));
                             }
-                            status = "Execution completed";
                         }
+                        completed = true;
                     }
                     catch (Exception e)
                     {
@@ -348,12 +381,48 @@ namespace RDBMS_qa
                         }
                         catch (Exception e)
                         {
+                            completed = false;
                             TSafe(new Action(delegate()
                             {
                                 AddRow("Exception Details", e.ToString());
                             }));
                             status = "Exceptions occurred";
                         }
+                    }
+
+                    if (completed)
+                    {
+                        if (needsaycompleted)
+                        {
+                            AddRow("Query results", "Completed");
+                        }
+                        long tsecs = (long)(DateTime.Now - starttime).TotalSeconds;
+                        StringBuilder sb = new StringBuilder();
+                        if (tsecs >= 60 * 60 * 24)
+                        {
+                            long x = tsecs / (60 * 60 * 24);
+                            sb.AppendFormat(" {0} {1}", x, 1 == x ? "day" : "days");
+                            tsecs %= 60 * 60 * 24;
+                        }
+                        if (tsecs >= 60 * 60)
+                        {
+                            long x = tsecs / (60 * 60);
+                            sb.AppendFormat(" {0} {1}", x, 1 == x ? "hour" : "hours");
+                            tsecs %= 60 * 60;
+                        }
+                        if (tsecs >= 60)
+                        {
+                            long x = tsecs / 60;
+                            sb.AppendFormat(" {0} {1}", x, 1 == x ? "minute" : "minutes");
+                            tsecs %= 60;
+                        }
+                        if (tsecs > 0 || 0 == sb.Length)
+                        {
+                            long x = tsecs / 1;
+                            sb.AppendFormat(" {0} {1}", x, 1 == x ? "second" : "seconds");
+                            tsecs %= 1;
+                        }
+                        status = "Execution completed in" + sb.ToString();
                     }
 
                     TSafe(new Action(delegate()

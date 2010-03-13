@@ -16,6 +16,9 @@
     <SccLocalPath>SAK</SccLocalPath>
     <SccAuxPath>SAK</SccAuxPath>
     <SccProvider>SAK</SccProvider>
+    <SignAssembly>false</SignAssembly>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -53,9 +56,11 @@
     <Compile Include="Compiler.cs" />
     <Compile Include="CriticalSection.cs" />
     <Compile Include="DGlobals.cs" />
+    <Compile Include="DiskCheck.cs" />
     <Compile Include="DRandom.cs" />
     <Compile Include="Enumerator.cs" />
     <Compile Include="Exec.cs" />
+    <Compile Include="FailoverFileStream.cs" />
     <Compile Include="Int32HT.cs" />
     <Compile Include="Int64HT.cs" />
     <Compile Include="MString.cs" />

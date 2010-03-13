@@ -337,6 +337,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
         internal long jid = 0;
         internal string sjid = "0";
+        internal string jobdesc = "";
 
 
         public DistObject(string objectname) :
@@ -346,7 +347,7 @@ namespace MySpace.DataMining.DistributedObjects5
         }
 
 
-        public void SetJID(long jid)
+        public void SetJID(long jid, string jobdesc)
         {
             if (0 != this.jid)
             {
@@ -354,6 +355,12 @@ namespace MySpace.DataMining.DistributedObjects5
             }
             this.jid = jid;
             this.sjid = jid.ToString();
+            this.jobdesc = jobdesc;
+        }
+
+        public void SetJID(long jid)
+        {
+            SetJID(jid, "");
         }
 
 
@@ -544,7 +551,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         servStm.WriteByte((byte)'B'); // AddBlock.
                         XContent.SendXContent(servStm, slave.sblockinfo);
                         XContent.SendXContent(servStm, lipep.Port.ToString());
-                        XContent.SendXContent(servStm, sjid);
+                        XContent.SendXContent(servStm, sjid + ":" + Convert.ToBase64String(Encoding.UTF8.GetBytes(jobdesc)));
                         {
                             int rB = servStm.ReadByte();
                             if ('+' != rB)

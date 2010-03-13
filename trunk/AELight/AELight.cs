@@ -131,8 +131,10 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    genhostnames <pattern> <startNum>");
             Console.WriteLine("                 <endNum> [<delimiter>]");
             Console.WriteLine("                 generate host names");
-            Console.WriteLine("    viewlogs      [machine=<machineName>]");
+            Console.WriteLine("    viewlogs     [machine=<machineName>]");
             Console.WriteLine("                 [count=<number of entries to return>]");
+            Console.WriteLine("                 [jobfile=<logs for this job file only>]");
+            Console.WriteLine("                 [jobid=<logs for this job identifier only>]");
             Console.WriteLine("                 view log entries");
             Console.WriteLine("    clearlogs                      clear logs from all machines in the cluster");
             Console.WriteLine("    maxuserlogsview                view maxUserLogs configuration");
@@ -168,6 +170,7 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    viewjob [-a] <JobID>           View standard output of a job");
             Console.WriteLine("    copyto <dfsfile> <target-host>");
             Console.WriteLine("           [<target-dfs-filename>] Copy DFS file to another cluster");
+            Console.WriteLine("    viewname [-m]                  Display logical name of cluster");
         }
 
 
@@ -463,6 +466,7 @@ namespace MySpace.DataMining.AELight
             finally
             {
                 Environment.CurrentDirectory = OriginalUserDir;
+                CurrentJobFileName = "";
             }
         }
 
@@ -1270,6 +1274,11 @@ namespace MySpace.DataMining.AELight
             return VerifyHostPermissions(slaves);
         }
 
+        public static bool IsMachinePingable(string host)
+        {
+            string result = Shell("ping " + host + " -n 1");
+            return (result.IndexOf("Reply from ", StringComparison.OrdinalIgnoreCase) != -1);
+        }
 
         public static string GetMemoryStatusForHost(string host)
         {
@@ -1781,6 +1790,7 @@ namespace MySpace.DataMining.AELight
         internal static string jidfp = "N/A";
         public static long jid = 0;
         public static string sjid = "0";
+        public static string CurrentJobFileName = "";
 
 #if DEBUG
         static int MainThreadId;
@@ -2776,7 +2786,7 @@ namespace MySpace.DataMining.AELight
                 }
                 Entry.ToBytes(ikey, keybuf, 0);
                 output.Add(keybs, line);
-                ikey = unchecked(ikey + 1);
+                ikey = unchecked(ikey + Qizmt_ProcessCount);
             }
         ]]>
         </Map>
@@ -2980,7 +2990,7 @@ namespace MySpace.DataMining.AELight
                                                             }
                                                             catch (Exception e)
                                                             {
-                                                                LogOutputToFile("Unable to kill Slave PID " + netpath + "\\" + spidStopRemote + " belonging to JID " + killsjid + ": " + e.Message);
+                                                                LogOutputToFile("Unable to kill Slave PID " + netpath + "\\" + spidStopRemote + " belonging to JID " + killsjid + ": " + e.ToString());
                                                             }
                                                         }
                                                     }), slaves, numthreads);
@@ -3081,6 +3091,7 @@ namespace MySpace.DataMining.AELight
                                                         catch (Exception e)
                                                         {
                                                             LogOutput("Unable to delete incomplete MR.DFS data belonging to JID " + killsjid + ": " + e.Message);
+                                                            LogOutputToFile("Unable to delete incomplete MR.DFS data belonging to JID " + killsjid + ": " + e.ToString());
                                                         }
                                                     }
                                                     try
@@ -3197,6 +3208,7 @@ namespace MySpace.DataMining.AELight
                                                     catch (Exception e)
                                                     {
                                                         LogOutput("Unable to delete intermediate data belonging to JID " + killsjid + ": " + e.Message);
+                                                        LogOutputToFile("Unable to delete intermediate data belonging to JID " + killsjid + ": " + e.ToString());
                                                     }
                                                     try
                                                     {
@@ -3240,6 +3252,7 @@ namespace MySpace.DataMining.AELight
                                                     catch (Exception e)
                                                     {
                                                         LogOutput("Unable to delete log files belonging to JID " + killsjid + ": " + e.Message);
+                                                        LogOutputToFile("Unable to delete log files belonging to JID " + killsjid + ": " + e.ToString());
                                                     }
                                                     try
                                                     {
@@ -3276,7 +3289,7 @@ namespace MySpace.DataMining.AELight
                                             }
                                             catch (Exception e)
                                             {
-                                                LogOutputToFile("Unable to kill Surrogate PID " + killAelightSPid + " belonging to JID " + killsjid + ": " + e.Message);
+                                                LogOutputToFile("Unable to kill Surrogate PID " + killAelightSPid + " belonging to JID " + killsjid + ": " + e.ToString());
                                             }
                                             try
                                             {
@@ -3357,6 +3370,52 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "setname":
+                    {
+                        if (args.Length <= 1)
+                        {
+                            Console.Error.WriteLine("Expected new cluster name");
+                            SetFailure();
+                            return;
+                        }
+                        else
+                        {
+                            string newname = args[1];
+                            using (LockDfsMutex())
+                            {
+                                dfs dc = LoadDfsConfig();
+                                dc.ClusterName = newname;
+                                UpdateDfsXml(dc);
+                            }
+                            Console.WriteLine("Cluster name set to {0}", newname);
+                        }
+                    }
+                    break;
+
+                case "viewname":
+                    {
+                        bool machinereadable = args.Length > 1 && "-m" == args[1];
+                        dfs dc = LoadDfsConfig();
+                        if (dc.ClusterName == null)
+                        {
+                            Console.Error.WriteLine("Cluster name not set");
+                            SetFailure();
+                            return;
+                        }
+                        else
+                        {
+                            if (machinereadable)
+                            {
+                                Console.WriteLine(dc.ClusterName);
+                            }
+                            else
+                            {
+                                Console.WriteLine("Cluster name is {0}", dc.ClusterName);
+                            }
+                        }
+                    }
+                    break;
+
                 case "exec":
                     if (args.Length < 2)
                     {
@@ -3420,6 +3479,7 @@ namespace MySpace.DataMining.AELight
                             //#if DEBUG
                             if (args[iarg].StartsWith("file://", StringComparison.OrdinalIgnoreCase))
                             {
+                                CurrentJobFileName = args[iarg].Substring(7);
                                 Exec(ExecOpts, LoadConfig(args[iarg].Substring(7)), SubArray(args, iarg + 1), true);
                                 return;
                             }
@@ -3437,6 +3497,7 @@ namespace MySpace.DataMining.AELight
                             {
                                 throw new Exception("Error: exec jobs file not in correct jobs DFS format");
                             }
+                            CurrentJobFileName = dfjob.Name;
                             string ejnetpath = NetworkPathForHost(dfjob.Nodes[0].Host.Split(';')[0]) + @"\" + dfjob.Nodes[0].Name;
 
                             if (dc.LogExecHistory > 0)
@@ -4323,6 +4384,8 @@ namespace MySpace.DataMining.AELight
                     {
                         int maxentries = 1000;
                         string machine = null;
+                        string findsjid = null;
+                        string findjobfile = null;
                         if (args.Length > 1)
                         {
                             for (int i = 1; i < args.Length; i++)
@@ -4353,6 +4416,23 @@ namespace MySpace.DataMining.AELight
                                         catch
                                         {
                                         }
+                                        break;
+                                    case "jobid":
+                                    case "jid":
+                                    case "jobidentifier":
+                                        {
+                                            findsjid = optval;
+                                            long findjid;
+                                            if (!long.TryParse(findsjid, out findjid) || findjid < 1)
+                                            {
+                                                Console.Error.WriteLine("Invalid JobID: " + findsjid);
+                                                return;
+                                            }
+                                        }
+                                        break;
+                                    case "jobfile":
+                                    case "jobsfile":
+                                        findjobfile = optval;
                                         break;
                                     default:
                                         Console.Error.WriteLine("Invalid argument for viewlogs");
@@ -4514,17 +4594,6 @@ namespace MySpace.DataMining.AELight
                         Console.WriteLine("Log entries:");
                         Console.WriteLine("-");
 
-                        if (allentries.Count == 1)
-                        {
-                            foreach (string entry in allentries[0])
-                            {
-                                Console.Write(entry);
-                            }
-                            Console.WriteLine("-");
-                            Console.WriteLine("Entries displayed: {0}", allentries[0].Length);
-                            Console.WriteLine("-");
-                        }
-                        else
                         {
                             List<KeyValuePair<DateTime, string>> list = new List<KeyValuePair<DateTime, string>>();
                             foreach (string[] entries in allentries)
@@ -4550,13 +4619,57 @@ namespace MySpace.DataMining.AELight
                             });
 
                             int start = list.Count > maxentries ? list.Count - maxentries : 0;
+                            int dispcount = 0;
                             for (int i = start; i < list.Count; i++)
                             {
-                                Console.Write(list[i].Value);
+                                string log = list[i].Value;
+                                if (null != findsjid | null != findjobfile)
+                                {
+                                    string logsjid;
+                                    string logjobdesc;
+                                    {
+                                        const string JSTART = "[JobID:";
+                                        int ij = log.LastIndexOf(JSTART);
+                                        if (-1 == ij)
+                                        {
+                                            continue;
+                                        }
+                                        ij += JSTART.Length;
+                                        const string JEND = "] ";
+                                        int ijend = log.IndexOf(JEND, ij);
+                                        if (-1 == ijend)
+                                        {
+                                            continue;
+                                        }
+                                        logsjid = log.Substring(ij, ijend - ij);
+                                        logjobdesc = log.Substring(ijend + JEND.Length);
+                                    }
+                                    if (null != findsjid)
+                                    {
+                                        if (logsjid != findsjid)
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                    if (null != findjobfile)
+                                    {
+                                        if (findjobfile.Length >= logjobdesc.Length
+                                            || ' ' != logjobdesc[findjobfile.Length])
+                                        {
+                                            continue;
+                                        }
+                                        if (!logjobdesc.StartsWith(findjobfile, true, null))
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                }
+                                Console.Write(log);
+                                dispcount++;
                             }
 
                             Console.WriteLine("-");
-                            Console.WriteLine("Entries displayed: {0}", list.Count - start);
+                            Console.WriteLine("Entries displayed: {0}", dispcount);
                             Console.WriteLine("-");
                         }
                     }
@@ -6017,21 +6130,42 @@ namespace MySpace.DataMining.AELight
                         // Note: doesn't include a non-participating surrogate! (it's not in SlaveList).
                         dfs dc = LoadDfsConfig();
                         string[] hosts = dc.Slaves.SlaveList.Split(';');
-                        int goodcount = 0;
                         bool healthcheck = (args.Length > 1 && "-healthy" == args[1]);
-                        foreach (string host in hosts)
+                        if (healthcheck)
                         {
-                            if (!healthcheck || Surrogate.IsHealthySlaveMachine(host))
+                            int threadcount = hosts.Length;
+                            if (threadcount > 15)
                             {
-                                Console.WriteLine("{0} {1}", host, Surrogate.NetworkPathForHost(host));
-                                goodcount++;
+                                threadcount = 15;
+                            }
+                            int goodcount = 0;
+                            MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                new Action<string>(
+                                delegate(string host)
+                                {
+                                    if (Surrogate.IsHealthySlaveMachine(host))
+                                    {
+                                        //lock (hosts)
+                                        {
+                                            Console.WriteLine("{0} {1}", host, Surrogate.NetworkPathForHost(host));
+                                            //goodcount++;
+                                        }
+                                        System.Threading.Interlocked.Increment(ref goodcount);
+                                    }
+                                }), hosts, threadcount);
+                            if (goodcount < dc.Replication)
+                            {
+                                Console.Error.WriteLine("Not enough healthy machines in cluster for replication factor of {0}", dc.Replication);
+                                SetFailure();
+                                return;
                             }
                         }
-                        if (goodcount < dc.Replication)
+                        else
                         {
-                            Console.Error.WriteLine("Not enough healthy machines in cluster for replication factor of {0}", dc.Replication);
-                            SetFailure();
-                            return;
+                            foreach (string host in hosts)
+                            {
+                                Console.WriteLine("{0} {1}", host, Surrogate.NetworkPathForHost(host));
+                            }
                         }
                     }
                     break;
@@ -6082,7 +6216,31 @@ namespace MySpace.DataMining.AELight
                             }
                             if (nvalues > 0)
                             {
-                                xd.Save(DFSXMLPATH);
+                                using (System.IO.Stream stm = new System.IO.MemoryStream(Encoding.UTF8.GetBytes(xd.InnerXml)))
+                                {
+                                    using (System.IO.StreamReader srconfig = new System.IO.StreamReader(stm))
+                                    {
+                                        System.Xml.Serialization.XmlSerializer xs = new System.Xml.Serialization.XmlSerializer(typeof(dfs));
+                                        dfs dc = (dfs)xs.Deserialize(srconfig);
+                                        if (null == dc.Files)
+                                        {
+                                            dc.Files = new List<dfs.DfsFile>();
+                                        }
+                                        if (null == dc.slave)
+                                        {
+                                            dc.slave = new dfs.ConfigSlave();
+                                        }
+                                        if (null == dc.slave.zblocks)
+                                        {
+                                            dc.slave.zblocks = new dfs.ConfigSlave.ConfigZBlocks();
+                                        }
+                                        if (dc.Blocks.SortedTotalCount <= 0)
+                                        {
+                                            dc.Blocks.SortedTotalCount = dc.Slaves.SlaveList.Split(';', ',').Length * Surrogate.NumberOfProcessors;
+                                        }
+                                        UpdateDfsXml(dc);
+                                    }
+                                }     
                             }
                         }
                         if (1 == nvalues)
@@ -6326,6 +6484,7 @@ namespace MySpace.DataMining.AELight
 
                 case "ps":
                     SafePS();
+                    Console.WriteLine("Information:");
                     if (!dfs.DfsConfigExists(DFSXMLPATH))
                     {
                         //Console.Error.WriteLine("DFS not setup; use:  {0} dfs format", appname);
@@ -8201,6 +8360,11 @@ namespace MySpace.DataMining.AELight
 
         public static void SafePS(bool ShowStatus)
         {
+            dfs dc = LoadDfsConfig();
+            if (dc.ClusterName != null)
+            {
+                Console.WriteLine("[{0}]", dc.ClusterName);
+            }
             using (System.Threading.Mutex lm = new System.Threading.Mutex(false, "DOexeclog"))
             {
                 lm.WaitOne(); // Lock also taken by kill.

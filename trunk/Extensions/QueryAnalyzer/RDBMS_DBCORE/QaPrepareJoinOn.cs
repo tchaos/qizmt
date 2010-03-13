@@ -14,6 +14,32 @@ namespace RDBMS_DBCORE
         public class PrepareJoinOn : Local
         {
 
+            protected virtual MapReduceCall GetMapReduceCallJoinOn(params string[] InputFiles)
+            {
+                // Can't QO this yet because of StaticGlobals.DSpace_InputFileName
+                if (QOLimit > 0)
+                {
+#if DEBUG
+                    if (InputFiles.Length == 0)
+                    {
+                        throw new Exception("DEBUG: No input files specified");
+                    }
+#endif
+                    try
+                    {
+                        long insize = _QOGetFileSizes(InputFiles);
+                        if (insize < QOLimit)
+                        {
+                            return new MapReduceCallInProc("RDBMS_Join", new JoinOnMap(), new JoinOnReduce());
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                return new MapReduceCallShellExec("RDBMS_JoinOn", "RDBMS_JoinOn.DBCORE");
+            }
+
             const bool queryresults = true;
             const bool dfsref = false;
 
@@ -348,19 +374,19 @@ namespace RDBMS_DBCORE
                     KeyLength = on2col.Type.Size;
                 }
 
-                Shell("dspace exec"
-                    + " \"//Job[@Name='RDBMS_JoinOn']/IOSettings/OutputMethod=grouped\""
-                    + " \"//Job[@Name='RDBMS_JoinOn']/IOSettings/DFSInput=" + DfsTableFilesInput
-                    + "\" \"//Job[@Name='RDBMS_JoinOn']/IOSettings/DFSOutput=" + DfsOutputName + "@" + DfsOutputRowSize
-                    + "\" \"//Job[@Name='RDBMS_JoinOn']/IOSettings/KeyLength=" + KeyLength.ToString()
-                    + "\" RDBMS_JoinOn.DBCORE"
-                    + " \"" + QlLeftTableName + "\" " + stype + " \"" + QlRightTableName
-                    + "\" \"" + QlOn
-                    + "\" \"" + on1col.RowOffset + "," + on1col.Type.Size + "=" + QlArgsEscape(on1col.Type.Name)
-                    + "\" \"" + on2col.RowOffset + "," + on2col.Type.Size + "=" + QlArgsEscape(on2col.Type.Name)
-                    + "\" \"" + DfsTableFilesInput
-                    + "\""
-                    );
+                {
+                    MapReduceCall mrc = GetMapReduceCallJoinOn(DfsTableFilesInput);
+                    mrc.OverrideOutputMethod = "grouped";
+                    mrc.OverrideInput = DfsTableFilesInput;
+                    mrc.OverrideOutput = DfsOutputName + "@" + DfsOutputRowSize;
+                    mrc.OverrideKeyLength = KeyLength;
+                    mrc.Call("\"" + QlLeftTableName + "\" " + stype + " \"" + QlRightTableName
+                        + "\" \"" + QlOn
+                        + "\" \"" + on1col.RowOffset + "," + on1col.Type.Size + "=" + QlArgsEscape(on1col.Type.Name)
+                        + "\" \"" + on2col.RowOffset + "," + on2col.Type.Size + "=" + QlArgsEscape(on2col.Type.Name)
+                        + "\" \"" + DfsTableFilesInput
+                        + "\"");
+                }
 
                 {
                     PrepareSelect.queryresults qr = new PrepareSelect.queryresults();

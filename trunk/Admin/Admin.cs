@@ -618,7 +618,23 @@ namespace MySpace.DataMining.AELight
                     if (verbose)
                     {
                         Console.WriteLine();
-                        Console.WriteLine("Participating surrogate: {0}", Lookup(netPaths, surrogate));
+                        string printsurrogate = Lookup(netPaths, surrogate);
+                        {
+                            try
+                            {
+                                dfs xdc = dfs.ReadDfsConfig_unlocked(
+                                    Surrogate.NetworkPathForHost(printsurrogate)
+                                    + @"\" + dfs.DFSXMLNAME);
+                                if (xdc.ClusterName != null)
+                                {
+                                    Console.WriteLine("[{0}]", xdc.ClusterName);
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
+                        Console.WriteLine("Participating surrogate: {0}", printsurrogate);
                         Console.WriteLine("Workers:");
                         foreach (string worker in workers)
                         {
@@ -667,8 +683,24 @@ namespace MySpace.DataMining.AELight
                     if (verbose)
                     {
                         Console.WriteLine();
+                        string printsurrogate = Lookup(netPaths, host);
+                        {
+                            try
+                            {
+                                dfs xdc = dfs.ReadDfsConfig_unlocked(
+                                    Surrogate.NetworkPathForHost(printsurrogate)
+                                    + @"\" + dfs.DFSXMLNAME);
+                                if (xdc.ClusterName != null)
+                                {
+                                    Console.WriteLine("[{0}]", xdc.ClusterName);
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("Non-participating surrogate: {0}", Lookup(netPaths, host));
+                        Console.WriteLine("Non-participating surrogate: {0}", printsurrogate);
                         Console.ForegroundColor = oldColor;
                         Console.WriteLine("Workers:");
                         foreach (string worker in workers)

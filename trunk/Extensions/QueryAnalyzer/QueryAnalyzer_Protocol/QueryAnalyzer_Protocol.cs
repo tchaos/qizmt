@@ -429,6 +429,8 @@ namespace QueryAnalyzer_Protocol
             rindexcleanupthd.Name = "RIndexCleanupPinsProc";
             rindexcleanupthd.IsBackground = true;
             rindexcleanupthd.Start();
+
+            DfsProtocol.Start();
         }
 
         protected override void OnStop()
@@ -930,7 +932,7 @@ namespace QueryAnalyzer_Protocol
                             // Share a single cluster lock:
                             string bihpartsoutput = null;
                             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\ST_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
-                            using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+                            //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
                             {
                                 if (null == bulkinserthosts)
                                 {
@@ -1261,7 +1263,7 @@ namespace QueryAnalyzer_Protocol
                 bulkinsertlistfile = null;
 
                 string dfsfilename = "RDBMS_QaBulkPut_" + TableName + "_" + Guid.NewGuid().ToString();
-                using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+                //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
                 {
                     Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " bulkput \"" + bulkinsertlistfilepath + "\" \"" + dfsfilename + "\" rbin@" + bulkinsertingOutputRowLength.ToString());
                     Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " combine \"" + dfsfilename + "\" \"" + bulkinsertingtabledfsfile + "\"");
@@ -1336,7 +1338,7 @@ namespace QueryAnalyzer_Protocol
             // Create index IndexName from table SourceTable.
 
             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
-            using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+            //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
             {
                 (new RDBMS_DBCORE.Qa.QueryAnalyzer()).Exec("SysTablesXmlFile", "'" + systablesfilepath + "'");
             }
@@ -1376,7 +1378,7 @@ namespace QueryAnalyzer_Protocol
             string outputBulkGet1;
             string bulkcrilistfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\BCRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
             string htnppartsoutput;
-            using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+            //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
             {
                 htnppartsoutput = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " slaveinstalls");
                 outputBulkGet1 = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " bulkget \"" + bulkcrilistfilepath + "\" \"" + SourceTableDfsFile + "\"");
@@ -1550,7 +1552,7 @@ namespace QueryAnalyzer_Protocol
         void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn, bool pinmemoryhash, bool keepvalueorder, string outliermode, int outliermax)
         {
             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
-            using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+            //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
             {
                 (new RDBMS_DBCORE.Qa.QueryAnalyzer()).Exec("SysTablesXmlFile", "'" + systablesfilepath + "'");
             }
@@ -1628,7 +1630,7 @@ namespace QueryAnalyzer_Protocol
             string outputBulkGet1;
             string bulkcrilistfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\BCRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
             string htnppartsoutput;
-            using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+            //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
             {
                 htnppartsoutput = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " slaveinstalls");
                 outputBulkGet1 = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " bulkget \"" + bulkcrilistfilepath + "\" \"" + SourceTableDfsFile + "\"");
@@ -1976,7 +1978,7 @@ namespace QueryAnalyzer_Protocol
             }
 
             string htnppartsoutput;
-            using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+            //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
             {
                 htnppartsoutput = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " slaveinstalls");
             }
@@ -2029,7 +2031,7 @@ namespace QueryAnalyzer_Protocol
         void _DropRIndex(string indexname)
         {
             string htnppartsoutput;
-            using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+            //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
             {
                 htnppartsoutput = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " slaveinstalls");
             }
@@ -2232,6 +2234,9 @@ namespace QueryAnalyzer_Protocol
             byte[] buf = new byte[1024 * 1024 * 8];
             string DelayedErrorMsg = null;
 
+            RDBMS_DBCORE.Qa.QOLimit = RDBMS_DBCORE.Qa.DEFAULT_QOLimit;
+            RDBMS_DBCORE.Qa.OwnThreadData();
+
             try
             {
                 QueryAnalyzer_Protocol.Protocol_AddTraceThread(null);
@@ -2253,8 +2258,21 @@ namespace QueryAnalyzer_Protocol
                                 XContent.ReceiveXBytes(netstm, out bc, buf);
                                 batchsize = BytesToLong(buf, 0);
                                 batchon = batchsize > 0;
-                                XContent.ReceiveXBytes(netstm, out bc, buf);
-                                BULKINSERTCHUNKSIZEMAX = BytesToLong(buf, 0);
+                                {
+                                    XContent.ReceiveXBytes(netstm, out bc, buf);
+                                    int optindex = 0;
+                                    BULKINSERTCHUNKSIZEMAX = BytesToLong(buf, optindex);
+                                    optindex += 8;
+                                    if (optindex < buf.Length)
+                                    {
+                                        int QOLimit = BytesToInt(buf, optindex);
+                                        optindex += 4;
+                                        if (QOLimit != -1)
+                                        {
+                                            RDBMS_DBCORE.Qa.QOLimit = QOLimit;
+                                        }
+                                    }
+                                }
                                 AllProtocolHosts = XContent.ReceiveXString(netstm, buf).Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
                                 sessionID = Guid.NewGuid().ToString();
                                 batchfname = "batch_" + sessionID + ".txt";
@@ -2312,7 +2330,7 @@ namespace QueryAnalyzer_Protocol
                                         FlushCommand(batchfname);
                                     }
 
-                                    using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+                                    //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
                                     {
                                         output = (new RDBMS_DBCORE.Qa.QueryAnalyzer()).Exec(escaped_cmd);
                                     }
@@ -2404,7 +2422,7 @@ namespace QueryAnalyzer_Protocol
                                 string htnppartsoutput;
                                 //string bulkquerylistfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\RDBMS_BulkQuery_" + Guid.NewGuid().ToString().Substring(0, 13); // Too long.
                                 string bulkquerylistfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\BQ_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
-                                using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+                                //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
                                 {
                                     htnppartsoutput = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " slaveinstalls -healthy");
                                     outputBulkGet1 = Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " bulkget \"" + bulkquerylistfilepath + "\" \"" + dfstable + "\"");
@@ -2668,7 +2686,7 @@ namespace QueryAnalyzer_Protocol
                                     {
                                         throw new Exception("Attempting to delete table file owned by caller: " + dfstable);
                                     }
-                                    using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
+                                    //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
                                     {
                                         Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " del " + dfstable, false);
                                     }

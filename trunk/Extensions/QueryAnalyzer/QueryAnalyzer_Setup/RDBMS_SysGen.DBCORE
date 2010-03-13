@@ -12,343 +12,98 @@
       <Using>RDBMS_DBCORE</Using>
       <Remote>
         <![CDATA[
-        
-            string DfsTableFile;
-            string TableName;
+            
+            class RemoteInputEnum: IEnumerator<ByteSlice>
+            {
+                internal RemoteInputEnum(RemoteInputStream dfsinput)
+                {
+                    this.dfsinput = dfsinput;
+                }
+                
+                public ByteSlice Current
+                {
+                    get
+                    {
+                        if(null == buf || hitend)
+                        {
+                            throw new InvalidOperationException();
+                        }
+                        return ByteSlice.Prepare(buf);
+                    }
+                }
+                
+                public void Dispose()
+                {
+                    dfsinput = null;
+                    buf = null;
+                }
+                
+                object System.Collections.IEnumerator.Current
+                {
+                    get
+                    {
+                        return Current;
+                    }
+                }
+
+                public bool MoveNext()
+                {
+                    if(null == buf)
+                    {
+                        buf = new List<byte>();
+                    }
+                    buf.Clear();
+                    if(DSpace_InputRecordLength > 0)
+                    {
+                        if(!dfsinput.ReadRecordAppend(buf))
+                        {
+                            hitend = true;
+                            return false;
+                        }
+                        return true;
+                    }
+                    else
+                    {
+                        if(!dfsinput.ReadLineAppend(buf))
+                        {
+                            hitend = true;
+                            return false;
+                        }
+                        return true;
+                    }
+                }
+                
+                public void Reset()
+                {
+                    throw new NotSupportedException();
+                    //dfsinput.Seek(); // ...
+                    //buf = null;
+                    //hitend = false;
+                }
+                
+                RemoteInputStream dfsinput;
+                List<byte> buf = null;
+                bool hitend = false;
+            }
         
             public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
             {
-                DfsTableFile = DSpace_ExecArgs[0];
-                {
-                    string RowInfo = Qa.QlArgsUnescape(DSpace_ExecArgs[1]);
-                    string DisplayInfo = DSpace_ExecArgs[2];
-                    //InitColInfos(RowInfo, DisplayInfo); // RDBMS_Select.DBCORE
-                }
-                TableName = DSpace_ExecArgs[3];
                 
-                if(0 == string.Compare(DfsTableFile, "qa://Sys.Tables", true))
-                {
-                    _SysTables(dfsoutput);
-                }
-                else if(0 == string.Compare(DfsTableFile, "qa://Sys.TablesXML", true))
-                {
-                    _SysTablesXML(dfsoutput);
-                }
-                else if(0 == string.Compare(DfsTableFile, "qa://Sys.Shell", true))
-                {
-                    _SysShell(dfsoutput);
-                }
-                else if(0 == string.Compare(DfsTableFile, "qa://Sys.Help", true))
-                {
-                    _SysHelp(dfsoutput);
-                }
-                else if(0 == string.Compare(DfsTableFile, "qa://Sys.Indexes", true))
-                {
-                    _SysIndexes(dfsoutput);
-                }
-                else
-                {
-                    throw new Exception("Unknown system table file: " + DfsTableFile);
-                }
+                Qa.SysGenRemote qaremote = new Qa.SysGenRemote();
+                qaremote.DSpace_InputRecordLength = DSpace_InputRecordLength;
+                qaremote.DSpace_OutputRecordLength = DSpace_OutputRecordLength;
+                qaremote.DSpace_ProcessID = DSpace_ProcessID;
+                qaremote.Init(DSpace_ExecArgs);
+                
+                RemoteInputEnum qainput = new RemoteInputEnum(dfsinput);
+                
+                qaremote.OnRemote(qainput, dfsoutput);
+                
+                DSpace_Log(qaremote.ReadToEnd());
                 
             }
             
             
-            void _SysShell(RemoteOutputStream dfsoutput)
-            {
-                string shellcmdraw;
-                {
-                    int ip = TableName.IndexOf('(');
-                    if(-1 == ip || TableName[TableName.Length - 1] != ')')
-                    {
-                        return; // No command to run.
-                    }
-                    shellcmdraw = QlArgsUnescape(TableName.Substring(ip + 1, TableName.Length - ip - 1 - 1));
-                }
-                if(shellcmdraw.Length <= 2 || '\'' != shellcmdraw[0] || '\'' != shellcmdraw[shellcmdraw.Length - 1])
-                {
-                    return;
-                }
-                string shellcmd = shellcmdraw.Substring(1, shellcmdraw.Length - 2);
-                string output = Shell(shellcmd);
-                
-                const int ColLineChars = 200;
-                int ColLineLength = 1 + (ColLineChars * 2);
-                string line = "";
-                char endchar = '\n';
-                List<byte> linebuf = new List<byte>();
-                foreach(char chr in output)
-                {
-                    line += chr;
-                    if(line.Length == ColLineChars || chr == endchar)
-                    {                        
-                        _OutputLine(line, dfsoutput, ColLineLength, linebuf);
-                        line = "";
-                    }
-                }
-                
-                if(line.Length > 0)
-                {
-                    _OutputLine(line, dfsoutput, ColLineLength, linebuf);
-                }
-            }
-            
-            void _OutputLine(string line, RemoteOutputStream dfsoutput, int maxByteLength, List<byte> linebuf)
-            {
-                linebuf.Clear();
-                StringToBytes(line, linebuf, maxByteLength);               
-                {                    
-                    if(linebuf.Count > maxByteLength)
-                    {
-                        throw new Exception("Column Line: length is too long: " + line);
-                    }
-                    for(int ibs = 0; ibs < linebuf.Count; ibs++)
-                    {
-                        dfsoutput.WriteByte(linebuf[ibs]);
-                    }
-                }
-            }            
-            
-            void _SysTablesXML(RemoteOutputStream dfsoutput)
-            {
-                string xml;
-                using(GlobalCriticalSection.GetLock())
-                {
-                    xml = LoadSysTablesXml_unlocked();
-                }
-                
-                int ColLineLength = 1 + (200 * 2);
-                List<byte> linebuf = new List<byte>();
-                foreach(string _line in xml.Split('\n'))
-                {
-                    string line = _line.Trim('\n', '\r');
-                    linebuf.Clear();
-                    StringToBytes(line, linebuf, DSpace_OutputRecordLength);                   
-                    {                       
-                        if(linebuf.Count > ColLineLength)
-                        {
-                            throw new Exception("Column Line: length is too long: " + line);
-                        }
-                        for(int ibs = 0; ibs < linebuf.Count; ibs++)
-                        {
-                            dfsoutput.WriteByte(linebuf[ibs]);
-                        }
-                    }
-                }                
-            }
-            
-            
-            void _SysTables(RemoteOutputStream dfsoutput)
-            {
-                System.Xml.XmlDocument systables;
-                using(GlobalCriticalSection.GetLock())
-                {
-                    systables = LoadSysTables_unlocked();
-                }
-                
-                List<byte> linebuf = new List<byte>();
-                
-                foreach(System.Xml.XmlNode xn in systables.SelectNodes("/tables/table"))
-                { 
-                    int ColTableLength = 1 + (100 * 2);
-                    string Table = xn["name"].InnerText;
-                    
-                    linebuf.Clear();
-                    StringToBytes(Table, linebuf, ColTableLength);                    
-                        
-                    if(linebuf.Count > ColTableLength)
-                    {
-                        throw new Exception("Column Table: length is too long: " + Table);
-                    }                    
-                    
-                    int ColFileLength = 1 + (120 * 2);
-                    string File = xn["file"].InnerText;
-                    
-                    StringToBytes(File, linebuf, ColTableLength + ColFileLength);                    
-                                           
-                    if(linebuf.Count > ColTableLength + ColFileLength)
-                    {
-                        throw new Exception("Column File: length is too long: " + File);
-                    }     
-                        
-                    if(linebuf.Count > DSpace_OutputRecordLength)
-                    {
-                        throw new Exception("Record too long");
-                    }
-                    for(int ibs = 0; ibs < linebuf.Count; ibs++)
-                    {
-                        dfsoutput.WriteByte(linebuf[ibs]);
-                    }     
-                }                
-            }
-            
-            void _SysHelp(RemoteOutputStream dfsoutput)
-            {
-                string xml = LoadUsageXml();
-                
-                const int ColLineChars = 1000;
-                int ColLineLength = 1 + (ColLineChars * 2);
-                List<byte> linebuf = new List<byte>();
-                foreach(string _linex in xml.Split('\n'))
-                {
-                    string linex = _linex.Trim();
-                    while(linex.Length > 0)
-                    {
-                        string line;
-                        if(linex.Length > ColLineChars - 1)
-                        {
-                            line = linex.Substring(0, ColLineChars - 1);
-                            linex = linex.Substring(ColLineChars - 1);
-                        }
-                        else
-                        {
-                            line = linex;
-                            linex = "";
-                        }
-                        linebuf.Clear();
-                        StringToBytes(line, linebuf, DSpace_OutputRecordLength);                        
-                        {                            
-                            if(linebuf.Count > ColLineLength)
-                            {
-                                throw new Exception("Column Line: length is too long: " + line);
-                            }
-                            for(int ibs = 0; ibs < linebuf.Count; ibs++)
-                            {
-                                dfsoutput.WriteByte(linebuf[ibs]);
-                            }
-                        }
-                    }
-                }
-            }
-            
-            void _SysIndexes(RemoteOutputStream dfsoutput)
-            {
-                const int ColLineChars = 1000;
-                int ColLineLength = 1 + (ColLineChars * 2);  
-                
-                int ip = TableName.IndexOf('(');
-                if(-1 == ip || TableName[TableName.Length - 1] != ')')
-                {
-                    return;
-                }
-                string indexdir = QlArgsUnescape(TableName.Substring(ip + 1, TableName.Length - ip - 1 - 1));
-                System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(indexdir);
-                System.IO.FileInfo[] files = dir.GetFiles("ind.Index.*.ind");
-                List<byte> linebuf = new List<byte>();
-                foreach (System.IO.FileInfo file in files)
-                {
-                    string[] parts = file.Name.Split('.');
-                    string indexname = parts[2];
-                    
-                    linebuf.Clear();
-                    StringToBytes(indexname, linebuf, DSpace_OutputRecordLength); 
-                    {                        
-                        if(linebuf.Count > ColLineLength)
-                        {
-                            throw new Exception("Column Line: length is too long: " + indexname);
-                        }
-                        for(int ibs = 0; ibs < linebuf.Count; ibs++)
-                        {
-                            dfsoutput.WriteByte(linebuf[ibs]);
-                        }
-                    }
-                }
-            }
-        
-        const string SYSTABLES_FILENAME = "RDBMS_SysTables";
-        
-        
-        System.Xml.XmlDocument LoadSysTables_unlocked()
-        {
-            string systablesfp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid() + SYSTABLES_FILENAME;
-            try
-            {
-                Shell("dspace get " + SYSTABLES_FILENAME + " \"" + systablesfp + "\"");
-            }
-            catch(Exception e)
-            {
-                if(-1 != e.Message.IndexOf("Error:  The specified file '" + SYSTABLES_FILENAME + "' does not exist in DFS"))
-                {
-                    throw new System.IO.FileNotFoundException("Unable to load " + SYSTABLES_FILENAME + ": " + e.Message, e);
-                }
-                throw;
-            }
-            System.Xml.XmlDocument xd = new System.Xml.XmlDocument();
-            xd.Load(systablesfp);
-            System.IO.File.Delete(systablesfp);
-            return xd;
-        }
-        
-        
-        string LoadSysTablesXml_unlocked()
-        {
-            string systablesfp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid() + SYSTABLES_FILENAME;
-            try
-            {
-                Shell("dspace get " + SYSTABLES_FILENAME + " \"" + systablesfp + "\"");
-            }
-            catch(Exception e)
-            {
-                if(-1 != e.Message.IndexOf("Error:  The specified file '" + SYSTABLES_FILENAME + "' does not exist in DFS"))
-                {
-                    throw new System.IO.FileNotFoundException("Unable to load " + SYSTABLES_FILENAME + ": " + e.Message, e);
-                }
-                throw;
-            }
-            string result = System.IO.File.ReadAllText(systablesfp);
-            System.IO.File.Delete(systablesfp);
-            return result;
-        }
-        
-        const string USAGE_FILENAME = "RDBMS_QA_Usage.xml";
-        string LoadUsageXml()
-        {
-            string usagefp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid() + USAGE_FILENAME;
-            try
-            {
-                Shell("dspace get " + USAGE_FILENAME + " \"" + usagefp + "\"");
-            }
-            catch(Exception e)
-            {
-                if(-1 != e.Message.IndexOf("Error:  The specified file '" + USAGE_FILENAME + "' does not exist in DFS"))
-                {
-                    throw new System.IO.FileNotFoundException("Unable to load " + USAGE_FILENAME + ": " + e.Message, e);
-                }
-                throw;
-            }
-            string result = System.IO.File.ReadAllText(usagefp);
-            System.IO.File.Delete(usagefp);
-            return result;
-        }
-        
-        
-        string QlArgsEscape(string args)
-        {
-            return Qa.QlArgsEscape(args);
-        }
-        
-        
-        string QlArgsUnescape(string eargs)
-        {
-            return Qa.QlArgsUnescape(eargs);
-        }
-        
-        string QlArgsUnescape(string[] eargs)
-        {
-            return Qa.QlArgsUnescape(eargs);
-        }
-            
-        void StringToBytes(string str, List<byte> buf, int maxbyteCount)
-        {
-          byte[] strbytes = System.Text.Encoding.Unicode.GetBytes(str);
-          buf.Add(0); //nullable byte
-          buf.AddRange(strbytes);
-          //Pad up the end of the char.
-          while(buf.Count < maxbyteCount)
-          {
-              buf.Add(0);
-          }
-        }            
         ]]>
       </Remote>
     </Job>

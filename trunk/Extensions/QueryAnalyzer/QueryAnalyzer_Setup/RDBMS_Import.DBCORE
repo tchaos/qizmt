@@ -8,7 +8,9 @@
         <DFSOutput></DFSOutput>
         <!-- OutputDfsFile -->
         <OutputMethod>grouped</OutputMethod>
+		<Setting name="Subprocess_TotalPrime" value="NearPrimeBelowCoreCount" />
       </IOSettings>
+      <DynamicFoil/>
       <IntermediateDataAddressing>64</IntermediateDataAddressing>
       <MapReduce>
         <Map>

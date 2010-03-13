@@ -3,29 +3,98 @@
     <Job Name="RDBMS_Distinct">
       <IOSettings>
         <JobType>mapreduce</JobType>
-        <KeyLength></KeyLength>
+        <KeyLength>0</KeyLength>
         <DFSInput></DFSInput>
         <DFSOutput></DFSOutput>
         <OutputMethod>sorted</OutputMethod>
+		<Setting name="Subprocess_TotalPrime" value="NearPrimeBelowCoreCount" />
       </IOSettings>
+      <DynamicFoil/>
       <IntermediateDataAddressing>64</IntermediateDataAddressing>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
       <MapReduce>
         <Map>
           <![CDATA[
-            public virtual void Map(ByteSlice line, MapOutput output)
+            
+            Qa.DistinctMap selmap = null;
+            
+            public virtual void Map(ByteSlice row, MapOutput output)
             {
-                output.Add(line, ByteSlice.Prepare());
+                if(null == selmap)
+                {
+                    selmap = new Qa.DistinctMap();
+                    selmap.DSpace_KeyLength = DSpace_KeyLength;
+                    selmap.DSpace_ProcessID = DSpace_ProcessID;
+                    selmap.DSpace_ProcessCount = DSpace_ProcessCount;
+                    selmap.Init(DSpace_ExecArgs);
+                }
+                
+                selmap.Map(row, output);
             }
+        
         ]]>
         </Map>
+        <ReduceInitialize>
+          <![CDATA[
+                
+                Qa.DistinctReduce selreduce = null;
+
+                public void ReduceInitialize()
+                {
+                    selreduce = new Qa.DistinctReduce();
+                    selreduce.DSpace_KeyLength = DSpace_KeyLength;
+                    selreduce.DSpace_ProcessID = DSpace_ProcessID;
+                    selreduce.DSpace_ProcessCount = DSpace_ProcessCount;
+                    selreduce.Init(DSpace_ExecArgs);
+                    
+                    selreduce.ReduceInitialize();
+                }
+                
+          ]]>
+        </ReduceInitialize>
         <Reduce>
           <![CDATA[
-            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
-            {
-                output.Add(key);
-            }
+          
+          class SelectOutput:Qa.MapReduceOutput
+          {
+              public ReduceOutput output;
+              
+              public override void Add(ByteSlice x)
+              {
+                  output.Add(x);
+              }
+          }
+          
+          SelectOutput selreduceout = null;
+          
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              if(null == selreduceout)
+              {
+                  selreduceout = new SelectOutput();
+              }
+              selreduceout.output = output;
+              
+              selreduce.Reduce(key, values, selreduceout);
+          }
+          
         ]]>
         </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+                
+                public void ReduceFinalize()
+                {
+                    
+                    selreduce.ReduceFinalize();
+                    
+                    DSpace_Log(selreduce.ReadToEnd());
+                    
+                }
+                
+          ]]>
+        </ReduceFinalize>
       </MapReduce>
     </Job>
   </Jobs>

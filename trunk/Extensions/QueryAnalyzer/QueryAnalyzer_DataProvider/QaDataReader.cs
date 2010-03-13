@@ -23,6 +23,11 @@ namespace QueryAnalyzer_DataProvider
         private int allRowsCurPos = 0;
         private int recordsize;
 
+        internal MetaData[] GetMetadata()
+        {
+            return metadata;
+        }
+
         public QaDataReader()
         {
         }
@@ -589,6 +594,59 @@ namespace QueryAnalyzer_DataProvider
     }
 
 
+    internal static class QaReaderUtils
+    {
+        public static string GetQaTypeName(Type t, int DataSize)
+        {
+            string cstype = t.Name;
+            switch (cstype)
+            {
+                case "Int32":
+                    return "int";
+                case "Int64":
+                    return "long";
+                case "Double":
+                    return "double";
+                case "DateTime":
+                    return "DateTime";
+                case "String":
+                    return "char(" + (DataSize / 2) + ")";
+                default:
+                    throw new Exception("Unable to GetQaTypeName from type " + cstype);
+            }
+        }
+
+        public static string GetQaTypeName(this QaDataReader reader, int ordinal)
+        {
+            return GetQaTypeName(reader.GetFieldType(ordinal), reader.GetMetadata()[ordinal].Size);
+        }
+
+        public static string GetQaTypeName(this QaDataReaderMulti reader, int ordinal)
+        {
+            return GetQaTypeName(reader.curreader.GetFieldType(ordinal), reader.curreader.GetMetadata()[ordinal].Size);
+        }
+
+        public static string GetQaTypeName(this DbDataReader reader, int ordinal)
+        {
+            {
+                QaDataReader x = reader as QaDataReader;
+                if (null != x)
+                {
+                    return x.GetQaTypeName(ordinal);
+                }
+            }
+            {
+                QaDataReaderMulti x = reader as QaDataReaderMulti;
+                if (null != x)
+                {
+                    return x.GetQaTypeName(ordinal);
+                }
+            }
+            throw new NotSupportedException("GetQaTypeName() on reader " + reader.GetType().FullName);
+        }
+    }
+
+
     internal class QaDataReaderMulti : DbDataReader
     {
 
@@ -601,7 +659,7 @@ namespace QueryAnalyzer_DataProvider
         IList<QaDataReader> readers;
         int readerindex = 0;
 
-        QaDataReader curreader
+        internal QaDataReader curreader
         {
             get
             {

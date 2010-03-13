@@ -602,7 +602,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             }
                             catch (Exception e)
                             {
-                                XLog.errorlog("DOSERVICE_TRACE: " + spid + " Trace Failure: " + e.Message);
+                                XLog.errorlog("DOSERVICE_TRACE: " + spid + " Trace Failure: " + e.ToString());
                             }
                         }));
                     stthd.IsBackground = true;
@@ -1089,7 +1089,7 @@ namespace MySpace.DataMining.DistributedObjects5
             {
                 // args: <host> <portnum> <typechar> <capacity> <logfile> <jid>
                 string procname = "MySpace.DataMining.DistributedObjects.DistributedObjectsSlave.exe";
-                string sargs = this.sdllclienthost + " " + dllport.ToString() + " \"" + blockinfo[0] + "\" \"" + blockinfo[2] + "\" \"" + blockinfo[4] + "\" " + sjid;
+                string sargs = this.sdllclienthost + " " + dllport.ToString() + " \"" + blockinfo[0] + "\" \"" + blockinfo[2] + "\" \"" + blockinfo[4] + "\" \"" + sjid + "\"";
                 bool substartlogging = XLog.logging;
 #if DEBUGnoisy
                 substartlogging = true;
@@ -1558,7 +1558,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                                             + "; timeout=" + CookTimeout.ToString()
                                                             + ") on " + System.Net.Dns.GetHostName(), e);
                                                     }
-                                                    System.Threading.Thread.Sleep(CookTimeout);
+                                                    System.Threading.Thread.Sleep(MyRealRetryTimeout(CookTimeout));
                                                     if (firstcook)
                                                     {
                                                         try
@@ -1567,6 +1567,24 @@ namespace MySpace.DataMining.DistributedObjects5
                                                                 + "; timeout=" + CookTimeout.ToString()
                                                                 + ") on " + System.Net.Dns.GetHostName()
                                                                 + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                                        }
+                                                        catch
+                                                        {
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        try
+                                                        {
+                                                            if ((CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                                            {
+                                                                XLog.errorlog("cooking continues with " + cooking_cooksremain
+                                                                    + " more retries (retries=" + CookRetries.ToString()
+                                                                    + "; timeout=" + CookTimeout.ToString()
+                                                                    + ") on " + System.Net.Dns.GetHostName()
+                                                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
+                                                                    + Environment.NewLine + e.ToString());
+                                                            }
                                                         }
                                                         catch
                                                         {
@@ -2345,6 +2363,22 @@ namespace MySpace.DataMining.DistributedObjects5
 
             dllclientStm.Close(2000); // Wait secs to finish sending pending data.
             dllclientStm.Dispose();
+        }
+
+
+        private static Random _myrrt = new Random(unchecked(
+            System.Threading.Thread.CurrentThread.ManagedThreadId
+            + DateTime.Now.Millisecond));
+        public static int MyRealRetryTimeout(int timeout)
+        {
+            if (timeout <= 3)
+            {
+                return timeout;
+            }
+            lock (_myrrt)
+            {
+                return _myrrt.Next(timeout / 4, timeout + 1);
+            }
         }
 
 

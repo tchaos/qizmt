@@ -610,6 +610,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <JobType>local</JobType>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <Local>
         <![CDATA[
         public virtual void Local()
@@ -653,6 +654,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSInput>dfs://sortInt_Input.txt</DFSInput>
         <DFSOutput>dfs://sortInt_Output.txt</DFSOutput>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -1047,6 +1049,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSOutput>dfs://Qizmt-Linq_Output.txt</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -1248,7 +1251,6 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
     <Job Name=`CollaborativeFiltering_Preprocessing` Custodian=`` email=``>
       <IOSettings>
         <JobType>local</JobType>
-        <OutputMethod>sorted</OutputMethod>
       </IOSettings>
       <Local>
         <![CDATA[
@@ -1482,7 +1484,6 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
     <Job Name=`mstring_Preprocessing` Custodian=`` email=``>
       <IOSettings>
         <JobType>local</JobType>
-        <OutputMethod>sorted</OutputMethod>
       </IOSettings>
       <Local>
         <![CDATA[
@@ -1639,6 +1640,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSOutput>dfs://putBinary_Output.blob</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -1876,6 +1878,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSOutput>dfs://ExplicitCacheWordCount_Output.txt</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -2124,6 +2127,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSOutput>dfs://Qizmt-WildCardNumericRanges_Output.txt</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -2217,6 +2221,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSOutput>dfs://Qizmt-NumericStringKeys_Output.txt</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -2684,6 +2689,7 @@ namespace testdll
         <DFSOutput>dfs://Qizmt-Table_Input.tbl@64</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -2728,6 +2734,7 @@ namespace testdll
         <DFSOutput>dfs://Qizmt-Table_Output.tbl@64</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -2852,6 +2859,7 @@ Qizmt exec Qizmt-ClusterLock.xml -c
         <DFSOutput>dfs://Qizmt-ClusterLock_Output.txt</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[
@@ -3201,6 +3209,7 @@ Qizmt exec Qizmt-ClusterLock.xml -c
         <DFSOutput>dfs://HeteroInputOutputFiles_Output1;dfs://HeteroInputOutputFiles_Output2@4</DFSOutput>
         <OutputMethod>sorted</OutputMethod>
       </IOSettings>
+      <DynamicFoil/>
       <MapReduce>
         <Map>
           <![CDATA[

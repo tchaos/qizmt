@@ -164,87 +164,6 @@ namespace RDBMS_DBCORE
         }
 
 
-        public abstract class Job
-        {
-            public string Exec(params string[] args)
-            {
-#if DEBUG
-                foreach (string darg in args)
-                {
-                    if (0 == darg.Length)
-                    {
-                        throw new Exception("DEBUG:  " + GetType().FullName + ".Exec() has an empty argument");
-                    }
-                }
-#endif
-                DSpace_ExecArgs = args;
-                Run();
-                return ReadToEnd();
-            }
-
-            protected abstract void Run();
-
-            protected string[] DSpace_ExecArgs;
-
-            protected void DSpace_Log(string line)
-            {
-                _log.AppendLine(line);
-            }
-
-            StringBuilder _log = new StringBuilder();
-
-            public string ReadToEnd()
-            {
-                string result = _log.ToString();
-                _log.Length = 0;
-                return result;
-            }
-        }
-
-
-        // Implement Run method.
-        public abstract class Local : Job
-        {
-        }
-
-
-        public abstract class MapReduceOutput
-        {
-            public abstract void Add(ByteSlice x);
-        }
-
-        public abstract class MapReduce : Job
-        {
-
-            public int DSpace_KeyLength = 0;
-            public int DSpace_ProcessID = 0;
-
-
-            public virtual void Map(ByteSlice line, MapOutput output)
-            {
-            }
-
-            public virtual void ReduceInitialize()
-            {
-            }
-
-            public virtual void Reduce(ByteSlice key, IEnumerator<ByteSlice> values, MapReduceOutput output)
-            {
-            }
-
-            public virtual void ReduceFinalize()
-            {
-            }
-
-            protected override void Run()
-            {
-#if DEBUG
-                System.Diagnostics.Debugger.Launch();
-#endif
-            }
-        }
-
-
         public static bool _ShouldDebugShellExec = false;
 
         internal static string Shell(string cmdline, bool suppresserrors)
@@ -275,19 +194,6 @@ namespace RDBMS_DBCORE
 #if DEBUG
         internal static void _checkfornullargs(string cmdline)
         {
-            for (int i = 0; ; )
-            {
-                i = cmdline.IndexOf("\"\"", i);
-                if (-1 == i)
-                {
-                    break;
-                }
-                if (i - 1 < 0 || ' ' == cmdline[i - 1])
-                {
-                    throw new Exception("DEBUG:  Shell() has an empty argument");
-                }
-                i += 2;
-            }
         }
 #endif
 
@@ -682,138 +588,149 @@ namespace RDBMS_DBCORE
                 else if (TableName.StartsWith("'dfs://", StringComparison.OrdinalIgnoreCase)
                     && '\'' == TableName[TableName.Length - 1])
                 {
-                    System.Xml.XmlElement xeNewTable = xd.CreateElement("table");
-                    string colinfo;
-                    string ssize;
-                    {
-                        string tableinfo = TableName.Substring(1, TableName.Length - 2); // Remove single quotes.
-                        int iat = tableinfo.IndexOf('@');
-                        if (-1 == iat)
-                        {
-                            throw new Exception("Record size expected: " + TableName);
-                        }
-                        string tablefile = tableinfo.Substring(0, iat);
-                        {
-                            //xeNewTable.AppendChild(NewElement(xd, "name", TableName)); // Not safe for command line format.
-                            string tablename = tablefile;
-                            if (tablename.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
-                            {
-                                tablename = tablename.Substring(6);
-                            }
-                            tablename = "dfs." + tablename;
-                            xeNewTable.AppendChild(NewElement(xd, "name", tablename));
-                        }
-                        xeNewTable.AppendChild(NewElement(xd, "file", tablefile));
-                        tableinfo = tableinfo.Substring(iat + 1);
-                        int isem = tableinfo.IndexOf(';');
-                        if (-1 == isem)
-                        {
-                            colinfo = "";
-                            ssize = tableinfo;
-                        }
-                        else
-                        {
-                            colinfo = tableinfo.Substring(isem + 1);
-                            ssize = tableinfo.Substring(0, isem);
-                        }
-                        int.Parse(ssize); // Validate.
-                    }
-                    bool anycols = false;
-                    int totsize = 0;
-                    foreach (string cs in colinfo.Split(';'))
-                    {
-                        int ieq = cs.IndexOf('=');
-                        if (-1 == ieq)
-                        {
-                            throw new Exception("Column info expected: name=type: " + TableName + " at " + cs);
-                        }
-                        anycols = true;
-                        System.Xml.XmlElement col = xd.CreateElement("column");
-                        col.AppendChild(NewElement(xd, "name", cs.Substring(0, ieq)));
-                        string coltype = cs.Substring(ieq + 1);
-                        int colsize;
-                        int colw;
-                        string colj;
-                        switch (coltype.ToUpper())
-                        {
-                            case "INT":
-                                {
-                                    colsize = 1 + 4;
-                                    DbType dt = DbType.Prepare(colsize, DbTypeID.INT);
-                                    colw = DisplayWidthFromType(dt);
-                                    colj = IntJustify();
-                                    coltype = dt.Name;
-                                }
-                                break;
-                            case "LONG":
-                                {
-                                    colsize = 1 + 8;
-                                    DbType dt = DbType.Prepare(colsize, DbTypeID.LONG);
-                                    colw = DisplayWidthFromType(dt);
-                                    colj = LongJustify();
-                                    coltype = dt.Name;
-                                }
-                                break;
-                            case "DATETIME":
-                                {
-                                    colsize = 1 + 8;
-                                    DbType dt = DbType.Prepare(colsize, DbTypeID.DATETIME);
-                                    colw = DisplayWidthFromType(dt);
-                                    colj = DateTimeJustify();
-                                    coltype = dt.Name;
-                                }
-                                break;
-                            case "DOUBLE":
-                                {
-                                    colsize = 1 + 9;
-                                    DbType dt = DbType.Prepare(colsize, DbTypeID.DOUBLE);
-                                    colw = DisplayWidthFromType(dt);
-                                    colj = DoubleJustify();
-                                    coltype = dt.Name;
-                                }
-                                break;
-                            default:
-                                if (coltype.StartsWith("CHAR(", StringComparison.OrdinalIgnoreCase)
-                                    && coltype.EndsWith(")"))
-                                {
-                                    string snchars = coltype.Substring(5, coltype.Length - 5 - 1);
-                                    int nchars;
-                                    if (!int.TryParse(snchars, out nchars) || nchars < 0)
-                                    {
-                                        throw new Exception("Invalid number of characters: " + snchars + ": " + TableName);
-                                    }
-                                    colsize = 1 + (2 * nchars);
-                                    DbType dt = DbType.Prepare(colsize, DbTypeID.CHARS);
-                                    colw = DisplayWidthFromType(dt);
-                                    colj = CharNJustify();
-                                    coltype = dt.Name;
-                                }
-                                else
-                                {
-                                    throw new Exception("Unknown type: " + coltype + ": " + TableName);
-                                }
-                                break;
-                        }
-                        totsize += colsize;
-                        col.AppendChild(NewElement(xd, "type", coltype));
-                        col.AppendChild(NewElement(xd, "bytes", colsize.ToString()));
-                        col.AppendChild(NewElement(xd, "dw", colw.ToString()));
-                        col.AppendChild(NewElement(xd, "justify", colj));
-                        xeNewTable.AppendChild(col);
-                    }
-                    if (!anycols)
-                    {
-                        throw new Exception("Table has no columns: " + TableName);
-                    }
-                    if (totsize != int.Parse(ssize))
-                    {
-                        throw new Exception("Column sizes do not add up to record size; columns add up to " + totsize);
-                    }
-                    xeNewTable.AppendChild(NewElement(xd, "size", ssize)); // Size of a full record.
-                    return xeNewTable;
+                    return GetDfsTableInfo(xd, TableName);
                 }
             }
             return null;
+        }
+
+        static System.Xml.XmlElement GetDfsTableInfo(System.Xml.XmlDocument xd, string TableName)
+        {
+            System.Xml.XmlElement xeNewTable = xd.CreateElement("table");
+            string colinfo;
+            string ssize;
+            {
+                string tableinfo = TableName.Substring(1, TableName.Length - 2); // Remove single quotes.
+                int iat = tableinfo.IndexOf('@');
+                if (-1 == iat)
+                {
+                    throw new Exception("Record size expected: " + TableName);
+                }
+                string tablefile = tableinfo.Substring(0, iat);
+                {
+                    //xeNewTable.AppendChild(NewElement(xd, "name", TableName)); // Not safe for command line format.
+                    string tablename = tablefile;
+                    if (tablename.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tablename = tablename.Substring(6);
+                    }
+                    tablename = "dfs." + tablename;
+                    xeNewTable.AppendChild(NewElement(xd, "name", tablename));
+                }
+                xeNewTable.AppendChild(NewElement(xd, "file", tablefile));
+                tableinfo = tableinfo.Substring(iat + 1);
+                int isem = tableinfo.IndexOf(';');
+                if (-1 == isem)
+                {
+                    colinfo = "";
+                    ssize = tableinfo;
+                }
+                else
+                {
+                    colinfo = tableinfo.Substring(isem + 1);
+                    ssize = tableinfo.Substring(0, isem);
+                }
+                int.Parse(ssize); // Validate.
+            }
+            bool anycols = false;
+            int totsize = 0;
+            foreach (string cs in colinfo.Split(';'))
+            {
+                int ieq = cs.IndexOf('=');
+                if (-1 == ieq)
+                {
+                    throw new Exception("Column info expected: name=type: " + TableName + " at " + cs);
+                }
+                anycols = true;
+                System.Xml.XmlElement col = xd.CreateElement("column");
+                col.AppendChild(NewElement(xd, "name", cs.Substring(0, ieq)));
+                string coltype = cs.Substring(ieq + 1);
+                int colsize;
+                int colw;
+                string colj;
+                switch (coltype.ToUpper())
+                {
+                    case "INT":
+                        {
+                            colsize = 1 + 4;
+                            DbType dt = DbType.Prepare(colsize, DbTypeID.INT);
+                            colw = DisplayWidthFromType(dt);
+                            colj = IntJustify();
+                            coltype = dt.Name;
+                        }
+                        break;
+                    case "LONG":
+                        {
+                            colsize = 1 + 8;
+                            DbType dt = DbType.Prepare(colsize, DbTypeID.LONG);
+                            colw = DisplayWidthFromType(dt);
+                            colj = LongJustify();
+                            coltype = dt.Name;
+                        }
+                        break;
+                    case "DATETIME":
+                        {
+                            colsize = 1 + 8;
+                            DbType dt = DbType.Prepare(colsize, DbTypeID.DATETIME);
+                            colw = DisplayWidthFromType(dt);
+                            colj = DateTimeJustify();
+                            coltype = dt.Name;
+                        }
+                        break;
+                    case "DOUBLE":
+                        {
+                            colsize = 1 + 9;
+                            DbType dt = DbType.Prepare(colsize, DbTypeID.DOUBLE);
+                            colw = DisplayWidthFromType(dt);
+                            colj = DoubleJustify();
+                            coltype = dt.Name;
+                        }
+                        break;
+                    default:
+                        if (coltype.StartsWith("CHAR(", StringComparison.OrdinalIgnoreCase)
+                            && coltype.EndsWith(")"))
+                        {
+                            string snchars = coltype.Substring(5, coltype.Length - 5 - 1);
+                            int nchars;
+                            if (!int.TryParse(snchars, out nchars) || nchars < 0)
+                            {
+                                throw new Exception("Invalid number of characters: " + snchars + ": " + TableName);
+                            }
+                            colsize = 1 + (2 * nchars);
+                            DbType dt = DbType.Prepare(colsize, DbTypeID.CHARS);
+                            colw = DisplayWidthFromType(dt);
+                            colj = CharNJustify();
+                            coltype = dt.Name;
+                        }
+                        else
+                        {
+                            throw new Exception("Unknown type: " + coltype + ": " + TableName);
+                        }
+                        break;
+                }
+                totsize += colsize;
+                col.AppendChild(NewElement(xd, "type", coltype));
+                col.AppendChild(NewElement(xd, "bytes", colsize.ToString()));
+                col.AppendChild(NewElement(xd, "dw", colw.ToString()));
+                col.AppendChild(NewElement(xd, "justify", colj));
+                xeNewTable.AppendChild(col);
+            }
+            if (!anycols)
+            {
+                throw new Exception("Table has no columns: " + TableName);
+            }
+            if (totsize != int.Parse(ssize))
+            {
+                throw new Exception("Column sizes do not add up to record size; columns add up to " + totsize);
+            }
+            xeNewTable.AppendChild(NewElement(xd, "size", ssize)); // Size of a full record.
+            return xeNewTable;
+        }
+
+        static System.Xml.XmlElement GetDfsTableInfo(string TableName)
+        {
+            System.Xml.XmlDocument xd = new System.Xml.XmlDocument();
+            return GetDfsTableInfo(xd, TableName);
         }
 
         static System.Xml.XmlElement NewElement(System.Xml.XmlDocument xd, string name, string InnerText)
@@ -833,20 +750,82 @@ namespace RDBMS_DBCORE
         const string SYSTABLES_FILENAME = "RDBMS_SysTables";
 
 
+        public static void OwnThreadData()
+        {
+            MySpace.DataMining.DistributedObjects.Stack.OwnThreadStack();
+            MySpace.DataMining.DistributedObjects.recordset.OwnThreadBuffers();
+        }
+
+
+        [ThreadStatic]
+        public static int QOLimit;
+        // 0 is off.
+        public const int DEFAULT_QOLimit = 0x400 * 0x400 * 64;
+
+        static protected internal long _QOGetFileSizes(params string[] InputFiles)
+        {
+            long insize = 0;
+            for (int i = 0; i < InputFiles.Length; i++)
+            {
+                string infp = InputFiles[i];
+                {
+                    int iat = infp.IndexOf('@');
+                    if (-1 != iat)
+                    {
+                        infp = infp.Substring(0, iat);
+                    }
+                }
+                insize += dfsclient.GetFileSize(infp);
+            }
+            return insize;
+        }
+
+        [ThreadStatic]
+        static DfsProtocolDLL.DfsClient _dfsclient;
+
+        static protected internal DfsProtocolDLL.DfsClient dfsclient
+        {
+            get
+            {
+                if (null == _dfsclient)
+                {
+                    _dfsclient = new DfsProtocolDLL.DfsClient();
+                    string dfsxmlpath = Shell("dspace metapath").Trim();
+                    string masterhost = dfsxmlpath.Substring(2, dfsxmlpath.IndexOf('\\', 2) - 2);
+                    _dfsclient.Connect(masterhost);
+                }
+                return _dfsclient;
+            }
+        }
+
+        static protected internal void dfsclientClose()
+        {
+            if (null != _dfsclient)
+            {
+                _dfsclient.Close();
+                _dfsclient = null;
+            }
+        }
+
+
         static string _GetSysTablesFile_unlocked()
         {
             string systablesfp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid() + SYSTABLES_FILENAME;
             try
             {
-                Shell("dspace get " + SYSTABLES_FILENAME + " \"" + systablesfp + "\"");
+                System.IO.File.WriteAllBytes(systablesfp, dfsclient.GetFileContent(SYSTABLES_FILENAME));
             }
             catch (Exception e)
             {
-                if (-1 != e.Message.IndexOf("Error:  The specified file '" + SYSTABLES_FILENAME + "' does not exist in DFS"))
+                if (-1 != e.Message.IndexOf("The specified file '" + SYSTABLES_FILENAME + "' does not exist in DFS"))
                 {
-                    throw new System.IO.FileNotFoundException("Unable to load " + SYSTABLES_FILENAME + ": " + e.Message, e);
+                    //throw new System.IO.FileNotFoundException("Unable to load " + SYSTABLES_FILENAME + ": " + e.Message, e);
+                    System.IO.File.WriteAllText(systablesfp, @"<tables></tables>");
                 }
-                throw;
+                else
+                {
+                    throw;
+                }
             }
             return systablesfp;
         }
@@ -877,28 +856,9 @@ namespace RDBMS_DBCORE
 
         static void UpdateSysTables_unlocked(System.Xml.XmlDocument xd)
         {
-            string systablesfp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid() + SYSTABLES_FILENAME;
-
-            xd.Save(systablesfp);
-
-            try
-            {
-                Shell("dspace del " + SYSTABLES_FILENAME + ".temp");
-            }
-            catch
-            {
-            }
-            Shell("dspace put \"" + systablesfp + "\" " + SYSTABLES_FILENAME + ".temp");
-
-            try
-            {
-                Shell("dspace del " + SYSTABLES_FILENAME);
-            }
-            catch
-            {
-            }
-            Shell("dspace rename " + SYSTABLES_FILENAME + ".temp " + SYSTABLES_FILENAME);
-
+            System.IO.MemoryStream ms = new System.IO.MemoryStream();
+            xd.Save(ms);
+            dfsclient.SetFileContent(SYSTABLES_FILENAME, "zd", ms.ToArray());
         }
 
 

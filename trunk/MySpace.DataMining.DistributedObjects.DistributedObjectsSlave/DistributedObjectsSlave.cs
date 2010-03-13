@@ -370,7 +370,18 @@ namespace MySpace.DataMining.DistributedObjects5
                     catch
                     {
                     }
-                    fstm.WriteLine(@"[{0} {1}ms] \\{2} DistributedObjectsSlave error: {3}{4}", System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond, System.Net.Dns.GetHostName(), build, line);
+                    string sjid;
+                    if (string.IsNullOrEmpty(DistributedObjectsSlave.sjid))
+                    {
+                        sjid = "?";
+                    }
+                    else
+                    {
+                        sjid = DistributedObjectsSlave.sjid;
+                    }
+                    fstm.WriteLine(@"[{0} {1}ms] \\{2} DistributedObjectsSlave error: {3}{4} [JobID:"
+                        + DistributedObjectsSlave.sjid + "] " + DistributedObjectsSlave.jobdesc,
+                        System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond, System.Net.Dns.GetHostName(), build, line);
                     fstm.WriteLine("----------------------------------------------------------------");
                     fstm.WriteLine();
                 }
@@ -603,6 +614,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public static long jid;
         public static string sjid;
+        public static string jobdesc = "";
 
 
         // args: <ipaddr> <portnum> <typechar> <capacity> <logfile> <jid>
@@ -817,6 +829,14 @@ namespace MySpace.DataMining.DistributedObjects5
 #endif
 
                 sjid = args[5];
+                {
+                    int ic = sjid.IndexOf(':');
+                    if (-1 != ic)
+                    {
+                        jobdesc = Encoding.UTF8.GetString(Convert.FromBase64String(sjid.Substring(ic + 1)));
+                        sjid = sjid.Substring(0, ic);
+                    }
+                }
                 jid = long.Parse(sjid);
 
                 try
