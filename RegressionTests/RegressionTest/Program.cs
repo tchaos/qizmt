@@ -66,6 +66,12 @@ namespace RegressionTest
                     case "killallproxy":
                         KillallProxy.TestKillallProxy(args);
                         break;
+                    case "speculativecomputingtesthdfailurebeforemapstarts":
+                        SpeculativeComputingMapPhase.TestHDFailureBeforeMapStarts(new string[]{"TestHDFailureBeforeMapStarts"});
+                        break;
+                    case "speculativecomputingtesthdfailureaftermapstarts":
+                        SpeculativeComputingMapPhase.TestHDFailureAfterMapStarts(new string[] { "TestHDFailureAfterMapStarts" });
+                        break;
                     default:
                         ShowUsage();
                         break;
@@ -102,6 +108,8 @@ namespace RegressionTest
             Console.WriteLine("    PerfmonAdminCommandLock <dfsXmlPath>");
             Console.WriteLine("    PacketSniffAdminCommandLock <dfsXmlPath>");
             Console.WriteLine("    KillallProxy");
+            Console.WriteLine("    SpeculativeComputingTestHDFailureBeforeMapStarts");
+            Console.WriteLine("    SpeculativeComputingTestHDFailureAfterMapStarts");
         }        
     }
 }

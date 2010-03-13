@@ -504,6 +504,53 @@ namespace QueryAnalyzer_DataProvider
                 throw new Exception("RIndex name expected");
             }
 
+#if TEMPTABLES
+            if (indexName == "#")
+            {
+                string temptable = "#";
+                if (xcmd.Length != 0 && !char.IsWhiteSpace(xcmd[0]))
+                {
+                    temptable += Qa.NextPart(ref xcmd);
+                }
+                this.cmdText = xcmd;
+                DbDataReader reader = _ExecuteDbDataReaderRIndex(CommandBehavior.Default);
+                if (null == conn.TempTables || !conn.TempTables.ContainsKey(temptable))
+                {
+                    // This temp table doesn't exist, so add it.
+                    if (null == conn.TempTables)
+                    {
+                        conn.TempTables = new Dictionary<string, QaConnection.TempTableInfo>(new _CaseInsensitiveEqualityComparer_2664());
+                    }
+                    QaConnection.TempTableInfo tti = new QaConnection.TempTableInfo();
+                    tti.Rows = new List<byte[]>();
+                    {
+                        int numcols = reader.FieldCount;
+                        tti.Columns = new List<RDBMS_DBCORE.DbColumn>(numcols);
+                        int curoffset = 0;
+                        for (int ordinal = 0; ordinal < numcols; ordinal++)
+                        {
+                            RDBMS_DBCORE.DbColumn col;
+                            col.ColumnName = reader.GetName(ordinal);
+                            col.Type = RDBMS_DBCORE.DbType.Prepare(reader.GetQaTypeName(ordinal));
+                            col.RowOffset = curoffset;
+                            curoffset += col.Type.Size;
+                            tti.Columns.Add(col);
+                        }
+                    }
+                    conn.TempTables.Add(temptable, tti);
+                }
+                else
+                {
+                    // This temp table exists, so verify column types.
+                    
+                }
+                while (reader.Read())
+                {
+                }
+                return true;
+            }
+#endif
+
             if (!conn.sysindexes.ContainsKey(indexName))
             {
                 throw new Exception("RIndex name not found in conn sysindexes.");

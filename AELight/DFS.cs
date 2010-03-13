@@ -1240,7 +1240,7 @@ namespace MySpace.DataMining.AELight
                         if (cooking_is_cooked)
                         {
                             cooking_is_cooked = false;
-                            System.Threading.Thread.Sleep(cooktimeout);
+                            System.Threading.Thread.Sleep(MySpace.DataMining.DistributedObjects.IOUtils.RealRetryTimeout(cooktimeout));
                             if (fs != null)
                             {
                                 fs.Close();
@@ -1517,7 +1517,7 @@ switch(workerindex)
                             if (cooking_is_cooked)
                             {
                                 cooking_is_cooked = false;
-                                System.Threading.Thread.Sleep(cooktimeout);
+                                System.Threading.Thread.Sleep(MySpace.DataMining.DistributedObjects.IOUtils.RealRetryTimeout(cooktimeout));
                                 if (fs != null)
                                 {
                                     fs.Close();
@@ -1930,7 +1930,7 @@ switch(workerindex)
                         if (cooking_is_cooked)
                         {
                             cooking_is_cooked = false;
-                            System.Threading.Thread.Sleep(cooktimeout);
+                            System.Threading.Thread.Sleep(MySpace.DataMining.DistributedObjects.IOUtils.RealRetryTimeout(cooktimeout));
                             if (fsrc != null)
                             {
                                 fsrc.Close();
@@ -3262,7 +3262,7 @@ switch(workerindex)
                                             + `; timeout=` + CookTimeout.ToString()
                                             + `) on ` + copyfrom, e);
                                     }
-                                    System.Threading.Thread.Sleep(CookTimeout);                                                    
+                                    System.Threading.Thread.Sleep(MySpace.DataMining.DistributedObjects.IOUtils.RealRetryTimeout(CookTimeout));                                                    
                                     continue; // !
                                 }
                                 break;
@@ -5475,6 +5475,8 @@ switch(workerindex)
                                 bool mt = false;
                                 bool metaonly = false;
                                 string metabackuplocation = null;
+                                int failovertimeout = -1;
+                                int failoverdocheck = -1;
 
                                 foreach (string arg in args)
                                 {
@@ -5667,6 +5669,14 @@ switch(workerindex)
                                         case "metabackuplocation":
                                         case "metabackup":
                                             metabackuplocation = optvalue;
+                                            break;
+
+                                        case "failovertimeout":
+                                            failovertimeout = int.Parse(optvalue);
+                                            break;
+
+                                        case "failoverdocheck":
+                                            failoverdocheck = int.Parse(optvalue);
                                             break;
 
                                         default:
@@ -5872,6 +5882,16 @@ switch(workerindex)
                                     if (cookretries >= 0)
                                     {
                                         dc.slave.CookRetries = cookretries;
+                                    }
+
+                                    if (failovertimeout >= 0)
+                                    {
+                                        dc.FailoverTimeout = failovertimeout; 
+                                    }
+
+                                    if (failoverdocheck >= 0)
+                                    {
+                                        dc.FailoverDoCheck = failoverdocheck;
                                     }
 
                                     try

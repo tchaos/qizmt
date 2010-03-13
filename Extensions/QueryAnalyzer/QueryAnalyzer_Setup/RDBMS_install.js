@@ -167,6 +167,7 @@ function InstallToMachine(machine, installdirNetpath, tempjobsdir, account, pass
     ExecDSpace("del RDBMS_QA_Usage.xml", true, machine);
     ExecDSpace("put \"" + installdirNetpath + "\\RDBMS_QA_Usage.xml\"", true, machine);
     ExecDSpace("put \"" + installdirNetpath + "\\RDBMS_DBCORE.dll\"", true, machine); // DLLs always overwrite.
+    ExecDSpace("put \"" + installdirNetpath + "\\RDBMS_DfsProtocol.dll\"", true, machine); // DLLs always overwrite.
     WScript.StdOut.WriteLine("Completed importing jobs into DFS...");
 
     var nextargt = installdirNetpath.substr(0, installdirNetpath.length - 1);

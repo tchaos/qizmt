@@ -103,6 +103,55 @@ namespace MySpace.DataMining.DistributedObjects
             }
         }
 
+        void _open()
+        {
+            System.Net.Sockets.Socket sock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+               System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+            System.Net.Sockets.NetworkStream ntsm = null;
+            try
+            {
+                sock.Connect(Surrogate.MasterHost, 55900);
+                ntsm = new XNetworkStream(sock);
+                ntsm.WriteByte((byte)'J'); //hand shake with surrogate
+                if (ntsm.ReadByte() == (byte)'+')
+                {
+                    this.sock = sock;
+                    this.ntsm = ntsm;
+                }
+                else
+                {
+                    throw new Exception("CriticalSection.Create() handshake failed.");
+                }
+            }
+            catch
+            {
+                if (ntsm != null)
+                {
+                    ntsm.Close();
+                    ntsm = null;
+                }
+                sock.Close();
+                sock = null;
+                throw;
+            }
+        }
+
+        void _reopen()
+        {
+            try
+            {
+                ntsm.Close();
+                ntsm = null;
+                sock.Close();
+                sock = null;
+            }
+            catch
+            {
+            }
+            hasLock = false;
+            _open();
+        }
+
         public void ReleaseLock()
         {
             if (ntsm == null)
@@ -145,21 +194,38 @@ namespace MySpace.DataMining.DistributedObjects
             {
                 throw new Exception("CriticalSection.EnterLock() failed:  Network stream has already been closed due to previous exceptions.");
             }
-            if (hasLock)
-            {
-                return true;
-            }
             try
             {
                 // acquire lock
-                if (null == locknamebytes)
+                for (int iacq = 0; ; )
                 {
-                    ntsm.WriteByte((byte)'Q');
+                    try
+                    {
+                        if (null == locknamebytes)
+                        {
+                            ntsm.WriteByte((byte)'Q');
+                        }
+                        else
+                        {
+                            ntsm.WriteByte(128 + (byte)'Q'); // 128+Q
+                            XContent.SendXContent(ntsm, locknamebytes);
+                        }
+                    }
+                    catch
+                    {
+                        if (++iacq > 60 / 5)
+                        {
+                            throw;
+                        }
+                        System.Threading.Thread.Sleep(1000 * 5);
+                        _reopen();
+                        continue;
+                    }
+                    break;
                 }
-                else
+                if (hasLock)
                 {
-                    ntsm.WriteByte(128 + (byte)'Q'); // 128+Q
-                    XContent.SendXContent(ntsm, locknamebytes);
+                    throw new Exception("CriticalSection.EnterLock() failed:  cannot enter lock twice");
                 }
                 if (ntsm.ReadByte() == (int)'+')
                 {

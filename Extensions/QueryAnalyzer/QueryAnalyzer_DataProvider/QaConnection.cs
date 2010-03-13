@@ -34,6 +34,16 @@ namespace QueryAnalyzer_DataProvider
         private Dictionary<string, System.Net.Sockets.NetworkStream> netstmpool = null;
         internal Dictionary<string, Index> sysindexes = null;
 
+        /*internal struct TempTableInfo
+        {
+            internal List<RDBMS_DBCORE.DbColumn> Columns;
+            internal List<byte[]> Rows;
+        }
+
+        internal Dictionary<string, TempTableInfo> TempTables; // Temporary tables local to this provider.
+        */
+
+
         public QaConnection()
         {
             buf = new byte[1024 * 1024 * 8];
@@ -510,14 +520,24 @@ namespace QueryAnalyzer_DataProvider
                 }
                 netstm = new System.Net.Sockets.NetworkStream(sock);
                 netstm.WriteByte((byte)'o'); //Open connection.
+                if (buf.Length < 128)
+                {
+                    buf = new byte[128];
+                }
                 Utils.Int64ToBytes(connstr.BatchSize, buf, 0);
                 XContent.SendXContent(netstm, buf, 8);
-                Utils.Int64ToBytes(connstr.BlockSize, buf, 0);
-                XContent.SendXContent(netstm, buf, 8);
+                {
+                    int optindex = 0;
+                    Utils.Int64ToBytes(connstr.BlockSize, buf, optindex);
+                    optindex += 8;
+                    Utils.Int32ToBytes(connstr.QOLimit, buf, optindex);
+                    optindex += 4;
+                    XContent.SendXContent(netstm, buf, optindex);
+                }
                 XContent.SendXContent(netstm, string.Join(";", hosts));
 
                 if (netstm.ReadByte() != (byte)'+')
-                {                    
+                {
                     throw new Exception("Cannot connect to host.  Handshake failed with protocol.");
                 }
                 sessionID = XContent.ReceiveXString(netstm, buf);
@@ -763,6 +783,7 @@ namespace QueryAnalyzer_DataProvider
             public RIndexType RIndex;
             public int RetryMaxCount;
             public int RetrySleep;
+            public int QOLimit; // -1 is "use default".
 
             internal enum RIndexType
             {
@@ -786,6 +807,7 @@ namespace QueryAnalyzer_DataProvider
                 cs.RIndex = RIndexType.DISABLED;
                 cs.RetryMaxCount = 20;
                 cs.RetrySleep = 1000 * 5;
+                cs.QOLimit = -1;
 
                 string[] parts = connstr.Trim(';').Split(';');
                 for (int i = 0; i < parts.Length; i++)
@@ -860,6 +882,12 @@ namespace QueryAnalyzer_DataProvider
                         case "retrysleep":
                             {
                                 cs.RetrySleep = Int32.Parse(val);
+                            }
+                            break;
+                        case "mr bypass limit":
+                        case "mr bypass":
+                            {
+                                cs.QOLimit = checked((int)ParseLongCapacity(val));
                             }
                             break;
                     }

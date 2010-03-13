@@ -97,6 +97,16 @@ namespace MySpace.DataMining.DistributedObjects5
                     XContent.SendXContent(slave.nstm, buf, 4);
                 }
 
+                if(HealthPluginPaths != null)
+                {
+                    slave.nstm.WriteByte((byte)'h');                    
+                    XContent.SendXContent(slave.nstm, string.Join(";", HealthPluginPaths));
+                    if (slave.nstm.ReadByte() != (byte)'+')
+                    {
+                        throw new Exception("Error while loading DiskCheck object on host: " + slave.Host);
+                    }
+                }
+
                 // Send assembly references if not local compile.
                 if (!LocalCompile)
                 {
@@ -756,7 +766,7 @@ namespace UserLoader
         public List<int> InputRecordLengths = null;
 
         public int ValueOffsetSize = 4;
-
+        public string[] HealthPluginPaths = null;
 
         void _DoMap(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
@@ -807,7 +817,7 @@ namespace UserLoader
 
                 slave.zmapblockbasename = "zmap_%n_" + Guid.NewGuid().ToString() + ".j" + sjid + ".zm";
                 XContent.SendXContent(slave.nstm, slave.zmapblockbasename);
-
+                
                 XContent.SendXContent(slave.nstm, fns); // All slaves of same DistObj get same input files.
                 Entry.ToBytes(_zmaps, buf, 0);
                 XContent.SendXContent(slave.nstm, buf, 4);
@@ -929,7 +939,7 @@ namespace UserMapper
             {
             }
 #endif
-            
+
             for(;;)//while cooked
             {
                 try
@@ -1031,6 +1041,10 @@ namespace UserMapper
                 }
                 catch(Exception e)
                 {
+                    if(null != e as MySpace.DataMining.DistributedObjects.FailoverFileStreamFatalException)
+                    {
+                        throw;
+                    }
                     //----------------------------COOKING--------------------------------
                     if(!cooking_is_read)
                     {
@@ -1053,7 +1067,7 @@ namespace UserMapper
                             + `; timeout=` + _CookTimeout.ToString()
                             + `) on ` + System.Net.Dns.GetHostName() + ns, e);
                     }
-                    System.Threading.Thread.Sleep(_CookTimeout);
+                    System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(_CookTimeout));
                     if (firstcook)
                     {
                         try
@@ -1062,6 +1076,24 @@ namespace UserMapper
                                 + `; timeout=` + _CookTimeout.ToString()
                                 + `) on ` + System.Net.Dns.GetHostName()
                                 + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                        }
+                        catch
+                        {
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            if ((_CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                            {
+                                Qizmt_Log(`cooking continues with ` + cooking_cooksremain
+                                    + ` more retries (retries=` + _CookRetries.ToString()
+                                    + `; timeout=` + _CookTimeout.ToString()
+                                    + `) on ` + System.Net.Dns.GetHostName()
+                                    + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
+                                    + Environment.NewLine + e.ToString());
+                            }
                         }
                         catch
                         {

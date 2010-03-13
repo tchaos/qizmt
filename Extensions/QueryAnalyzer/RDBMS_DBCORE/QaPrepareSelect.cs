@@ -139,6 +139,113 @@ namespace RDBMS_DBCORE
             }
 
 
+            protected virtual MapReduceCall GetMapReduceCallSelect(params string[] InputFiles)
+            {
+                if (QOLimit > 0)
+                {
+#if DEBUG
+                    if (InputFiles.Length == 0)
+                    {
+                        throw new Exception("DEBUG: No input files specified");
+                    }
+#endif
+                    try
+                    {
+                        long insize = _QOGetFileSizes(InputFiles);
+                        if (insize < QOLimit)
+                        {
+                            return new MapReduceCallInProc("RDBMS_Select", new SelectMap(), new SelectReduce());
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                return new MapReduceCallShellExec("RDBMS_Select", "RDBMS_Select.DBCORE");
+            }
+
+            protected virtual MapReduceCall GetMapReduceCallDistinct(params string[] InputFiles)
+            {
+                if (QOLimit > 0)
+                {
+#if DEBUG
+                    if (InputFiles.Length == 0)
+                    {
+                        throw new Exception("DEBUG: No input files specified");
+                    }
+#endif
+                    try
+                    {
+                        long insize = _QOGetFileSizes(InputFiles);
+                        if (insize < QOLimit)
+                        {
+                            return new MapReduceCallInProc("RDBMS_Distinct", new DistinctMap(), new DistinctReduce());
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                return new MapReduceCallShellExec("RDBMS_Distinct", "RDBMS_Distinct.DBCORE");
+            }
+
+            protected virtual RemoteCall GetRemoteCallSysGen()
+            {
+                //return new RemoteCallShellExec("RDBMS_SysGen", "RDBMS_SysGen.DBCORE");
+                return new RemoteCallInProc("RDBMS_SysGen", new SysGenRemote());
+            }
+
+            protected virtual RemoteCall GetRemoteCallWriteTop(params string[] InputFiles)
+            {
+                if (QOLimit > 0)
+                {
+#if DEBUG
+                    if (InputFiles.Length == 0)
+                    {
+                        throw new Exception("DEBUG: No input files specified");
+                    }
+#endif
+                    try
+                    {
+                        long insize = _QOGetFileSizes(InputFiles);
+                        if (insize < QOLimit)
+                        {
+                            return new RemoteCallInProc("RDBMS_WriteTop", new WriteTopRemote());
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                return new RemoteCallShellExec("RDBMS_WriteTop", "RDBMS_WriteTop.DBCORE");
+            }
+
+            protected virtual RemoteCall GetRemoteCallTop(params string[] InputFiles)
+            {
+                if (QOLimit > 0)
+                {
+#if DEBUG
+                    if (InputFiles.Length == 0)
+                    {
+                        throw new Exception("DEBUG: No input files specified");
+                    }
+#endif
+                    try
+                    {
+                        long insize = _QOGetFileSizes(InputFiles);
+                        if (insize < QOLimit)
+                        {
+                            return new RemoteCallInProc("RDBMS_Top", new TopRemote());
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                return new RemoteCallShellExec("RDBMS_Top", "RDBMS_Top.DBCORE");
+            }
+
+
             List<DbColumn> cols = null;
             List<string> colswidths = null;
 
@@ -170,7 +277,14 @@ namespace RDBMS_DBCORE
                 bool WhatFunctions = -1 != SelectWhat.IndexOf('('); // Select clause has functions (aggregates and/or scalars).
                 if (Order2By)
                 {
+                    OrderBy = true;
                     WhatFunctions = false;
+#if DEBUG
+                    if (GroupBy)
+                    {
+                        throw new Exception("DEBUG:  Not supposed to find GroupBy here with Order2By");
+                    }
+#endif
 #if DEBUG
                     //System.Diagnostics.Debugger.Launch();
 #endif
@@ -265,7 +379,7 @@ namespace RDBMS_DBCORE
                             NewOps.Add(Ops[iop]);
                         }
                         QlArgsOps = QlArgsEscape(string.Join("\0", NewOps.ToArray()));
-                        
+
 #if DEBUG
                         //System.Diagnostics.Debugger.Launch();
 #endif
@@ -275,6 +389,23 @@ namespace RDBMS_DBCORE
                             "FROM", QlArgsEscape(TableName),
                             QlArgsEscape(string.Join(" ", NewOps.ToArray()))
                             );
+                        {
+                            if (-1 != TableName.IndexOf(Qa.DFS_TEMP_FILE_MARKER))
+                            {
+                                try
+                                {
+                                    System.Xml.XmlElement tt = GetDfsTableInfo(TableName);
+                                    string ttf = tt["file"].InnerText;
+                                    if (-1 != ttf.IndexOf(Qa.DFS_TEMP_FILE_MARKER))
+                                    {
+                                        dfsclient.DeleteFile(ttf);
+                                    }
+                                }
+                                catch
+                                {
+                                }
+                            }
+                        }
                         Qa.PrepareSelect.queryresults qr = Qa.PrepareSelect.GetQueryResults(sel1);
                         for (int iobc = 0; iobc < OrderByCols.Count; iobc++)
                         {
@@ -282,12 +413,6 @@ namespace RDBMS_DBCORE
                         }
                         try
                         {
-                            /*
-                            QueryAnalyzer qa2 = new QueryAnalyzer();
-                            string sel2 = qa2.Exec(
-                                dfstemp ? "SELECT DFSTEMP" : (dfsref ? "SELECT DFSREF" : "SELECT")
-                                );
-                             * */
                             string newopts = "";
                             if (dfstemp)
                             {
@@ -324,6 +449,9 @@ namespace RDBMS_DBCORE
                                 }
                                 neworderby = sbnob.ToString();
                             }
+#if DEBUG
+                            //System.Diagnostics.Debugger.Launch();
+#endif
                             newopts += ";O2BY"; // Order-by phase 2.
                             // [QlArgs]SelectWhat might have () but they are NOT evaluated at this point (no SFUNC)
                             string sel2 = ps2.Exec(
@@ -341,7 +469,17 @@ namespace RDBMS_DBCORE
                         {
                             if (qr.IsTempTable)
                             {
-                                Shell("dspace del \"" + qr.temptable + "\"");
+                                {
+                                    string delfile = qr.temptable;
+                                    {
+                                        int iat = delfile.IndexOf('@');
+                                        if (-1 != iat)
+                                        {
+                                            delfile = delfile.Substring(0, iat);
+                                        }
+                                    }
+                                    dfsclient.DeleteFile(delfile);
+                                }
                             }
                         }
 
@@ -595,7 +733,13 @@ namespace RDBMS_DBCORE
                         {
                             qafile = qafile.Substring(0, iat);
                         }
-                        Shell("dspace exec \"//Job[@Name='RDBMS_SysGen']/IOSettings/DFS_IO/DFSWriter=" + SysGenOutputFile + "\" RDBMS_SysGen.DBCORE \"" + qafile + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(TableName) + "\"");
+                        {
+                            RemoteCall rc = GetRemoteCallSysGen();
+                            //rc.OverrideInput = #;
+                            rc.OverrideOutput = SysGenOutputFile;
+                            //rc.OverrideKeyLength = #;
+                            rc.Call("\"" + qafile + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(TableName) + "\"").Trim();
+                        }
                     }
                 }
                 else
@@ -697,7 +841,15 @@ namespace RDBMS_DBCORE
                             {
                                 FuncArgsOptions += ";GBY";
                             }
-                            string FuncSelectOutput1 = Shell("dspace exec" + " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"" + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + FuncDfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + FuncDfsOutput + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" " + FuncArgsOptions).Trim();
+                            string FuncSelectOutput1;
+                            {
+                                MapReduceCall mrc = GetMapReduceCallSelect(FuncDfsInput);
+                                mrc.OverrideOutputMethod = "grouped";
+                                mrc.OverrideInput = FuncDfsInput;
+                                mrc.OverrideOutput = FuncDfsOutput + "@" + OutputsRowSize;
+                                mrc.OverrideKeyLength = KeyLength;
+                                FuncSelectOutput1 = mrc.Call("\"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" " + FuncArgsOptions).Trim();
+                            }
                             string[] FuncOutputTypeNames;
                             {
                                 const string AOTIBEGINSTRING = "BEGIN:{AC596AA3-8E2F-41fa-B9E1-601D92F08AEC}";
@@ -764,7 +916,14 @@ namespace RDBMS_DBCORE
                             string GByDfsOutput = "dfs://RDBMS_SelectGroupBy_" + Guid.NewGuid().ToString();
                             GByDfsOutput = DfsOutputName; // For now...
                             string GByArgsOptions = "GBY";
-                            Shell("dspace exec" + " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"" + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + GByDfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + GByDfsOutput + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" " + GByArgsOptions).Trim();
+                            {
+                                MapReduceCall mrc = GetMapReduceCallSelect(GByDfsInput);
+                                mrc.OverrideOutputMethod = "grouped";
+                                mrc.OverrideInput = GByDfsInput;
+                                mrc.OverrideOutput = GByDfsOutput + "@" + OutputsRowSize;
+                                mrc.OverrideKeyLength = KeyLength;
+                                mrc.Call("\"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" " + GByArgsOptions).Trim();
+                            }
                             DfsInput = GByDfsOutput + "@" + OutputsRowSize;
                             {
                                 RowInfo = OutputRowInfo;
@@ -774,12 +933,18 @@ namespace RDBMS_DBCORE
                         }
                         else
                         {
-                            string condxpath = ""; // Append to this, but include a space before new xpath.
-                            if (Update)
                             {
-                                condxpath += " \"//Job[@Name='RDBMS_Select']/IOSettings/OutputMethod=grouped\"";
+                                MapReduceCall mrc = GetMapReduceCallSelect(DfsInput);
+                                if (!OrderBy || Update)
+                                {
+                                    mrc.OverrideOutputMethod = "grouped";
+                                }
+                                mrc.OverrideInput = DfsInput;
+                                mrc.OverrideOutput = DfsOutputName + "@" + OutputsRowSize;
+                                mrc.OverrideKeyLength = KeyLength;
+                                shelloutputSelect1 = mrc.Call("\"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\"").Trim();
                             }
-                            shelloutputSelect1 = Shell("dspace exec" + condxpath + " \"//Job[@Name='RDBMS_Select']/IOSettings/DFSInput=" + DfsInput + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/DFSOutput=" + DfsOutputName + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Select']/IOSettings/KeyLength=" + KeyLength.ToString() + "\" RDBMS_Select.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\"").Trim();
+
                         }
                     }
                     else
@@ -794,17 +959,32 @@ namespace RDBMS_DBCORE
 
                 if (null != DfsTempInputFile)
                 {
-                    Shell("dspace del \"" + DfsTempInputFile + "\"");
+                    {
+                        string delfile = DfsTempInputFile;
+                        {
+                            int iat = delfile.IndexOf('@');
+                            if (-1 != iat)
+                            {
+                                delfile = delfile.Substring(0, iat);
+                            }
+                        }
+                        dfsclient.DeleteFile(delfile);
+                    }
                 }
 
                 if (distinct)
                 {
                     string outtablefn = DfsOutputName + "_out_" + Guid.NewGuid().ToString();
-                    Shell("dspace exec" + " \"//Job[@Name='RDBMS_Distinct']/IOSettings/DFSInput=" + DfsOutputName + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Distinct']/IOSettings/DFSOutput=" + outtablefn + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_Distinct']/IOSettings/KeyLength=" + OutputsRowSize + "\" RDBMS_Distinct.DBCORE \"");
-                    string distincttablefn = DfsOutputName + "_distinct_" + Guid.NewGuid().ToString();
-                    Shell("dspace rename \"" + DfsOutputName + "\" \"" + distincttablefn + "\"");
-                    Shell("dspace rename \"" + outtablefn + "\" \"" + DfsOutputName + "\"");
-                    Shell("dspace del \"" + distincttablefn + "\"");
+                    {
+                        MapReduceCall mrc = GetMapReduceCallDistinct();
+                        //mrc.OverrideOutputMethod = #;
+                        mrc.OverrideInput = DfsOutputName + "@" + OutputsRowSize;
+                        mrc.OverrideOutput = outtablefn + "@" + OutputsRowSize;
+                        mrc.OverrideKeyLength = int.Parse(OutputsRowSize);
+                        mrc.Call().Trim();
+                    }
+                    Shell("dspace swap \"" + outtablefn + "\" \"" + DfsOutputName + "\"");
+                    dfsclient.DeleteFile(outtablefn);
                 }
 
                 if (queryresults)
@@ -818,7 +998,7 @@ namespace RDBMS_DBCORE
                         }
                     }
 
-                    string sDfsOutputSize = Shell("dspace filesize \"" + DfsOutputName + "\"").Split('\n')[0].Trim();
+                    string sDfsOutputSize = dfsclient.GetFileSizeString(DfsOutputName);
                     long DfsOutputSize = long.Parse(sDfsOutputSize);
                     long NumRowsOutput = DfsOutputSize / OutputRowSize;
                     if (0 != (DfsOutputSize % OutputRowSize))
@@ -834,18 +1014,21 @@ namespace RDBMS_DBCORE
                             if (topdfstemp)
                             {
                                 string outtablefn = DfsOutputName + "_out_" + Guid.NewGuid().ToString();
-                                Shell("dspace exec \"//Job[@Name='RDBMS_WriteTop']/IOSettings/DFS_IO/DFSReader=" + DfsOutputName + "@" + OutputsRowSize + "\" \"//Job[@Name='RDBMS_WriteTop']/IOSettings/DFS_IO/DFSWriter=" + outtablefn + "@" + OutputsRowSize + "\" RDBMS_WriteTop.DBCORE " + TopCount.ToString());
-                                string toppingtablefn = DfsOutputName + "_topping_" + Guid.NewGuid().ToString();
-                                Shell("dspace rename \"" + DfsOutputName + "\" \"" + toppingtablefn + "\"");
-                                Shell("dspace rename \"" + outtablefn + "\" \"" + DfsOutputName + "\"");
-                                Shell("dspace del \"" + toppingtablefn + "\"");
+                                {
+                                    RemoteCall rc = GetRemoteCallWriteTop();
+                                    rc.OverrideInput = DfsOutputName + "@" + OutputsRowSize;
+                                    rc.OverrideOutput = outtablefn + "@" + OutputsRowSize;
+                                    rc.Call(TopCount.ToString()).Trim();
+                                }
+                                Shell("dspace swap \"" + DfsOutputName + "\" \"" + outtablefn + "\"");
+                                dfsclient.DeleteFile(outtablefn);
                             }
                         }
                     }
                     DSpace_Log("    <recordcount>" + recordcount.ToString() + "</recordcount>");
                     DSpace_Log("    <recordsize>" + OutputsRowSize + "</recordsize>");
 
-                    string sPartCount = Shell("dspace countparts \"" + DfsOutputName + "\"").Split('\n')[0].Trim();
+                    string sPartCount = dfsclient.GetFilePartCountString(DfsOutputName);
                     DSpace_Log("    <parts>" + sPartCount + "</parts>");
 
                     DSpace_Log("  </queryresults>");
@@ -859,9 +1042,25 @@ namespace RDBMS_DBCORE
                     {
                         sTopOptions += ";JOINED";
                     }
-                    DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_Top']/IOSettings/DFS_IO/DFSReader=" + DfsOutputName + "@" + OutputsRowSize + "\" RDBMS_Top.DBCORE \"" + TableName + "\" \"" + DfsOutputName + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" \"" + OutputDisplayInfo + "\" " + TopCount.ToString() + " " + sTopOptions).Trim());
+                    string topoutput1;
+                    {
+                        RemoteCall rc = GetRemoteCallTop(DfsOutputName);
+                        rc.OverrideInput = DfsOutputName + "@" + OutputsRowSize;
+                        topoutput1 = rc.Call("\"" + TableName + "\" \"" + DfsOutputName + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" \"" + OutputDisplayInfo + "\" " + TopCount.ToString() + " " + sTopOptions).Trim();
+                    }
+                    DSpace_Log(topoutput1);
 
-                    Shell("dspace del \"" + DfsOutputName + "\"");
+                    {
+                        string delfile = DfsOutputName;
+                        {
+                            int iat = delfile.IndexOf('@');
+                            if (-1 != iat)
+                            {
+                                delfile = delfile.Substring(0, iat);
+                            }
+                        }
+                        dfsclient.DeleteFile(delfile);
+                    }
                 }
 
             }

@@ -8,7 +8,10 @@
         <DFSOutput></DFSOutput>
         <OutputMethod>fsorted</OutputMethod>
         <!-- Don't use rsorted! -->
+		<Setting name="Subprocess_TotalPrime" value="NearPrimeBelowCoreCount" />
       </IOSettings>
+      <DynamicFoil/>
+      <IntermediateDataAddressing>64</IntermediateDataAddressing>
       <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
       <Using>RDBMS_DBCORE</Using>
       <MapReduce>
@@ -24,7 +27,8 @@
                     selmap = new Qa.SelectMap();
                     selmap.DSpace_KeyLength = DSpace_KeyLength;
                     selmap.DSpace_ProcessID = DSpace_ProcessID;
-                    selmap.Exec(DSpace_ExecArgs);
+                    selmap.DSpace_ProcessCount = DSpace_ProcessCount;
+                    selmap.Init(DSpace_ExecArgs);
                 }
                 
                 selmap.Map(row, output);
@@ -42,7 +46,8 @@
                     selreduce = new Qa.SelectReduce();
                     selreduce.DSpace_KeyLength = DSpace_KeyLength;
                     selreduce.DSpace_ProcessID = DSpace_ProcessID;
-                    selreduce.Exec(DSpace_ExecArgs);
+                    selreduce.DSpace_ProcessCount = DSpace_ProcessCount;
+                    selreduce.Init(DSpace_ExecArgs);
                     
                     selreduce.ReduceInitialize();
                 }

@@ -44,7 +44,7 @@ namespace MySpace.DataMining.AELight
                 string outputguid = Guid.NewGuid().ToString();
                 TestRemote dobj = new TestRemote(cfgj.NarrativeName + "_test");
                 string outputfilename = outputguid + ".local";
-                dobj.SetJID(jid);
+                dobj.SetJID(jid, CurrentJobFileName + " Test: " + cfgj.NarrativeName);
                 dobj.AddBlock(@"127.0.0.1|" + outputfilename + @".log|slaveid=0");
                 string codectx = (@"
     public const int DSpace_BlockID = 0;

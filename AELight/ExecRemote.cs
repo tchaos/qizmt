@@ -106,7 +106,7 @@ namespace MySpace.DataMining.AELight
                     }
                     SlaveIP = IPAddressUtil.GetIPv4Address(SlaveHost); // !
 
-                    rem.SetJID(jid);
+                    rem.SetJID(jid, CurrentJobFileName + " Remote: " + cfgj.NarrativeName);
                     rem.AddBlock(SlaveIP + @"|" + logname + @"|slaveid=0");
 
                     string codectx = (@"

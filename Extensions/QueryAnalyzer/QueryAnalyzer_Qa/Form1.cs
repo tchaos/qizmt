@@ -62,7 +62,8 @@ namespace RDBMS_qa
 
         private void LoadTreeView()
         {
-            ShowStatus("Loading table information...");
+            //ShowStatus("Loading table information...");
+            ShowStatus("Connecting to database...");
             tvTables.Nodes.Clear();
 
             string rootName = datasource;
@@ -371,6 +372,7 @@ namespace RDBMS_qa
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
             frmConnection frm = new frmConnection();
+            frm.Owner = this;
             frm.Icon = this.Icon;
             if (connstr.Length > 0)
             {
@@ -513,6 +515,11 @@ namespace RDBMS_qa
             HelpBrowser helpBrowser = new HelpBrowser(cmdNodes);
             helpBrowser.Show();
             helpBrowser.Focus();
+        }
+
+        private void exitToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            this.Close();
         }
     }
 }

@@ -19,6 +19,10 @@ namespace RegressionTest2
             }
             string dfsxmlpath = args[1];
 
+#if DEBUG
+            //System.Diagnostics.Debugger.Launch();
+#endif
+
             {
 
 
@@ -32,6 +36,7 @@ namespace RegressionTest2
                 }
                 finally
                 {
+                    /* // Old, simpler test:
                     try
                     {
                         // Don't care if this fails.
@@ -41,7 +46,9 @@ namespace RegressionTest2
                     catch
                     {
                         Console.WriteLine("    Global critical section release exception (this is OK)");
-                    }
+                    }*/
+                    // New and improved test:
+                    Console.WriteLine("Not releasing old lock");
                 }
 
                 System.Threading.Thread.Sleep(1000 * 3);

@@ -8,24 +8,101 @@
           <DFSWriter></DFSWriter>
         </DFS_IO>
       </IOSettings>
+      <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
+      <Using>RDBMS_DBCORE</Using>
       <Remote>
         <![CDATA[            
-            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
-            {       
-                long TopCount = long.Parse(DSpace_ExecArgs[0]);
-                
-                for(List<byte> rowbuf = new List<byte>(); 
-                    (TopCount == -1 || TopCount > 0) && dfsinput.ReadRecordAppend(rowbuf);
-                    rowbuf.Clear())
+            
+            class RemoteInputEnum: IEnumerator<ByteSlice>
+            {
+                internal RemoteInputEnum(RemoteInputStream dfsinput)
                 {
-                    dfsoutput.WriteRecord(rowbuf); 
-                    
-                    if(TopCount != -1)
+                    this.dfsinput = dfsinput;
+                }
+                
+                public ByteSlice Current
+                {
+                    get
                     {
-                        TopCount--;
-                    }                    
-                }                
+                        if(null == buf || hitend)
+                        {
+                            throw new InvalidOperationException();
+                        }
+                        return ByteSlice.Prepare(buf);
+                    }
+                }
+                
+                public void Dispose()
+                {
+                    dfsinput = null;
+                    buf = null;
+                }
+                
+                object System.Collections.IEnumerator.Current
+                {
+                    get
+                    {
+                        return Current;
+                    }
+                }
+
+                public bool MoveNext()
+                {
+                    if(null == buf)
+                    {
+                        buf = new List<byte>();
+                    }
+                    buf.Clear();
+                    if(DSpace_InputRecordLength > 0)
+                    {
+                        if(!dfsinput.ReadRecordAppend(buf))
+                        {
+                            hitend = true;
+                            return false;
+                        }
+                        return true;
+                    }
+                    else
+                    {
+                        if(!dfsinput.ReadLineAppend(buf))
+                        {
+                            hitend = true;
+                            return false;
+                        }
+                        return true;
+                    }
+                }
+                
+                public void Reset()
+                {
+                    throw new NotSupportedException();
+                    //dfsinput.Seek(); // ...
+                    //buf = null;
+                    //hitend = false;
+                }
+                
+                RemoteInputStream dfsinput;
+                List<byte> buf = null;
+                bool hitend = false;
             }
+        
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                
+                Qa.WriteTopRemote qaremote = new Qa.WriteTopRemote();
+                qaremote.DSpace_InputRecordLength = DSpace_InputRecordLength;
+                qaremote.DSpace_OutputRecordLength = DSpace_OutputRecordLength;
+                qaremote.DSpace_ProcessID = DSpace_ProcessID;
+                qaremote.Init(DSpace_ExecArgs);
+                
+                RemoteInputEnum qainput = new RemoteInputEnum(dfsinput);
+                
+                qaremote.OnRemote(qainput, dfsoutput);
+                
+                DSpace_Log(qaremote.ReadToEnd());
+                
+            }
+            
         ]]>
       </Remote>
     </Job>

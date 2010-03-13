@@ -67,7 +67,7 @@ namespace MySpace.DataMining.AELight
                 {
                     cfgj.AddAssemblyReferences(rem.CompilerAssemblyReferences, Surrogate.NetworkPathForHost(firstslave));
                 }
-                rem.SetJID(jid);
+                rem.SetJID(jid, CurrentJobFileName + " Local: " + cfgj.NarrativeName);
                 rem.AddBlock(SlaveHost + @"|" + logname + @"|slaveid=0");
                 rem.Open();
 

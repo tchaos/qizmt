@@ -537,7 +537,7 @@ namespace RDBMS_DBCORE
             List<byte> newfieldsbuf = new List<byte>(); // For when selecting other than *, but not if WhatFunctions
             DbFunctionTools ftools = null; // null until first needed.
             int defkey;
-            public virtual void Map(ByteSlice row, MapOutput output)
+            public override void Map(ByteSlice row, MapOutput output)
             {
 
                 if (null == TableName)
@@ -609,7 +609,7 @@ namespace RDBMS_DBCORE
                         orderbuf.Clear();
                         Entry.ToBytesAppend(defkey, orderbuf);
                         key = ByteSlice.Prepare(orderbuf);
-                        defkey = unchecked(defkey + 1);
+                        defkey = unchecked(defkey + DSpace_ProcessCount);
                     }
 
                     if (null != Updates)
@@ -713,7 +713,7 @@ namespace RDBMS_DBCORE
 
             List<string> FieldTypeStrings = null; // Only valid if WhatFunctions.
 
-            public void ReduceInitialize()
+            public override void ReduceInitialize()
             {
             }
 
@@ -1018,7 +1018,7 @@ namespace RDBMS_DBCORE
 
 
 
-            public void ReduceFinalize()
+            public override void ReduceFinalize()
             {
 
                 if (WhatFunctions)

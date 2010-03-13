@@ -80,6 +80,7 @@
             this.Controls.Add(this.tvTopic);
             this.Name = "HelpBrowser";
             this.Text = "HelpBrowser";
+            this.Load += new System.EventHandler(this.HelpBrowser_Load);
             this.panel1.ResumeLayout(false);
             this.ResumeLayout(false);
 
