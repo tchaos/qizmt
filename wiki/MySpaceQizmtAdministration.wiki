@@ -9,20 +9,33 @@ Back to <wiki:comment>Link:</wiki:comment>[Main Wiki Main]
 = MySpace Qizmt Administrator Guide =
 
 
-== Suggested Requirements per node ==
+== Suggested Minimum Requirements per node ==
 
  * 8-way 2GHz cores
  * 32GB RAM
- * 1 Gb/s non-blocking network bandwidth
+ * 1 Gb/s non-blocking network bandwidth. (Every machine should be able to max out its 1Gb/s to 100% at the same time)
  * 1TB – 4TB disk space per node in RAID 0 for installation drive
  * RAID 10 for OS drive
  * Windows 2003 SP2, Windows 2008, Windows Vista or Windows 7
  * .NET Framework 3.5 SP1
 
+== Windows configuration settings to set per machine of cluster: ==
+
+ * Note: The machines of your cluster should be on a private vlan and not allow untrusted connectivity.
+ * Disable windows search indexing
+ * dword decimal:
+ * HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanManServer\Parameters\DisableDos 1
+ * HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Filesystem\NtfsDisableLastAccessUpdate 1
+ * HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\SynAttackProtect 0
+ * HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\MaxUserPort 15000
+ * HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\TcpTimedWaitDelay 5
+ * HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\TcpFinWait2Delay 5
+ * HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\MaxHashTableSize 16384
+
 == Cluster Installation ==
 
- # Install MySpace.DataMining.Qizmt.msi and any extensions on all machines
-  # See *Quick Start* section for details on driver installation
+ # Install MySpace.DataMining.Qizmt.msi and any extensions on all machines.
+  - See *Quick Start* section for details on driver installation. Also, be sure that the account has read/write permission to {{{\\<host>\<drive>$\<installdir>\}}} from every machine to every other machine. This can be tested by logging in to every machine with the account or automated with PowerShell
  # Pick one machine and issue the command: <br /> C:\>*`Qizmt  format Machines=<HOST0>,<HOST2>,<HOST2>,...`* <br />You may now RDP into any of the specified hosts and issue Qizmt commands to code/debug jobs, execute jobs, etc. <br /> For command help, issue: <br /> C:\>*Qizmt*
 
 
