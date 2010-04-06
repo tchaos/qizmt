@@ -55,6 +55,7 @@
     <Compile Include="CommonCs.cs" />
     <Compile Include="Compiler.cs" />
     <Compile Include="CriticalSection.cs" />
+    <Compile Include="DfsStream.cs" />
     <Compile Include="DGlobals.cs" />
     <Compile Include="DiskCheck.cs" />
     <Compile Include="DRandom.cs" />

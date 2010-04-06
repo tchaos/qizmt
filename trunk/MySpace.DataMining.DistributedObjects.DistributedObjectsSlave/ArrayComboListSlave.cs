@@ -604,6 +604,10 @@ namespace MySpace.DataMining.DistributedObjects5
 #if DEBUG
                                 read = 0x200;
 #endif
+                                if (read > valuesbuf.Length)
+                                {
+                                    read = valuesbuf.Length;
+                                }
                                 read = fzvalueblock.Read(valuesbuf, curvalueoffset, read);
                                 if (read < 1)
                                 {

@@ -2540,7 +2540,7 @@ namespace MySpace.DataMining.AELight
                 {
                     Doc.Lexing.Keywords[0] = CSKEYWORDS_MODIFIED.Replace('|', ' ');
 
-                    Doc.Lexing.Keywords[1] = "ByteSlice Entry List IList StringBuilder MapOutput RandomAccessEntries RandomAccessOutput RemoteInputStream RemoteOutputStream Int16 UInt16 Int32 UInt32 Int64 UInt64 Chris Cynthia Daniel mstring mstringarray recordset ByteSliceList ReduceOutput Blob GlobalCriticalSection";
+                    Doc.Lexing.Keywords[1] = "ByteSlice Entry List IList StringBuilder MapOutput RandomAccessEntries RandomAccessOutput RemoteInputStream RemoteOutputStream Int16 UInt16 Int32 UInt32 Int64 UInt64 Chris Cynthia Daniel mstring mstringarray recordset ByteSliceList ReduceOutput Blob GlobalCriticalSection DfsStream";
 
                     Doc.Lexing.Keywords[3] = "new ToString object Object string String foreach Split LoadXml Load ReadLine Copy Format Concat GetEnumerator Insert Substring ToCharArray ToLower ToUpper Trim TrimEnd TrimStart ToPOS ToPOSString Remove RemoveAt ToArray DSpace_Log Qizmt_Log DSpace_LogResult Qizmt_LogResult Shell OuterXml InnerXml InnerText Clone MemberwiseClone SelectNodes SelectSingleNode AppendChild CloneNode CreateAttribute CraeteCDataSection CreateComment CreateDefaultAttribute CreateDocumentFragment CreateDocumentType CreateElement CreateEntityReference CreateNavigator CreateNode CreateTextNode CreateWhitespace CreateXmlDeclaration GetElementsByTagName ImportNode InsertAfter InsertBefore Normalize PrependChild ReadNode PadLeft PadRight Replace ReadBinary WriteBinary GetDateTime GetLock";
 

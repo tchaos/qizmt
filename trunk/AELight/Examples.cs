@@ -2532,6 +2532,324 @@ namespace testdll
             Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             #endregion
 
+            #region SharedMemory
+            alljobfiles.Add(@"Qizmt-SharedMemory.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+                @"
+<!--
+
+    -  If shared memory is too large for 1 machine, should use distributed
+        memory / RINDEX so that there is scalable direct access lookups.
+        
+    -  If a lookup table is ultra-small, should have redundant copy in every
+        process so that it can be stored as a local dictionary.
+        
+    -  This is an example useful for storing data which is redundant across
+        machines, but shared by all workers on each machine.
+
+-->
+
+<SourceCode>
+  <Jobs>
+    <Job Name=`SharedMem_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del SharedMem_Input.txt`);
+                Shell(@`Qizmt del SharedMem_Table.txt`);
+                Shell(@`Qizmt del SharedMem_Output.txt`);
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`SharedMem_CreateInputData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://SharedMem_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine(`1498,The Last Supper,100.45,374000000`);
+                dfsoutput.WriteLine(`1503,Mona Lisa,4.75,600000000`);
+                dfsoutput.WriteLine(`1990,Bill Murray,4.4,112000000`);
+                dfsoutput.WriteLine(`1501,Study for a portrait of Isabella d'Este,1.5,100000000`);
+                dfsoutput.WriteLine(`1501,Study of horse,1.5,100000000`);
+                dfsoutput.WriteLine(`2003,Josh Holloway,1.1,500000000`);
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`SharedMem_CreateTableData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://SharedMem_Table.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine(`1501`);
+                dfsoutput.WriteLine(`1498`);
+                dfsoutput.WriteLine(`1503`);
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`SharedMem` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int,double</KeyLength>
+        <DFSInput>dfs://SharedMem_Input.txt</DFSInput>
+        <DFSOutput>dfs://SharedMem_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <Using>System.Runtime.InteropServices</Using>
+      <Unsafe/>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                mstring sLine = mstring.Prepare(line);
+                int year = sLine.NextItemToInt(',');
+                mstring title = sLine.NextItemToString(',');
+                double size = sLine.NextItemToDouble(',');
+                long pixel = sLine.NextItemToLong(',');
+                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(year);
+                rKey.PutDouble(size);
+                
+                recordset rValue = recordset.Prepare();
+                rValue.PutString(title);
+                rValue.PutLong(pixel);
+                
+                output.Add(rKey, rValue);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            
+            const int sharedbytes = 0x400 * 0x400; // Number of bytes to reserve.
+            unsafe int* pyears;
+            int pyearslength; // Will be updated with the number of valid elements in pyears.
+            unsafe byte* pview = null;
+            IntPtr hmap = IntPtr.Zero;
+            
+            public unsafe void ReduceInitialize()
+            {
+                System.Threading.Mutex mutex = new System.Threading.Mutex(false, `SharedMem_Table{B98FC90B-D396-4e2d-A08F-90F7E955D703}`);
+                mutex.WaitOne();
+                try
+                {
+                    hmap = CreateFileMapping(INVALID_HANDLE_VALUE, IntPtr.Zero, PAGE_READWRITE, 0, sharedbytes, `SharedMem_Table{E2E20082-8DCE-44ec-AFBA-5E6F1AB1A07B}`);
+                    int lasterror = Marshal.GetLastWin32Error();
+                    if(IntPtr.Zero == hmap)
+                    {
+                        throw new Exception(`CreateFileMapping failed; Marshal.GetLastWin32Error() returned error code ` + lasterror);
+                    }
+                    pview = (byte*)MapViewOfFile(hmap, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+                    pyears = (int*)pview + 1; // First int of pview is number of following elements.
+                    if(lasterror != ERROR_ALREADY_EXISTS)
+                    {
+                        *(int*)pview = 0; // Number of elements init.
+                        DfsStream ds = new DfsStream(`dfs://SharedMem_Table.txt`);
+                        System.IO.StreamReader sr = new System.IO.StreamReader(ds);
+                        int* pcurrent = (int*)pview + 1;
+                        for(;;)
+                        {
+                            string line = sr.ReadLine();
+                            if(line == null)
+                            {
+                                break;
+                            }
+                            if((byte*)pcurrent >= pview + sharedbytes)
+                            {
+                                throw new Exception(`Read too many values into shared memory map`);
+                            }
+                            *pcurrent = int.Parse(line);
+                            pcurrent++;
+                            pyearslength++;
+                        }
+                        *(int*)pview = pyearslength; // Number of elements.
+                        sr.Close();
+                        ds.Close();
+                    }
+                    pyearslength = *(int*)pview;
+                }
+                finally
+                {
+                    mutex.ReleaseMutex();
+                    mutex.Close();
+                }
+            }
+            
+            public unsafe override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rKey = recordset.Prepare(key);
+                int year = rKey.GetInt();
+                double size = rKey.GetDouble();
+                
+                {
+                    // Use pyears table to see if this year is wanted.
+                    bool wantyear = false;
+                    for(int i = 0; i < pyearslength; i++)
+                    {
+                        if(year == pyears[i])
+                        {
+                            wantyear = true;
+                            break;
+                        }
+                    }
+                    if(!wantyear)
+                    {
+                        return;
+                    }
+                }
+                
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rValue = recordset.Prepare(values.Items[i]);
+                    mstring title = rValue.GetString();
+                    long pixel = rValue.GetLong();
+                    
+                    mstring sLine = mstring.Prepare(year);
+                    sLine = sLine.AppendM(',')
+                        .AppendM(title)
+                        .AppendM(',')
+                        .AppendM(size)
+                        .AppendM(',')
+                        .AppendM(pixel);
+                    
+                    output.Add(sLine);
+                }
+            }
+            
+            public unsafe void ReduceFinalize()
+            {
+                UnmapViewOfFile(new IntPtr(pview));
+                CloseHandle(hmap);
+            }
+            
+            
+            public unsafe static void pmemcpy(byte* dest, byte* src, int length)
+            {
+                uint numints = (uint)length >> 2;
+                int* idest = (int*)dest;
+                int* isrc = (int*)src;
+                for (int i = 0; i < numints; i++)
+                {
+                    idest[i] = isrc[i];
+                }
+                for (uint remainpos = numints << 2; remainpos < (uint)length; remainpos++)
+                {
+                    dest[remainpos] = src[remainpos];
+                }
+            }
+
+            public unsafe static void pmemcpy(byte* dest, byte[] src, int srcoffset, int length)
+            {
+                fixed (byte* psrc = src)
+                {
+                    pmemcpy(dest, psrc + srcoffset, length);
+                }
+            }
+
+            public unsafe static void pmemcpy(byte[] dest, int destoffset, byte* src, int length)
+            {
+                fixed (byte* pdest = dest)
+                {
+                    pmemcpy(pdest + destoffset, src, length);
+                }
+            }
+
+
+            [DllImport(`kernel32`, SetLastError = true, CharSet = CharSet.Auto)]
+            public static extern IntPtr CreateFile(
+               String lpFileName, int dwDesiredAccess, int dwShareMode,
+               IntPtr lpSecurityAttributes, int dwCreationDisposition,
+               int dwFlagsAndAttributes, IntPtr hTemplateFile);
+
+            [DllImport(`kernel32`, SetLastError = true, CharSet = CharSet.Auto)]
+            public static extern IntPtr CreateFileMapping(
+               IntPtr hFile, IntPtr lpAttributes, int flProtect,
+               int dwMaximumSizeHigh, int dwMaximumSizeLow,
+               String lpName);
+
+            [DllImport(`kernel32`, SetLastError = true)]
+            public static extern bool FlushViewOfFile(
+               IntPtr lpBaseAddress, int dwNumBytesToFlush);
+
+            [DllImport(`kernel32`, SetLastError = true)]
+            public static extern IntPtr MapViewOfFile(
+               IntPtr hFileMappingObject, int dwDesiredAccess, int dwFileOffsetHigh,
+               int dwFileOffsetLow, int dwNumBytesToMap);
+
+            [DllImport(`kernel32`, SetLastError = true, CharSet = CharSet.Auto)]
+            public static extern IntPtr OpenFileMapping(
+               int dwDesiredAccess, bool bInheritHandle, String lpName);
+
+            [DllImport(`kernel32`, SetLastError = true)]
+            public static extern bool UnmapViewOfFile(IntPtr lpBaseAddress);
+
+            [DllImport(`kernel32`, SetLastError = true)]
+            public static extern bool CloseHandle(IntPtr handle);
+
+            public const int ERROR_ALREADY_EXISTS = 183 ;
+
+            public static IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
+
+            public const int PAGE_READWRITE = 0x4;
+
+            public const int FILE_MAP_WRITE = 0x2;
+            public const int FILE_MAP_READ = 0x4;
+            public const int FILE_MAP_ALL_ACCESS = 0xF001F;
+            
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name=`SharedMem_Display` Custodian=`` Email=`` Description=`Display output data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://SharedMem_Output.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display output.
+                Qizmt_Log(`Output:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
             #region RemoteMultiIO
             /*
             alljobfiles.Add(@"Qizmt-RemoteMultiIO.xml");
@@ -3215,7 +3533,7 @@ Qizmt exec Qizmt-ClusterLock.xml -c
           <![CDATA[
             public virtual void Map(ByteSlice line, MapOutput output)
             {
-                if(Qizmt_InputRecordLength == 4)
+                if(string.Compare(StaticGlobals.Qizmt_InputFileName, `HeteroInputOutputFiles_Input2`, true) == 0)
                 {
                     recordset rs = recordset.Prepare(line);
                     int i = rs.GetInt();
@@ -3223,7 +3541,7 @@ Qizmt exec Qizmt-ClusterLock.xml -c
                     ms.AppendM(`,N/A,N/A,N/A`);
                     output.Add(rs, ms);
                 }
-                else if(Qizmt_InputRecordLength == -1) // Text.
+                else if(string.Compare(StaticGlobals.Qizmt_InputFileName, `HeteroInputOutputFiles_Input1`, true) == 0) // Text.
                 {
                     recordset rs = recordset.Prepare();
                     mstring ms = mstring.Prepare(line);
@@ -3266,7 +3584,7 @@ Qizmt exec Qizmt-ClusterLock.xml -c
                 List<byte> buf = new List<byte>();
                 for(;;)
                 {
-                    if(Qizmt_InputRecordLength == 4)
+                    if(string.Compare(StaticGlobals.Qizmt_InputFileName, `HeteroInputOutputFiles_Output2`, true) == 0)
                     {
                         buf.Clear();
                         if(!dfsinput.ReadRecordAppend(buf))
@@ -3278,7 +3596,7 @@ Qizmt exec Qizmt-ClusterLock.xml -c
                         int i = rs.GetInt();
                         Qizmt_Log(`int : ` + i);
                     }
-                    else if(Qizmt_InputRecordLength == -1) // Text.
+                    else if(string.Compare(StaticGlobals.Qizmt_InputFileName, `HeteroInputOutputFiles_Output1`, true) == 0) // Text.
                     {
                         buf.Clear();
                         if(!dfsinput.ReadLineAppend(buf))

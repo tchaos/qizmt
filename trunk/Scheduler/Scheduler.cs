@@ -28,6 +28,7 @@ namespace MySpace.DataMining.DistributedObjects
                 wait = true;
 
                 ScheduleInfo.QEntry qe = null;
+                bool ispaused;
 
                 {
                     System.Threading.Mutex mu = new System.Threading.Mutex(false, ScheduleInfo.MUTEXNAME);
@@ -41,7 +42,8 @@ namespace MySpace.DataMining.DistributedObjects
                     try
                     {
                         ScheduleInfo sched = ScheduleInfo.Load_unlocked();
-                        if (sched.Queued.Count > 0)
+                        ispaused = sched.QueuePaused;
+                        if (!ispaused && sched.Queued.Count > 0)
                         {
                             qe = sched.Queued[0];
                             sched.Queued.RemoveAt(0);
@@ -62,7 +64,14 @@ namespace MySpace.DataMining.DistributedObjects
                     {
                         LastQueueActions.Dequeue();
                     }
-                    LastQueueActions.Enqueue("Queue is empty; waiting for queue entry");
+                    if (ispaused)
+                    {
+                        LastQueueActions.Enqueue("Queue is paused; waiting for unpause");
+                    }
+                    else
+                    {
+                        LastQueueActions.Enqueue("Queue is empty; waiting for queue entry");
+                    }
                 }
                 else
                 {
@@ -99,6 +108,7 @@ namespace MySpace.DataMining.DistributedObjects
                         }
 
                     }
+
                 }
 
             }
@@ -278,6 +288,7 @@ namespace MySpace.DataMining.DistributedObjects
             return RunQizmtExec(Cmd, Out, Err, int.MaxValue, null);
         }
 
+        // If StatusQueue is not null, LastDequeuedJID will be updated with the JID.
         public static int RunQizmtExec(string Cmd, string Out, string Err, int WaitForProcessTimeout, Queue<string> StatusQueue)
         {
             try
@@ -354,6 +365,12 @@ namespace MySpace.DataMining.DistributedObjects
                                                                     {
                                                                         sj = sj.Substring(0, inl).Trim();
                                                                         jid = long.Parse(sj);
+                                                                        if (null != StatusQueue)
+                                                                        {
+                                                                            ScheduleInfo sched = ScheduleInfo.Load();
+                                                                            sched.LastDequeuedJID = jid;
+                                                                            sched.Save();
+                                                                        }
                                                                     }
                                                                 }
                                                             }
@@ -612,9 +629,17 @@ namespace MySpace.DataMining.DistributedObjects
         }
 
 
+        public static IList<ScheduleInfo.QEntry> GetQueueSnapshot(out bool IsPaused)
+        {
+            ScheduleInfo sched = ScheduleInfo.Load();
+            IsPaused = sched.QueuePaused;
+            return sched.Queued;
+        }
+
         public static IList<ScheduleInfo.QEntry> GetQueueSnapshot()
         {
-            return ScheduleInfo.Load().Queued;
+            bool IsPaused;
+            return GetQueueSnapshot(out IsPaused);
         }
 
         public static IList<ScheduleInfo.SEntry> GetScheduleSnapshot()
@@ -709,6 +734,38 @@ namespace MySpace.DataMining.DistributedObjects
                 IDisposable dmu = mu;
                 dmu.Dispose();
             }
+        }
+
+
+        public static bool PauseQueue(bool paused)
+        {
+            System.Threading.Mutex mu = new System.Threading.Mutex(false, ScheduleInfo.MUTEXNAME);
+            try
+            {
+                mu.WaitOne();
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+            }
+            try
+            {
+                ScheduleInfo sched = ScheduleInfo.Load_unlocked();
+                sched.QueuePaused = paused;
+                sched.Save_unlocked();
+                return true;
+            }
+            finally
+            {
+                mu.ReleaseMutex();
+                IDisposable dmu = mu;
+                dmu.Dispose();
+            }
+        }
+
+
+        public static long GetLastDequeuedJID()
+        {
+            return ScheduleInfo.Load().LastDequeuedJID;
         }
 
 
@@ -941,6 +998,8 @@ namespace MySpace.DataMining.DistributedObjects
 
             public long LastScheduleID = 0;
 
+            public long LastDequeuedJID = 0;
+
             public interface ICommand
             {
                 string GetCommand();
@@ -989,6 +1048,8 @@ namespace MySpace.DataMining.DistributedObjects
 
             }
             public List<QEntry> Queued;
+
+            public bool QueuePaused = false;
 
             public class SEntry : IEntry, ICommand, IComparable<SEntry>
             {

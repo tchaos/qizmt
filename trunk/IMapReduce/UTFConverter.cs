@@ -229,7 +229,7 @@ namespace MySpace.DataMining.DistributedObjects
 
                 if (bytesToWrite == 4)
                 {
-                    ConvertCodeValueToBytesUTF16(target0, ref b0, ref b1);
+                    ConvertCodeValueToBytesUTF16(target1, ref b0, ref b1);
 
                     Stack.PutByte(b0);
                     Stack.PutByte(b1);
