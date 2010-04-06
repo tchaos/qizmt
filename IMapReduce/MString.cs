@@ -423,7 +423,7 @@ namespace MySpace.DataMining.DistributedObjects
             CurrentDelPos = DEFAULT_DEL_POS;
         }
 
-        public ByteSlice ToByteSlice()
+        public ByteSlice ToByteSlice(bool strictConversion)
         {
             if (ByteCount == 0)
             {
@@ -431,16 +431,26 @@ namespace MySpace.DataMining.DistributedObjects
             }
 
             int offset = Stack.CurrentPos;
-            int length = UTFConverter.ConvertUTF16ToUTF8(Stack.Buffer, StartIndex, ByteCount, true);
+            int length = UTFConverter.ConvertUTF16ToUTF8(Stack.Buffer, StartIndex, ByteCount, strictConversion);
             return ByteSlice.Prepare(Stack.Buffer, offset, length);
+        }
+
+        public ByteSlice ToByteSlice()
+        {
+            return ToByteSlice(true);
+        }
+
+        public ByteSlice ToByteSlice(int size, bool strictConversion)
+        {
+            int offset = Stack.CurrentPos;
+            int length = UTFConverter.ConvertUTF16ToUTF8(Stack.Buffer, StartIndex, ByteCount, strictConversion);
+            byte[] buf = ByteSlice.PreparePaddedUTF8Bytes(Stack.Buffer, offset, length, size);
+            return ByteSlice.Prepare(buf, 0, size);
         }
 
         public ByteSlice ToByteSlice(int size)
         {
-            int offset = Stack.CurrentPos;
-            int length = UTFConverter.ConvertUTF16ToUTF8(Stack.Buffer, StartIndex, ByteCount, true);
-            byte[] buf = ByteSlice.PreparePaddedUTF8Bytes(Stack.Buffer, offset, length, size);
-            return ByteSlice.Prepare(buf, 0, size);
+            return ToByteSlice(size, true);
         }
 
         public ByteSlice ToByteSliceUTF16()

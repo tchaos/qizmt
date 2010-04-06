@@ -786,6 +786,37 @@ namespace MySpace.DataMining.DistributedObjects5
                     XLog.errorlog("OnStart Scheduler exception: " + e.ToString());
                 }
 
+                try
+                {
+                    Thread notifythd = new Thread(
+                        new ThreadStart(
+                        delegate
+                        {
+                            DOService_AddTraceThread(null);
+                            System.Threading.Thread.Sleep(1000 * 30);
+                            for (; ; )
+                            {
+                                try
+                                {
+                                    MySpace.DataMining.DistributedObjects.Scheduler.RunNotifierService();
+                                }
+                                catch (Exception queuee)
+                                {
+                                    XLog.errorlog("Exception during notifier service: " + queuee.ToString());
+                                    System.Threading.Thread.Sleep(1000 * 30);
+                                }
+                            }
+                            DOService_RemoveTraceThread(null);
+                        }));
+                    notifythd.Name = "NotifierService";
+                    notifythd.IsBackground = true;
+                    notifythd.Start();
+                }
+                catch (Exception e)
+                {
+                    XLog.errorlog("OnStart Notifier exception: " + e.ToString());
+                }
+
             }
             catch (Exception e)
             {
@@ -827,6 +858,10 @@ namespace MySpace.DataMining.DistributedObjects5
                             {
                                 try
                                 {
+                                    if (string.Compare(fi.Name, "driver.pid", StringComparison.OrdinalIgnoreCase) == 0)
+                                    {
+                                        continue;
+                                    }
                                     // After the wait, these files might not exist anymore, so check.
                                     stoplog.WriteLine("        {0}", fi.Name);
                                     if (fi.Exists)
@@ -878,6 +913,28 @@ namespace MySpace.DataMining.DistributedObjects5
                             procs.AddRange(System.Diagnostics.Process.GetProcessesByName("dspace"));
                             procs.AddRange(System.Diagnostics.Process.GetProcessesByName("qizmt"));
                             procs.AddRange(System.Diagnostics.Process.GetProcessesByName("mrdebug"));
+                            try
+                            {
+                                foreach (System.Diagnostics.Process proc in
+                                    System.Diagnostics.Process.GetProcesses())
+                                {
+                                    try
+                                    {
+                                        string mmname = proc.MainModule.ModuleName;
+                                        if (-1 != mmname.IndexOf("dbg_")
+                                            && -1 != mmname.IndexOf('~'))
+                                        {
+                                            procs.Add(proc);
+                                        }
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                            }
                             foreach (System.Diagnostics.Process proc in procs)
                             {
                                 if (invincibles.Contains(proc.Id))
@@ -1225,7 +1282,15 @@ namespace MySpace.DataMining.DistributedObjects5
             }
             catch (Exception e)
             {
-                XLog.errorlog("pingputthreadproc thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString());
+                string thishost = "NA";
+                try
+                {
+                    thishost = System.Net.Dns.GetHostName();
+                }
+                catch
+                {
+                }
+                XLog.errorlog("pingputthreadproc thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString() + " [on " + thishost + "]");
             }
         }
 
@@ -1265,7 +1330,15 @@ namespace MySpace.DataMining.DistributedObjects5
             }
             catch (Exception e)
             {
-                XLog.errorlog("pingputthreadproc thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString());
+                string thishost = "NA";
+                try
+                {
+                    thishost = System.Net.Dns.GetHostName();
+                }
+                catch
+                {
+                }
+                XLog.errorlog("pingputthreadproc thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString() + " [on " + thishost + "]");
             }
             DistributedObjectsService.DOService_RemoveTraceThread(null);
         }
@@ -1325,8 +1398,16 @@ namespace MySpace.DataMining.DistributedObjects5
             }
             catch (Exception e)
             {
+                string thishost = "NA";
+                try
+                {
+                    thishost = System.Net.Dns.GetHostName();
+                }
+                catch
+                {
+                }
                 //stdoutputthreadproc (char)bch exception: e.ToString()
-                XLog.errorlog("stdoutputthreadproc '" + ((char)bch).ToString() + "' thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString());
+                XLog.errorlog("stdoutputthreadproc '" + ((char)bch).ToString() + "' thread named " + System.Threading.Thread.CurrentThread.Name + " exception: " + e.ToString() + " [on " + thishost + "]");
             }
             DistributedObjectsService.DOService_RemoveTraceThread(null);
         }

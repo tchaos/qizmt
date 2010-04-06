@@ -306,17 +306,43 @@ namespace MySpace.DataMining.AELight
             }
 
             string outputformat = "";
+            string outputdir = null;
+            System.IO.StreamWriter htmloutput = null;
+            int htmlindex = 0;
+            const int htmlcols = 3;
+
             for (int i = 1; i < args.Length; i++)
             {
-                string arg = args[i].ToLower();
+                string arg = args[i];
+                string val = "";
+                {
+                    int ieq = arg.IndexOf('=');
+                    if (-1 != ieq)
+                    {
+                        val = arg.Substring(ieq + 1);
+                        arg = arg.Substring(0, ieq);
+                    }
+                }
+                arg = arg.ToLower();
                 switch (arg)
                 {
                     case "-c":
                     case "-n":
                         outputformat = arg;
                         break;
+                    case "-dir":
+                        outputformat = arg;
+                        outputdir = val;
+                        if (!System.IO.Directory.Exists(outputdir))
+                        {
+                            Console.Error.WriteLine("\"-dir={0}\" directory does not exist", outputdir);
+                            return;
+                        }
+                        htmloutput = new StreamWriter(Path.Combine(outputdir, "Clusters.html"));
+                        htmloutput.WriteLine("<html><style> .c { color: maroon; } </style><table border=\"1\">");
+                        break;
                     default:
-                        Console.Error.WriteLine("Output format argument is invalid.  Try: -c | -n");
+                        Console.Error.WriteLine("Output format argument is invalid.  Try: -c | -n | -dir=<dir>");
                         return;
                 }
             }
@@ -622,9 +648,7 @@ namespace MySpace.DataMining.AELight
                         {
                             try
                             {
-                                dfs xdc = dfs.ReadDfsConfig_unlocked(
-                                    Surrogate.NetworkPathForHost(printsurrogate)
-                                    + @"\" + dfs.DFSXMLNAME);
+                                dfs xdc = dfs.ReadDfsConfig_unlocked(printsurrogate + @"\" + dfs.DFSXMLNAME);
                                 if (xdc.ClusterName != null)
                                 {
                                     Console.WriteLine("[{0}]", xdc.ClusterName);
@@ -662,6 +686,66 @@ namespace MySpace.DataMining.AELight
                             Console.WriteLine(worker);
                         }
                     }
+                    else if (outputformat == "-dir")
+                    {
+                        string cluster = null;
+                        string printsurrogate = Lookup(netPaths, surrogate);
+                        {
+                            try
+                            {
+                                dfs xdc = dfs.ReadDfsConfig_unlocked(printsurrogate + @"\" + dfs.DFSXMLNAME);
+                                if (xdc.ClusterName != null)
+                                {
+                                    cluster = xdc.ClusterName;
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
+                        if (null == cluster)
+                        {
+                            cluster = surrogate.ToUpper();
+                            Console.WriteLine("Cluster with surrogate {0} has no cluster name; writing to {1}.txt", surrogate, cluster);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Cluster named {0} with surrogate {1} found; writing to {2}.txt", cluster, surrogate, cluster);
+                        }
+
+                        using (System.IO.StreamWriter sw = new StreamWriter(Path.Combine(outputdir, cluster + ".txt")))
+                        {
+                            if (0 == (htmlindex % htmlcols))
+                            {
+                                if (0 != htmlindex)
+                                {
+                                    htmloutput.WriteLine("</tr>");
+                                }
+                                htmloutput.WriteLine("<tr>");
+                            }
+                            htmlindex++;
+                            htmloutput.WriteLine("<td valign=\"top\">");
+
+                            sw.WriteLine("#{0}:", cluster);
+                            sw.WriteLine("# Participating surrogate {0}", surrogate);
+
+                            htmloutput.WriteLine("<div class=\"c\">#{0}:</div>", cluster);
+                            htmloutput.WriteLine("<div class=\"c\"># Participating surrogate {0}</div>", surrogate);
+
+                            List<string> workers2 = new List<string>(workers);
+                            workers2.Sort();
+                            foreach (string worker in workers2)
+                            {
+                                sw.WriteLine(worker);
+
+                                htmloutput.WriteLine("<div>{0}</div>", worker);
+                            }
+
+                            htmloutput.WriteLine("</td>");
+
+                        }
+
+                    }
                 }
             }
             
@@ -687,9 +771,7 @@ namespace MySpace.DataMining.AELight
                         {
                             try
                             {
-                                dfs xdc = dfs.ReadDfsConfig_unlocked(
-                                    Surrogate.NetworkPathForHost(printsurrogate)
-                                    + @"\" + dfs.DFSXMLNAME);
+                                dfs xdc = dfs.ReadDfsConfig_unlocked(printsurrogate + @"\" + dfs.DFSXMLNAME);
                                 if (xdc.ClusterName != null)
                                 {
                                     Console.WriteLine("[{0}]", xdc.ClusterName);
@@ -731,13 +813,95 @@ namespace MySpace.DataMining.AELight
                             Console.WriteLine(worker);
                         }
                     }
+                    else if (outputformat == "-dir")
+                    {
+                        string cluster = null;
+                        string printsurrogate = Lookup(netPaths, host);
+                        {
+                            try
+                            {
+                                dfs xdc = dfs.ReadDfsConfig_unlocked(printsurrogate + @"\" + dfs.DFSXMLNAME);
+                                if (xdc.ClusterName != null)
+                                {
+                                    cluster = xdc.ClusterName;
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
+                        if (null == cluster)
+                        {
+                            cluster = host.ToUpper();
+                            Console.WriteLine("Cluster with surrogate {0} has no cluster name; writing to {1}.txt", host, cluster);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Cluster named {0} with surrogate {1} found; writing to {2}.txt", cluster, host, cluster);
+                        }
+
+                        using (System.IO.StreamWriter sw = new StreamWriter(Path.Combine(outputdir, cluster + ".txt")))
+                        {
+                            if (0 == (htmlindex % htmlcols))
+                            {
+                                if (0 != htmlindex)
+                                {
+                                    htmloutput.WriteLine("</tr>");
+                                }
+                                htmloutput.WriteLine("<tr>");
+                            }
+                            htmlindex++;
+                            htmloutput.WriteLine("<td valign=\"top\">");
+
+                            sw.WriteLine("#{0}:", cluster);
+                            sw.WriteLine("# Non-participating surrogate {0}", host);
+
+                            htmloutput.WriteLine("<div class=\"c\">#{0}:</div>", cluster);
+                            htmloutput.WriteLine("<div class=\"c\"># Non-participating surrogate {0}</div>", host);
+
+                            List<string> workers2 = new List<string>(workers);
+                            workers2.Sort();
+                            foreach (string worker in workers2)
+                            {
+                                sw.WriteLine(worker);
+
+                                htmloutput.WriteLine("<div>{0}</div>", worker);
+                            }
+
+                            htmloutput.WriteLine("</td>");
+
+                        }
+
+                    }
                 }
             }
 
-            if (!verbose)
+            if (!verbose && outputdir == null)
             {
                 return;
             }
+
+            System.IO.StreamWriter swfailures = null;
+            if (null != outputdir)
+            {
+                swfailures = new StreamWriter(Path.Combine(outputdir, "Failures.txt"));
+                swfailures.WriteLine("#Failures:");
+
+                if (0 == (htmlindex % htmlcols))
+                {
+                    if (0 != htmlindex)
+                    {
+                        htmloutput.WriteLine("</tr>");
+                    }
+                    htmloutput.WriteLine("<tr>");
+                }
+                htmlindex++;
+                htmloutput.WriteLine("<td valign=\"top\">");
+
+                htmloutput.WriteLine("<div class=\"c\">#Failures:</div>");
+            }
+
+            int numfailures = 0;
 
             Console.ForegroundColor = ConsoleColor.Red;
 
@@ -751,14 +915,30 @@ namespace MySpace.DataMining.AELight
                     string surrogate = pair.Key;
                     List<string> reasons = pair.Value;
 
-                    Console.WriteLine();
-                    Console.WriteLine("Bad meta backup surrogate: {0}", Lookup(netPaths, surrogate));
-                    Console.WriteLine("Reasons:");
-
-                    foreach (string reason in reasons)
+                    if (null != outputdir)
                     {
-                        Console.WriteLine(reason);
+                        swfailures.WriteLine("# Bad meta backup surrogate:");
+                        htmloutput.WriteLine("<div class=\"c\"># Bad meta backup surrogate:</div>");
+                        foreach (string reason in reasons)
+                        {
+                            htmloutput.WriteLine("<div class=\"c\"># &nbsp; {0}</div>", reason);
+                            swfailures.WriteLine("  #   {0}", reason);
+                        }
+                        swfailures.WriteLine(surrogate);
+                        htmloutput.WriteLine("<div>{0}</div>", surrogate);
                     }
+                    if (verbose)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Bad meta backup surrogate: {0}", Lookup(netPaths, surrogate));
+                        Console.WriteLine("Reasons:");
+
+                        foreach (string reason in reasons)
+                        {
+                            Console.WriteLine(reason);
+                        }
+                    }
+                    numfailures++;
                 }
             }
 
@@ -769,8 +949,19 @@ namespace MySpace.DataMining.AELight
 
                 foreach (string host in hs)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine("Inaccessible host: {0}", Lookup(netPaths, host));
+                    if (null != outputdir)
+                    {
+                        swfailures.WriteLine("# Inaccessible host");
+                        htmloutput.WriteLine("<div class=\"c\"># Inaccessible host</div>");
+                        swfailures.WriteLine(host);
+                        htmloutput.WriteLine("<div>{0}</div>", host);
+                    }
+                    if (verbose)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Inaccessible host: {0}", Lookup(netPaths, host));
+                    }
+                    numfailures++;
                 }
             }
 
@@ -781,8 +972,19 @@ namespace MySpace.DataMining.AELight
 
                 foreach (string host in hs)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine("Permission denied host: {0}", Lookup(netPaths, host));
+                    if (null != outputdir)
+                    {
+                        swfailures.WriteLine("# Permission denied host");
+                        htmloutput.WriteLine("<div class=\"c\"># Permission denied host</div>");
+                        swfailures.WriteLine(host);
+                        htmloutput.WriteLine("<div>{0}</div>", host);
+                    }
+                    if (verbose)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Permission denied host: {0}", Lookup(netPaths, host));
+                    }
+                    numfailures++;
                 }
             }
 
@@ -793,8 +995,19 @@ namespace MySpace.DataMining.AELight
 
                 foreach (string host in hs)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine("Uninstalled host: {0}", Lookup(netPaths, host));
+                    if (null != outputdir)
+                    {
+                        swfailures.WriteLine("# Uninstalled host");
+                        htmloutput.WriteLine("<div class=\"c\"># Uninstalled host</div>");
+                        swfailures.WriteLine(host);
+                        htmloutput.WriteLine("<div>{0}</div>", host);
+                    }
+                    if (verbose)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Uninstalled host: {0}", Lookup(netPaths, host));
+                    }
+                    numfailures++;
                 }
             }
 
@@ -810,14 +1023,33 @@ namespace MySpace.DataMining.AELight
                     List<string> os = pair.Value;
                     os.Sort();
 
-                    Console.WriteLine();
-                    Console.WriteLine("Broken surrogate: {0}", Lookup(netPaths, surrogate));
-                    Console.WriteLine("Bad workers:");
-
-                    foreach (string o in os)
+                    if (null != outputdir)
                     {
-                        Console.WriteLine(Lookup(netPaths, o));
+                        swfailures.WriteLine("# Broken surrogate>");
+                        htmloutput.WriteLine("<div class=\"c\"># Broken surrogate</div>");
+                        swfailures.WriteLine(surrogate);
+                        htmloutput.WriteLine("<div>{0}</div>", surrogate);
+                        swfailures.WriteLine("#   Bad workers:");
+                        htmloutput.WriteLine("<div class=\"c\"># &nbsp; Bad workers:</div>");
+
+                        foreach (string o in os)
+                        {
+                            swfailures.WriteLine(Lookup(netPaths, o));
+                            htmloutput.WriteLine("<div>{0}</div>", Lookup(netPaths, o));
+                        }
                     }
+                    if (verbose)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Broken surrogate: {0}", Lookup(netPaths, surrogate));
+                        Console.WriteLine("Bad workers:");
+
+                        foreach (string o in os)
+                        {
+                            Console.WriteLine(Lookup(netPaths, o));
+                        }
+                    }
+                    numfailures++;
                 }
             }
 
@@ -828,16 +1060,55 @@ namespace MySpace.DataMining.AELight
 
                 foreach (string host in hs)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine("Orphaned worker: {0}", Lookup(netPaths, host));
+                    if (null != outputdir)
+                    {
+                        swfailures.WriteLine("# Orphaned worker");
+                        htmloutput.WriteLine("<div class=\"c\"># Orphaned worker</div>");
+                        swfailures.WriteLine(host);
+                        htmloutput.WriteLine("<div>{0}</div>", host);
+                    }
+                    if (verbose)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Orphaned worker: {0}", Lookup(netPaths, host));
+                    }
+                    numfailures++;
                 }
+            }
+
+            if (null != htmloutput)
+            {
+                if (0 == numfailures)
+                {
+                    swfailures.WriteLine("# None");
+                    htmloutput.WriteLine("<div class=\"c\"># None</div>");
+                }
+                htmloutput.WriteLine("</td>"); // For failures.
+
+                int emptycols = htmlcols - (htmlindex % htmlcols);
+                for (int i = 0; i < emptycols; i++)
+                {
+                    htmloutput.WriteLine("<td></td>");
+                    htmlindex++;
+                }
+                if (0 != emptycols)
+                {
+                    htmloutput.WriteLine("</tr>");
+                }
+                htmloutput.WriteLine("</table></html>");
+                swfailures.Close();
+                htmloutput.Close();
             }
 
             Console.ForegroundColor = oldColor;
 
-            Console.WriteLine();
-            Console.WriteLine("clustercheck request start time: {0}", startTime);
-            Console.WriteLine("clustercheck request end time: {0}", DateTime.Now);
+            if (verbose)
+            {
+                Console.WriteLine();
+                Console.WriteLine("clustercheck request start time: {0}", startTime);
+                Console.WriteLine("clustercheck request end time: {0}", DateTime.Now);
+            }
+
         }
 
         private static string GetDriveLetter(string netPath)

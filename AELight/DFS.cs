@@ -5206,6 +5206,7 @@ switch(workerindex)
                                         else if (0 == string.Compare(df.Type, DfsFileTypes.NORMAL, true)
                                             || 0 == string.Compare(df.Type, DfsFileTypes.BINARY_RECT, true))
                                         {
+                                            bool HasSamples = df.RecordLength < 1;
                                             Console.WriteLine("[DFS file information]");
                                             Console.WriteLine("   DFS File: {0}", df.Name);
                                             string shost = "";
@@ -5250,12 +5251,23 @@ switch(workerindex)
                                                     }*/
                                                     try
                                                     {
-                                                        Console.WriteLine("     {0} [{3}] ({1} data; {2} samples)",
-                                                            fn.Name,
-                                                            GetFriendlyByteSize((new System.IO.FileInfo(dfs.MapNodeToNetworkPath(fn))).Length),
-                                                            GetFriendlyByteSize((new System.IO.FileInfo(dfs.MapNodeToNetworkPath(fn, true))).Length),
-                                                            replindex
-                                                            );
+                                                        if (HasSamples)
+                                                        {
+                                                            Console.WriteLine("     {0} [{3}] ({1} data; {2} samples)",
+                                                                fn.Name,
+                                                                GetFriendlyByteSize((new System.IO.FileInfo(dfs.MapNodeToNetworkPath(fn))).Length),
+                                                                GetFriendlyByteSize((new System.IO.FileInfo(dfs.MapNodeToNetworkPath(fn, true))).Length),
+                                                                replindex
+                                                                );
+                                                        }
+                                                        else
+                                                        {
+                                                            Console.WriteLine("     {0} [{2}] ({1} data)",
+                                                                fn.Name,
+                                                                GetFriendlyByteSize((new System.IO.FileInfo(dfs.MapNodeToNetworkPath(fn))).Length),
+                                                                replindex
+                                                                );
+                                                        }
                                                     }
                                                     catch (Exception e)
                                                     {
@@ -5285,6 +5297,7 @@ switch(workerindex)
                                             if (0 == string.Compare(df.Type, DfsFileTypes.NORMAL, true)
                                                 || 0 == string.Compare(df.Type, DfsFileTypes.BINARY_RECT, true))
                                             {
+                                                bool HasSamples = df.RecordLength < 1;
                                                 Console.WriteLine("   DFS File: {0}", df.Name);
                                                 int RecordLength = df.RecordLength;
                                                 if (RecordLength > 0)
@@ -5292,6 +5305,7 @@ switch(workerindex)
                                                     Console.WriteLine("      Record Length: {0}", RecordLength);
                                                 }
                                                 Console.WriteLine("      Size: {0} ({1})", GetFriendlyByteSize(df.Size), df.Size);
+                                                if (HasSamples)
                                                 {
                                                     long samplesize = 0;
                                                     MySpace.DataMining.Threading.ThreadTools<dfs.DfsFile.FileNode>.Parallel(
@@ -5350,12 +5364,15 @@ switch(workerindex)
                                                             catch
                                                             {
                                                             }
-                                                            try
+                                                            if (HasSamples)
                                                             {
-                                                                zsasize += (new System.IO.FileInfo(dfs.MapNodeToNetworkPath(df.Nodes[i], true))).Length;
-                                                            }
-                                                            catch
-                                                            {
+                                                                try
+                                                                {
+                                                                    zsasize += (new System.IO.FileInfo(dfs.MapNodeToNetworkPath(df.Nodes[i], true))).Length;
+                                                                }
+                                                                catch
+                                                                {
+                                                                }
                                                             }
                                                             partsonhosts[key] = value;
                                                             zdsizeonhosts[key] = zdsize;
@@ -5364,10 +5381,20 @@ switch(workerindex)
                                                     }
                                                     foreach (KeyValuePair<string, int> kvp in partsonhosts)
                                                     {
-                                                        Console.WriteLine("        {0} chunks on {1} ({2} data; {3} samples)",
-                                                            kvp.Value, kvp.Key,
-                                                            GetFriendlyByteSize(zdsizeonhosts[kvp.Key]), GetFriendlyByteSize(zsasizeonhosts[kvp.Key])
-                                                            );
+                                                        if (HasSamples)
+                                                        {
+                                                            Console.WriteLine("        {0} chunks on {1} ({2} data; {3} samples)",
+                                                                kvp.Value, kvp.Key,
+                                                                GetFriendlyByteSize(zdsizeonhosts[kvp.Key]), GetFriendlyByteSize(zsasizeonhosts[kvp.Key])
+                                                                );
+                                                        }
+                                                        else
+                                                        {
+                                                            Console.WriteLine("        {0} chunks on {1} ({2} data)",
+                                                                kvp.Value, kvp.Key,
+                                                                GetFriendlyByteSize(zdsizeonhosts[kvp.Key])
+                                                                );
+                                                        }
                                                     }
                                                 }
                                             }

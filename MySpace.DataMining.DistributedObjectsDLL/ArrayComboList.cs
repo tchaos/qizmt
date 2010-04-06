@@ -1090,8 +1090,9 @@ namespace UserMapper
                                 Qizmt_Log(`cooking continues with ` + cooking_cooksremain
                                     + ` more retries (retries=` + _CookRetries.ToString()
                                     + `; timeout=` + _CookTimeout.ToString()
-                                    + `) on ` + System.Net.Dns.GetHostName()
-                                    + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
+                                    + `) worker host name= ` + System.Net.Dns.GetHostName()
+                                    + `; path of file being read= ` + input.Name
+                                    + `; in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                     + Environment.NewLine + e.ToString());
                             }
                         }

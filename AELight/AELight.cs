@@ -151,6 +151,8 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("         Adds a command to the end of the queue");
             Console.WriteLine("    queuekill <QueueID>            Removes the specified Queue Identifier");
             Console.WriteLine("    clearqueue                     Removes all entries from the queue");
+            Console.WriteLine("    pausequeue                     Disables dequeuing from the queue");
+            Console.WriteLine("    unpausequeue                   Enables dequeuing from the queue");
             Console.WriteLine("    schedule command=<value> start=<now|<datetime>> [frequency=<seconds>]");
             Console.WriteLine("         [texceptions=<<datetime>[-<datetime>]>[,...]] ranges when not to run");
             Console.WriteLine("         [wexceptions=<weekday>[,...]] whole weekdays not to run");
@@ -171,6 +173,10 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    copyto <dfsfile> <target-host>");
             Console.WriteLine("           [<target-dfs-filename>] Copy DFS file to another cluster");
             Console.WriteLine("    viewname [-m]                  Display logical name of cluster");
+            Console.WriteLine("    notifyfinish <JobID> <email>   Receive an e-mail when a JobID finishes");
+            Console.WriteLine("    notifykill <NotifyID>          Remove a notification");
+            Console.WriteLine("    clearnotify                    Remove all notifications");
+            Console.WriteLine("    viewnotify                     View outstanding notifications");
         }
 
 
@@ -2405,6 +2411,120 @@ namespace MySpace.DataMining.AELight
             switch (act)
             {
 
+                case "notifyfinish":
+                    {
+                        if (args.Length <= 2)
+                        {
+                            Console.Error.WriteLine("Invalid arguments, expected <jobid> <email>");
+                            SetFailure();
+                            return;
+                        }
+#if DEBUG
+                        bool _dbypass = args[1].StartsWith("+");
+#endif
+                        long WaitOnJID;
+                        if (!long.TryParse(args[1], out WaitOnJID) || WaitOnJID < 1)
+                        {
+                            Console.WriteLine("Invalid JID: {0}", args[1]);
+                            SetFailure();
+                            return;
+                        }
+                        string email = args[2];
+
+#if DEBUG
+                        if (!_dbypass)
+#endif
+                        {
+                            if (!System.IO.File.Exists(WaitOnJID.ToString() + ".jid"))
+                            {
+                                Console.WriteLine("JobID {0} is not running", WaitOnJID);
+                                return;
+                            }
+                        }
+
+                        dfs dc = LoadDfsConfig();
+
+                        if (dc.SMTP == null)
+                        {
+                            Console.Error.WriteLine("The SMTP server must be set before adding notifications");
+                            Console.Error.WriteLine("Use 'clusterconfigupdate SMTP' to set the SMTP server");
+                            SetFailure();
+                            return;
+                        }
+
+                        MySpace.DataMining.DistributedObjects.Scheduler.NotifyInfo.NEntry ne
+                            = MySpace.DataMining.DistributedObjects.Scheduler.AddNotify(WaitOnJID, email, douser);
+
+                        Console.WriteLine("Notify Identifier: {0}", ne.ID);
+                    }
+                    break;
+
+                case "notifykill":
+                case "killnotify":
+                    {
+                        if (args.Length <= 1)
+                        {
+                            Console.Error.WriteLine("Error: expected NID");
+                            SetFailure();
+                            return;
+                        }
+                        string snid = args[1];
+                        long nid;
+                        try
+                        {
+                            nid = long.Parse(snid);
+                            if (nid <= 0)
+                            {
+                                throw new Exception("Must be greater than 0");
+                            }
+                            //snid = nid.ToString(); // Normalize.
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Invalid NID '{0}': {1}", snid, e.Message);
+                            SetFailure();
+                            return;
+                        }
+                        if (!MySpace.DataMining.DistributedObjects.Scheduler.NotifyKill(nid))
+                        {
+                            Console.Error.WriteLine("No such NID: {0}", snid);
+                            SetFailure();
+                            return;
+                        }
+                        Console.WriteLine("Done");
+                    }
+                    break;
+
+                case "clearnotify":
+                    if (args.Length > 1)
+                    {
+                        Console.Error.WriteLine("Invalid arguments");
+                        SetFailure();
+                        return;
+                    }
+                    MySpace.DataMining.DistributedObjects.Scheduler.ClearNotify();
+                    Console.WriteLine("Notifications cleared");
+                    break;
+
+                case "viewnotify":
+                    {
+                        IList<MySpace.DataMining.DistributedObjects.Scheduler.NotifyInfo.NEntry> notify =
+                            MySpace.DataMining.DistributedObjects.Scheduler.GetNotifySnapshot();
+                        if (0 == notify.Count)
+                        {
+                            Console.WriteLine("  None");
+                        }
+                        else
+                        {
+                            foreach (MySpace.DataMining.DistributedObjects.Scheduler.NotifyInfo.NEntry ne in notify)
+                            {
+                                Console.WriteLine("  {0} {1} Waiting on JobID {2} to e-mail {3}",
+                                    ne.ID, ne.UserAdded, ne.WaitOnJID, ne.Email);
+                            }
+                        }
+                    }
+                    break;
+
                 case "enqueue":
                     {
                         MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.QEntry qe;
@@ -2467,6 +2587,18 @@ namespace MySpace.DataMining.AELight
                         MySpace.DataMining.DistributedObjects.Scheduler.ClearQueue();
                         Console.WriteLine("Queue cleared");
                     }
+                    break;
+
+                case "pausequeue":
+                case "queuepause":
+                    MySpace.DataMining.DistributedObjects.Scheduler.PauseQueue(true);
+                    Console.WriteLine("Done");
+                    break;
+
+                case "unpausequeue":
+                case "queueunpause":
+                    MySpace.DataMining.DistributedObjects.Scheduler.PauseQueue(false);
+                    Console.WriteLine("Done");
                     break;
 
                 case "schedule":
@@ -5387,31 +5519,53 @@ namespace MySpace.DataMining.AELight
                                 {
                                     //string host = hosts[si];
                                     string reason = null;
-                                    if (!all) // Only do this here if not -a because it'll be done later in more detail.
                                     {
-                                        foreach (KeyValuePair<string, Surrogate.HealthMethod> plugin in plugins)
-                                        {
-                                            Surrogate.HealthMethod hm = plugin.Value;
-                                            if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
+                                        System.Threading.Thread thd = new System.Threading.Thread(
+                                            new System.Threading.ThreadStart(
+                                            delegate()
                                             {
-                                                reason = null;
-                                            }
-                                            else
+                                                if (!all) // Only do this here if not -a because it'll be done later in more detail.
+                                                {
+                                                    foreach (KeyValuePair<string, Surrogate.HealthMethod> plugin in plugins)
+                                                    {
+                                                        Surrogate.HealthMethod hm = plugin.Value;
+                                                        if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
+                                                        {
+                                                            reason = null;
+                                                        }
+                                                        else
+                                                        {
+                                                            badones++;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+
+                                                if (null == reason)
+                                                {
+                                                    if (Surrogate.IsHealthySlaveMachine(host, out reason))
+                                                    {
+                                                        reason = null;
+                                                    }
+                                                    else
+                                                    {
+                                                        System.Threading.Interlocked.Increment(ref badones);
+                                                    }
+                                                }
+                                            }));
+                                        thd.IsBackground = true;
+                                        thd.Start();
+                                        const int healthtimeoutsecs = 30;
+                                        if (!thd.Join(1000 * healthtimeoutsecs))
+                                        {
+                                            try
                                             {
-                                                badones++;
-                                                break;
+                                                thd.Abort();
                                             }
-                                        }
-                                    }
-                                    if (null == reason)
-                                    {
-                                        if (Surrogate.IsHealthySlaveMachine(host, out reason))
-                                        {
-                                            reason = null;
-                                        }
-                                        else
-                                        {
-                                            badones++;
+                                            catch
+                                            {
+                                            }
+                                            reason = "Timed out (" + healthtimeoutsecs + " seconds)";
                                         }
                                     }
                                     if (reason != null)
@@ -6203,18 +6357,80 @@ namespace MySpace.DataMining.AELight
                     {
                         string xpath = dfs.FixXPath(args[1]);
                         string value = args[2];
+                        bool removing = "-" == value;
                         int nvalues = 0;
+                        string status;
                         using (LockDfsMutex())
                         {
+                            bool needsave = false;
                             System.Xml.XmlDocument xd = new System.Xml.XmlDocument();
                             xd.Load(DFSXMLPATH);
                             System.Xml.XmlNodeList xnl = xd.SelectNodes(xpath);
                             for (int j = 0; j < xnl.Count; j++)
                             {
-                                xnl[j].InnerText = value;
+                                if (removing)
+                                {
+                                    xnl[j].ParentNode.RemoveChild(xnl[j]);
+                                }
+                                else
+                                {
+                                    xnl[j].InnerText = value;
+                                }
                                 nvalues++;
                             }
                             if (nvalues > 0)
+                            {
+                                needsave = true;
+                                if (1 == nvalues)
+                                {
+                                    status = "Value updated";
+                                }
+                                else
+                                {
+                                    status = nvalues.ToString() + " values updated";
+                                }
+                            }
+                            else
+                            {
+                                status = "0 values updated";
+                                if (!removing)
+                                {
+                                    // Attempt to add the value.
+                                    int ilslash = xpath.LastIndexOf('/');
+                                    if (-1 != ilslash && ilslash < xpath.Length - 1)
+                                    {
+                                        string newnodename = xpath.Substring(ilslash + 1);
+                                        xpath = xpath.Substring(0, ilslash);
+                                        xnl = xd.SelectNodes(xpath);
+                                        nvalues = 0;
+                                        for (int j = 0; j < xnl.Count; j++)
+                                        {
+                                            System.Xml.XmlElement xe = xd.CreateElement(newnodename);
+                                            xe.InnerText = value;
+                                            xnl[j].AppendChild(xe);
+                                            nvalues++;
+                                        }
+                                        if (nvalues > 0)
+                                        {
+                                            needsave = true;
+                                            if (1 == nvalues)
+                                            {
+                                                status = "Value added";
+                                            }
+                                            else
+                                            {
+                                                if (nvalues > 0)
+                                                {
+                                                    status = nvalues.ToString() + " values added";
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                            }
+
+                            if (needsave)
                             {
                                 using (System.IO.Stream stm = new System.IO.MemoryStream(Encoding.UTF8.GetBytes(xd.InnerXml)))
                                 {
@@ -6240,17 +6456,11 @@ namespace MySpace.DataMining.AELight
                                         }
                                         UpdateDfsXml(dc);
                                     }
-                                }     
+                                }
                             }
+
                         }
-                        if (1 == nvalues)
-                        {
-                            Console.WriteLine("Value updated");
-                        }
-                        else
-                        {
-                            Console.WriteLine("{0} values updated", nvalues);
-                        }
+                        Console.WriteLine(status);
                     }
                     break;
 
@@ -8397,6 +8607,7 @@ namespace MySpace.DataMining.AELight
                     }
 
                     //Console.WriteLine("Running:");
+                    long LastDequeuedJID = MySpace.DataMining.DistributedObjects.Scheduler.GetLastDequeuedJID();
                     for (int il = 0; il < lines.Length; il++)
                     {
                         int ippp = lines[il].IndexOf("+++");
@@ -8404,18 +8615,23 @@ namespace MySpace.DataMining.AELight
                         {
                             string[] settings = lines[il].Substring(0, ippp).Split(' ');
                             string pssjid = "0";
+                            long psjid;
                             if (settings.Length > 1)
                             {
                                 pssjid = settings[1];
                             }
+                            psjid = long.Parse(pssjid);
                             string ln = lines[il].Substring(ippp + 4);
                             Console.Write("  {0} {1}", pssjid, ln.Replace("drule", "SYSTEM"));
+                            if (psjid == LastDequeuedJID)
+                            {
+                                Console.Write(" <queue>");
+                            }
                             if (ShowStatus)
                             {
                                 bool unk = true;
                                 try
                                 {
-                                    long psjid = long.Parse(pssjid);
                                     pssjid = psjid.ToString(); // Normalize.
                                     if (psjid >= 1)
                                     {
@@ -8470,8 +8686,17 @@ namespace MySpace.DataMining.AELight
 
                     {
                         Console.WriteLine("Queued:");
+                        bool ispaused;
                         IList<MySpace.DataMining.DistributedObjects.Scheduler.ScheduleInfo.QEntry> qs
-                            = MySpace.DataMining.DistributedObjects.Scheduler.GetQueueSnapshot();
+                            = MySpace.DataMining.DistributedObjects.Scheduler.GetQueueSnapshot(out ispaused);
+                        if (ispaused)
+                        {
+                            Console.WriteLine("  un-paused [paused]");
+                        }
+                        else
+                        {
+                            Console.WriteLine("  [un-paused] paused");
+                        }
                         int qsCount = qs.Count;
                         if (qsCount > 0)
                         {

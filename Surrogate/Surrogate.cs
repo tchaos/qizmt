@@ -57,6 +57,9 @@ namespace MySpace.DataMining.AELight
         public string ClusterName = null;
 
 
+        public string SMTP = null;
+
+
         [System.Xml.Serialization.XmlElement("DefaultDebugType")]
         public string DefaultDebugTypeTag = null;
         
