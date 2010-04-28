@@ -54,6 +54,7 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    who                     show who is logged on");
             Console.WriteLine("    history [<count>] [-j]  show command history");
             Console.WriteLine("    killall                 kill all jobs, clean any orphaned intermediate data");
+            Console.WriteLine("    killall xproxy          killall using install credentials");
             //Console.WriteLine("    gen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]    generate random data");
             //Console.WriteLine("    asciigen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]  generate random ASCII");
             //Console.WriteLine("    wordgen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]   random sentence words");
@@ -2411,6 +2412,65 @@ namespace MySpace.DataMining.AELight
             switch (act)
             {
 
+                case "rfileview":
+                    {
+                        if (args.Length <= 1)
+                        {
+                            Console.Error.WriteLine("Invalid arguments, expected <rfilename>");
+                            SetFailure();
+                            return;
+                        }
+                        string rfilename = args[1];
+                        string[] hosts;
+                        if (args.Length > 2)
+                        {
+                            if (args[2].StartsWith("@"))
+                            {
+                                hosts = Surrogate.GetHostsFromFile(args[2].Substring(1));
+                            }
+                            else
+                            {
+                                hosts = args[2].Split(',', ';');
+                            }
+                        }
+                        else
+                        {
+                            dfs dc = LoadDfsConfig();
+                            hosts = dc.Slaves.SlaveList.Split(',', ';');
+                        }
+                        for (int ihost = 0; ihost < hosts.Length; ihost++)
+                        {
+                            string host = hosts[ihost];
+                            Console.WriteLine();
+                            if (ihost > 0)
+                            {
+                                Console.WriteLine("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+                                //Console.WriteLine();
+                            }
+                            try
+                            {
+                                string netfp = Surrogate.NetworkPathForHost(host) + @"\" + rfilename;
+                                if (System.IO.File.Exists(netfp))
+                                {
+                                    string content = System.IO.File.ReadAllText(netfp);
+                                    Console.WriteLine("{0}:", host);
+                                    Console.WriteLine();
+                                    Console.WriteLine(content.Trim());
+                                }
+                                else
+                                {
+                                    Console.WriteLine("File does not exist on host {0}", host);
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                Console.Error.WriteLine("Error from host {0}:", host);
+                                Console.Error.WriteLine(e.ToString());
+                            }
+                        }
+                    }
+                    break;
+
                 case "notifyfinish":
                     {
                         if (args.Length <= 2)
@@ -3142,7 +3202,7 @@ namespace MySpace.DataMining.AELight
                                                     string netpath = Surrogate.NetworkPathForHost(slave);
                                                     {
                                                         // Delete leaked chunks only! Have to check with DFS.xml
-                                                        Dictionary<string, bool> dcnodes = new Dictionary<string, bool>(new Surrogate.CaseInsensitiveEqualityComparer());
+                                                        Dictionary<string, bool> dcnodes = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
                                                         foreach (dfs.DfsFile df in dc.Files)
                                                         {
                                                             for (int ifn = 0; ifn < df.Nodes.Count; ifn++)
@@ -8691,7 +8751,14 @@ namespace MySpace.DataMining.AELight
                             = MySpace.DataMining.DistributedObjects.Scheduler.GetQueueSnapshot(out ispaused);
                         if (ispaused)
                         {
-                            Console.WriteLine("  un-paused [paused]");
+                            if (isdspace)
+                            {
+                                Console.WriteLine("  un-paused \u00012[\u00010paused\u00012]\u00010");
+                            }
+                            else
+                            {
+                                Console.WriteLine("  un-paused [paused]");
+                            }
                         }
                         else
                         {

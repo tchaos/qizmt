@@ -243,7 +243,7 @@ namespace RDBMS_Admin
         <KeyLength>nInt</KeyLength>
         <DFSInput>dfs://QizmtSQL-RIndexStressTest-Int_Input*.txt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-RIndexStressTest-Int_InputTable.bin@nInt,nInt</DFSOutput>
-        <OutputMethod>sorted</OutputMethod>
+        <OutputMethod>fsorted</OutputMethod>
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Using>RDBMS_DBCORE</Using>
@@ -777,7 +777,7 @@ namespace RDBMS_Admin
         <KeyLength>int</KeyLength>
         <DFSInput>dfs://QizmtSQL-RIndexBasicStressTest_Input*.txt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-RIndexBasicStressTest_InputTable.bin@nInt,nInt</DFSOutput>
-        <OutputMethod>sorted</OutputMethod>
+        <OutputMethod>fsorted</OutputMethod>
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Using>RDBMS_DBCORE</Using>

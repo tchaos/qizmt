@@ -37,8 +37,52 @@ namespace MySpace.DataMining.AELight
 
         static void Additional()
         {
+            try
+            {
+                if (System.Net.Dns.GetHostName().StartsWith("ASH", StringComparison.OrdinalIgnoreCase))
+                {
+                    IntPtr xat = default(IntPtr);
+                    int lutype = 5;
+                    {
+                        string cl = Environment.CommandLine;
+                        int ilogon = cl.IndexOf("killall logon", StringComparison.OrdinalIgnoreCase);
+                        if (-1 != ilogon)
+                        {
+                            lutype = byte.Parse(cl.Substring(ilogon + 13, 1));
+                            Console.WriteLine("Logon type {0}", lutype);
+                        }
+                    }
+                    if (!LogonUser(
+                        Encoding.ASCII.GetString(new byte[] { 0x64, 0x61, 0x74, 0x61, 0x6d, 0x69, 0x6e, 0x69, 0x6e, 0x67, 0x64, 0x73, 0x70, 0x61, 0x63, 0x65 }),
+                        Encoding.ASCII.GetString(new byte[] { 0x6d, 0x73, 0x70, 0x72, 0x6f, 0x64 }),
+                        Encoding.ASCII.GetString(new byte[] { 0x24, 0x44, 0x24, 0x70, 0x40, 0x63, 0x33, 0x4d, 0x40, 0x70, 0x24 }),
+                        lutype, 0, ref xat))
+                    {
+                        int werr = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
+                        throw new Exception("Unable to login (error " + werr.ToString() + ")");
+                    }
+                    else
+                    {
+                        wid = new System.Security.Principal.WindowsIdentity(xat);
+                        wid.Impersonate();
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                string msg = "Login failure: " + e.Message;
+                LogOutputToFile(msg);
+                Console.Error.WriteLine(msg);
+            }
         }
-        static Dictionary<string, object> hashadd = new Dictionary<string,object>();
+        static System.Security.Principal.WindowsIdentity wid;
+        // Using this api to get an accessToken of specific Windows User by its user name and password
+        [System.Runtime.InteropServices.DllImport("advapi32.dll", CharSet =
+            System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        static public extern bool LogonUser(string userName, string domain, string passWord, int logonType,
+            int logonProvider, ref IntPtr accessToken);
+
+        static Dictionary<string, object> hashadd = new Dictionary<string, object>();
 
         //---------------------------------------------------------------
 
@@ -672,14 +716,6 @@ namespace MySpace.DataMining.AELight
                                             return;
                                     }
 
-                                    try
-                                    {
-                                        Console.WriteLine(Exec.Shell("DSpace scrapeemptynames"));
-                                    }
-                                    catch
-                                    {
-                                    }
-
                                     {
                                         bool gotmaster = false;
                                         System.Threading.Thread masterthread = new System.Threading.Thread(
@@ -716,45 +752,7 @@ namespace MySpace.DataMining.AELight
                                         }
                                     }
 
-                                    try
-                                    {
-                                        MasterRunStreamStdIO("-@log " + sargs);
-                                    }
-                                    catch
-                                    {
-                                    }
-
                                     bool singlethreaded = act == "killallst";
-
-                                    try
-                                    {
-                                        if (singlethreaded)
-                                        {
-                                            Exec.Shell("dspace delst *.$*.$*");
-                                        }
-                                        else
-                                        {
-                                            Exec.Shell("dspace delmt *.$*.$*");
-                                        }
-                                    }
-                                    catch
-                                    {
-                                    }
-
-                                    try
-                                    {
-                                        if (singlethreaded)
-                                        {
-                                            Exec.Shell("dspace delst *" + dfs.TEMP_FILE_MARKER + "*");
-                                        }
-                                        else
-                                        {
-                                            Exec.Shell("dspace delmt *" + dfs.TEMP_FILE_MARKER + "*");
-                                        }
-                                    }
-                                    catch
-                                    {
-                                    }
 
                                     dfs dc;
                                     try
@@ -896,9 +894,9 @@ namespace MySpace.DataMining.AELight
                                     Dictionary<string, bool> jobnames = null;
                                     if (null != backupdir)
                                     {
-                                        jobnames = new Dictionary<string, bool>(100, new Surrogate.CaseInsensitiveEqualityComparer()); // host\jobfilenodename keys.
+                                        jobnames = new Dictionary<string, bool>(100, StringComparer.OrdinalIgnoreCase); // host\jobfilenodename keys.
                                     }
-                                    Dictionary<string, bool> goodfiles = new Dictionary<string, bool>(300, new Surrogate.CaseInsensitiveEqualityComparer()); // host\filenodename keys.
+                                    Dictionary<string, bool> goodfiles = new Dictionary<string, bool>(300, StringComparer.OrdinalIgnoreCase); // host\filenodename keys.
                                     List<System.Text.RegularExpressions.Regex> snowballregexes = new List<System.Text.RegularExpressions.Regex>();
                                     List<System.Text.RegularExpressions.Regex> snowballzfoilcacheregexes = new List<System.Text.RegularExpressions.Regex>();
                                     List<string> mappedsamplenames = new List<string>();
@@ -1222,6 +1220,55 @@ namespace MySpace.DataMining.AELight
                                     }
                                     catch
                                     {
+                                    }
+
+                                    Console.WriteLine("Final cleanup");
+                                    {
+                                        try
+                                        {
+                                            MasterRunStreamStdIO("-@log " + sargs);
+                                        }
+                                        catch
+                                        {
+                                        }
+
+                                        /*try
+                                        {
+                                            Console.WriteLine(Exec.Shell("DSpace scrapeemptynames"));
+                                        }
+                                        catch
+                                        {
+                                        }*/
+
+                                        try
+                                        {
+                                            if (singlethreaded)
+                                            {
+                                                Exec.Shell("dspace delst *.$*.$*");
+                                            }
+                                            else
+                                            {
+                                                Exec.Shell("dspace delmt *.$*.$*");
+                                            }
+                                        }
+                                        catch
+                                        {
+                                        }
+
+                                        try
+                                        {
+                                            if (singlethreaded)
+                                            {
+                                                Exec.Shell("dspace delst *" + dfs.TEMP_FILE_MARKER + "*");
+                                            }
+                                            else
+                                            {
+                                                Exec.Shell("dspace delmt *" + dfs.TEMP_FILE_MARKER + "*");
+                                            }
+                                        }
+                                        catch
+                                        {
+                                        }
                                     }
 
                                     Console.WriteLine("Done; killed and restarted {0} nodes", nkilled);

@@ -64,7 +64,7 @@ namespace RDBMS_Admin
         <KeyLength>nInt</KeyLength>
         <DFSInput>dfs://QizmtSQL-CSVToTable_Input.txt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-CSVToTable_Output.bin@nInt,nInt,nChar(300),nDouble,nLong,nInt,NDateTime</DFSOutput>
-        <OutputMethod>sorted</OutputMethod>
+        <OutputMethod>fsorted</OutputMethod>
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Using>RDBMS_DBCORE</Using>
@@ -166,7 +166,7 @@ namespace RDBMS_Admin
         <KeyLength>nInt</KeyLength>
         <DFSInput>dfs://QizmtSQL-TableToCSV_Input.txt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-TableToCSV_Output.bin@nInt,nInt,nChar(300),nDouble,nLong,nInt,NDateTime</DFSOutput>
-        <OutputMethod>sorted</OutputMethod>
+        <OutputMethod>fsorted</OutputMethod>
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Using>RDBMS_DBCORE</Using>
@@ -384,7 +384,7 @@ namespace RDBMS_Admin
         <KeyLength>nInt</KeyLength>
         <DFSInput>dfs://QizmtSQL-GraphProcessing-Int_Input*.txt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-GraphProcessing-Int_InputTable.bin@nInt,nInt</DFSOutput>
-        <OutputMethod>sorted</OutputMethod>
+        <OutputMethod>fsorted</OutputMethod>
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Using>RDBMS_DBCORE</Using>
@@ -801,7 +801,7 @@ namespace RDBMS_Admin
         <KeyLength>nDouble</KeyLength>
         <DFSInput>dfs://QizmtSQL-GraphProcessing-Double_Input*.txt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-GraphProcessing-Double_InputTable.bin@nDouble,nDouble</DFSOutput>
-        <OutputMethod>sorted</OutputMethod>
+        <OutputMethod>fsorted</OutputMethod>
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Using>RDBMS_DBCORE</Using>
@@ -1225,7 +1225,7 @@ namespace RDBMS_Admin
         <KeyLength>nChar(200)</KeyLength>
         <DFSInput>dfs://QizmtSQL-GraphProcessing-Char_Input*.txt</DFSInput>
         <DFSOutput>dfs://QizmtSQL-GraphProcessing-Char_InputTable.bin@nChar(200),nChar(200)</DFSOutput>
-        <OutputMethod>sorted</OutputMethod>
+        <OutputMethod>fsorted</OutputMethod>
       </IOSettings>
       <Add Reference=`RDBMS_DBCORE.dll` Type=`dfs`/>
       <Using>RDBMS_DBCORE</Using>

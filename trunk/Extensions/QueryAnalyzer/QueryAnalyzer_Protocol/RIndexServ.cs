@@ -1132,118 +1132,158 @@ namespace QueryAnalyzer_Protocol
             {
                 string _chunkname = chunkname.ToLower();
                 string _indexname = indexname.ToLower();
-                lock (rindexpins)
-                {
-                    if (rindexpins.ContainsKey(_indexname))
-                    {
-                        if (rindexpins[_indexname].ContainsKey(_chunkname))
-                        {
-                            return rindexpins[_indexname][_chunkname];
-                        }
-                    }
-                }
-
-                string chunkfilename;
-                string chunkhosts;
-                string qizmtrootdir;
-                {
-                    int lastdel = chunkname.LastIndexOf(@"\");
-                    chunkfilename = chunkname.Substring(lastdel + 1);
-                    int del = chunkname.IndexOf(@"\", 2);
-                    chunkhosts = chunkname.Substring(2, del - 2);
-                    qizmtrootdir = chunkname.Substring(del + 1, lastdel - del - 1);
-                }
-
                 ChunkRowsData fbuf;
-                System.IO.Stream fs = null;
-                if (failover)
+
+                if (_GetPinnedFileChunk_lower(_chunkname, _indexname, out fbuf))
                 {
-                    fs = new DfsFileNodeStream(chunkhosts, chunkfilename, true, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x1000, qizmtrootdir);
+                    return fbuf;
                 }
-                else
+
+                lock ("RIndex_LoadFileChunk{191CEE36-66C9-4acf-9A5E-122360416E53}")
                 {
-                    fs = new System.IO.FileStream(qizmtrootdir.Replace('$',':') + @"\" + chunkfilename, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x1000);
-                }
-                
-                try
-                {   
-                    long datalength;
+
+                    // Check again in case another thread got in the lock first and loaded it.
+                    if (_GetPinnedFileChunk_lower(_chunkname, _indexname, out fbuf))
                     {
-                        // Skip the dfs-chunk file-header...
-                        int headerlength = 0;
+                        return fbuf;
+                    }
+
+                    string chunkfilename;
+                    string chunkhosts;
+                    string qizmtrootdir;
+                    {
+                        int lastdel = chunkname.LastIndexOf(@"\");
+                        chunkfilename = chunkname.Substring(lastdel + 1);
+                        int del = chunkname.IndexOf(@"\", 2);
+                        chunkhosts = chunkname.Substring(2, del - 2);
+                        qizmtrootdir = chunkname.Substring(del + 1, lastdel - del - 1);
+                    }
+
+                    System.IO.Stream fs = null;
+                    if (failover)
+                    {
+                        fs = new DfsFileNodeStream(chunkhosts, chunkfilename, true, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x1000, qizmtrootdir);
+                    }
+                    else
+                    {
+                        fs = new System.IO.FileStream(qizmtrootdir.Replace('$', ':') + @"\" + chunkfilename, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 0x1000);
+                    }
+
+                    try
+                    {
+                        long datalength;
                         {
-                            if (buffer.Length < 4)
+                            // Skip the dfs-chunk file-header...
+                            int headerlength = 0;
                             {
-                                buffer = new byte[4];
-                            }
-                            if (4 != fs.Read(buffer, 0, 4))
-                            {
-                                throw new Exception("Invalid chunk '" + chunkname + "' for index '" + indexname + "': unable to read chunk file header");
-                            }
-                            {
-                                headerlength = ClientHandler.BytesToInt(buffer, 0);
-                                if (headerlength > 4)
+                                if (buffer.Length < 4)
                                 {
-                                    int hremain = headerlength - 4;
-                                    if (hremain > buffer.Length)
+                                    buffer = new byte[4];
+                                }
+                                if (4 != fs.Read(buffer, 0, 4))
+                                {
+                                    throw new Exception("Invalid chunk '" + chunkname + "' for index '" + indexname + "': unable to read chunk file header");
+                                }
+                                {
+                                    headerlength = ClientHandler.BytesToInt(buffer, 0);
+                                    if (headerlength > 4)
                                     {
-                                        buffer = new byte[hremain];
+                                        int hremain = headerlength - 4;
+                                        if (hremain > buffer.Length)
+                                        {
+                                            buffer = new byte[hremain];
+                                        }
+                                        ClientHandler.StreamReadExact(fs, buffer, hremain);
                                     }
-                                    ClientHandler.StreamReadExact(fs, buffer, hremain);
                                 }
                             }
+                            datalength = fs.Length - headerlength;
                         }
-                        datalength = fs.Length - headerlength;
-                    }
 
-                    {
-                        MySpace.DataMining.Binary.LongByteArray fbufBytes = new MySpace.DataMining.Binary.LongByteArray(datalength);
-                        fbuf = new ChunkRowsData(fbufBytes, rowlength);
-                    }
-
-                    byte[] xbuf = new byte[0x400 * 0x400 * 4];
-                    for (long xoffset = 0; xoffset < datalength; )
-                    {
-                        int read = fs.Read(xbuf, 0, xbuf.Length);
-                        if (read <= 0)
                         {
-                            throw new Exception("Unexpected end-of-file when reading chunk '"
-                                + chunkname + "' of index '"
-                                + indexname + "'; expected "
-                                + (datalength - xoffset).ToString() + " more bytes");
+                            MySpace.DataMining.Binary.LongByteArray fbufBytes = new MySpace.DataMining.Binary.LongByteArray(datalength);
+                            fbuf = new ChunkRowsData(fbufBytes, rowlength);
                         }
-                        for (int ir = 0; ir < read; ir++, xoffset++)
-                        {
-                            fbuf.Bytes[xoffset] = xbuf[ir];
-                        }
-                    }                    
-                }
-                finally
-                {
-                    fs.Close();
-                }                
 
-                if (ispinhash)
-                {
-                    fbuf.MakeHash(keyoffset);
-                }
-
-                if (ispin)
-                {
-                    lock (rindexpins)
-                    {
-                        if (!rindexpins.ContainsKey(_indexname))
+                        byte[] xbuf = new byte[0x400 * 0x400 * 1];
+                        for (long xoffset = 0; xoffset < datalength; )
                         {
-                            rindexpins.Add(_indexname, new Dictionary<string, ChunkRowsData>());
-                        }
-                        if (!rindexpins[_indexname].ContainsKey(_chunkname))
-                        {
-                            rindexpins[_indexname].Add(_chunkname, fbuf);
+                            int read = fs.Read(xbuf, 0, xbuf.Length);
+                            if (read <= 0)
+                            {
+                                throw new Exception("Unexpected end-of-file when reading chunk '"
+                                    + chunkname + "' of index '"
+                                    + indexname + "'; expected "
+                                    + (datalength - xoffset).ToString() + " more bytes");
+                            }
+                            for (int ir = 0; ir < read; ir++, xoffset++)
+                            {
+                                fbuf.Bytes[xoffset] = xbuf[ir];
+                            }
                         }
                     }
+                    finally
+                    {
+                        fs.Close();
+                    }
+
+                    if (ispinhash)
+                    {
+                        fbuf.MakeHash(keyoffset);
+                    }
+
+                    if (ispin)
+                    {
+                        lock (rindexpins)
+                        {
+                            if (!rindexpins.ContainsKey(_indexname))
+                            {
+                                rindexpins.Add(_indexname, new Dictionary<string, ChunkRowsData>());
+                            }
+                            if (!rindexpins[_indexname].ContainsKey(_chunkname))
+                            {
+                                rindexpins[_indexname].Add(_chunkname, fbuf);
+                            }
+                        }
+                    }
+
                 }
 
                 return fbuf;
+            }
+
+            private bool _GetPinnedFileChunk_lower(string chunkname_lower, string indexname_lower, out ChunkRowsData crd)
+            {
+#if DEBUG
+                if (chunkname_lower.ToLower() != chunkname_lower)
+                {
+                    throw new Exception("DEBUG:  _GetPinnedFileChunk_lower: (chunkname_lower.ToLower() != chunkname_lower)");
+                }
+                if (indexname_lower.ToLower() != indexname_lower)
+                {
+                    throw new Exception("DEBUG:  _GetPinnedFileChunk_lower: (indexname_lower.ToLower() != indexname_lower)");
+                }
+#endif
+                lock (rindexpins)
+                {
+                    if (rindexpins.ContainsKey(indexname_lower))
+                    {
+                        if (rindexpins[indexname_lower].ContainsKey(chunkname_lower))
+                        {
+                            crd = rindexpins[indexname_lower][chunkname_lower];
+                            return true;
+                        }
+                    }
+                }
+                crd = new ChunkRowsData();
+                return false;
+            }
+
+            private bool GetPinnedFileChunk(string chunkname, string indexname, out ChunkRowsData crd)
+            {
+                string chunkname_lower = chunkname.ToLower();
+                string indexname_lower = indexname.ToLower();
+                return _GetPinnedFileChunk_lower(chunkname_lower, indexname_lower, out crd);
             }
 
             private int FindChunkIndexFromMasterIndex(string chunkname, List<KeyValuePair<string, byte[]>> mi)
