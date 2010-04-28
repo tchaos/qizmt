@@ -2973,7 +2973,10 @@ public void DSpace_LogResult(string name, bool passed)
                         perslave = goodblockcount / slaves.Length;
                         if ((goodblockcount % slaves.Length) != 0)
                         {
-                            perslave++;
+                            perslave++; // Can cause last machine to get no processes.
+                            Console.Error.WriteLine("Process count for range sort (rsorted, rhashsorted) must be even multiple of machine count");
+                            SetFailure();
+                            return;
                         }
                     }
 #if DEBUG

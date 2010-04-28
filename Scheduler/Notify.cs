@@ -23,22 +23,19 @@ namespace MySpace.DataMining.DistributedObjects
                 }
                 wait = true;
 
-                string clustername = "N/A";
-                string SMTP;
                 {
-                    MySpace.DataMining.AELight.dfs dc =
-                        MySpace.DataMining.AELight.dfs.ReadDfsConfig_unlocked(
-                        MySpace.DataMining.AELight.dfs.DFSXMLNAME);
-                    if (dc.ClusterName != null)
+                    if (!MySpace.DataMining.AELight.dfs.DfsConfigExists(
+                        MySpace.DataMining.AELight.dfs.DFSXMLNAME))
                     {
-                        clustername = dc.ClusterName;
+                        // If not surrogate, wait a lot longer.
+                        // Need to keep this loop in case this machine becomes surrogate.
+                        System.Threading.Thread.Sleep(1000 * 30 * 9);
+                        continue;
                     }
-                    SMTP = dc.SMTP;
                 }
 
                 NotifyInfo ninfo = NotifyInfo.Load();
 
-                if (SMTP != null)
                 {
                     for (int i = 0; i < ninfo.Notify.Count; i++)
                     {
@@ -50,6 +47,22 @@ namespace MySpace.DataMining.DistributedObjects
                             ninfo.Save();
                             try
                             {
+                                string clustername = "N/A";
+                                string SMTP;
+                                {
+                                    MySpace.DataMining.AELight.dfs dc =
+                                        MySpace.DataMining.AELight.dfs.ReadDfsConfig_unlocked(
+                                        MySpace.DataMining.AELight.dfs.DFSXMLNAME);
+                                    if (dc.ClusterName != null)
+                                    {
+                                        clustername = dc.ClusterName;
+                                    }
+                                    SMTP = dc.SMTP;
+                                }
+                                if (null == SMTP)
+                                {
+                                    throw new Exception("SMTP server is null");
+                                }
 
                                 string subject = "Qizmt Notification";
                                 string body;

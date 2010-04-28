@@ -1590,6 +1590,9 @@ namespace MySpace.DataMining.DistributedObjects5
                                     }
                                     int cooking_cooksremain = CookRetries;
                                     string[] files = XContent.ReceiveXString(dllclientStm, buf).Split('\u0001');
+                                    List<string> errors = new List<string>(files.Length);
+                                    const int MAX_SIZE_PER_RECEIVE = 0x400 * 64;
+
                                     //for (int fi = 0; fi < files.Length; fi++)
                                     MyThreadTools<string>.Parallel(
                                         new Action<string>(delegate(string fn)
@@ -1623,58 +1626,199 @@ namespace MySpace.DataMining.DistributedObjects5
                                                 throw new Exception("Error: empty file name");
                                             }
 
-                                            for (; ; ) // Cooking loop.
+                                            bool haserr = false;
+                                            using (System.IO.FileStream fdest = new System.IO.FileStream(destfn, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, 0x1000))
                                             {
-                                                try
+                                                System.IO.FileStream fsource = null;
+                                                byte[] fbuf = new byte[MAX_SIZE_PER_RECEIVE];
+                                                bool cooking_is_read = false;
+                                                bool cooking_is_cooked = false;
+                                                long cooking_pos = 0;
+                                                long prev_cooking_pos = -1;
+                                                int stuckretries = 3;
+                                                int stuckremains = stuckretries;
+
+                                                for (; ; ) //while cooked
                                                 {
-                                                    System.IO.File.Copy(fn, destfn, true); // overwrite=true
-                                                }
-                                                catch (Exception e)
-                                                {
-                                                    bool firstcook = cooking_cooksremain == CookRetries;
-                                                    if (cooking_cooksremain-- <= 0)
+                                                    try
                                                     {
-                                                        throw new System.IO.IOException("cooked too many times (retries="
-                                                            + CookRetries.ToString()
-                                                            + "; timeout=" + CookTimeout.ToString()
-                                                            + ") on " + System.Net.Dns.GetHostName(), e);
+                                                        for (; ; )
+                                                        {
+                                                            //----------------------------COOKING--------------------------------
+                                                            cooking_is_read = true;
+                                                            if (cooking_is_cooked)
+                                                            {
+                                                                cooking_is_cooked = false;
+                                                                fsource.Close();
+                                                                fsource = null;
+                                                                fsource = new System.IO.FileStream(fn, FileMode.Open, FileAccess.Read, FileShare.Read, 0x1000);
+                                                                fsource.Seek(cooking_pos, SeekOrigin.Begin);
+                                                            }
+                                                            //----------------------------COOKING--------------------------------                                                        
+                                                            if (fsource == null)
+                                                            {
+                                                                fsource = new System.IO.FileStream(fn, FileMode.Open, FileAccess.Read, FileShare.Read, 0x1000);
+                                                            }
+                                                            int xread = fsource.Read(fbuf, 0, MAX_SIZE_PER_RECEIVE);
+                                                            cooking_pos += xread;
+                                                            //----------------------------COOKING--------------------------------
+                                                            cooking_is_read = false;
+                                                            //----------------------------COOKING--------------------------------
+                                                            if (xread <= 0)
+                                                            {
+                                                                break;
+                                                            }
+                                                            fdest.Write(fbuf, 0, xread);
+                                                        }
+                                                        break;
                                                     }
-                                                    System.Threading.Thread.Sleep(MyRealRetryTimeout(CookTimeout));
-                                                    if (firstcook)
+                                                    catch (System.IO.FileNotFoundException)
                                                     {
                                                         try
                                                         {
-                                                            XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
-                                                                + "; timeout=" + CookTimeout.ToString()
-                                                                + ") on " + System.Net.Dns.GetHostName()
-                                                                + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                                            XLog.errorlog("File not found=" + fn);
                                                         }
                                                         catch
                                                         {
                                                         }
-                                                    }
-                                                    else
-                                                    {
-                                                        try
+                                                        lock (errors)
                                                         {
-                                                            if ((CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                                            errors.Add(fn);
+                                                        }
+                                                        haserr = true;
+                                                        break;                                                     
+                                                    }
+                                                    catch (Exception e)
+                                                    {                                                       
+                                                        if (!cooking_is_read)
+                                                        {
+                                                            try
                                                             {
-                                                                XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                                                    + " more retries (retries=" + CookRetries.ToString()
+                                                                XLog.errorlog("Non-reading error; file=" + fn
+                                                                    + ";error=" + e.ToString());
+                                                            }
+                                                            catch
+                                                            {
+                                                            }
+                                                            lock (errors)
+                                                            {
+                                                                errors.Add(fn);
+                                                            }
+                                                            haserr = true;
+                                                            break;
+                                                        }
+
+                                                        bool firstcook = cooking_cooksremain == CookRetries;
+                                                        if (cooking_cooksremain-- <= 0)
+                                                        {
+                                                            try
+                                                            {
+                                                                XLog.errorlog("cooked too many times (retries="
+                                                                    + CookRetries.ToString()
                                                                     + "; timeout=" + CookTimeout.ToString()
                                                                     + ") on " + System.Net.Dns.GetHostName()
-                                                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
-                                                                    + Environment.NewLine + e.ToString());
+                                                                    + "; file=" + fn + ";error=" + e.ToString());
+                                                            }
+                                                            catch
+                                                            {
+                                                            }
+                                                            lock (errors)
+                                                            {
+                                                                errors.Add(fn);
+                                                            }
+                                                            haserr = true;
+                                                            break; 
+                                                        }
+
+                                                        bool dosleep = true;
+                                                        
+                                                        //-------------bad sector-----------------                                                        
+                                                        if (prev_cooking_pos != cooking_pos)
+                                                        {
+                                                            prev_cooking_pos = cooking_pos;
+                                                            stuckremains = stuckretries;
+                                                        }
+                                                        else if(cooking_pos > 2) //make sure it is not at the begining of the file.
+                                                        {
+                                                            dosleep = false;
+                                                            if (stuckremains-- <= 0)
+                                                            {
+                                                                try
+                                                                {
+                                                                    XLog.errorlog("Bad sector detected at byte position=" + cooking_pos.ToString()
+                                                                       + "; file=" + fn
+                                                                       + "; worker host=" + System.Net.Dns.GetHostName() + ";error=" + e.ToString());
+                                                                }
+                                                                catch
+                                                                {
+                                                                }
+                                                                lock (errors)
+                                                                {
+                                                                    errors.Add(fn);
+                                                                }
+                                                                haserr = true;
+                                                                break;                                                                
                                                             }
                                                         }
-                                                        catch
+                                                        //-------------bad sector-----------------
+
+                                                        if (dosleep)
                                                         {
+                                                            System.Threading.Thread.Sleep(MyRealRetryTimeout(CookTimeout));
                                                         }
+                                                        
+                                                        if (firstcook)
+                                                        {
+                                                            try
+                                                            {
+                                                                XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
+                                                                    + "; timeout=" + CookTimeout.ToString()
+                                                                    + ") on " + System.Net.Dns.GetHostName()
+                                                                    + "; file=" + fn
+                                                                    + "; cooking_pos=" + cooking_pos.ToString()
+                                                                    + "; prev_cooking_pos=" + prev_cooking_pos.ToString()
+                                                                    + "; stuckremains=" + stuckremains.ToString()
+                                                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
+                                                                    + "; error: " + e.ToString());
+                                                            }
+                                                            catch
+                                                            {
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            try
+                                                            {
+                                                                if ((CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                                                {
+                                                                    XLog.errorlog("cooking continues with " + cooking_cooksremain
+                                                                        + " more retries (retries=" + CookRetries.ToString()
+                                                                        + "; timeout=" + CookTimeout.ToString()
+                                                                        + ") on " + System.Net.Dns.GetHostName()
+                                                                        + "; file=" + fn
+                                                                        + "; cooking_pos=" + cooking_pos.ToString()
+                                                                        + "; prev_cooking_pos=" + prev_cooking_pos.ToString()
+                                                                        + "; stuckremains=" + stuckremains.ToString()
+                                                                        + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
+                                                                        + "; error: " + e.ToString()
+                                                                        + Environment.NewLine + e.ToString());
+                                                                }
+                                                            }
+                                                            catch
+                                                            {
+                                                            }
+                                                        }
+                                                        cooking_is_cooked = true;
+                                                        continue;
                                                     }
-                                                    continue; // !
                                                 }
-                                                break;
                                             }
+                                           
+                                            if (haserr)
+                                            {
+                                                System.IO.File.Delete(destfn);
+                                            }
+                                            
                                             if (eachfeedback)
                                             {
                                                 lock (dllclientStm)
@@ -1682,9 +1826,26 @@ namespace MySpace.DataMining.DistributedObjects5
                                                     dllclientStm.WriteByte((byte)'.');
                                                 }
                                             }
-
                                         }), files);
-                                    dllclientStm.WriteByte((byte)'+');
+
+                                    if (errors.Count > 0)
+                                    {
+                                        dllclientStm.WriteByte((byte)'e');
+                                        StringBuilder sberr = new StringBuilder(1024);
+                                        foreach(string err in errors)
+                                        {
+                                            if(sberr.Length > 0)
+                                            {
+                                                sberr.Append(';');
+                                            }
+                                            sberr.Append(err);
+                                        }
+                                        XContent.SendXContent(dllclientStm, sberr.ToString());
+                                    }
+                                    else
+                                    {
+                                        dllclientStm.WriteByte((byte)'+');
+                                    }                                    
                                 }
                                 catch
                                 {

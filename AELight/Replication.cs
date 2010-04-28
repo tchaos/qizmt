@@ -395,6 +395,8 @@ namespace MySpace.DataMining.AELight
                         }
                     }
 
+                    Dictionary<string, string> pullerrors = new Dictionary<string, string>(slaves.Length);
+
                     // Send these file-pull requests!
                     Random pfrnd = new Random(unchecked(DateTime.Now.Millisecond + System.Threading.Thread.CurrentThread.ManagedThreadId));
                     MySpace.DataMining.Threading.ThreadTools<ReplInfo>.Parallel(
@@ -474,11 +476,19 @@ namespace MySpace.DataMining.AELight
                                     XContent.SendXContent(nstm, opts);
                                     XContent.SendXContent(nstm, spullpaths);
 
-                                    if ('+' != nstm.ReadByte())
+                                    int ib = nstm.ReadByte();
+                                    if (ib == '-')
                                     {
                                         throw new ReplicationException("Host " + ri.host + " did not report a success for bulk file transfer");
                                     }
-
+                                    if (ib == 'e')
+                                    {
+                                        string failedfiles = XContent.ReceiveXString(nstm, opts);
+                                        lock (pullerrors)
+                                        {
+                                            pullerrors[ri.host] = failedfiles;
+                                        }                                        
+                                    }
                                 }
                                 catch (ReplicationException e)
                                 {
@@ -521,6 +531,57 @@ namespace MySpace.DataMining.AELight
 
                     if (anywork)
                     {
+                        if (pullerrors.Count > 0)
+                        {
+                            Console.WriteLine("Replication error:");
+
+                            //get all unique repl file nodes by node name.
+                            Dictionary<string, ReplFileNode> allreplfilenodes = new Dictionary<string, ReplFileNode>();
+                            for(int ri = 0; ri < infos.Count; ri++)
+                            {
+                                foreach (ReplFileNode fn in infos[ri].pullfiles)
+                                {
+                                    string nodename = fn.node.Name.ToLower();
+                                    if (!allreplfilenodes.ContainsKey(nodename))
+                                    {
+                                        allreplfilenodes.Add(nodename, fn);
+                                    }
+                                }
+                            }
+
+                            //removed failed replicated host from filenode.
+                            foreach (KeyValuePair<string, string> pair in pullerrors)
+                            {
+                                string failedhost = pair.Key;
+                                string[] nodenames = pair.Value.Split(';');
+                                foreach (string nodename in nodenames)
+                                {
+                                    int del = nodename.LastIndexOf(@"\");
+                                    string _nodename = nodename.Substring(del + 1).ToLower();
+                                    if (allreplfilenodes.ContainsKey(_nodename))
+                                    {
+                                        ReplFileNode fn = allreplfilenodes[_nodename];
+                                        string[] chosts = fn.node.Host.Split(';');
+                                        string validhosts = "";
+                                        foreach (string chost in chosts)
+                                        {
+                                            if (string.Compare(chost, failedhost, StringComparison.OrdinalIgnoreCase) != 0)
+                                            {
+                                                if (validhosts.Length > 0)
+                                                {
+                                                    validhosts += ';';
+                                                }
+                                                validhosts += chost;
+                                            }
+                                        }
+                                        fn.node.Host = validhosts;
+
+                                        Console.WriteLine("    File: {0}; Part: {1}; Failed Host: {2}", fn.ownerfile, fn.node.Name, failedhost);
+                                    }
+                                }
+                            }
+                        }
+
                         // Perform DFS merge!
                         if (ReplicationDebugVerbose)
                         {
@@ -948,6 +1009,12 @@ namespace MySpace.DataMining.AELight
                     return;
                 }
 
+                int newblockbase = dc.Slaves.SlaveList.Split(';').Length * Surrogate.NumberOfProcessors;
+                int newblockcount = NearestPrimeGE(newblockbase);
+                int newsortedblockcount = newblockbase;
+
+                dc.Blocks.TotalCount = newblockcount;
+                dc.Blocks.SortedTotalCount = newsortedblockcount;
                 UpdateDfsXml(dc);
 
             }
@@ -961,7 +1028,7 @@ namespace MySpace.DataMining.AELight
                         try
                         {
                             string ohnetpath = Surrogate.NetworkPathForHost(oldhost);
-                            System.IO.File.Delete(oldhost + @"\slave.dat");
+                            System.IO.File.Delete(ohnetpath + @"\slave.dat");
                         }
                         catch
                         {
