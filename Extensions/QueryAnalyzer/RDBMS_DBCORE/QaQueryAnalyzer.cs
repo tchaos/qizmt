@@ -383,7 +383,7 @@ namespace RDBMS_DBCORE
                                     {
                                         throw new Exception("Expected )");
                                     }
-                                    bool thisident = (char.IsLetter(slp[0]) || '_' == slp[0]);
+                                    bool thisident = (char.IsLetterOrDigit(slp[0]) || '_' == slp[0]);
                                     if (prevident && thisident)
                                     {
                                         swsb.Append(' ');

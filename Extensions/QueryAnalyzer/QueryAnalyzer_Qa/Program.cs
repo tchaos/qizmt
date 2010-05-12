@@ -11,10 +11,13 @@ namespace RDBMS_qa
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+#if DEBUG
+            AutoConnectAtStartup = (args.Length > 0 && "/c" == args[0]);
+#endif
             try
             {
                 _FixSciLexDLL();
@@ -26,6 +29,11 @@ namespace RDBMS_qa
             }
             Application.Run(new Form1());
         }
+
+
+#if DEBUG
+        internal static bool AutoConnectAtStartup = false;
+#endif
 
 
         static void _FixSciLexDLL()

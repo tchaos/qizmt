@@ -313,7 +313,7 @@
             this.ConnStrOtherBox.Name = "ConnStrOtherBox";
             this.ConnStrOtherBox.Size = new System.Drawing.Size(340, 20);
             this.ConnStrOtherBox.TabIndex = 0;
-            this.ConnStrOtherBox.Text = "Batch Size = 64MB; MR.DFS Block Size = 16MB";
+            this.ConnStrOtherBox.Text = "MR.DFS Block Size = 16MB";
             // 
             // groupBox3
             // 

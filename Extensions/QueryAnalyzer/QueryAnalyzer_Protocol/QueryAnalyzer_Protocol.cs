@@ -863,6 +863,7 @@ namespace QueryAnalyzer_Protocol
         string[] bulkinsertingRowTypes;
         int bulkinsertingOutputRowLength;
 
+        // Note: this is automatic bulk insert, not BEGIN BULKINSERT.
         private bool BulkInsert(string cmd)
         {
             string originalcmd = cmd;
@@ -1245,6 +1246,7 @@ namespace QueryAnalyzer_Protocol
             }
         }
 
+        // Note: this is automatic bulk insert, not BEGIN BULKINSERT.
         private bool FinishBulkInsert()
         {
             if (null != bulkinsertingtable)
@@ -1549,8 +1551,16 @@ namespace QueryAnalyzer_Protocol
 
         }
 
-        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool pinmemory, string keycolumn, bool pinmemoryhash, bool keepvalueorder, string outliermode, int outliermax)
+        void _CreateRIndexNonPartial(string IndexName, string SourceTable, bool updatememoryonly, bool pinmemory, string keycolumn, bool pinmemoryhash, bool keepvalueorder, string outliermode, int outliermax)
         {
+            if (updatememoryonly)
+            {
+                if (!pinmemory)
+                {
+                    throw new Exception("CREATE RINDEX " + IndexName + ": updatememoryonly must be used with pin memory");
+                }
+            }
+
             string systablesfilepath = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\CRI_" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
             //using (GlobalCriticalSection.GetLock_internal("DsQaAdo"))
             {
@@ -1756,6 +1766,9 @@ namespace QueryAnalyzer_Protocol
                 System.Xml.XmlElement xeOrdinal = xi.CreateElement("ordinal");
                 xeOrdinal.InnerText = keyordinal.ToString();
                 xeIndex.AppendChild(xeOrdinal);
+                System.Xml.XmlElement xeUpdatememoryonly = xi.CreateElement("updatememoryonly");
+                xeUpdatememoryonly.InnerText = updatememoryonly ? "1" : "0";
+                xeIndex.AppendChild(xeUpdatememoryonly);
                 System.Xml.XmlElement xePin = xi.CreateElement("pin");
                 xePin.InnerText = pinmemory ? "1" : "0";
                 xeIndex.AppendChild(xePin);
@@ -1871,6 +1884,7 @@ namespace QueryAnalyzer_Protocol
                         throw new Exception("Expected table name for CREATE RINDEX");
                     }
 
+                    bool updatememoryonly = false;
                     bool pinmem = true;
                     bool pinmemhash = true;
                     bool keepvalueorder = false;
@@ -1886,6 +1900,10 @@ namespace QueryAnalyzer_Protocol
                         }
                         switch (nextcmd)
                         {
+                            case "updatememoryonly":
+                                updatememoryonly = true;
+                                break;
+
                             case "pinmemory":
                                 pinmem = true;
                                 pinmemhash = false;
@@ -1931,7 +1949,7 @@ namespace QueryAnalyzer_Protocol
                                 break;
                         }
                     }
-                    _CreateRIndexNonPartial(IndexName, SourceTable, pinmem, keycolumn, pinmemhash, keepvalueorder, outliermode, outliermax);
+                    _CreateRIndexNonPartial(IndexName, SourceTable, updatememoryonly, pinmem, keycolumn, pinmemhash, keepvalueorder, outliermode, outliermax);
                     return true;
                 }
                 else
@@ -2854,6 +2872,9 @@ namespace QueryAnalyzer_Protocol
                             }
                             break;
 
+                        case 'I': // Bulk insert.
+                            break;
+
                         case (byte)'c': //close
                             {
                                 try
@@ -2866,9 +2887,18 @@ namespace QueryAnalyzer_Protocol
                                 }
                                 catch (Exception e)
                                 {
-                                    netstm.WriteByte((byte)'-');
-                                    XContent.SendXContent(netstm, e.ToString());
-                                    throw;
+                                    if (null == DelayedErrorMsg)
+                                    {
+                                        netstm.WriteByte((byte)'-');
+                                        XContent.SendXContent(netstm, e.ToString());
+                                        throw;
+                                    }
+                                    else
+                                    {
+                                        DelayedErrorMsg += Environment.NewLine
+                                            + " --- Error while closing: --- "
+                                            + Environment.NewLine + e.ToString();
+                                    }
                                 }
                                 stop = true;
                                 if (null != DelayedErrorMsg)

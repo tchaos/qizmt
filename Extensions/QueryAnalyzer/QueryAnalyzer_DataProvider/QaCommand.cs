@@ -178,15 +178,17 @@ namespace QueryAnalyzer_DataProvider
                 }
 
                 string[] stmts = cmdText.Split('\0');
-                Dictionary<string, Dictionary<string, BatchInfo>> hostBatches = new Dictionary<string, Dictionary<string, BatchInfo>>(conn.connstr.DataSource.Length, new _CaseInsensitiveEqualityComparer_2664());
-                Dictionary<string, int> chunkInsertCount = new Dictionary<string, int>(conn.connstr.DataSource.Length, new _CaseInsensitiveEqualityComparer_2664());
+                Dictionary<string, Dictionary<string, BatchInfo>> hostBatches = new Dictionary<string, Dictionary<string, BatchInfo>>(conn.connstr.DataSource.Length, StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, int> chunkInsertCount = new Dictionary<string, int>(conn.connstr.DataSource.Length, StringComparer.OrdinalIgnoreCase);
                 foreach (string stmt in stmts)
                 {
                     if (stmt.Trim().Length == 0)
                     {
                         continue;
                     }
-                    if (!RInsert(stmt, hostBatches, stmts.Length, chunkInsertCount) && !RDelete(stmt, hostBatches, stmts.Length))
+                    if (!RInsert(stmt, hostBatches, stmts.Length, chunkInsertCount)
+                        && !RDelete(stmt, hostBatches, stmts.Length)
+                        && !FlushRIndex(stmt, hostBatches, stmts.Length))
                     {
                         throw new Exception("Unknown query: " + stmt);
                     }
@@ -321,6 +323,266 @@ namespace QueryAnalyzer_DataProvider
             }
         }
 
+        class RFlushConn
+        {
+            internal string host;
+            internal System.Net.Sockets.NetworkStream netstm;
+            internal string chunkbasename;
+            internal int counter = 0;
+            internal int[] chunksizes;
+        }
+
+        private bool FlushRIndex(string xcmd, Dictionary<string, Dictionary<string, BatchInfo>> hostBatches, int cmdCount)
+        {
+            string originalcmd = xcmd;
+            if (!(0 == string.Compare("FLUSH", Qa.NextPart(ref xcmd), true)
+                && 0 == string.Compare("RINDEX", Qa.NextPart(ref xcmd), true)))
+            {
+                return false;
+            }
+
+#if DEBUG
+            //System.Diagnostics.Debugger.Launch();
+#endif
+
+            string indexName = Qa.NextPart(ref xcmd).ToLower();
+            if (0 == indexName.Length)
+            {
+                throw new Exception("RIndex name expected");
+            }
+
+            if (0 != string.Compare("TO", Qa.NextPart(ref xcmd), true))
+            {
+                throw new Exception("Expected TO after " + originalcmd);
+            }
+
+            string todfsfile;
+            {
+                string todfsfilesqlstr = Qa.NextPart(ref xcmd);
+                if (0 == todfsfilesqlstr.Length
+                    || '\'' != todfsfilesqlstr[0]
+                    || '\'' != todfsfilesqlstr[todfsfilesqlstr.Length - 1])
+                {
+                    throw new Exception("Expected destination DFS file name string after " + originalcmd);
+                }
+                todfsfile = todfsfilesqlstr.Substring(1, todfsfilesqlstr.Length - 2).Replace("''", "'");
+                if (todfsfile.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                {
+                    todfsfile = todfsfile.Substring(6);
+                }
+            }
+
+            if (cmdCount > 1)
+            {
+                // This is needed because updates haven't been sent yet.
+                throw new Exception("Cannot FLUSH RINDEX within BULKUPDATE");
+            }
+
+            {
+                CheckOkToExecute();
+                conn.islocked = true;
+
+                if (conn.mindexes == null)
+                {
+                    throw new Exception("Master indexes is null.");
+                }
+
+                if (!conn.mindexes.ContainsKey(indexName))
+                {
+                    throw new Exception("Index " + indexName + " is not found in the master indexes.");
+                }
+
+                if (!conn.sysindexes.ContainsKey(indexName))
+                {
+                    throw new Exception("Index " + indexName + " is not found in the sys indexes.");
+                }
+                QaConnection.Index sysindex = conn.sysindexes[indexName];
+
+                {
+                    QaConnection.QaConnectionString xconnstr = conn.connstr;
+                    QaConnection.QaConnectionString.RIndexType xrindextype = xconnstr.RIndex;
+                    if (xrindextype != QaConnection.QaConnectionString.RIndexType.POOLED)
+                    {
+                        throw new Exception("FLUSH RINDEX: cannot flush rindex if rindex is not pooled");
+                    }
+                }
+
+                int RowLength = 0;
+                foreach (QaConnection.Column col in sysindex.Table.Columns)
+                {
+                    RowLength += col.Bytes;
+                }
+
+                List<KeyValuePair<byte[], string>> mi = conn.mindexes[indexName];
+
+                // Indexed by n-th flushed chunk, value is host.
+                List<string> flushedchunks = new List<string>(mi.Count);
+                string somehost = conn.connstr.DataSource[0];
+
+                // Indexed by host is the request of chunk names to be flushed.
+                Dictionary<string, StringBuilder> reqs = new Dictionary<string, StringBuilder>(conn.connstr.DataSource.Length);
+#if DEBUG
+                // Ensuring there's no duplicate chunk names.
+                Dictionary<string, bool> dbgchunknames = new Dictionary<string, bool>(100);
+#endif
+                for (int im = 0; im < mi.Count; im++)
+                {
+                    KeyValuePair<byte[], string> m = mi[im];
+                    string chunkname = m.Value;
+#if DEBUG
+                    if (!chunkname.StartsWith(@"\\"))
+                    {
+                        throw new Exception("DEBUG: chunkinfo expected to start with 2 backslashes");
+                    }
+#endif
+                    int cnsep = chunkname.IndexOf('\\', 2);
+#if DEBUG
+                    if (cnsep <= 2)
+                    {
+                        throw new Exception("DEBUG: name backslash invalid; index " + cnsep);
+                    }
+#endif
+                    string[] chunkhosts = chunkname.Substring(2, cnsep - 2).Split(';');
+                    //string chunknamepart = chunkname.Substring(cnsep + 1);
+#if DEBUG
+                    if (dbgchunknames.ContainsKey(chunkname))
+                    {
+                        throw new Exception("DEBUG: duplicate chunk name found: " + chunkname);
+                    }
+                    dbgchunknames[chunkname] = true;
+#endif
+                    StringBuilder req;
+                    if (!reqs.TryGetValue(chunkhosts[0], out req))
+                    {
+                        req = new StringBuilder(2000);
+                        reqs.Add(chunkhosts[0], req);
+                    }
+                    if (req.Length > 0)
+                    {
+                        req.Append('|');
+                    }
+                    req.Append(chunkname);
+
+                    flushedchunks.Add(chunkhosts[0]);
+
+                    somehost = chunkhosts[0];
+
+                }
+
+                Dictionary<string, RFlushConn> flushes = new Dictionary<string, RFlushConn>(reqs.Count);
+                foreach (KeyValuePair<string, StringBuilder> kvp in reqs)
+                {
+                    string host = kvp.Key;
+                    StringBuilder req = kvp.Value;
+                    RFlushConn rfc = new RFlushConn();
+                    rfc.host = host;
+                    conn.OpenSocketRIndex(host);
+                    rfc.netstm = conn.netstm;
+                    rfc.chunkbasename = "zd.%n.rflush." + Guid.NewGuid() + ".zd";
+                    flushes.Add(host, rfc);
+                    rfc.netstm.WriteByte((byte)'f');
+                    XContent.SendXContent(rfc.netstm, indexName);
+                    XContent.SendXContent(rfc.netstm, rfc.chunkbasename);
+                    XContent.SendXContent(rfc.netstm, req.ToString());
+                }
+
+                // Join.
+                foreach (KeyValuePair<string, RFlushConn> kvp in flushes)
+                {
+                    RFlushConn rfc = kvp.Value;
+                    int ib = rfc.netstm.ReadByte();
+                    if ('+' != ib)
+                    {
+                        if ('-' == ib)
+                        {
+                            string err = null;
+                            try
+                            {
+                                err = XContent.ReceiveXString(rfc.netstm, null);
+                            }
+                            catch
+                            {
+                            }
+                            if (err != null)
+                            {
+                                throw new Exception("Error returned for flush rindex from machine " + rfc.host + ":"
+                                    + Environment.NewLine + err);
+                            }
+                        }
+#if DEBUG
+                        throw new Exception("Remote machine " + rfc.host + " did not return a success signal for flush rindex; (byte)" + ib);
+#else
+                        throw new Exception("Remote machine " + rfc.host + " did not return a success signal for flush rindex");
+#endif
+                    }
+
+                    int buflen;
+                    //rfc.chunkbasename.Replace("%n", 0.ToString());
+                    {
+                        buf = XContent.ReceiveXBytes(rfc.netstm, out buflen, buf);
+                        rfc.chunksizes = new int[buflen / 4];
+                        for (int i = 0; i < rfc.chunksizes.Length; i++)
+                        {
+                            rfc.chunksizes[i] = Utils.BytesToInt(buf, i * 4);
+                        }
+                    }
+                }
+
+                // Lines of "<host> <chunkname> <size>" but <size> must exclude the size of the header.
+                StringBuilder sbbp = new StringBuilder(1000);
+                for (int fi = 0; fi < flushedchunks.Count; fi++)
+                {
+                    string host = flushedchunks[fi];
+                    RFlushConn rfc = flushes[host];
+                    int blockindex = rfc.counter++;
+                    sbbp.AppendFormat("{0} {1} {2}{3}",
+                        host,
+                        rfc.chunkbasename.Replace("%n", blockindex.ToString()),
+                        rfc.chunksizes[blockindex],
+                        Environment.NewLine);
+                }
+
+                {
+                    // Bulk put in one of the protocols.
+                    conn.OpenSocketRIndex(somehost);
+                    conn.netstm.WriteByte((byte)'P');
+                    string todfsfiletype = "rbin@" + RowLength;
+                    XContent.SendXContent(conn.netstm, todfsfile);
+                    XContent.SendXContent(conn.netstm, todfsfiletype);
+                    XContent.SendXContent(conn.netstm, sbbp.ToString());
+                    int ib = conn.netstm.ReadByte();
+                    if ('+' != ib)
+                    {
+                        if ('-' == ib)
+                        {
+                            string err = null;
+                            try
+                            {
+                                err = XContent.ReceiveXString(conn.netstm, null);
+                            }
+                            catch
+                            {
+                            }
+                            if (err != null)
+                            {
+                                throw new Exception("Error returned for flush rindex (bulk put) from machine " + somehost + ":"
+                                    + Environment.NewLine + err);
+                            }
+                        }
+#if DEBUG
+                        throw new Exception("Remote machine " + somehost + " did not return a success signal for flush rindex (bulk put); (byte)" + ib);
+#else
+                        throw new Exception("Remote machine " + somehost + " did not return a success signal for flush rindex (bulk put)");
+#endif
+                    }
+                }
+
+                conn.islocked = false;
+            }
+
+            return true;
+        }
+
         private bool RDelete(string xcmd, Dictionary<string, Dictionary<string, BatchInfo>> hostBatches, int cmdCount)
         {
             string originalcmd = xcmd;
@@ -342,6 +604,16 @@ namespace QueryAnalyzer_DataProvider
             }
          
             QaConnection.Index sysindex = conn.sysindexes[indexName];
+            bool UpdateMemoryOnly = sysindex.UpdateMemoryOnly;
+#if DEBUG
+            if (indexName.EndsWith("UMO"))
+            {
+                if (!UpdateMemoryOnly)
+                {
+                    throw new Exception("DEBUG: *UMO index isn't UpdateMemoryOnly");
+                }
+            }
+#endif
             string keytype = sysindex.Table.Columns[sysindex.Ordinal].Type.ToLower();
             int keylen = sysindex.Table.Columns[sysindex.Ordinal].Bytes;
             if (keytype.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
@@ -447,6 +719,10 @@ namespace QueryAnalyzer_DataProvider
                     string chunkName = mi[result].Value;
                     int del = chunkName.IndexOf(@"\", 2);
                     string[] chunkHosts = chunkName.Substring(2, del - 2).Split(';');
+                    if (UpdateMemoryOnly)
+                    {
+                        chunkHosts = new string[] { chunkHosts[0] };
+                    }
 
                     foreach (string host in chunkHosts)
                     {
@@ -557,11 +833,22 @@ namespace QueryAnalyzer_DataProvider
             }
 
             string keytype = "";
-            int keylen = 0;            
+            int keylen = 0;
+            bool UpdateMemoryOnly = false;
             {
                 QaConnection.Index sysindex = conn.sysindexes[indexName];
                 keytype = sysindex.Table.Columns[sysindex.Ordinal].Type.ToLower();
                 keylen = sysindex.Table.Columns[sysindex.Ordinal].Bytes;
+                UpdateMemoryOnly = sysindex.UpdateMemoryOnly;
+#if DEBUG
+                if (indexName.EndsWith("UMO"))
+                {
+                    if (!UpdateMemoryOnly)
+                    {
+                        throw new Exception("DEBUG: *UMO index isn't UpdateMemoryOnly");
+                    }
+                }
+#endif
                 if (keytype.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
                 {
                     keytype = "char";
@@ -621,6 +908,10 @@ namespace QueryAnalyzer_DataProvider
                     string chunkName = mi[result].Value;
                     int del = chunkName.IndexOf(@"\", 2);
                     string[] chunkHosts = chunkName.Substring(2, del - 2).Split(';');
+                    if (UpdateMemoryOnly)
+                    {
+                        chunkHosts = new string[] { chunkHosts[0] };
+                    }
 
                     if (!chunkInsertCount.ContainsKey(chunkName))
                     {
@@ -636,7 +927,7 @@ namespace QueryAnalyzer_DataProvider
                         Dictionary<string, BatchInfo> chunkBatches = null;
                         if (!hostBatches.ContainsKey(host))
                         {
-                            chunkBatches = new Dictionary<string, BatchInfo>(cmdCount, new _CaseInsensitiveEqualityComparer_2664());
+                            chunkBatches = new Dictionary<string, BatchInfo>(cmdCount, StringComparer.OrdinalIgnoreCase);
                             hostBatches.Add(host, chunkBatches);
                         }
                         else
@@ -673,50 +964,72 @@ namespace QueryAnalyzer_DataProvider
             return true;
         }
 
+        private int TypeToInt(string keytype)
+        {
+            switch (keytype)
+            {
+                case "long": return 1;
+                case "int": return 2;
+                case "double": return 3;
+                case "datetime": return 4;
+                case "char": return 5;
+            }
+            if (keytype.StartsWith("char"))
+            {
+                return 5;
+            }
+            return 0;
+        }
+
         private void ConvertKeyToBinary(string skey, int keylen, string keytype)
+        {
+            ConvertKeyToBinary(Qa.StringSlice.Prepare(skey), keylen, TypeToInt(keytype));
+        }
+
+        private void ConvertKeyToBinary(Qa.StringSlice skey, int keylen, int ikeytype)
         {
             if (buf.Length < keylen)
             {
                 buf = new byte[keylen];
             }
             buf[0] = 0; //is null = false on first byte.
-            switch (keytype)
+            switch (ikeytype)
             {
-                case "long":
+                case 1: // "long"
                     {
-                        long key = Int64.Parse(skey);
+                        long key = Qa.Int64Parse(skey);
                         UInt64 ukey = (ulong)(key + long.MaxValue + 1);
                         Utils.Int64ToBytes((Int64)ukey, buf, 1);
                     }
                     break;
 
-                case "int":
+                case 2: // "int"
                     {
-                        int key = Int32.Parse(skey);
+                        int key = Qa.Int32Parse(skey);
                         uint ukey = (uint)(key + int.MaxValue + 1);
                         Utils.Int32ToBytes((int)ukey, buf, 1);
                     }
                     break;
 
-                case "double":
+                case 3: // "double"
                     {
-                        double key = Double.Parse(skey);
+                        double key = Double.Parse(skey.ToString());
                         Utils.DoubleToBytes(key, buf, 1);
                     }
                     break;
 
-                case "datetime":
+                case 4: // "datetime"
                     {
                         skey = skey.Substring(1, skey.Length - 2);
-                        DateTime key = DateTime.Parse(skey);
+                        DateTime key = DateTime.Parse(skey.ToString());
                         Utils.Int64ToBytes(key.Ticks, buf, 1);
                     }
                     break;
 
-                case "char":
+                case 5: // "char"
                     {
                         skey = skey.Substring(1, skey.Length - 2);
-                        string key = skey.Replace("''", "'");
+                        string key = skey.ToString().Replace("''", "'");
                         byte[] strbuf = System.Text.Encoding.Unicode.GetBytes(key);
                         if (strbuf.Length > keylen - 1)
                         {
@@ -733,7 +1046,7 @@ namespace QueryAnalyzer_DataProvider
                         }
                     }
                     break;
-            }       
+            }
         }
 
         public override int ExecuteNonQuery()
@@ -776,12 +1089,13 @@ namespace QueryAnalyzer_DataProvider
                 {
                     throw new Exception("Master indexes is null.");
                 }
-                string xcmd = cmdText;
-                if (0 == string.Compare("RSELECT", Qa.NextPart(ref xcmd), true) &&
-                    0 == string.Compare("*", Qa.NextPart(ref xcmd), true) &&
-                    0 == string.Compare("FROM", Qa.NextPart(ref xcmd), true))
+                Qa.StringSlice ssxcmd = Qa.StringSlice.Prepare(cmdText);
+                if (0 == Qa.StringSlice.Compare(Qa.SliceNextPart(ref ssxcmd), "RSELECT", StringComparison.OrdinalIgnoreCase)
+                    && 0 == Qa.StringSlice.Compare(Qa.SliceNextPart(ref ssxcmd), "*", StringComparison.OrdinalIgnoreCase)
+                    && 0 == Qa.StringSlice.Compare(Qa.SliceNextPart(ref ssxcmd), "FROM", StringComparison.OrdinalIgnoreCase)
+                    )
                 {
-                    string indexname = Qa.NextPart(ref xcmd).ToLower();
+                    string indexname = Qa.SliceNextPart(ref ssxcmd).ToString().ToLower();
                     if (indexname.Length == 0)
                     {
                         throw new Exception("RSELECT expects an index name.");
@@ -792,12 +1106,12 @@ namespace QueryAnalyzer_DataProvider
                     }
 
                     int samplesize = 0;
-                    string nextarg = Qa.NextPart(ref xcmd);
-                    if (0 == string.Compare("SAMPLE", nextarg, true))
+                    Qa.StringSlice nextarg = Qa.SliceNextPart(ref ssxcmd);
+                    if (0 == Qa.StringSlice.Compare(nextarg, "SAMPLE", StringComparison.OrdinalIgnoreCase))
                     {
                         try
                         {
-                            samplesize = Int32.Parse(Qa.NextPart(ref xcmd));
+                            samplesize = Qa.Int32Parse(Qa.SliceNextPart(ref ssxcmd));
                             if (samplesize <= 0)
                             {
                                 throw new Exception("SAMPLE size expected to be greater than 0.");
@@ -808,16 +1122,17 @@ namespace QueryAnalyzer_DataProvider
                             throw new Exception("SAMPLE size integer expected.");
                         }
 
-                        nextarg = Qa.NextPart(ref xcmd);
+                        nextarg = Qa.SliceNextPart(ref ssxcmd);
                     }
 
-                    if (0 == string.Compare("WHERE", nextarg, true))
+                    if (0 == Qa.StringSlice.Compare(nextarg, "WHERE", StringComparison.OrdinalIgnoreCase))
                     {
                         string keytype = "long";
                         int keylen = 9;
+                        QaConnection.Index sysindex;
                         if (conn.sysindexes.ContainsKey(indexname))
                         {
-                            QaConnection.Index sysindex = conn.sysindexes[indexname];
+                            sysindex = conn.sysindexes[indexname];
                             keytype = sysindex.Table.Columns[sysindex.Ordinal].Type.ToLower();
                             keylen = sysindex.Table.Columns[sysindex.Ordinal].Bytes;
                             if (keytype.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
@@ -825,8 +1140,18 @@ namespace QueryAnalyzer_DataProvider
                                 keytype = "char";
                             }
                         }
+                        else
+                        {
+                            //sysindex = new QaConnection.Index();
+                            throw new Exception("Table not found in sysindexes; must recreate rindex");
+                        }
+                        int ikeytype = TypeToInt(keytype);
 
-                        Dictionary<string, StringBuilder> batches = new Dictionary<string, StringBuilder>(new _CaseInsensitiveEqualityComparer_2664());
+                        Dictionary<string, StringBuilder> batches = new Dictionary<string, StringBuilder>(StringComparer.OrdinalIgnoreCase);
+                        Random rnd = new Random(unchecked(System.DateTime.Now.Millisecond
+                            + System.Diagnostics.Process.GetCurrentProcess().Id
+                            + System.Threading.Thread.CurrentThread.ManagedThreadId
+                            + ssxcmd.Length));
                         char op = 'x';
                         if (buf.Length < keylen)
                         {
@@ -834,26 +1159,25 @@ namespace QueryAnalyzer_DataProvider
                         }
                         for (; ; )
                         {
-                            if (0 == string.Compare("KEY", Qa.NextPart(ref xcmd), true)
-                                && 0 == string.Compare("=", Qa.NextPart(ref xcmd), true))
+                            if (0 == Qa.StringSlice.Compare(Qa.SliceNextPart(ref ssxcmd), "KEY", StringComparison.OrdinalIgnoreCase)
+                                && 0 == Qa.StringSlice.Compare(Qa.SliceNextPart(ref ssxcmd), "=", StringComparison.OrdinalIgnoreCase))
                             {
-                                string skey = Qa.NextPart(ref xcmd);
-                                if (skey == "-")
+                                Qa.StringSlice skey = Qa.SliceNextPart(ref ssxcmd);
+                                if (0 == Qa.StringSlice.Compare(skey, "-"))
                                 {
-                                    string numpart = Qa.NextPart(ref xcmd);
-                                    skey += numpart;
+                                    Qa.StringSlice numpart = Qa.SliceNextPart(ref ssxcmd);
+                                    skey = Qa.StringSlice.Concat(skey, numpart);
                                 }
                                 if (skey.Length == 0)
                                 {
                                     throw new Exception("RSELECT expects a key value of " + keytype + " data type in where clause.");
                                 }
 
-                                ConvertKeyToBinary(skey, keylen, keytype);                          
+                                ConvertKeyToBinary(skey, keylen, ikeytype);                          
 
                                 List<KeyValuePair<byte[], string>> mi = conn.mindexes[indexname];
                                 string chunkname = "";
                                 string host = "";
-                                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
                                 if (mi.Count > 0)
                                 {
                                     int result = -2;
@@ -926,7 +1250,7 @@ namespace QueryAnalyzer_DataProvider
                                 batch.Append('\0');
                                 batch.Append(skey);
 
-                                if (0 == string.Compare("OR", Qa.NextPart(ref xcmd), true))
+                                if (0 == Qa.StringSlice.Compare(Qa.SliceNextPart(ref ssxcmd), "OR", StringComparison.OrdinalIgnoreCase))
                                 {
                                     {
                                         QaConnection.QaConnectionString xconnstr = conn.connstr;
@@ -968,7 +1292,7 @@ namespace QueryAnalyzer_DataProvider
                                             throw new Exception("_ExecuteDbDataReaderRIndex did not receive a success signal from service.");
                                         }
 
-                                        QaDataReader xreader = new QaDataReader(this, conn.netstm);
+                                        QaDataReader xreader = new QaDataReaderRIndex(this, ref sysindex, conn.netstm);
 
                                         xreaders.Add(xreader);
 
@@ -1510,7 +1834,13 @@ namespace QueryAnalyzer_DataProvider
         {
             if (conn != null && conn.State == ConnectionState.Open)
             {
-                conn.Close();
+                try
+                {
+                    conn.Close();
+                }
+                catch
+                {
+                }
             }
         }
 

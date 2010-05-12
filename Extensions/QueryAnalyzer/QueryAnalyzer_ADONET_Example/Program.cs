@@ -17,7 +17,7 @@ namespace QueryAnalyzer_ADONET_Example
             System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
 
             DbConnection conn = fact.CreateConnection();
-            conn.ConnectionString = "Data Source = " + datasource + "; Batch Size = 64MB";
+            conn.ConnectionString = "Data Source = " + datasource;
             conn.Open();
             Console.WriteLine("Data source is set to {0}", datasource);
 

@@ -8,6 +8,7 @@
           <DFSWriter></DFSWriter>
         </DFS_IO>
       </IOSettings>
+      <ForceStandardError/>
       <Remote>
         <![CDATA[
           public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)

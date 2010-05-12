@@ -178,6 +178,9 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    notifykill <NotifyID>          Remove a notification");
             Console.WriteLine("    clearnotify                    Remove all notifications");
             Console.WriteLine("    viewnotify                     View outstanding notifications");
+            Console.WriteLine("    dfscheck [-all]                Confirm all DFS chunks can be fully scanned");
+            Console.WriteLine("    dfscheck <dfsfile|chunkname>   Only scan a particular DFS file or chunk");
+            Console.WriteLine("                                   No jobs should be running");
         }
 
 
@@ -318,7 +321,14 @@ namespace MySpace.DataMining.AELight
                     if (System.IO.File.Exists(np))
                     {
                         string trickle = System.IO.File.ReadAllText(np);
-                        if (-1 != trickle.IndexOf("Thread exception:") || -1 != trickle.IndexOf("ArrayComboList Sub Process exception: "))
+                        if (-1 != trickle.IndexOf("__#ForceStandardError#__"))
+                        {
+                            //throw new Exception("Exception detected from " + hosts[i] + ": " + trickle);
+                            Console.Error.WriteLine("Exception detected from " + hosts[i] + ": " + trickle);
+                            SetFailure();
+                            return;
+                        }
+                        else if (-1 != trickle.IndexOf("Thread exception:") || -1 != trickle.IndexOf("ArrayComboList Sub Process exception: "))
                         {
                             //throw new Exception("Exception detected from " + hosts[i] + ": " + trickle);
                             Console.Error.WriteLine("Exception detected from " + hosts[i] + ": " + trickle);
@@ -328,6 +338,9 @@ namespace MySpace.DataMining.AELight
                         sb.Append(trickle);
                         System.IO.File.Delete(np);
                     }
+                }
+                catch (System.Threading.ThreadAbortException)
+                {
                 }
                 catch
                 {
@@ -1279,13 +1292,7 @@ namespace MySpace.DataMining.AELight
             }
             string[] slaves = dc.Slaves.SlaveList.Split(',', ';');
             return VerifyHostPermissions(slaves);
-        }
-
-        public static bool IsMachinePingable(string host)
-        {
-            string result = Shell("ping " + host + " -n 1");
-            return (result.IndexOf("Reply from ", StringComparison.OrdinalIgnoreCase) != -1);
-        }
+        }        
 
         public static string GetMemoryStatusForHost(string host)
         {
@@ -2411,6 +2418,81 @@ namespace MySpace.DataMining.AELight
             }
             switch (act)
             {
+                case "enablefilescanner":
+                    {
+                        dfs dc = LoadDfsConfig();
+                        if (dc.FileDaemon == null)
+                        {
+                            dc.FileDaemon = new dfs.ConfigFileDaemon();
+                            long allchunkcount = 0;
+                            foreach (dfs.DfsFile df in dc.Files)
+                            {
+                                allchunkcount += df.Nodes.Count;
+                            }
+                            const int OneMin = 1000 * 60;
+                            const int ThreeDays = OneMin * 60 * 24 * 3;
+                            dc.FileDaemon.ScanChunkSleep = (allchunkcount < 1) ? 0 : (int)(ThreeDays / allchunkcount);
+                            if (dc.FileDaemon.ScanChunkSleep < 200)
+                            {
+                                dc.FileDaemon.ScanChunkSleep = 200;
+                            }
+                            if (dc.FileDaemon.ScanChunkSleep > OneMin * 60)
+                            {
+                                dc.FileDaemon.ScanChunkSleep = OneMin * 60;
+                            }
+                            dc.FileDaemon.Enabled = true;
+                        }
+                        UpdateDfsXml(dc);
+                        Console.WriteLine("File scanner is now enabled");
+                        Console.WriteLine("killall must be issued for file scanner changes to take effect");
+                    }
+                    break;
+
+                case "disablefilescanner":
+                    {
+                        dfs dc = LoadDfsConfig();
+                        if (dc.FileDaemon != null)
+                        {
+                            dc.FileDaemon.Enabled = false;
+                            UpdateDfsXml(dc);
+                        }
+                        Console.WriteLine("File scanner is now disabled");
+                        Console.WriteLine("killall must be issued for file scanner changes to take effect");
+                    }
+                    break;
+
+                case "repairlog":
+                    {
+                        try
+                        {
+                            Console.Write(System.IO.File.ReadAllText("filerepairlog.txt"));
+                        }
+                        catch (System.IO.FileNotFoundException)
+                        {
+                            Console.Error.WriteLine("No repair log file found");
+                        }
+                    }
+                    break;
+
+                case "clearrepairlog":
+                    System.IO.File.Delete("filerepairlog.txt");
+                    Console.Write('.');
+                    Console.WriteLine();
+                    break;
+
+                case "dfscheck":
+                case "checkdfs":
+                    DfsCheck(SubArray(args, 1));
+                    break;
+
+                case "dfsfix":
+                case "fixdfs":
+                    DfsFix(SubArray(args, 1));
+                    break;
+
+                case "chkdfs":
+                    ChkDfs(SubArray(args, 1));
+                    break;
 
                 case "rfileview":
                     {
@@ -3582,7 +3664,7 @@ namespace MySpace.DataMining.AELight
                             Console.WriteLine("Cluster name set to {0}", newname);
                         }
                     }
-                    break;
+                    break;               
 
                 case "viewname":
                     {
@@ -5589,7 +5671,7 @@ namespace MySpace.DataMining.AELight
                                                     foreach (KeyValuePair<string, Surrogate.HealthMethod> plugin in plugins)
                                                     {
                                                         Surrogate.HealthMethod hm = plugin.Value;
-                                                        if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
+                                                        if (Surrogate.SafeCallHealthMethod(hm, host, null, out reason))
                                                         {
                                                             reason = null;
                                                         }
@@ -5746,7 +5828,7 @@ namespace MySpace.DataMining.AELight
                                     delegate(string host)
                                     {
                                         string reason;
-                                        if (Surrogate.SafeCallHealthMethod(hm, host, out reason))
+                                        if (Surrogate.SafeCallHealthMethod(hm, host, null, out reason))
                                         {
                                             reason = null;
                                         }
@@ -6981,6 +7063,8 @@ namespace MySpace.DataMining.AELight
                 case "swap":
                 case "fput":
                 case "fget":
+                case "partinfo":
+                case "delchunk":
                     {
                         string dfsarg = args[0];
                         Dfs(dfsarg, SubArray(args, 1));

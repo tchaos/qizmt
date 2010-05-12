@@ -30,6 +30,8 @@
 //#define DEBUG_TESTREDUCECOOKING
 #endif
 
+//#define FAILOVER_TEST
+
 //#define REDUCE_SPLIT_CALLS_GC
 
 using System;
@@ -4158,6 +4160,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
             internal bool _compression = false;
             internal static byte[] openbuf = new byte[32]; // Shared!
+            internal bool _rehash = false;
 
             // Depends on Name being the full file path.
             internal void _open()
@@ -4200,6 +4203,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             throw new NotFiniteNumberException();
                         }
 #endif
+                        if (!_rehash)
                         {
                             // Skip the dfs-chunk file-header...
                             int headerlength = 0;
@@ -4261,7 +4265,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                 XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
                                     + "; timeout=" + acl.CookTimeout.ToString()
                                     + ") on " + System.Net.Dns.GetHostName()
-                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                                    + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod() + " Error: " + e.ToString());
                             }
                             catch
                             {
@@ -4902,29 +4906,32 @@ namespace MySpace.DataMining.DistributedObjects5
                             {
                                 int pipe = xfiles.IndexOf('|');
                                 dfsfiles = xfiles.Substring(0, pipe).Split(';');
-                                string[] xoffsets = xfiles.Substring(pipe + 1).Split(';');
-                                dfsfilenames = new string[xoffsets.Length];
-                                nodesoffsets = new int[xoffsets.Length];
-                                inputrecordlengths = new int[xoffsets.Length];
-                                for (int xi = 0; xi < xoffsets.Length; xi++)
+                                if (pipe + 1 < xfiles.Length)
                                 {
-                                    string xoffset = xoffsets[xi];
-                                    pipe = xoffset.IndexOf('|');
-                                    int offset = Int32.Parse(xoffset.Substring(0, pipe));
-                                    string fname = xoffset.Substring(pipe + 1);
+                                    string[] xoffsets = xfiles.Substring(pipe + 1).Split(';');
+                                    dfsfilenames = new string[xoffsets.Length];
+                                    nodesoffsets = new int[xoffsets.Length];
+                                    inputrecordlengths = new int[xoffsets.Length];
+                                    for (int xi = 0; xi < xoffsets.Length; xi++)
                                     {
-                                        int inreclen = -1;
-                                        int iat = fname.IndexOf('@');
-                                        if (-1 != iat)
+                                        string xoffset = xoffsets[xi];
+                                        pipe = xoffset.IndexOf('|');
+                                        int offset = Int32.Parse(xoffset.Substring(0, pipe));
+                                        string fname = xoffset.Substring(pipe + 1);
                                         {
-                                            inreclen = int.Parse(fname.Substring(iat + 1));
-                                            fname = fname.Substring(0, iat);
+                                            int inreclen = -1;
+                                            int iat = fname.IndexOf('@');
+                                            if (-1 != iat)
+                                            {
+                                                inreclen = int.Parse(fname.Substring(iat + 1));
+                                                fname = fname.Substring(0, iat);
+                                            }
+                                            inputrecordlengths[xi] = inreclen;
                                         }
-                                        inputrecordlengths[xi] = inreclen;
+                                        dfsfilenames[xi] = fname;
+                                        nodesoffsets[xi] = offset;
                                     }
-                                    dfsfilenames[xi] = fname;
-                                    nodesoffsets[xi] = offset;
-                                }
+                                }                                
                             }
                             else
                             {
@@ -4948,6 +4955,12 @@ namespace MySpace.DataMining.DistributedObjects5
                             throw new Exception("Map already called (zmblocks is set)");
                         }
 
+                        bool rehash = false;
+                        {
+                            string srehash = XContent.ReceiveXString(nstm, buf);
+                            rehash = srehash == "1";                           
+                        }
+
                         if (ZMapBlockFileBufferSize < 0)
                         {
                             ZMapBlockFileBufferSize = 0x400 * 400;
@@ -4967,7 +4980,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         for (int i = 0; i < numzmblocks; i++)
                         {
                             zmblocks[i] = new ZMapBlock(this, i, zmapblockbasename);
-                        }
+                        }                        
 
                         if (XLog.logging)
                         {
@@ -5088,9 +5101,9 @@ namespace MySpace.DataMining.DistributedObjects5
                         ACLMapOutput mapoutput = new ACLMapOutput(this);
                         int maxerrors = 10;
                         StaticGlobals.DSpace_Last = false;
-                        int curoffset = 0;
+                        int curoffset = -1;
                         int fi = 0;
-                        if (dfsfiles.Length > 0)
+                        if (nodesoffsets != null)
                         {
                             curoffset = nodesoffsets[fi];
                         }
@@ -5114,8 +5127,9 @@ namespace MySpace.DataMining.DistributedObjects5
                             {
                                 mapinput.Name = dfsfiles[i];
                                 mapinput._compression = compressdfschunks;
+                                mapinput._rehash = rehash;    
                                 mapinput._open(); // Depends on MapInput.Name being the full file path.                              
-                                StaticGlobals.DSpace_InputBytesRemain = (i == dfsfiles.Length - 1 ? mapinput.Stream.Length - mapinput.Stream.Position : Int64.MaxValue);                                
+                                StaticGlobals.DSpace_InputBytesRemain = (i == dfsfiles.Length - 1 ? mapinput.Stream.Length - mapinput.Stream.Position : Int64.MaxValue);
                                 mp.OnMap(mapinput, mapoutput);
                                 mapinput._close();
                             }
@@ -5337,6 +5351,15 @@ namespace MySpace.DataMining.DistributedObjects5
                             }
                             kentries32 = new List<ZBlock.KeyBlockEntry32v>(1);
                         }
+
+#if FAILOVER_TEST
+                        {
+                            while (System.IO.File.Exists(@"c:\temp\failoverslavetest1.txt"))
+                            {
+                                System.Threading.Thread.Sleep(10000);
+                            }                            
+                        }
+#endif
 
 #if ENABLE_TIMING
                         if(XLog.logging)
@@ -5651,22 +5674,36 @@ namespace MySpace.DataMining.DistributedObjects5
                                                     lastxfile = fn;
                                                     try
                                                     {
-                                                        //----------------------------COOKING--------------------------------
-                                                        using (System.IO.FileStream fs = new System.IO.FileStream(fn, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+                                                        //----------------------------COOKING--------------------------------                                                        
                                                         {
-                                                            cooking_stream_is_open = true;
-                                                            System.IO.Stream gzs = fs;
-                                                            if (compresszmaps)
+                                                            System.IO.Stream gzs = null;
+                                                            try
                                                             {
-                                                                //gzs = new System.IO.Compression.GZipStream(gzs, System.IO.Compression.CompressionMode.Decompress);
-                                                                throw new NotSupportedException("ZMapBlocks do not support compression");
+                                                                if (diskcheck == null)
+                                                                {
+                                                                    gzs = new System.IO.FileStream(fn, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
+                                                                }
+                                                                else
+                                                                {
+                                                                    gzs = new MySpace.DataMining.DistributedObjects.FailoverFileStream(fn, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE, diskcheck);
+                                                                }
+                                                                cooking_stream_is_open = true;
+                                                                if (compresszmaps)
+                                                                {
+                                                                    //gzs = new System.IO.Compression.GZipStream(gzs, System.IO.Compression.CompressionMode.Decompress);
+                                                                    throw new NotSupportedException("ZMapBlocks do not support compression");
+                                                                }
+                                                                if (0 != pos)
+                                                                {
+                                                                    gzs.Position = pos;
+                                                                }
+                                                                ZMapStreamToZBlocks_needcooking(gzs, -1, fn, FILE_BUFFER_SIZE, ref pos);
                                                             }
-                                                            if (0 != pos)
+                                                            finally
                                                             {
-                                                                gzs.Position = pos;
-                                                            }
-                                                            ZMapStreamToZBlocks_needcooking(gzs, -1, fn, FILE_BUFFER_SIZE, ref pos);
-                                                        }
+                                                                gzs.Close();
+                                                            }                                                            
+                                                        }                                                        
                                                         //----------------------------COOKING--------------------------------
                                                     }
                                                     catch (Exception e)
@@ -5940,6 +5977,11 @@ namespace MySpace.DataMining.DistributedObjects5
 #if COOK_TEST_ZMapStreamToZBlocks
             int throwon = 2;
 #endif
+
+#if FAILOVER_TEST
+            int failoverteston = 10;
+#endif
+
             //----------------------------COOKING--------------------------------
             bool cooking_is_read = false;
             //----------------------------COOKING--------------------------------
@@ -5979,6 +6021,18 @@ namespace MySpace.DataMining.DistributedObjects5
                     if (throwon > 0 && --throwon == 0)
                     {
                         throw new Exception("COOK_TEST_ZMapStreamToZBlocks");
+                    }
+#endif
+
+#if FAILOVER_TEST
+                    {
+                        if (failoverteston > 0 && --failoverteston == 0)
+                        {
+                            while (System.IO.File.Exists(@"c:\temp\failoverslavetest2.txt"))
+                            {
+                                System.Threading.Thread.Sleep(10000);
+                            }
+                        }                        
                     }
 #endif
                     StreamReadExact(stm, buf, valuelen);

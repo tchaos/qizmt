@@ -23,7 +23,7 @@ namespace RDBMS_qa
         {
             if (ConnectionString.Length == 0)
             {
-                ConnectionString = "Data Source = localhost," + System.Net.Dns.GetHostName() + "; Batch Size = 64MB; MR.DFS Block Size = 16MB";
+                ConnectionString = "Data Source = localhost," + System.Net.Dns.GetHostName() + "; MR.DFS Block Size = 16MB";
             }
             txtConnStr.Text = ConnectionString;
         }

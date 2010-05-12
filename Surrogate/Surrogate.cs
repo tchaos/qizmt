@@ -287,6 +287,15 @@ namespace MySpace.DataMining.AELight
             }
         }
 
+        public class ConfigFileDaemon
+        {
+            public bool Enabled = false;
+            public int ScanChunkSleep = 1000;
+            public int RepairSleep = 1000 * 60 * 60 * 24 * 3 + (1000 * 60 * 60 * 2);
+            public int MaxRepairs = 10;
+        }
+        public ConfigFileDaemon FileDaemon;
+
         public class DfsFile
         {
             public string Name;
@@ -424,6 +433,31 @@ namespace MySpace.DataMining.AELight
                 }
             }
             return df;
+        }
+
+        public DfsFile.FileNode FindFileNode(string nodename, out string ownerfilename)
+        {
+            dfs dc = this;
+            dfs.DfsFile.FileNode fn = null;
+            ownerfilename = null;
+            for (int i = 0; i < dc.Files.Count; i++)
+            {
+                dfs.DfsFile df = dc.Files[i];
+                for (int ni = 0; ni < df.Nodes.Count; ni++)
+                {
+                    if (string.Compare(df.Nodes[ni].Name, nodename, true) == 0)
+                    {
+                        fn = df.Nodes[ni];
+                        ownerfilename = df.Name;
+                        break;
+                    }
+                }
+                if (fn != null)
+                {
+                    break;
+                }
+            }
+            return fn;
         }
 
         public DfsFile Find(string dfspath, string type)
@@ -2032,6 +2066,8 @@ namespace MySpace.DataMining.AELight
 
             public string ExchangeOrder = "shuffle";
 
+            public string ForceStandardError = null;
+
 
             [System.Xml.Serialization.XmlIgnore]
             private int _IntermediateDataAddressing = 0;
@@ -2063,7 +2099,10 @@ namespace MySpace.DataMining.AELight
             public class ComputingConfig
             {
                 public string Mode = "";
-                public string InputOrder = "next";
+                public string MapInputOrder = "next";
+                public int HeartBeatTimeout = 30000;
+                public int HeartBeatRetries = 10;
+                public int HeartBeatExpired = 120000;
             }
 
             public class ConfigIOSettings
@@ -3292,16 +3331,22 @@ namespace MySpace.DataMining.AELight
         /// <param name="host">Host to check</param>
         /// <param name="reason">Why the host is healthy or unhealthy</param>
         /// <returns>bool IsHealthy</returns>
-        public delegate bool HealthMethod(string host, out string reason);
+        public delegate bool HealthMethod(string host, Dictionary<string, int> roguehosts, out string reason);
 
+        public struct HealthPlugin
+        {
+            public HealthMethod Method;
+            public uint StartInteration;
+            public uint ExecutionSkipFactor;
+        }
 
         static readonly char[] _schmTerm = new char[] { '\r', '\n', '\f', '\v', '\0' };
 
-        public static bool SafeCallHealthMethod(HealthMethod hm, string host, out string reason)
+        public static bool SafeCallHealthMethod(HealthMethod hm, string host, Dictionary<string, int> roguehosts, out string reason)
         {
             try
             {
-                bool result = hm(host, out reason);
+                bool result = hm(host, roguehosts, out reason);
                 {
                     reason = reason.Trim();
                     int iterm = reason.IndexOfAny(_schmTerm);

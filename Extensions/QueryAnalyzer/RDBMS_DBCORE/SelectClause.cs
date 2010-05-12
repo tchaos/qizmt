@@ -127,7 +127,8 @@ namespace RDBMS_DBCORE
                         {
                             string xnc = calls;
                             s = Qa.NextPart(ref xnc);
-                            if (0 == s.Length || "," == s || ")" == s)
+                            if (0 == s.Length || "," == s || ")" == s
+                                || 0 == string.Compare(s, "AS", true))
                             {
                                 ci.func = colpart;
                                 ci.args = args;

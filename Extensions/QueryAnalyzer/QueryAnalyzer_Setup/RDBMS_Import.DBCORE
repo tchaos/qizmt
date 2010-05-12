@@ -10,6 +10,7 @@
         <OutputMethod>grouped</OutputMethod>
 		<Setting name="Subprocess_TotalPrime" value="NearPrimeBelowCoreCount" />
       </IOSettings>
+      <ForceStandardError/>
       <DynamicFoil/>
       <IntermediateDataAddressing>64</IntermediateDataAddressing>
       <MapReduce>

@@ -71,6 +71,39 @@ namespace RDBMS_DBCORE_RegressionTests
             }
 
             {
+                Console.WriteLine("Testing DbAggregators_COUNT(with NULL)...");
+
+                DbFunctionArguments[] fargs = new DbFunctionArguments[rowcount];
+                int expected = 0;
+                for (int i = 0; i < fargs.Length; i++)
+                {
+                    int input = rnd.Next(Int32.MinValue, Int32.MaxValue);
+                    List<DbValue> args = new List<DbValue>();
+                    if (1 == i % 8)
+                    {
+                        args.Add(tools.AllocNullValue());
+                    }
+                    else
+                    {
+                        args.Add(tools.AllocValue(input));
+                        expected++;
+                    }
+                    fargs[i] = new DbFunctionArguments(args);
+                }
+                DbValue valOutput = DbAggregators.COUNT(tools, new DbAggregatorArguments(fargs));
+                ByteSlice bs = valOutput.Eval();
+                int output = (int)tools.GetLong(bs);
+                if (expected != output)
+                {
+                    throw new Exception("DbAggregators_COUNT(with NULL) has failed.  Expected result: " + expected.ToString() + ", but received: " + output.ToString());
+                }
+                else
+                {
+                    Console.WriteLine("Expected results received.");
+                }
+            }
+
+            {
                 Console.WriteLine("Testing DbAggregators_COUNT(Int64)...");
 
                 DbFunctionArguments[] fargs = new DbFunctionArguments[rowcount];

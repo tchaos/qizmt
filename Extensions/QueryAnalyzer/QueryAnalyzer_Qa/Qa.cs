@@ -173,7 +173,10 @@ namespace RDBMS_qa
                 _query.StartsWith("rinsert", StringComparison.OrdinalIgnoreCase) ||
                 _query.StartsWith("rdelete", StringComparison.OrdinalIgnoreCase) ||
                 _query.StartsWith("rcreate", StringComparison.OrdinalIgnoreCase) ||
-                _query.StartsWith("rdrop", StringComparison.OrdinalIgnoreCase));            
+                _query.StartsWith("rdrop", StringComparison.OrdinalIgnoreCase) ||
+                (_query.StartsWith("flush", StringComparison.OrdinalIgnoreCase)
+                    && -1 != _query.IndexOf("rindex", StringComparison.OrdinalIgnoreCase))
+                );
         }
 
         private void TSafe(Action act)

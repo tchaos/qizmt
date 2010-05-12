@@ -9,7 +9,77 @@ namespace RDBMS_DBCORE_RegressionTests
     {
         static void Main(string[] args)
         {
+            for (int iarg = 0; iarg < args.Length; iarg++)
+            {
+                if ("-attach" == args[iarg])
+                {
+                    System.Diagnostics.Debugger.Launch();
+                }
+                else if ("-qadebug" == args[iarg])
+                {
+                    //IsQaDebug = true;
+                }
+                else
+                {
+                    //whichtest = args[iarg];
+                }
+            }
+
             List<KeyValuePair<string, bool>> AllTests = new List<KeyValuePair<string, bool>>();
+
+            {
+                string testname = "DbFunctions_ARITHMETIC";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    DbFunctions_ARITHMETIC();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
+                string testname = "DbFunctions_IIF";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    DbFunctions_IIF();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
+
+            {
+                string testname = "DbFunctions_DATEPART";
+                Console.WriteLine("*** Running test {0}...", testname);
+                try
+                {
+                    DbFunctions_DATEPART();
+                    Console.WriteLine("[PASSED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e.ToString());
+                    Console.WriteLine("[FAILED] - {0}", testname);
+                    AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                }
+                Console.WriteLine();
+            }
 
             {
                 string testname = "DbFunctions_CAST";

@@ -1331,7 +1331,7 @@ namespace RemoteExec
             throw new NotSupportedException("Remote.BeforeLoadFullSource");
         }
 
-        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
+        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets, bool rehash)
         {
             throw new NotSupportedException("Remote.DoMapFullSource");
         }
@@ -1346,6 +1346,10 @@ namespace RemoteExec
             throw new NotSupportedException("Remote.GetMapSource");
         }
 
+        public override string GetMapRehashSource(string code, string classname)
+        {
+            throw new NotSupportedException("Remote.GetMapRehashSource");
+        }
 
         public int OutputStartingPoint
         {

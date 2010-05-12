@@ -300,6 +300,7 @@ namespace QueryAnalyzer_DataProvider
                         foreach (System.Xml.XmlNode xnIndex in xnIndexes)
                         {
                             string indName = xnIndex["name"].InnerText;
+                            System.Xml.XmlNode xnUpdatememoryonly = xnIndex.SelectSingleNode("updatememoryonly");
                             System.Xml.XmlElement xePinHash = xnIndex["pinHash"];  
                             System.Xml.XmlElement xeTable = xnIndex["table"];
                             System.Xml.XmlNodeList xnCols = xeTable.SelectNodes("column");
@@ -321,6 +322,7 @@ namespace QueryAnalyzer_DataProvider
                             ind.Name = indName;
                             ind.Ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
                             ind.Table = tab;
+                            ind.UpdateMemoryOnly = (xnUpdatememoryonly != null && xnUpdatememoryonly.InnerText == "1");
                             ind.PinHash = (xePinHash != null && xePinHash.InnerText == "1");
                             ind.Hash = ind.PinHash ? new Position[256 * 256] : null;
                             ind.MaxKey = new byte[tab.Columns[ind.Ordinal].Bytes];
@@ -802,7 +804,7 @@ namespace QueryAnalyzer_DataProvider
                 QaConnectionString cs;
                 cs.ConnectionString = connstr;
                 cs.DataSource = null;
-                cs.BatchSize = 1024 * 1024 * 64;
+                cs.BatchSize = 0;
                 cs.BlockSize = 1024 * 1024 * 16;
                 cs.RIndex = RIndexType.DISABLED;
                 cs.RetryMaxCount = 20;
@@ -974,6 +976,7 @@ namespace QueryAnalyzer_DataProvider
         {
             public string Name;
             public int Ordinal;
+            public bool UpdateMemoryOnly;
             public bool PinHash;
             public Table Table;
             public Position[] Hash;

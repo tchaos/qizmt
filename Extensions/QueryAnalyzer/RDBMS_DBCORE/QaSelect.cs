@@ -26,7 +26,8 @@ namespace RDBMS_DBCORE
             bool WhatFunctions = false;
             bool GroupBy = false;
 
-            List<int> KeyOn = null; // ORDER BY or GROUP BY key info. List of indices in cols, or null.
+            delegate void GetKeyPart(ByteSlice row, List<byte> AppendKeyPart);
+            List<GetKeyPart> KeyOn = null; // ORDER BY or GROUP BY key info. Delegates to get the key, or null.
 
             WhereClause filter = null;
             bool DeleteFromFilter = false; // The WhereClause filter is what to DELETE.
@@ -34,6 +35,23 @@ namespace RDBMS_DBCORE
             List<UpdateField> Updates = null;
 
             List<int> OutputColumnSizes;
+
+
+            void GetKeyPartForColumn(ByteSlice row, int ColIndex, List<byte> AppendKeyPart)
+            {
+                DbColumn ci = cols[ColIndex];
+                int StartOffset = ci.RowOffset;
+                int Size = ci.Type.Size;
+                ByteSlice cval = ByteSlice.Prepare(row, StartOffset, Size);
+                if (ci.Type.Name.StartsWith("char"))
+                {
+                    CellStringToCaseInsensitiveAppend(cval, AppendKeyPart);
+                }
+                else
+                {
+                    cval.AppendTo(AppendKeyPart);
+                }
+            }
 
 
             void ValidateSettings()
@@ -431,7 +449,7 @@ namespace RDBMS_DBCORE
                             op = (iop < aOps.Length) ? aOps[iop++] : "";
                             if (0 == string.Compare(op, "BY", true))
                             {
-                                List<int> xorder = new List<int>();
+                                List<GetKeyPart> xorder = new List<GetKeyPart>();
                                 for (; ; )
                                 {
                                     op = (iop < aOps.Length) ? aOps[iop++] : "";
@@ -440,7 +458,14 @@ namespace RDBMS_DBCORE
                                         throw new Exception("Expected fields for ORDER BY");
                                     }
                                     int ColIndex = IndexOfCol_ensure(op);
-                                    xorder.Add(ColIndex);
+                                    //if (-1 != ColIndex)
+                                    {
+                                        xorder.Add(
+                                            delegate(ByteSlice row, List<byte> AppendKeyPart)
+                                            {
+                                                GetKeyPartForColumn(row, ColIndex, AppendKeyPart);
+                                            });
+                                    }
                                     op = (iop < aOps.Length) ? aOps[iop++] : "";
                                     if ("," != op)
                                     {
@@ -485,7 +510,7 @@ namespace RDBMS_DBCORE
                                 {
                                     throw new Exception("Unexpected use of GROUP BY");
                                 }
-                                List<int> xGROUP = new List<int>();
+                                List<GetKeyPart> xGROUP = new List<GetKeyPart>();
                                 for (; ; )
                                 {
                                     op = (iop < aOps.Length) ? aOps[iop++] : "";
@@ -493,8 +518,100 @@ namespace RDBMS_DBCORE
                                     {
                                         throw new Exception("Expected fields for GROUP BY");
                                     }
-                                    int ColIndex = IndexOfCol_ensure(op);
-                                    xGROUP.Add(ColIndex);
+                                    int ColIndex = IndexOfCol(op);
+                                    if (-1 != ColIndex)
+                                    {
+                                        xGROUP.Add(
+                                            delegate(ByteSlice row, List<byte> AppendKeyPart)
+                                            {
+                                                GetKeyPartForColumn(row, ColIndex, AppendKeyPart);
+                                            });
+                                    }
+                                    else
+                                    {
+                                        string sgroup;
+                                        {
+                                            StringBuilder sbgroup = new StringBuilder();
+                                            sbgroup.Append(op);
+                                            int nparens = 0;
+                                            for (; ; )
+                                            {
+                                                op = (iop < aOps.Length) ? aOps[iop++] : "";
+                                                if (0 == op.Length)
+                                                {
+                                                    if (0 != nparens)
+                                                    {
+                                                        throw new Exception("Expected ) in GROUP BY");
+                                                    }
+                                                    break;
+                                                }
+                                                sbgroup.Append(' ');
+                                                sbgroup.Append(op);
+                                                if ("(" == op)
+                                                {
+                                                    nparens++;
+                                                }
+                                                else if (")" == op)
+                                                {
+                                                    if (nparens > 0)
+                                                    {
+                                                        nparens--;
+                                                    }
+                                                    if (0 == nparens)
+                                                    {
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            sgroup = sbgroup.ToString();
+                                        }
+
+                                        if (null == ftools)
+                                        {
+                                            ftools = new DbFunctionTools();
+                                        }
+                                        SelectClause selgroup = new SelectClause(ftools, cols);
+                                        List<ByteSlice> lrows = new List<ByteSlice>(1);
+                                        int rnbytes = -1;
+
+                                        xGROUP.Add(
+                                            delegate(ByteSlice row, List<byte> AppendKeyPart)
+                                            {
+                                                lrows.Clear();
+                                                lrows.Add(row);
+                                                List<DbValue> lr = selgroup.ProcessSelectPart(sgroup, lrows);
+                                                sgroup = null;
+                                                if (lr.Count == 1)
+                                                {
+                                                    DbType rtype;
+                                                    ByteSlice r = lr[0].Eval(out rtype);
+                                                    if (-1 == rnbytes)
+                                                    {
+                                                        rnbytes = r.Length;
+                                                    }
+                                                    else
+                                                    {
+                                                        if (rnbytes != r.Length)
+                                                        {
+                                                            throw new Exception("GROUP BY evaluation not returning consistent byte count");
+                                                        }
+                                                    }
+                                                    if (rtype.ID == DbTypeID.CHARS)
+                                                    {
+                                                        CellStringToCaseInsensitiveAppend(r, AppendKeyPart);
+                                                    }
+                                                    else
+                                                    {
+                                                        r.AppendTo(AppendKeyPart);
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    throw new Exception("Invalid number of results for GROUP BY evaluation");
+                                                }
+                                            });
+
+                                    }
                                     op = (iop < aOps.Length) ? aOps[iop++] : "";
                                     if ("," != op)
                                     {
@@ -562,19 +679,8 @@ namespace RDBMS_DBCORE
                         orderbuf.Clear();
                         for (int iob = 0; iob < KeyOn.Count; iob++)
                         {
-                            int oi = KeyOn[iob];
-                            DbColumn ci = cols[oi];
-                            int StartOffset = ci.RowOffset;
-                            int Size = ci.Type.Size;
-                            ByteSlice cval = ByteSlice.Prepare(row, StartOffset, Size);
-                            if (ci.Type.Name.StartsWith("char"))
-                            {
-                                CellStringToCaseInsensitiveAppend(cval, orderbuf);
-                            }
-                            else
-                            {
-                                cval.AppendTo(orderbuf);
-                            }
+                            GetKeyPart gkp = KeyOn[iob];
+                            gkp(row, orderbuf);
                         }
 #if DEBUG
                       string KeyOnStringValue = "<not evaluated yet>";
@@ -634,10 +740,29 @@ namespace RDBMS_DBCORE
 
                     if (null == Updates)
                     {
+                        if (null != ftools)
+                        {
+                            ftools.ResetBuffers();
+                        }
+
                         return;
                     }
 
-                    key = row;
+                    if (KeyOn != null)
+                    {
+                        key = row;
+#if DEBUG
+                        throw new Exception("DEBUG:  (!keep) && (KeyOn != null)");
+#endif
+                    }
+                    else
+                    {
+                        // Use default key.
+                        orderbuf.Clear();
+                        Entry.ToBytesAppend(defkey, orderbuf);
+                        key = ByteSlice.Prepare(orderbuf);
+                        defkey = unchecked(defkey + DSpace_ProcessCount);
+                    }
 
                 }
 
@@ -685,6 +810,11 @@ namespace RDBMS_DBCORE
                 }
 
                 output.Add(key, row);
+
+                if (null != ftools)
+                {
+                    ftools.ResetBuffers();
+                }
 
             }
 
