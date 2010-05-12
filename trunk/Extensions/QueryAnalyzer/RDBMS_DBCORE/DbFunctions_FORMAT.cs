@@ -40,8 +40,13 @@ namespace RDBMS_DBCORE
 
             string formatstr = tools.GetString(arg0).ToString();            
             DateTime dt = tools.GetDateTime(arg1);
-           
-            return tools.AllocValue(mstring.Prepare(dt.ToString(formatstr)));
+
+            mstring result = mstring.Prepare(dt.ToString(formatstr));
+            while (result.Length < 80)
+            {
+                result.MAppend('\0');
+            }
+            return tools.AllocValue(result);
         }
     }
 }

@@ -14,7 +14,21 @@ namespace RDBMS_DBCORE
     {
         public static DbValue COUNT(DbFunctionTools tools, DbAggregatorArguments args)
         {
-            return tools.AllocValue((long)args.Length);
+            string AggregatorName = "COUNT";
+
+            long count = 0;
+            for (int iarg = 0; iarg < args.Length; iarg++)
+            {
+                args[iarg].EnsureCount(AggregatorName, 1);
+                DbType arg0type;
+                ByteSlice arg0 = args[iarg][0].Eval(out arg0type);
+                if (Types.IsNullValue(arg0))    //ignore null
+                {
+                    continue;
+                }
+                count++;
+            }
+            return tools.AllocValue(count);
         }
     }
 }

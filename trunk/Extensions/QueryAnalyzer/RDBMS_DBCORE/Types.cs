@@ -227,7 +227,7 @@ namespace RDBMS_DBCORE
                                 {
                                     nparens++;
                                 }
-                                bool thisident = (s.Length > 0 && (char.IsLetter(s[0]) || '_' == s[0]));
+                                bool thisident = (s.Length > 0 && (char.IsLetterOrDigit(s[0]) || '_' == s[0]));
                                 if (prevident && thisident)
                                 {
                                     call.Append(' ');

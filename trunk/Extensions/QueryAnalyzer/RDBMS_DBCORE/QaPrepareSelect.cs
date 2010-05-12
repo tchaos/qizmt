@@ -273,6 +273,13 @@ namespace RDBMS_DBCORE
                 bool distinct = -1 != sOptions.IndexOf("DISTINCT");
                 bool joined = -1 != sOptions.IndexOf("JOINED");
 
+#if DEBUG
+                if (TopCount == 4242)
+                {
+                    System.Diagnostics.Debugger.Launch();
+                }
+#endif
+
                 string SelectWhat = QlArgsUnescape(QlArgsSelectWhat);
                 bool WhatFunctions = -1 != SelectWhat.IndexOf('('); // Select clause has functions (aggregates and/or scalars).
                 if (Order2By)
@@ -1148,6 +1155,7 @@ namespace RDBMS_DBCORE
                             }
                             int extsize = -1;
                             int tsizenarg = -1; // tsize is only the size of this argument (0-based).
+                            int tsizelargestfrom = -1; // tsize is the largest argument starting here (0-based).
                             string funcname = bexpr.Substring(0, ip);
                             if (0 == string.Compare("AVG", funcname, true))
                             {
@@ -1273,6 +1281,78 @@ namespace RDBMS_DBCORE
                             {
                                 extsize = 1 + 9; // DOUBLE
                             }
+                            else if (0 == string.Compare("DATEPART_YEAR", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("DATEPART_MONTH", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("DATEPART_DAY", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("DATEPART_HOUR", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("DATEPART_MINUTE", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("DATEPART_SECOND", funcname, true))
+                            {
+                                extsize = 1 + 4; // INT
+                            }
+                            else if (0 == string.Compare("IIF", funcname, true))
+                            {
+                                tsizelargestfrom = 1;
+                            }
+                            else if (0 == string.Compare("ADD", funcname, true))
+                            {
+                                tsizelargestfrom = 0;
+                            }
+                            else if (0 == string.Compare("SUB", funcname, true))
+                            {
+                                tsizelargestfrom = 0;
+                            }
+                            else if (0 == string.Compare("MUL", funcname, true))
+                            {
+                                tsizelargestfrom = 0;
+                            }
+                            else if (0 == string.Compare("DIV", funcname, true))
+                            {
+                                tsizelargestfrom = 0;
+                            }
+                            else if (0 == string.Compare("MOD", funcname, true))
+                            {
+                                tsizelargestfrom = 0;
+                            }
+                            else if (0 == string.Compare("NULLIF", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("LEFT", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("RIGHT", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("RPAD", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("LPAD", funcname, true))
+                            {
+                                tsizenarg = 0;
+                            }
+                            else if (0 == string.Compare("FORMAT", funcname, true))
+                            {
+                                tsizenarg = 1 + (80 * 2); // CHAR(80)
+                            }
 #if DEBUG
                             else if (0 == string.Compare("CAST", funcname, true))
                             {
@@ -1309,13 +1389,6 @@ namespace RDBMS_DBCORE
                                         {
                                             int astsize;
                                             int aswidth;
-                                            /*{
-                                                string sargwidth;
-                                                DbColumn argcol = GetDbColumn(sube, out sargwidth);
-                                                int argwidth = int.Parse(sargwidth);
-                                                assize = argcol.Type.Size - 1;
-                                                aswidth = argwidth;
-                                            }*/
                                             {
                                                 // Remove "'AS " and "'"
                                                 string sastype = sube.Substring(4, sube.Length - 4 - 1).Replace("''", "'");
@@ -1324,18 +1397,10 @@ namespace RDBMS_DBCORE
                                                 {
                                                     throw new Exception("Unexpedted AS type: " + sastype);
                                                 }
-                                                //if (astype.Size - 1 > assize)
-                                                {
-                                                    astsize = astype.Size - 1;
-                                                }
+                                                astsize = astype.Size;
                                                 int xdw = DisplayWidthFromType(astype);
-                                                //if (xdw > aswidth)
-                                                {
-                                                    aswidth = xdw;
-                                                }
+                                                aswidth = xdw;
                                             }
-                                            //tsize += assize;
-                                            //totdw += aswidth;
                                             tsize = astsize;
                                             totdw = aswidth;
                                             break; // Note: ignores anything after this, but that's OK here for CAST.
@@ -1356,10 +1421,25 @@ namespace RDBMS_DBCORE
                                             throw new Exception("Argument to function cannot be " + argcol.ColumnName + " (Type.Size=0)");
                                         }
 #endif
-                                        if (-1 == tsizenarg || narg == tsizenarg)
+
+                                        if (-1 != tsizelargestfrom)
                                         {
-                                            tsize += argcol.Type.Size - 1;
-                                            totdw += argwidth;
+                                            if (narg >= tsizelargestfrom)
+                                            {
+                                                if (tsize < argcol.Type.Size)
+                                                {
+                                                    tsize = argcol.Type.Size;
+                                                    totdw = argwidth;
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (-1 == tsizenarg || narg == tsizenarg)
+                                            {
+                                                tsize += argcol.Type.Size - 1;
+                                                totdw += argwidth;
+                                            }
                                         }
 
                                     }
@@ -1404,7 +1484,7 @@ namespace RDBMS_DBCORE
                     DbColumn c;
                     c.Type = DbType.Prepare("", 0, DbTypeID.NULL);
                     c.RowOffset = 0;
-                    c.ColumnName = string.Empty;
+                    c.ColumnName = bexpr + "(undefined)";
                     sdw = "0";
                     return c;
                 }

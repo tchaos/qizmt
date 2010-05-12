@@ -386,22 +386,7 @@ namespace QueryAnalyzer_Protocol
                                     }
 
                                     //Query succeeded.
-                                    netstm.WriteByte((byte)'+');
-
-                                    ClientHandler.MyToBytes(columns.Length, buf, 0);
-                                    XContent.SendXContent(netstm, buf, 4);
-
-                                    foreach(Column col in columns)
-                                    {
-                                        XContent.SendXContent(netstm, col.Name);
-                                        XContent.SendXContent(netstm, col.Type.FullName);
-                                        ClientHandler.MyToBytes(col.FrontBytes, buf, 0);
-                                        XContent.SendXContent(netstm, buf, 4);
-                                        ClientHandler.MyToBytes(col.Size, buf, 0);
-                                        XContent.SendXContent(netstm, buf, 4);
-                                        ClientHandler.MyToBytes(col.BackBytes, buf, 0);
-                                        XContent.SendXContent(netstm, buf, 4);
-                                    }                                                                     
+                                    netstm.WriteByte((byte)'+');   
 
                                     //return rows.   
                                     byte[] recordbuf = null;
@@ -923,6 +908,170 @@ namespace QueryAnalyzer_Protocol
                                 }
                                 break;
 
+                            case (byte)'f': // Flush (first replicate only).
+                                try
+                                {
+                                    string indexName = XContent.ReceiveXString(netstm, buf);
+                                    string chunkbasename = XContent.ReceiveXString(netstm, buf);
+                                    string[] chunknames = XContent.ReceiveXString(netstm, buf).Split('|');
+
+                                    Index thisIndex = LoadIndexInfo(indexName);
+                                    byte[] chunksizesbuf = new byte[chunknames.Length * 4]; // Excluding headers.
+                                    int numpinnedchunks = 0;
+                                    for (int ichunk = 0; ichunk < chunknames.Length; ichunk++)
+                                    {
+                                        string chunkname = chunknames[ichunk];
+                                        string chunklocalfp;
+                                        string destchunkfp;
+                                        {
+                                            int cnsep = chunkname.IndexOf('\\', 2);
+#if DEBUG
+                                            if (cnsep <= 2)
+                                            {
+                                                throw new Exception("DEBUG: name backslash invalid; index " + cnsep);
+                                            }
+#endif
+                                            chunklocalfp = chunkname.Substring(cnsep + 1).Replace('$', ':');
+                                            int ilbslash = chunklocalfp.LastIndexOf('\\');
+#if DEBUG
+                                            if (ilbslash == -1)
+                                            {
+                                                throw new Exception("DEBUG:  case 'f': (ilbslash == -1)");
+                                            }
+#endif
+                                            destchunkfp = chunklocalfp.Substring(0, ilbslash + 1)
+                                                + chunkbasename.Replace("%n", ichunk.ToString());
+                                        }
+                                        int chunksize; // Excluding header size.
+                                        ChunkRowsData crd;
+                                        using (System.IO.FileStream fdest = new System.IO.FileStream(destchunkfp,
+                                            System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None))
+                                        {
+                                            {
+                                                // Write chunk header.
+                                                ClientHandler.Int32ToBytes(4, buf, 0);
+                                                fdest.Write(buf, 0, 4);
+                                            }
+                                            if (GetPinnedFileChunk(chunkname, indexName, out crd))
+                                            {
+                                                numpinnedchunks++;
+                                                chunksize = crd.Bytes.Length;
+                                                for (int j = 0; j < chunksize; j++)
+                                                {
+                                                    fdest.WriteByte(crd.Bytes[j]);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                // Copy the file, don't load it all into ChunkRowsData.
+                                                using (System.IO.FileStream fsrc = new System.IO.FileStream(chunklocalfp,
+                                                    System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                                                {
+                                                    // Skip the chunk header.
+                                                    {
+                                                        int headerlength = 0;
+                                                        if (4 != fsrc.Read(buf, 0, 4))
+                                                        {
+                                                            throw new Exception("Unable to read chunk header from " + chunkname);
+                                                        }
+                                                        {
+                                                            headerlength = ClientHandler.BytesToInt(buf, 0);
+                                                            if (headerlength > 4)
+                                                            {
+                                                                int hremain = headerlength - 4;
+                                                                if (hremain > buf.Length)
+                                                                {
+                                                                    buf = new byte[hremain];
+                                                                }
+                                                                ClientHandler.StreamReadExact(fsrc, buf, hremain);
+                                                            }
+                                                        }
+                                                    }
+                                                    {
+                                                        chunksize = 0;
+                                                        for (; ; )
+                                                        {
+                                                            int read = fsrc.Read(buf, 0, buf.Length);
+                                                            if (read < 1)
+                                                            {
+                                                                break;
+                                                            }
+                                                            fdest.Write(buf, 0, read);
+                                                            chunksize += read;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        ClientHandler.Int32ToBytes(chunksize, chunksizesbuf, ichunk * 4);
+                                    }
+
+                                    netstm.WriteByte((byte)'+');
+                                    XContent.SendXContent(netstm, chunksizesbuf, chunksizesbuf.Length);
+                                }
+                                catch(Exception e)
+                                {
+                                    try
+                                    {
+                                        netstm.WriteByte((byte)'-');
+                                        XContent.SendXContent(netstm, "RIndexServ flush error: " + e.ToString());
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    throw;
+                                }
+                                break;
+
+                            case (byte)'P': // Bulk put.
+                                try
+                                {
+
+#if DEBUG
+                                    //System.Diagnostics.Debugger.Launch();
+#endif
+
+                                    string todfsfile = XContent.ReceiveXString(netstm, buf);
+                                    if (todfsfile.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        todfsfile = todfsfile.Substring(6);
+                                    }
+                                    string todfsfiletype = XContent.ReceiveXString(netstm, buf);
+                                    string bp = XContent.ReceiveXString(netstm, buf);
+                                    string putinfofile = QueryAnalyzer_Protocol.CurrentDirNetPath + @"\RIndexServBP_"
+                                        + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '-');
+                                    System.IO.File.WriteAllText(putinfofile, bp);
+                                    try
+                                    {
+                                        Exec.Shell(QueryAnalyzer_Protocol.dspaceexe + " bulkput \"" + putinfofile + "\" \"" + todfsfile + "\" \"" + todfsfiletype + "\"");
+
+                                        netstm.WriteByte((byte)'+');
+                                    }
+                                    finally
+                                    {
+                                        try
+                                        {
+                                            System.IO.File.Delete(putinfofile);
+                                        }
+                                        catch
+                                        {
+                                        }
+                                    }
+                                }
+                                catch (Exception e)
+                                {
+                                    try
+                                    {
+                                        netstm.WriteByte((byte)'-');
+                                        XContent.SendXContent(netstm, "RIndexServ bulk put error: " + e.ToString());
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    throw;
+                                }
+                                break;
+
                             case (byte)'c': // Close.
                                 stop = true;
                                 netstm.WriteByte((byte)'+');
@@ -1377,6 +1526,7 @@ namespace QueryAnalyzer_Protocol
             {
                 public string Name;
                 public int Ordinal;
+                public bool UpdateMemoryOnly;
                 public bool PinHash;
                 public bool PinMemory;
                 public Table Table;
@@ -1386,6 +1536,130 @@ namespace QueryAnalyzer_Protocol
                 public int RowLength;
                 public string OutlierMode;
                 public int OutlierMax;
+            }
+
+            internal static Index LoadIndexInfo(string indexName)
+            {
+                string sysindexesfn = "sys.indexes";
+                if (System.IO.File.Exists(sysindexesfn))
+                {
+                    bool updatememoryonly = false;
+                    bool ispin = false;
+                    bool ispinhash = false;
+                    string tableName = "";
+                    string keydatatype = "long";
+                    int keylen = 9;
+                    int keyoffset = 0;
+                    int rowlen = 9 * 3;
+
+                    Column[] columns = null;
+                    System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
+                    xi.Load(sysindexesfn);
+                    System.Xml.XmlNodeList xnIndexes = xi.SelectNodes("/indexes/index");
+                    foreach (System.Xml.XmlNode xnIndex in xnIndexes)
+                    {
+                        if (string.Compare(indexName, xnIndex["name"].InnerText, true) == 0)
+                        {
+                            int ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
+                            System.Xml.XmlNode xnUpdatememoryonly = xnIndex.SelectSingleNode("updatememoryonly");
+                            if (null != xnUpdatememoryonly)
+                            {
+                                updatememoryonly = (xnUpdatememoryonly.InnerText == "1");
+                            }
+#if DEBUG
+                            if (indexName.EndsWith("UMO"))
+                            {
+                                if (!updatememoryonly)
+                                {
+                                    throw new Exception("DEBUG: *UMO index isn't UpdateMemoryOnly");
+                                }
+                            }
+#endif
+                            System.Xml.XmlNode xnPin = xnIndex.SelectSingleNode("pin");
+                            ispin = (xnPin.InnerText == "1");
+                            System.Xml.XmlNode xnPinHash = xnIndex.SelectSingleNode("pinHash");
+                            ispinhash = (xnPinHash != null && xnPinHash.InnerText == "1");
+                            System.Xml.XmlNode xnTable = xnIndex.SelectSingleNode("table");
+                            tableName = xnTable["name"].InnerText;
+                            System.Xml.XmlNodeList xnCols = xnTable.SelectNodes("column");
+                            columns = new Column[xnCols.Count];
+                            rowlen = 0;
+                            for (int ci = 0; ci < xnCols.Count; ci++)
+                            {
+                                System.Xml.XmlNode xnCol = xnCols[ci];
+                                int colBytes = Int32.Parse(xnCol["bytes"].InnerText);
+                                string colType = xnCol["type"].InnerText.ToLower();
+                                if (colType.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    colType = "char";
+                                }
+                                if (ci == ordinal)
+                                {
+                                    keydatatype = colType;
+                                    keylen = colBytes;
+                                }
+                                else if (ci < ordinal)
+                                {
+                                    keyoffset += colBytes;
+                                }
+                                rowlen += colBytes;
+
+                                Column col;
+                                col.Name = xnCol["name"].InnerText;
+                                col.sType = colType;
+                                switch (colType)
+                                {
+                                    case "long":
+                                        col.Type = typeof(System.Int64);
+                                        break;
+
+                                    case "int":
+                                        col.Type = typeof(System.Int32);
+                                        break;
+
+                                    case "double":
+                                        col.Type = typeof(System.Double);
+                                        break;
+
+                                    case "char":
+                                        col.Type = typeof(System.String);
+                                        break;
+
+                                    case "datetime":
+                                        col.Type = typeof(System.DateTime);
+                                        break;
+
+                                    default:
+                                        throw new Exception("Type: " + colType + " is invalid.");
+                                }
+                                col.Size = colBytes - 1;
+                                col.FrontBytes = 1;
+                                col.BackBytes = 0;
+                                columns[ci] = col;
+                            }
+
+                            Table tab;
+                            tab.Name = tableName;
+                            tab.Columns = columns;
+
+                            Index ind;
+                            ind.Name = indexName;
+                            ind.Ordinal = ordinal;
+                            ind.UpdateMemoryOnly = updatememoryonly;
+                            ind.PinHash = ispinhash;
+                            ind.PinMemory = ispin;
+                            ind.Table = tab;
+                            ind.KeyDataType = keydatatype;
+                            ind.KeyLength = keylen;
+                            ind.KeyOffset = keyoffset;
+                            ind.RowLength = rowlen;
+                            ind.OutlierMode = xnIndex.SelectSingleNode("outlier/mode").InnerText;
+                            ind.OutlierMax = Int32.Parse(xnIndex.SelectSingleNode("outlier/max").InnerText);
+                            return ind;
+                        }
+                    }
+                }
+                throw new Exception("Index is not found.");
             }
 
             private class RIndexUpdateCoord
@@ -1406,7 +1680,7 @@ namespace QueryAnalyzer_Protocol
 
             private class RIndexUpdate
             {                
-                RIndexUpdateCoord coord;                
+                RIndexUpdateCoord coord;
 
                 public RIndexUpdate(RIndexUpdateCoord updatecoord)
                 {
@@ -1444,121 +1718,15 @@ namespace QueryAnalyzer_Protocol
                         Index thisIndex;
                         lock (coord)
                         {
-                            if (!coord.LoadedIndexes.ContainsKey(indexName))
+                            if (coord.LoadedIndexes.ContainsKey(indexName))
                             {
-                                string sysindexesfn = "sys.indexes";
-                                if (System.IO.File.Exists(sysindexesfn))
-                                {
-                                    bool ispin = false;
-                                    bool ispinhash = false;
-                                    string tableName = "";
-                                    string keydatatype = "long";
-                                    int keylen = 9;
-                                    int keyoffset = 0;
-                                    int rowlen = 9 * 3;
-
-                                    Column[] columns = null;
-                                    System.Xml.XmlDocument xi = new System.Xml.XmlDocument();
-                                    xi.Load(sysindexesfn);
-                                    System.Xml.XmlNodeList xnIndexes = xi.SelectNodes("/indexes/index");
-                                    bool indexFound = false;
-                                    foreach (System.Xml.XmlNode xnIndex in xnIndexes)
-                                    {
-                                        if (string.Compare(indexName, xnIndex["name"].InnerText, true) == 0)
-                                        {
-                                            int ordinal = Int32.Parse(xnIndex["ordinal"].InnerText);
-                                            System.Xml.XmlNode xnPin = xnIndex.SelectSingleNode("pin");
-                                            ispin = (xnPin.InnerText == "1");
-                                            System.Xml.XmlNode xnPinHash = xnIndex.SelectSingleNode("pinHash");
-                                            ispinhash = (xnPinHash != null && xnPinHash.InnerText == "1");
-                                            System.Xml.XmlNode xnTable = xnIndex.SelectSingleNode("table");
-                                            tableName = xnTable["name"].InnerText;
-                                            System.Xml.XmlNodeList xnCols = xnTable.SelectNodes("column");
-                                            columns = new Column[xnCols.Count];
-                                            rowlen = 0;
-                                            for (int ci = 0; ci < xnCols.Count; ci++)
-                                            {
-                                                System.Xml.XmlNode xnCol = xnCols[ci];
-                                                int colBytes = Int32.Parse(xnCol["bytes"].InnerText);
-                                                string colType = xnCol["type"].InnerText.ToLower();
-                                                if (colType.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
-                                                {
-                                                    colType = "char";
-                                                }
-                                                if (ci == ordinal)
-                                                {
-                                                    keydatatype = colType;
-                                                    keylen = colBytes;
-                                                }
-                                                else if (ci < ordinal)
-                                                {
-                                                    keyoffset += colBytes;
-                                                }
-                                                rowlen += colBytes;
-
-                                                Column col;
-                                                col.Name = xnCol["name"].InnerText;
-                                                col.sType = colType;
-                                                switch (colType)
-                                                {
-                                                    case "long":
-                                                        col.Type = typeof(System.Int64);
-                                                        break;
-
-                                                    case "int":
-                                                        col.Type = typeof(System.Int32);
-                                                        break;
-
-                                                    case "double":
-                                                        col.Type = typeof(System.Double);
-                                                        break;
-
-                                                    case "char":
-                                                        col.Type = typeof(System.String);
-                                                        break;
-
-                                                    case "datetime":
-                                                        col.Type = typeof(System.DateTime);
-                                                        break;
-
-                                                    default:
-                                                        throw new Exception("Type: " + colType + " is invalid.");
-                                                }
-                                                col.Size = colBytes - 1;
-                                                col.FrontBytes = 1;
-                                                col.BackBytes = 0;
-                                                columns[ci] = col;
-                                            }
-
-                                            Table tab;
-                                            tab.Name = tableName;
-                                            tab.Columns = columns;
-
-                                            Index ind;
-                                            ind.Name = indexName;
-                                            ind.Ordinal = ordinal;
-                                            ind.PinHash = ispinhash;
-                                            ind.PinMemory = ispin;
-                                            ind.Table = tab;
-                                            ind.KeyDataType = keydatatype;
-                                            ind.KeyLength = keylen;
-                                            ind.KeyOffset = keyoffset;
-                                            ind.RowLength = rowlen;
-                                            ind.OutlierMode = xnIndex.SelectSingleNode("outlier/mode").InnerText;
-                                            ind.OutlierMax = Int32.Parse(xnIndex.SelectSingleNode("outlier/max").InnerText);
-
-                                            coord.LoadedIndexes.Add(indexName, ind);
-                                            indexFound = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!indexFound)
-                                    {
-                                        throw new Exception("Index is not found.");
-                                    }
-                                }
+                                thisIndex = coord.LoadedIndexes[indexName];
                             }
-                            thisIndex = coord.LoadedIndexes[indexName];
+                            else
+                            {
+                                thisIndex = LoadIndexInfo(indexName);
+                                coord.LoadedIndexes.Add(indexName, thisIndex);
+                            }
                         }
 
                         ChunkRowsData chunk = coord.Handler.LoadFileChunk(chunkName, indexName, thisIndex.PinMemory, thisIndex.RowLength, thisIndex.PinHash, thisIndex.KeyOffset, _buf, false);
@@ -1767,29 +1935,32 @@ namespace QueryAnalyzer_Protocol
                             newchunk = fixedNewChunk;
                         }
 
-                        {  
-                            int del = chunkName.IndexOf(@"\", 2);
-                            string chunkpath = chunkName.Substring(del + 1).Replace('$', ':');
-                            string rename = chunkpath + "_updating_" + DateTime.Now.ToString("yyyyMMddHHmmss");
-                            System.IO.File.Move(chunkpath, rename);
-                            using (System.IO.FileStream fs = new System.IO.FileStream(chunkpath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
+                        {
+                            if (!thisIndex.UpdateMemoryOnly)
                             {
-                                //header
-                                ClientHandler.Int32ToBytes(4 + 8, _buf, 0);// Size of header.
-                                ClientHandler.Int64ToBytes(newchunk.Bytes.LongLength, _buf, 4);
-                                fs.Write(_buf, 0, 4 + 8);
-
-                                for (long ki = 0; ki < newchunk.NumberOfRows; ki++)
+                                int del = chunkName.IndexOf(@"\", 2);
+                                string chunkpath = chunkName.Substring(del + 1).Replace('$', ':');
+                                string rename = chunkpath + "_updating_" + DateTime.Now.ToString("yyyyMMddHHmmss");
+                                System.IO.File.Move(chunkpath, rename);
+                                using (System.IO.FileStream fs = new System.IO.FileStream(chunkpath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read))
                                 {
-                                    RowData onerow = newchunk[ki];
-                                    for (int yi = 0; yi < onerow.Length; yi++)
+                                    //header
+                                    ClientHandler.Int32ToBytes(4 + 8, _buf, 0);// Size of header.
+                                    ClientHandler.Int64ToBytes(newchunk.Bytes.LongLength, _buf, 4);
+                                    fs.Write(_buf, 0, 4 + 8);
+
+                                    for (long ki = 0; ki < newchunk.NumberOfRows; ki++)
                                     {
-                                        fs.WriteByte(onerow[yi]);
+                                        RowData onerow = newchunk[ki];
+                                        for (int yi = 0; yi < onerow.Length; yi++)
+                                        {
+                                            fs.WriteByte(onerow[yi]);
+                                        }
                                     }
+                                    fs.Close();
                                 }
-                                fs.Close();
+                                System.IO.File.Delete(rename);
                             }
-                            System.IO.File.Delete(rename);                            
 
                             UpdateChunkPinMemory(chunkName, indexName, newchunk);
                         }

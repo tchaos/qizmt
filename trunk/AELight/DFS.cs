@@ -88,6 +88,11 @@ namespace MySpace.DataMining.AELight
             return dc.FindAny(dfspath);
         }
 
+        public static dfs.DfsFile.FileNode DfsFindFileNode(dfs dc, string nodename, out string ownerfilename)
+        {
+            return dc.FindFileNode(nodename, out ownerfilename);
+        }
+
         public static dfs.DfsFile DfsFind(dfs dc, string dfspath, string type)
         {
             return dc.Find(dfspath, type);
@@ -5465,6 +5470,172 @@ switch(workerindex)
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                        break;
+
+                    case "partinfo":
+                        {
+                            if (args.Length < 1)
+                            {
+                                Console.Error.WriteLine("qizmt partinfo <partname>");
+                                SetFailure();
+                            }
+                            else
+                            {
+                                string nodename = args[0];
+                                dfs dc = LoadDfsConfig();
+                                string ownerfilename = null;
+                                dfs.DfsFile.FileNode fn = DfsFindFileNode(dc, nodename, out ownerfilename);
+                                if (fn == null)
+                                {
+                                    Console.WriteLine("Part not found in dfs.xml");
+                                }
+                                else
+                                {
+                                    Console.WriteLine();
+                                    Console.WriteLine("Owner file name: {0}", ownerfilename);
+
+                                    Console.WriteLine();
+                                    Console.WriteLine("Part paths in metadata:");
+                                    Console.WriteLine();
+                                    string[] nhosts = fn.Host.Split(';');  
+                                    for (int hi = 0; hi < nhosts.Length; hi++)
+                                    {
+                                        Console.WriteLine(NetworkPathForHost(nhosts[hi]) + @"\" + fn.Name);                                        
+                                        Console.WriteLine();
+                                    } 
+
+                                    Console.WriteLine();
+                                    Console.WriteLine("Part paths in physical files:");
+                                    Console.WriteLine();        
+                                    ConsoleColor oldcolor = Console.ForegroundColor;
+                                    string colorcode = "\u00014";
+                                    string endcolorcode = "\u00010"; 
+                                    for (int hi = 0; hi < nhosts.Length; hi++)
+                                    {
+                                        string ppath = NetworkPathForHost(nhosts[hi]) + @"\" + fn.Name;
+                                        if (!System.IO.File.Exists(ppath))
+                                        {
+                                            Console.ForegroundColor = ConsoleColor.Red;
+                                            Console.WriteLine("{0}{1} does not exist{2}", colorcode, ppath, endcolorcode);
+                                            Console.ForegroundColor = oldcolor;
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine(ppath);
+                                        }                                        
+                                        Console.WriteLine();
+                                    }                                    
+                                }
+                            }
+                        }
+                        break;
+
+                    case "delchunk":
+                        {
+                            if (args.Length < 2)
+                            {
+                                Console.Error.WriteLine("qizmt delchunk <chunkname> <host>");
+                                SetFailure();
+                                return;
+                            }
+                            else
+                            {
+                                string nodename = args[0];
+                                string delhost = args[1];
+
+                                dfs.DfsFile.FileNode fn = null;
+                                bool metaremoved = false;
+                                using (LockDfsMutex())
+                                {
+                                    dfs dc = LoadDfsConfig();
+                                    string ownerfilename = null;
+                                    fn = DfsFindFileNode(dc, nodename, out ownerfilename);
+                                    if (fn == null)
+                                    {
+                                        Console.WriteLine("Part not found in dfs.xml");
+                                        return;
+                                    }
+                                    else
+                                    {
+                                        string[] nhosts = fn.Host.Split(';');
+                                        string goodhosts = "";                                        
+                                        for (int hi = 0; hi < nhosts.Length; hi++)
+                                        {
+                                            if (string.Compare(nhosts[hi], delhost, true) != 0)
+                                            {
+                                                if (goodhosts.Length > 0)
+                                                {
+                                                    goodhosts += ';';
+                                                }
+                                                goodhosts += nhosts[hi];
+                                            }
+                                            else
+                                            {
+                                                metaremoved = true;
+                                            }
+                                        }
+                                        if (goodhosts.Length > 0)
+                                        {
+                                            fn.Host = goodhosts;
+                                        }
+                                        else
+                                        {
+                                            //remove this node all together
+                                            dfs.DfsFile df = DfsFindAny(dc, ownerfilename);
+                                            if (df == null)
+                                            {
+                                                Console.Error.WriteLine("Cannot locate owner file.");
+                                                return;
+                                            }
+                                            else
+                                            {
+                                                long filesize = 0;
+                                                List<dfs.DfsFile.FileNode> goodnodes = new List<dfs.DfsFile.FileNode>(df.Nodes.Count - 1);
+                                                for (int ni = 0; ni < df.Nodes.Count; ni++)
+                                                {
+                                                    dfs.DfsFile.FileNode thisnode = df.Nodes[ni];
+                                                    if (string.Compare(thisnode.Name, nodename, true) != 0)
+                                                    {
+                                                        goodnodes.Add(thisnode);
+                                                        thisnode.Position = filesize;
+                                                        filesize += thisnode.Length;
+                                                    }
+                                                }
+                                                df.Size = filesize;
+                                                df.Nodes = goodnodes;
+                                            }
+                                        }
+                                        
+                                        UpdateDfsXml(dc);
+                                    }                                    
+                                }
+
+                                bool physicalfileremoved = false;
+                                try
+                                {
+                                    string ppath = NetworkPathForHost(delhost) + @"\" + fn.Name;
+                                    if (System.IO.File.Exists(ppath) || System.IO.File.Exists(ppath + ".zsa"))
+                                    {
+                                        System.IO.File.Delete(ppath);
+                                        System.IO.File.Delete(ppath + ".zsa");
+                                        physicalfileremoved = true;
+                                    }                                    
+                                }
+                                catch
+                                {
+                                }
+
+                                Console.WriteLine("Chunk deleted successfully from host:");
+                                if (metaremoved)
+                                {
+                                    Console.WriteLine("Metadata removed");
+                                }
+                                if (physicalfileremoved)
+                                {
+                                    Console.WriteLine("Physical file deleted");
                                 }
                             }
                         }

@@ -67,11 +67,20 @@
     <Compile Include="DbAggregators_LAST.cs" />
     <Compile Include="DbAggregators_MAX.cs" />
     <Compile Include="DbAggregators_MIN.cs" />
+    <Compile Include="DbFunctions_ADD.cs" />
     <Compile Include="DbFunctions_CAST.cs" />
     <Compile Include="DbFunctions_CONVERT.cs" />
     <Compile Include="DbFunctions_DATEADD.cs" />
     <Compile Include="DbFunctions_DATEDIFF.cs" />
+    <Compile Include="DbFunctions_DATEPART_DAY.cs" />
+    <Compile Include="DbFunctions_DATEPART_HOUR.cs" />
+    <Compile Include="DbFunctions_DATEPART_MINUTE.cs" />
+    <Compile Include="DbFunctions_DATEPART_MONTH.cs" />
+    <Compile Include="DbFunctions_DATEPART_SECOND.cs" />
+    <Compile Include="DbFunctions_DATEPART_YEAR.cs" />
+    <Compile Include="DbFunctions_DIV.cs" />
     <Compile Include="DbFunctions_FORMAT.cs" />
+    <Compile Include="DbFunctions_IIF.cs" />
     <Compile Include="DbFunctions_MONTHS_BETWEEN.cs" />
     <Compile Include="DbAggregators_STD.cs" />
     <Compile Include="DbAggregators_STD_SAMP.cs" />
@@ -110,6 +119,7 @@
     <Compile Include="DbFunctions_LPAD.cs" />
     <Compile Include="DbFunctions_LTRIM.cs" />
     <Compile Include="DbFunctions_MOD.cs" />
+    <Compile Include="DbFunctions_MUL.cs" />
     <Compile Include="DbFunctions_NEXT_DAY.cs" />
     <Compile Include="DbFunctions_NOTEQUAL.cs" />
     <Compile Include="DbFunctions_NULLIF.cs" />
@@ -131,6 +141,7 @@
     <Compile Include="DbFunctions_SPACE.cs" />
     <Compile Include="DbFunctions_SQRT.cs" />
     <Compile Include="DbFunctions_SQUARE.cs" />
+    <Compile Include="DbFunctions_SUB.cs" />
     <Compile Include="DbFunctions_SUBSTRING.cs" />
     <Compile Include="DbFunctions_SYSDATE.cs" />
     <Compile Include="DbFunctions_TAN.cs" />

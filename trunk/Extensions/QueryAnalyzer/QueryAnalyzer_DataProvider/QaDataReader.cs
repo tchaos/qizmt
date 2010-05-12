@@ -9,19 +9,19 @@ namespace QueryAnalyzer_DataProvider
 {
     public class QaDataReader: DbDataReader
     {
-        private MetaData[] metadata = null;
-        private Dictionary<string, int> ordinals = null;
-        private QaCommand cmd = null;
-        private System.Net.Sockets.NetworkStream netstm = null;       
-        private object[] currow = null;
-        private DataTable schemaTable = null;
-        private bool isClosed = true;
-        private bool eof = true;
-        private bool isRindexEnabled = false;
-        private bool isFirstRead = true;
-        private int allRowsByteCount = 0;
-        private int allRowsCurPos = 0;
-        private int recordsize;
+        protected MetaData[] metadata = null;
+        protected Dictionary<string, int> ordinals = null;
+        protected QaCommand cmd = null;
+        protected System.Net.Sockets.NetworkStream netstm = null;
+        protected object[] currow = null;
+        protected DataTable schemaTable = null;
+        protected bool isClosed = true;
+        protected bool eof = true;
+        protected bool isRindexEnabled = false;
+        protected bool isFirstRead = true;
+        protected int allRowsByteCount = 0;
+        protected int allRowsCurPos = 0;
+        protected int recordsize;
 
         internal MetaData[] GetMetadata()
         {
@@ -32,6 +32,7 @@ namespace QueryAnalyzer_DataProvider
         {
         }
 
+        // Note: the below constructor isn't used for rindex.
         public QaDataReader(QaCommand cm, System.Net.Sockets.NetworkStream ns)
         {
             cmd = cm;
@@ -591,6 +592,89 @@ namespace QueryAnalyzer_DataProvider
                 return md;
             }
         }
+    }
+
+    internal class QaDataReaderRIndex : QaDataReader
+    {
+        internal QaDataReaderRIndex(QaCommand cm, ref QaConnection.Index sysindex, System.Net.Sockets.NetworkStream ns)
+            : base()
+        {
+            cmd = cm;
+            netstm = ns;
+            isClosed = false;
+            eof = false;
+            isRindexEnabled = cm.conn.isRIndexEnabled();
+
+            {
+
+                int columnCount = sysindex.Table.Columns.Length;
+                metadata = new MetaData[columnCount];
+                ordinals = new Dictionary<string, int>();
+
+                recordsize = 0;
+                for (int i = 0; i < columnCount; i++)
+                {
+                    string cname = sysindex.Table.Columns[i].Name;
+
+                    Type type;
+                    {
+                        string colType = sysindex.Table.Columns[i].Type;
+                        if (colType.StartsWith("char(", StringComparison.OrdinalIgnoreCase))
+                        {
+                            colType = "char";
+                        }
+                        switch (colType)
+                        {
+                            case "long":
+                                type = typeof(System.Int64);
+                                break;
+
+                            case "int":
+                                type = typeof(System.Int32);
+                                break;
+
+                            case "double":
+                                type = typeof(System.Double);
+                                break;
+
+                            case "char":
+                                type = typeof(System.String);
+                                break;
+
+                            case "DateTime":
+                                type = typeof(System.DateTime);
+                                break;
+
+                            default:
+                                throw new Exception("Type: " + colType + " is invalid.");
+                        }
+                    }
+
+                    int frontbytes = 1;
+
+                    int csize = sysindex.Table.Columns[i].Bytes - 1;
+
+                    int backbytes = 0;
+
+                    MetaData md = MetaData.Prepare(cname, type, csize, frontbytes, backbytes);
+                    metadata[i] = md;
+
+                    recordsize += csize + frontbytes + backbytes;
+
+                    ordinals[cname.ToLower()] = i;
+                }
+
+                if (null == cmd.buf
+                    || cmd.buf.Length < recordsize)
+                {
+                    cmd.buf = new byte[recordsize];
+                }
+
+                currow = new object[columnCount];
+            }
+
+        }
+
     }
 
 

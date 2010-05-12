@@ -165,6 +165,27 @@ namespace QueryAnalyzer_RegressionTests
             }
 
             {
+                string testname = "GROUP BY Functions";
+                if (null == whichtest || 0 == string.Compare(whichtest, testname, true))
+                {
+                    Console.WriteLine("*** Running test {0}...", testname);
+                    try
+                    {
+                        GroupByFunctions(TableName);
+                        Console.WriteLine("[PASSED] - {0}", testname);
+                        AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Error.WriteLine(e.ToString());
+                        Console.WriteLine("[FAILED] - {0}", testname);
+                        AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                    }
+                    Console.WriteLine();
+                }
+            }
+
+            {
                 string testname = "Aggregate GROUP BY";
                 if (null == whichtest || 0 == string.Compare(whichtest, testname, true))
                 {
@@ -497,6 +518,7 @@ namespace QueryAnalyzer_RegressionTests
         public static string QaExec(string query)
         {
             //return Exec.Shell("dspace " + (IsQaDebug ? "-debug " : "") + "exec RDBMS_QueryAnalyzer.DBCORE \"" + RDBMS_DBCORE.Qa.QlArgsEscape(query) + "\"");
+            RDBMS_DBCORE.Qa.QOLimit = 0x400 * 0x400 * 16;
             return (new RDBMS_DBCORE.Qa.QueryAnalyzer()).Exec(RDBMS_DBCORE.Qa.QlArgsEscape(query));
         }
 

@@ -49,9 +49,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DfsChecks.cs" />
     <Compile Include="ExamplesImageProcessKMeans.cs" />
+    <Compile Include="ExecFailover.cs" />
     <Compile Include="ExecTest.cs" />
     <Compile Include="Generate.cs" />
+    <Compile Include="HeartBeats.cs" />
     <Compile Include="JobsConfig.cs" />
     <Compile Include="DFS.cs" />
     <Compile Include="Examples.cs" />

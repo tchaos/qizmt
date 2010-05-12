@@ -14,16 +14,17 @@ namespace RDBMS_DBCORE
         public static DbValue RAND(DbFunctionTools tools, DbFunctionArguments args)
         {
             string FunctionName = "RAND";
-            
-            Random rnd = null;
-            
+
             if (args.Length == 1)
             {
                 DbType arg0type;
                 ByteSlice arg0 = args[0].Eval(out arg0type);
                 if (Types.IsNullValue(arg0))
                 {
-                    rnd = new Random();
+                    if (null == _rnd)
+                    {
+                        _rnd = new Random();
+                    }
                 }
                 else
                 {
@@ -33,16 +34,22 @@ namespace RDBMS_DBCORE
                     }
 
                     int seed = tools.GetInt(arg0);
-                    rnd = new Random(seed);
+                    _rnd = new Random(seed);
                 }
             }
             else
             {
-                rnd = new Random();
+                if (null == _rnd)
+                {
+                    _rnd = new Random();
+                }
             }
            
-            return tools.AllocValue(rnd.NextDouble());
+            return tools.AllocValue(_rnd.NextDouble());
         }
+
+        static Random _rnd = null;
+
     }
 }
 

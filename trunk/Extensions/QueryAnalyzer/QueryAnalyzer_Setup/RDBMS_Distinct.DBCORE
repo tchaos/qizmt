@@ -9,6 +9,7 @@
         <OutputMethod>sorted</OutputMethod>
 		<Setting name="Subprocess_TotalPrime" value="NearPrimeBelowCoreCount" />
       </IOSettings>
+      <ForceStandardError/>
       <DynamicFoil/>
       <IntermediateDataAddressing>64</IntermediateDataAddressing>
       <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>

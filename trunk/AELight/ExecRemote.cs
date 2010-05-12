@@ -107,7 +107,8 @@ namespace MySpace.DataMining.AELight
                     SlaveIP = IPAddressUtil.GetIPv4Address(SlaveHost); // !
 
                     rem.SetJID(jid, CurrentJobFileName + " Remote: " + cfgj.NarrativeName);
-                    rem.AddBlock(SlaveIP + @"|" + logname + @"|slaveid=0");
+                    rem.AddBlock(SlaveIP + @"|"
+                        + (cfgj.ForceStandardError != null ? "&" : "") + logname + @"|slaveid=0");
 
                     string codectx = (@"
     public const int DSpace_BlockID = " + BlockID.ToString() + @";
@@ -285,6 +286,7 @@ public static void DSpace_LogResult(string name, bool passed)
                 slaveIDs.Add(slaves[si].ToUpper(), si);
             }
 
+            bool aborting = false;
             try
             {
                 List<RemoteBlockInfo> blocks = new List<RemoteBlockInfo>(cfgj.IOSettings.DFS_IOs.Length);
@@ -396,7 +398,7 @@ public static void DSpace_LogResult(string name, bool passed)
                     bi.DFSWriter = cfgj.IOSettings.DFS_IOs[BlockID].DFSWriter.Trim();
                     bi.Meta = cfgj.IOSettings.DFS_IOs[BlockID].Meta;
 
-                    List<string> dfswriters = new List<string>();                    
+                    List<string> dfswriters = new List<string>();
                     if (bi.DFSWriter.Length > 0)
                     {
                         string[] writers = bi.DFSWriter.Split(';');
@@ -454,7 +456,7 @@ public static void DSpace_LogResult(string name, bool passed)
                         dfswriters.Add("");
                         outputrecordlengths.Add(-1);
                     }
-                    bi.DFSWriters = dfswriters;                   
+                    bi.DFSWriters = dfswriters;
                     bi.verbose = verbose;
                     bi.rem = new MySpace.DataMining.DistributedObjects5.Remote(cfgj.NarrativeName + "_remote");
                     bi.rem.CookRetries = dc.slave.CookRetries;
@@ -476,9 +478,9 @@ public static void DSpace_LogResult(string name, bool passed)
                     if (cfgj.Unsafe != null)
                     {
                         bi.rem.AddUnsafe();
-                    }                    
+                    }
                     {
-                        List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();                        
+                        List<dfs.DfsFile.FileNode> nodes = new List<dfs.DfsFile.FileNode>();
                         List<string> mapfileswithnodes = null;
                         List<int> nodesoffsets = null;
                         IList<string> mapfiles = SplitInputPaths(dc, cfgj.IOSettings.DFS_IOs[BlockID].DFSReader);
@@ -548,8 +550,8 @@ public static void DSpace_LogResult(string name, bool passed)
                                     nodesoffsets.Add(nodes.Count);
                                     inputrecordlengths.Add(inreclen);
                                     nodes.AddRange(df.Nodes);
-                                }                                
-                                
+                                }
+
                             }
                         }
                         bi.dfsinputpaths = new List<string>(nodes.Count);
@@ -733,6 +735,10 @@ public static void DSpace_LogResult(string name, bool passed)
                 }
 
             }
+            catch (System.Threading.ThreadAbortException)
+            {
+                aborting = true;
+            }
             finally
             {
                 {
@@ -761,7 +767,10 @@ public static void DSpace_LogResult(string name, bool passed)
                     }
                 }
 
-                CheckUserLogs(slaves, logname);
+                if (!aborting)
+                {
+                    CheckUserLogs(slaves, logname);
+                }
             }
 
             if (verbose)

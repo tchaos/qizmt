@@ -58,6 +58,7 @@
     <Compile Include="DistributedObjectsService.Designer.cs">
       <DependentUpon>DistributedObjectsService.cs</DependentUpon>
     </Compile>
+    <Compile Include="FileDaemon.cs" />
     <Compile Include="PacketMonitor.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ProjectInstaller.cs">
@@ -125,6 +126,10 @@
       <Project>{E63A37A4-FE35-4084-B394-1399A5D6DBBC}</Project>
       <Name>DProcess</Name>
     </ProjectReference>
+    <ProjectReference Include="..\IMapReduce\IMapReduce.csproj">
+      <Project>{366F14FC-74F8-4F8B-9D30-33CFB37B2BEC}</Project>
+      <Name>IMapReduce</Name>
+    </ProjectReference>
     <ProjectReference Include="..\MDORedir\MDORedir.csproj">
       <Project>{FBDCCE59-8EEE-421D-B5CD-AA70A1C6DF25}</Project>
       <Name>MDORedir</Name>
@@ -152,6 +157,10 @@
     <ProjectReference Include="..\Scheduler\Scheduler.csproj">
       <Project>{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}</Project>
       <Name>Scheduler</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Surrogate\Surrogate.csproj">
+      <Project>{ED7CFA32-911C-4E41-A4E8-8D7E325DF6E7}</Project>
+      <Name>Surrogate</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

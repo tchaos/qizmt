@@ -4,6 +4,7 @@
       <IOSettings>
         <JobType>local</JobType>
       </IOSettings>
+      <ForceStandardError/>
       <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
       <Using>RDBMS_DBCORE</Using>
       <Local>

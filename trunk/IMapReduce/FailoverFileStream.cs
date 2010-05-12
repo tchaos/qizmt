@@ -519,7 +519,7 @@ namespace MySpace.DataMining.DistributedObjects
 
         bool IsDiskFailure(string host)
         {
-            return diskcheck.IsDiskFailure(host, out dfreason);
+            return diskcheck.IsDiskFailure(host, null, out dfreason);
         }
 
         static Dictionary<string, int> diskfailures; // Indexed by hostname.

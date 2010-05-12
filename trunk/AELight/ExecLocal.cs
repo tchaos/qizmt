@@ -38,6 +38,7 @@ namespace MySpace.DataMining.AELight
 
             string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + ".j" + sjid + "_log.txt";
 
+            bool aborting = false;
             try
             {
                 dfs dc = LoadDfsConfig();
@@ -68,7 +69,8 @@ namespace MySpace.DataMining.AELight
                     cfgj.AddAssemblyReferences(rem.CompilerAssemblyReferences, Surrogate.NetworkPathForHost(firstslave));
                 }
                 rem.SetJID(jid, CurrentJobFileName + " Local: " + cfgj.NarrativeName);
-                rem.AddBlock(SlaveHost + @"|" + logname + @"|slaveid=0");
+                rem.AddBlock(SlaveHost + @"|"
+                    + (cfgj.ForceStandardError != null ? "&" : "") + logname + @"|slaveid=0");
                 rem.Open();
 
                 string codectx = (@"
@@ -164,9 +166,16 @@ public static void DSpace_LogResult(string name, bool passed)
                 }
 
             }
+            catch (System.Threading.ThreadAbortException)
+            {
+                aborting = true;
+            }
             finally
             {
-                CheckUserLogs(new string[] { SlaveIP }, logname);
+                if (!aborting)
+                {
+                    CheckUserLogs(new string[] { SlaveIP }, logname);
+                }
             }
 
             if (verbose)

@@ -5,6 +5,7 @@
         <JobType>local</JobType>
         <LocalHost>localhost</LocalHost>
       </IOSettings>
+      <ForceStandardError/>
       <Local>
         <![CDATA[
             public virtual void Local()

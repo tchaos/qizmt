@@ -52,6 +52,14 @@ namespace RDBMS_qa
             
             //uncomment to display a MDI sub window without connecting
             //ShowNewQaForm("SELECT TOP 10 * FROM foo WHERE base='all' ORDER BY bar;");
+
+#if DEBUG
+            if (Program.AutoConnectAtStartup)
+            {
+                openToolStripMenuItem_Click(this, new EventArgs());
+            }
+#endif
+
         }
 
         private void ShowStatus(string status)

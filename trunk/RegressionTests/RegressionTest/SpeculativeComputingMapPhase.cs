@@ -605,7 +605,7 @@ namespace RegressionTest
       </IOSettings>
       <Computing>
         <Mode>speculative</Mode>
-        <InputOrder>shuffle</InputOrder>
+        <MapInputOrder>shuffle</MapInputOrder>
       </Computing>
       <MapReduce>
         <Map>

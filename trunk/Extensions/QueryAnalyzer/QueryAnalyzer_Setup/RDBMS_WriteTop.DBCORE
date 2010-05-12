@@ -8,6 +8,7 @@
           <DFSWriter></DFSWriter>
         </DFS_IO>
       </IOSettings>
+      <ForceStandardError/>
       <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
       <Using>RDBMS_DBCORE</Using>
       <Remote>

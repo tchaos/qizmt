@@ -84,7 +84,7 @@ namespace MySpace.DataMining.DistributedObjects5
 
                 try
                 {
-                    XLog.errorlog(msg, XLog.UserLogFile);
+                    XLog.errorlog(msg, XLog.UserLogFile, XLog.DelimitUserErrors);
                 }
                 catch
                 {
@@ -343,9 +343,10 @@ namespace MySpace.DataMining.DistributedObjects5
 
 
         internal static string UserLogFile;
+        internal static bool DelimitUserErrors = false;
 
 
-        public static void errorlog(string line, string fn)
+        public static void errorlog(string line, string fn, bool Delimit)
         {
             try
             {
@@ -379,9 +380,17 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         sjid = DistributedObjectsSlave.sjid;
                     }
+                    if (Delimit)
+                    {
+                        fstm.WriteLine("{__#ForceStandardError#__");
+                    }
                     fstm.WriteLine(@"[{0} {1}ms] \\{2} DistributedObjectsSlave error: {3}{4} [JobID:"
                         + DistributedObjectsSlave.sjid + "] " + DistributedObjectsSlave.jobdesc,
                         System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond, System.Net.Dns.GetHostName(), build, line);
+                    if (Delimit)
+                    {
+                        fstm.WriteLine("__#ForceStandardError#__}");
+                    }
                     fstm.WriteLine("----------------------------------------------------------------");
                     fstm.WriteLine();
                 }
@@ -393,6 +402,11 @@ namespace MySpace.DataMining.DistributedObjects5
             {
                 logmutex.ReleaseMutex();
             }
+        }
+
+        public static void errorlog(string line, string fn)
+        {
+            errorlog(line, fn, false);
         }
 
         public static void errorlog(string line)
@@ -648,6 +662,11 @@ namespace MySpace.DataMining.DistributedObjects5
 #endif
 
                 XLog.UserLogFile = args[4];
+                if (XLog.UserLogFile.StartsWith("&"))
+                {
+                    XLog.UserLogFile = XLog.UserLogFile.Substring(1);
+                    XLog.DelimitUserErrors = true;
+                }
 
 #if SLAVE_TRACE
                 try

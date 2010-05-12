@@ -475,6 +475,7 @@ namespace MySpace.DataMining.AELight
                                     nstm.WriteByte((byte)'Y'); // Batch send.
                                     XContent.SendXContent(nstm, opts);
                                     XContent.SendXContent(nstm, spullpaths);
+                                    XContent.SendXContent(nstm, "");  //empty health plugin paths
 
                                     int ib = nstm.ReadByte();
                                     if (ib == '-')
@@ -576,7 +577,7 @@ namespace MySpace.DataMining.AELight
                                         }
                                         fn.node.Host = validhosts;
 
-                                        Console.WriteLine("    File: {0}; Part: {1}; Failed Host: {2}", fn.ownerfile, fn.node.Name, failedhost);
+                                        Console.WriteLine("    Owner File Name: {0}; Part Name: {1} on {2}; Worker Host (puller): {3}", fn.ownerfile.Name, fn.node.Name, fn.node.Host, failedhost);
                                     }
                                 }
                             }

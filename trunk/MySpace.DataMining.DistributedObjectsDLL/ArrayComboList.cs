@@ -655,19 +655,8 @@ namespace UserLoader
             }
         }
 
-
         public void ZBlockExchange(IList<ArrayComboList> all, IList<int> ownedzmapblockIDs)
-        {          
-            ensureopen("ZBlockExchange");
-            ensurenotsortd("ZBlockExchange");
-            ensurenotenumd("ZBlockExchange");
-
-            byte[] ranges = new byte[ownedzmapblockIDs.Count * 4];
-            for (int i = 0; i < ownedzmapblockIDs.Count; i++)
-            {
-                Entry.ToBytes(ownedzmapblockIDs[i], ranges, i * 4);
-            }
-
+        {
             // Note: doesn't manage mutliple slaves for one ACL: won't exchange zmapblocks for other slaves in same ACL.
             string basepaths = "";
             {
@@ -696,6 +685,20 @@ namespace UserLoader
                     }
                 }
                 basepaths = sb.ToString();
+            }
+            ZBlockExchange(basepaths, ownedzmapblockIDs);
+        }
+
+        public void ZBlockExchange(string basepaths, IList<int> ownedzmapblockIDs)
+        {          
+            ensureopen("ZBlockExchange");
+            ensurenotsortd("ZBlockExchange");
+            ensurenotenumd("ZBlockExchange");
+
+            byte[] ranges = new byte[ownedzmapblockIDs.Count * 4];
+            for (int i = 0; i < ownedzmapblockIDs.Count; i++)
+            {
+                Entry.ToBytes(ownedzmapblockIDs[i], ranges, i * 4);
             }
 
             // Even if hostsandports is 0-length, need to tell the slave to exchange so it moves from zmapblocks to zblocks...
@@ -768,7 +771,7 @@ namespace UserLoader
         public int ValueOffsetSize = 4;
         public string[] HealthPluginPaths = null;
 
-        void _DoMap(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
+        void _DoMap(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource, List<string> inputdfsfilenames, List<int> inputnodesoffsets, bool rehash)
         {
             ensureopen("DoMap");
             ensurenotsortd("DoMap");
@@ -784,19 +787,22 @@ namespace UserLoader
             if (fns.Length > 0)
             {
                 string offsets = "";
-                for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
+                if (inputdfsfilenames != null && inputnodesoffsets != null)
                 {
-                    if (oi >= InputRecordLengths.Count
-                        || -1 == InputRecordLengths[oi])
+                    for (int oi = 0; oi < inputdfsfilenames.Count; oi++)
                     {
-                        offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                        if (oi >= InputRecordLengths.Count
+                            || -1 == InputRecordLengths[oi])
+                        {
+                            offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + ";";
+                        }
+                        else
+                        {
+                            offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + "@" + InputRecordLengths[oi] + ";";
+                        }
                     }
-                    else
-                    {
-                        offsets += inputnodesoffsets[oi].ToString() + "|" + inputdfsfilenames[oi] + "@" + InputRecordLengths[oi] + ";";
-                    }
-                }
-                offsets = offsets.Trim(';');
+                    offsets = offsets.Trim(';');
+                }                
                 fns = fns + "|" + offsets;               
             }           
 
@@ -821,6 +827,8 @@ namespace UserLoader
                 XContent.SendXContent(slave.nstm, fns); // All slaves of same DistObj get same input files.
                 Entry.ToBytes(_zmaps, buf, 0);
                 XContent.SendXContent(slave.nstm, buf, 4);
+
+                XContent.SendXContent(slave.nstm, rehash ? "1" : "0");               
             }
 
             // "Join"...
@@ -834,8 +842,16 @@ namespace UserLoader
             }
         }
 
+        public string GetZMapBlockBaseName()
+        {
+            if (dslaves.Count > 0)
+            {
+                return ((BufSlaveInfo)dslaves[0]).zmapblockbasename;
+            }
+            return null;
+        }
 
-        public virtual void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
+        public virtual void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets, bool rehash)
         {
             byte[] dlldata = null;
             if (LocalCompile)
@@ -850,7 +866,7 @@ namespace UserLoader
                     CompilerInvoked("Map", true);
                 }
             }
-            _DoMap(inputdfsnodes, dlldata, classname, code, inputdfsfilenames, inputnodesoffsets);
+            _DoMap(inputdfsnodes, dlldata, classname, code, inputdfsfilenames, inputnodesoffsets, rehash);
         }
 
 
@@ -1114,14 +1130,209 @@ namespace UserMapper
 }");
         }
 
+        public virtual string GetMapRehashSource(string code, string classname)
+        {           
+            return (@"using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using MySpace.DataMining.DistributedObjects;
+
+namespace UserMapper
+{
+    public class " + classname + @"_Sample : " + classname + @"
+    {
+        public " + classname + @"_Sample()
+        {
+            _issample = true;
+        }
+    }
+
+    public class " + classname + @" : MySpace.DataMining.DistributedObjects.IMap
+    {
+        public bool MapSampling
+        {
+            get
+            {
+                return _issample;
+            }
+        }
+        protected bool _issample = false;      
+        
+        byte[] keybuf = new byte[(8 + DSpace_KeyLength > 8 + 8) ? 8 + DSpace_KeyLength : 8 + 8];       
+        byte[] valuebuf = new byte[0x400 * 0x400 * 1];   
+        const int _CookTimeout = " + CookTimeout.ToString() + @";
+        const int _CookRetries = " + CookRetries.ToString() + @";
+        public void OnMap(MapInput input, MapOutput output)
+        {
+                //StaticGlobals.MapIteration = -1;
+                //StaticGlobals.ReduceIteration = -1;
+                //StaticGlobals.DSpace_KeyLength = DSpace_KeyLength;
+                //StaticGlobals.DSpace_SlaveIP = DSpace_SlaveIP;
+                //StaticGlobals.DSpace_SlaveHost = DSpace_SlaveHost;
+                //StaticGlobals.DSpace_BlocksTotalCount = DSpace_BlocksTotalCount;
+                //StaticGlobals.DSpace_BlockID = DSpace_BlockID;
+                //StaticGlobals.ExecutionContext = ExecutionContextType.MAP;
+                //StaticGlobals.DSpace_Hosts = new string[]{" + ExpandListCode(StaticGlobals.DSpace_Hosts) + @"};
+                //StaticGlobals.DSpace_OutputDirection = `" + StaticGlobals.DSpace_OutputDirection + @"`;
+                //StaticGlobals.DSpace_OutputDirection_ascending = " + (StaticGlobals.DSpace_OutputDirection_ascending ? "true" : "false") + @";
+                //InputRecordLength = StaticGlobals.DSpace_InputRecordLength;
+                //StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
+                //StaticGlobals.DSpace_MaxDGlobals = " + StaticGlobals.DSpace_MaxDGlobals.ToString() + @";
+                ").Replace('`', '"') + DGlobalsM.ToCode() + (@"
+            
+            //----------------------------COOKING--------------------------------
+            bool cooking_is_cooked = false;
+            int cooking_cooksremain = _CookRetries;
+            bool cooking_is_read = false;
+            long cooking_pos = 0; // Last known good position between key/value pairs.
+            //----------------------------COOKING--------------------------------
+
+            for(;;)//while cooked
+            {
+                try
+                {
+                    for(;;)//foreach key/value pair
+                    {                                               
+                        //----------------------------COOKING--------------------------------
+                        cooking_is_read = true;
+                        if(cooking_is_cooked)
+                        {
+                            cooking_is_cooked = false;
+                            input.Reopen(cooking_pos);
+                        }
+                        //----------------------------COOKING--------------------------------
+                        int readkey = StreamReadLoop(input.Stream, keybuf, DSpace_KeyLength + 4);
+                        if (0 == readkey)
+                        {
+                            return;
+                        }
+
+                        int valuelen = Entry.BytesToInt(keybuf, DSpace_KeyLength);
+                        if (valuelen > valuebuf.Length)
+                        {
+                            valuebuf = new byte[Entry.Round2Power(valuelen)];
+                        }
+
+                        StreamReadExact(input.Stream, valuebuf, valuelen);
+                        //----------------------------COOKING--------------------------------
+                        cooking_pos += DSpace_KeyLength + 4 + valuelen;
+                        cooking_is_read = false;
+                        //----------------------------COOKING--------------------------------
+                        
+                        //Map(ByteSlice.Create(_mapbuf), output);
+                        output.Add(ByteSlice.Create(keybuf, 0, DSpace_KeyLength), ByteSlice.Create(valuebuf, 0, valuelen));
+                    }
+                }
+                catch(Exception e)
+                {
+                    if(null != e as MySpace.DataMining.DistributedObjects.FailoverFileStreamFatalException)
+                    {
+                        throw;
+                    }
+                    //----------------------------COOKING--------------------------------
+                    if(!cooking_is_read)
+                    {
+                        throw;
+                    }
+                    bool firstcook = cooking_cooksremain == _CookRetries;
+                    if(cooking_cooksremain-- <= 0)
+                    {
+                            string ns = ` (unable to get connection count)`;
+                            try
+                            {
+                                ns = ` (` + NetUtils.GetActiveConnections().Length.ToString()
+                                    + ` total connections on this machine)`;
+                            }
+                            catch
+                            {
+                            }
+                        throw new System.IO.IOException(`cooked too many times (retries=`
+                            + _CookRetries.ToString()
+                            + `; timeout=` + _CookTimeout.ToString()
+                            + `) on ` + System.Net.Dns.GetHostName() + ns, e);
+                    }
+                    System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(_CookTimeout));
+                    if (firstcook)
+                    {
+                        try
+                        {
+                            Qizmt_Log(`cooking started (retries=` + _CookRetries.ToString()
+                                + `; timeout=` + _CookTimeout.ToString()
+                                + `) on ` + System.Net.Dns.GetHostName()
+                                + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
+                        }
+                        catch
+                        {
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            if ((_CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                            {
+                                Qizmt_Log(`cooking continues with ` + cooking_cooksremain
+                                    + ` more retries (retries=` + _CookRetries.ToString()
+                                    + `; timeout=` + _CookTimeout.ToString()
+                                    + `) on ` + System.Net.Dns.GetHostName()
+                                    + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
+                                    + Environment.NewLine + e.ToString());
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+                    cooking_is_cooked = true;
+                    continue;
+                    //----------------------------COOKING--------------------------------
+                }
+                break;
+            }
+        }
+
+        private static int StreamReadLoop(System.IO.Stream stm, byte[] buf, int len)
+        {
+            int sofar = 0;
+            while (sofar < len)
+            {
+                int xread = stm.Read(buf, sofar, len - sofar);
+                if (xread <= 0)
+                {
+                    break;
+                }
+                sofar += xread;
+            }
+            return sofar;
+        }
+
+        private static void StreamReadExact(System.IO.Stream stm, byte[] buf, int len)
+        {
+            if (len != StreamReadLoop(stm, buf, len))
+            {
+                throw new System.IO.IOException(`Unable to read from stream`);
+            }
+        }
+        
+        ").Replace('`', '"') + code + (@"
+    }
+}");
+        }
 
         // inputdfsnodes must be accessible by the remote machine. Can be star-delimited failover names (starnames).
         public virtual void DoMap(IList<string> inputdfsnodes, string code, string[] usings, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             const string classname = "DfsMapper";
-            DoMapFullSource(inputdfsnodes, GetMapSource(code, usings, classname), classname, inputdfsfilenames, inputnodesoffsets);
+            DoMapFullSource(inputdfsnodes, GetMapSource(code, usings, classname), classname, inputdfsfilenames, inputnodesoffsets, false);
         }
 
+        public virtual void DoMapRehash(IList<string> inputdfsnodes, string code)
+        {
+            const string classname = "DfsMapper";
+            DoMapFullSource(inputdfsnodes, GetMapRehashSource(code, classname), classname, null, null, true);
+        }
 
         public int FoilKeySkipFactor = 5000;
 

@@ -23,6 +23,7 @@
 #define MR_EXCHANGE_TIME_PRINT
 #define MR_REPLICATION_TIME_PRINT
 
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,910 +32,9 @@ using System.Text;
 namespace MySpace.DataMining.AELight
 {
     public partial class AELight
-    {
-        internal class FailoverInfo
-        {
-            internal Dictionary<string, List<MapReduceBlockInfo>> hostToBlocks = null;
-            internal MapReduceBlockInfo[] allBlocks = null;
-            internal Dictionary<string, int> goodHosts = null;
-            internal Dictionary<string, int> badHosts = null;
-            internal Dictionary<int,int> blockStatus = null;
-            internal List<string> newBadHosts = null;
-            internal MySpace.DataMining.DistributedObjects.DiskCheck diskcheck = null;
-            internal Random rnd = null;
-            internal int sleepCnt = 0;
-            internal string inputOrder = null;
-            internal string[] healthpluginpaths = null;
-
-            internal FailoverInfo(dfs dc, string inputorder)
-            {
-                healthpluginpaths = GetHealthPluginPaths(dc);
-                diskcheck = new MySpace.DataMining.DistributedObjects.DiskCheck(healthpluginpaths);
-                rnd = new Random(unchecked(DateTime.Now.Millisecond + System.Diagnostics.Process.GetCurrentProcess().Id));
-                inputOrder = inputorder;
-            }
-
-            internal void CreateBlocks(string[] hosts, List<MapReduceBlockInfo> _blocks, int blockscount, int initialstatus, JobInfo jobinfo)
-            {
-                int allblockscount = blockscount * jobinfo.dc.Replication;
-                hostToBlocks = new Dictionary<string, List<MapReduceBlockInfo>>(hosts.Length);
-                allBlocks = new MapReduceBlockInfo[allblockscount];
-                goodHosts = new Dictionary<string, int>(hosts.Length);
-                blockStatus = new Dictionary<int, int>(allblockscount);
-                badHosts = new Dictionary<string, int>(hosts.Length);
-                newBadHosts = new List<string>(hosts.Length);
-
-                foreach (string host in hosts)
-                {
-                    goodHosts.Add(host.ToLower(), 0);
-                }
-
-                int blocksperhost = allblockscount / hosts.Length;
-                if ((blocksperhost * hosts.Length) != allblockscount)
-                {
-                    blocksperhost++;
-                }
-                        
-                for (int ri = 0; ri < jobinfo.dc.Replication; ri++)
-                {
-                    for (int bi = 0; bi < blockscount; bi++)
-                    {
-                        MapReduceBlockInfo block = new MapReduceBlockInfo();
-                        block.BlockID = bi;
-                        block.BlockCID = ri * blockscount + block.BlockID;
-                        block.failover = this;
-                        allBlocks[block.BlockCID] = block;
-                        blockStatus.Add(block.BlockCID, initialstatus);
-                    }
-                }
-                
-                MapReduceBlockInfo[] firstset = new MapReduceBlockInfo[blockscount];
-                {
-                    Dictionary<string, Dictionary<int, MapReduceBlockInfo>> hostToBlockIDs = new Dictionary<string, Dictionary<int, MapReduceBlockInfo>>(hosts.Length);
-                    int nexthost = 0;
-                    List<MapReduceBlockInfo> collisions = new List<MapReduceBlockInfo>(blockscount);
-                    Dictionary<string, Dictionary<int, MapReduceBlockInfo>> hostToBlockIDsPerRep = new Dictionary<string, Dictionary<int, MapReduceBlockInfo>>(hosts.Length);
-
-                    for (int ri = 0; ri < jobinfo.dc.Replication; ri++)
-                    {
-#if FAILOVER_DEBUG
-                        Log("Assigning hosts to blocks in replication index = " + ri.ToString());
-#endif
-
-                        hostToBlockIDsPerRep.Clear();
-                       
-                        MapReduceBlockInfo[] scrambled = new MapReduceBlockInfo[blockscount]; //!
-                        for (int bi = 0; bi < scrambled.Length; bi++)
-                        {
-                            scrambled[bi] = allBlocks[bi + ri * blockscount];
-                        }
-                        for (int bi = 0; bi < scrambled.Length; bi++)
-                        {
-                            int rndindex = rnd.Next() % scrambled.Length;
-                            MapReduceBlockInfo oldvalue = scrambled[bi];
-                            scrambled[bi] = scrambled[rndindex];
-                            scrambled[rndindex] = oldvalue;
-                        }
-                       
-                        if (ri == 0)
-                        {
-                            for (int bi = 0; bi < scrambled.Length; bi++)
-                            {
-                                firstset[bi] = scrambled[bi];
-                            }
-                        }
-#if FAILOVER_DEBUG
-                        {
-                            string debugtxt = "firstset:" + Environment.NewLine;
-                            foreach (MapReduceBlockInfo bl in firstset)
-                            {
-                                debugtxt += bl.BlockID.ToString() + ":" + bl.BlockCID.ToString() + ":" + (bl.SlaveHost == null ? "null" : bl.SlaveHost) + Environment.NewLine;
-                            }
-                            Log(debugtxt);
-                        }
-#endif
-                        
-                        int tryremains = blockscount;
-                        for (; ; )
-                        {
-                            AssignBlocksToHosts(scrambled, hosts, ref nexthost, hostToBlockIDs, collisions, hostToBlockIDsPerRep, blocksperhost, blockscount);
-                            if (collisions.Count == 0)
-                            {
-                                break;
-                            }
-                            if (--tryremains <= 0)
-                            {
-                                throw new Exception("Cannot resolve collisions.  Reached maximum number of tries.");
-                            }
-                            scrambled = collisions.ToArray();
-                            collisions.Clear();
-                        }
-                    }
-
-                    foreach (MapReduceBlockInfo block in allBlocks)
-                    {
-                        string host = block.SlaveHost.ToLower();
-                        if (!hostToBlocks.ContainsKey(host))
-                        {
-                            hostToBlocks.Add(host, new List<MapReduceBlockInfo>(blocksperhost));
-                        }
-                        hostToBlocks[host].Add(block);
-                    }
-                }
-                
-                foreach (MapReduceBlockInfo block in allBlocks)
-                {
-                    block.jobshared = jobinfo.jobshared;
-                    block.allinputsamples = jobinfo.allinputsamples;
-                    block.extraverbose = jobinfo.extraverbose;
-                    block.AddCacheOnly = false;
-                    block.outputfiles = jobinfo.outputfiles;
-                    block.outputfile = jobinfo.outputfile;
-                    block.basefilesize = jobinfo.dc.DataNodeBaseSize;
-                    block.cfgj = jobinfo.cfgj;
-                    block.SlaveIP = IPAddressUtil.GetIPv4Address(block.SlaveHost);
-                    block.ExecArgs = jobinfo.execargs;
-                    block.logname = jobinfo.logname;
-                    block.acl = new MySpace.DataMining.DistributedObjects5.ArrayComboList(jobinfo.cfgj.NarrativeName + "_BlockID" + block.BlockID.ToString(), jobinfo.cfgj.IOSettings.KeyLength);
-                    block.acl.SetJID(jid);
-                    block.acl.HealthPluginPaths = healthpluginpaths;
-                    int IntermediateDataAddressing = jobinfo.cfgj.IntermediateDataAddressing;
-                    if (0 == IntermediateDataAddressing)
-                    {
-                        IntermediateDataAddressing = jobinfo.dc.IntermediateDataAddressing;
-                    }
-                    block.acl.ValueOffsetSize = IntermediateDataAddressing / 8;
-                    if (block.acl.ValueOffsetSize <= 0)
-                    {
-                        throw new InvalidOperationException("Invalid value for IntermediateDataAddressing: " + IntermediateDataAddressing.ToString());
-                    }
-                    block.acl.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
-                    block.acl.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
-                    block.acl.OutputRecordLengths = jobinfo.outputrecordlengths;
-                    block.acl.InputRecordLengths = new List<int>();
-                    block.acl.CookRetries = jobinfo.dc.slave.CookRetries;
-                    block.acl.CookTimeout = jobinfo.dc.slave.CookTimeout;
-                    block.acl.LocalCompile = (0 == block.BlockID);
-                    block.acl.BTreeCapSize = jobinfo.dc.BTreeCapSize;
-                    MySpace.DataMining.DistributedObjects5.DistObject.FILE_BUFFER_SIZE = FILE_BUFFER_SIZE;
-                    block.acl.atype = atype;
-                    block.acl.DfsSampleDistance = jobinfo.dc.DataNodeBaseSize / jobinfo.dc.DataNodeSamples;
-                    block.slaveconfigxml = jobinfo.slaveconfigxml;
-                    block.acl.CompressFileOutput = jobinfo.dc.slave.CompressDfsChunks;
-                    block.acl.ZMapBlockCount = blockscount;
-                    block.verbose = jobinfo.verbose;
-                    block.acl.CompilerOptions = jobinfo.cfgj.IOSettings.CompilerOptions;
-                    block.acl.CompilerVersion = jobinfo.cfgj.IOSettings.CompilerVersion;
-                    if (jobinfo.cfgj.AssemblyReferencesCount > 0)
-                    {
-                        jobinfo.cfgj.AddAssemblyReferences(block.acl.CompilerAssemblyReferences, Surrogate.NetworkPathForHost(block.SlaveHost));
-                    }
-                    if (jobinfo.cfgj.OpenCVExtension != null)
-                    {
-                        block.acl.AddOpenCVExtension();
-                    }
-                    if (jobinfo.cfgj.Unsafe != null)
-                    {
-                        block.acl.AddUnsafe();
-                    }
-                    block.gencodectx();
-                    block.acl.AddBlock("1", "1", block.SlaveHost + @"|" + block.logname + @"|slaveid=0");
-                    block.ownedzmapblockIDs.Add(block.BlockID);
-
-                    if (block.BlockCID < blockscount)
-                    {
-                        _blocks.Add(block);
-                    }
-                }
-                jobinfo.timethread.Start();
-
-#if FAILOVER_DEBUG
-                {
-                    Log("jobinfo.mapinputchunks");
-                    string debugtxt = "";
-                    foreach (dfs.DfsFile.FileNode xx in jobinfo.mapinputchunks)
-                    {
-                        debugtxt += xx.Name + Environment.NewLine;
-                    }
-                    Log(debugtxt);  
-                }
-                {
-                    Log("jobinfo.inputnodesoffsets");
-                    string debugtxt = "";
-                    foreach (int xx in jobinfo.inputnodesoffsets)
-                    {
-                        debugtxt += xx.ToString() + Environment.NewLine;
-                    }
-                    Log(debugtxt);
-                }
-                {
-                    Log("jobinfo.mapfileswithnodes");
-                    string debugtxt = "";
-                    foreach (string xx in jobinfo.mapfileswithnodes)
-                    {
-                        debugtxt += xx + Environment.NewLine;
-                    }
-                    Log(debugtxt);
-                }                
-                {
-                    Log("jobinfo.inputrecordlengths");
-                    string debugtxt = "";
-                    foreach (int xx in jobinfo.inputrecordlengths)
-                    {
-                        debugtxt += xx.ToString() + Environment.NewLine;
-                    }
-                    Log(debugtxt);
-                }
-#endif
-                               
-                {
-                    List<dfs.DfsFile.FileNode> _mapinputchunks = null;
-                    List<string> _mapfileswithnodes = null;
-                    List<int> _inputnodesoffsets = null;
-                    List<int> _inputrecordlengths = null;
-
-                    if (string.Compare("next", inputOrder, StringComparison.OrdinalIgnoreCase) == 0)
-                    {
-                        _mapinputchunks = jobinfo.mapinputchunks;
-                        _mapfileswithnodes = jobinfo.mapfileswithnodes;
-                        _inputnodesoffsets = jobinfo.inputnodesoffsets;
-                        _inputrecordlengths = jobinfo.inputrecordlengths;
-                    }
-                    else if (string.Compare("shuffle", inputOrder, StringComparison.OrdinalIgnoreCase) == 0)
-                    {
-                        _mapinputchunks = new List<dfs.DfsFile.FileNode>(jobinfo.mapinputchunks.Count);
-                        _mapfileswithnodes = new List<string>(jobinfo.mapinputchunks.Count);
-                        _inputnodesoffsets = new List<int>(jobinfo.mapinputchunks.Count);
-                        _inputrecordlengths = new List<int>(jobinfo.mapinputchunks.Count);
-
-                        for (int ci = 0; ci < jobinfo.mapinputchunks.Count; ci++)
-                        {
-                            _mapinputchunks.Add(jobinfo.mapinputchunks[ci]);
-                            _inputnodesoffsets.Add(ci);
-                        }
-
-                        for (int oi = 0; oi < jobinfo.inputnodesoffsets.Count; oi++)
-                        {
-                            string fname = jobinfo.mapfileswithnodes[oi];
-                            int reclen = jobinfo.inputrecordlengths[oi];
-                            int expand = (oi == jobinfo.inputnodesoffsets.Count - 1 ? jobinfo.mapinputchunks.Count : jobinfo.inputnodesoffsets[oi + 1]);
-                            expand = expand - _mapfileswithnodes.Count;
-
-                            for (int ei = 0; ei < expand; ei++)
-                            {
-                                _mapfileswithnodes.Add(fname);
-                                _inputrecordlengths.Add(reclen);
-                            }
-                        }
-                        
-                        for (int ci = 0; ci < _mapinputchunks.Count; ci++)
-                        {
-                            int rndindex = rnd.Next() % _mapinputchunks.Count;
-                            dfs.DfsFile.FileNode oldchunk = _mapinputchunks[ci];
-                            _mapinputchunks[ci] = _mapinputchunks[rndindex];
-                            _mapinputchunks[rndindex] = oldchunk;
-
-                            string oldfname = _mapfileswithnodes[ci];
-                            _mapfileswithnodes[ci] = _mapfileswithnodes[rndindex];
-                            _mapfileswithnodes[rndindex] = oldfname;
-
-                            int oldreclen = _inputrecordlengths[ci];
-                            _inputrecordlengths[ci] = _inputrecordlengths[rndindex];
-                            _inputrecordlengths[rndindex] = oldreclen;
-                        }
-                    }
-                    else
-                    {
-                        throw new Exception("Computing InputOrder is not valid");
-                    }
-
-#if FAILOVER_DEBUG
-                    Log("Done shuffling; InputOrder=" + inputOrder);
-                    {
-                        Log("jobinfo.mapinputchunks");
-                        string debugtxt = "";
-                        foreach (dfs.DfsFile.FileNode xx in jobinfo.mapinputchunks)
-                        {
-                            debugtxt += xx.Name + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-                    {
-                        Log("jobinfo.inputnodesoffsets");
-                        string debugtxt = "";
-                        foreach (int xx in jobinfo.inputnodesoffsets)
-                        {
-                            debugtxt += xx.ToString() + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-                    {
-                        Log("jobinfo.mapfileswithnodes");
-                        string debugtxt = "";
-                        foreach (string xx in jobinfo.mapfileswithnodes)
-                        {
-                            debugtxt += xx + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-                    {
-                        Log("jobinfo.inputrecordlengths");
-                        string debugtxt = "";
-                        foreach (int xx in jobinfo.inputrecordlengths)
-                        {
-                            debugtxt += xx.ToString() + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-                    {
-                        Log("_mapinputchunks");
-                        string debugtxt = "";
-                        foreach (dfs.DfsFile.FileNode xx in _mapinputchunks)
-                        {
-                            debugtxt += xx.Name + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-                    {
-                        Log("_inputnodesoffsets");
-                        string debugtxt = "";
-                        foreach (int xx in _inputnodesoffsets)
-                        {
-                            debugtxt += xx.ToString() + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-                    {
-                        Log("_mapfileswithnodes");
-                        string debugtxt = "";
-                        foreach (string xx in _mapfileswithnodes)
-                        {
-                            debugtxt += xx + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-                    {
-                        Log("inputrecordlengths");
-                        string debugtxt = "";
-                        foreach (int xx in _inputrecordlengths)
-                        {
-                            debugtxt += xx.ToString() + Environment.NewLine;
-                        }
-                        Log(debugtxt);
-                    }
-#endif
-
-                    int firstsetpos = -1;
-                    MapReduceBlockInfo targetblock = null;
-                    string[] dfsfilenames = new string[blockscount];
-                    string curfilename = null;
-                    int curreclen = 0;
-                    int curoffset = 0;
-                    int fi = 0;
-                    if (_mapinputchunks.Count > 0)
-                    {
-                        curoffset = _inputnodesoffsets[fi];
-                    }
-                    for (int mi = 0; mi < _mapinputchunks.Count; mi++)
-                    {
-                        if (curoffset == mi)
-                        {
-                            curfilename = _mapfileswithnodes[fi];
-                            curreclen = _inputrecordlengths[fi];
-                            if (++fi < _inputnodesoffsets.Count)
-                            {
-                                curoffset = _inputnodesoffsets[fi];
-                            }
-                        }
-
-                        if (++firstsetpos >= firstset.Length)
-                        {
-                            firstsetpos = 0;
-                        }
-                        targetblock = firstset[firstsetpos];
-
-                        targetblock.mapinputdfsnodes.Add(dfs.MapNodeToNetworkStarPath(_mapinputchunks[mi], false, rnd.Next() % jobinfo.dc.Replication));
-                        if (dfsfilenames[targetblock.BlockID] != curfilename)
-                        {
-                            if (targetblock.mapinputfilenames == null)
-                            {
-                                targetblock.mapinputfilenames = new List<string>();
-                                targetblock.mapinputnodesoffsets = new List<int>();
-                            }
-                            int offset = targetblock.mapinputdfsnodes.Count - 1;
-                            targetblock.mapinputnodesoffsets.Add(offset);
-                            targetblock.mapinputfilenames.Add(curfilename);
-                            targetblock.acl.InputRecordLengths.Add(curreclen);
-                            dfsfilenames[targetblock.BlockID] = curfilename;
-                        }
-                    }
-                }
-
-                //scramble each inputfile node path and assign to the other set of blocks
-                {
-                    foreach (MapReduceBlockInfo block in firstset)
-                    {
-                        for (int ri = 1; ri < jobinfo.dc.Replication; ri++)
-                        {
-                            MapReduceBlockInfo repblock = allBlocks[ri * blockscount + block.BlockID];
-                            repblock.mapinputnodesoffsets = block.mapinputnodesoffsets;
-                            repblock.mapinputfilenames = block.mapinputfilenames;
-                            repblock.acl.InputRecordLengths = block.acl.InputRecordLengths;
-                        }
-                        
-                        foreach (string mpinput in block.mapinputdfsnodes)
-                        {
-                            string[] parts = mpinput.Split('*');
-                            for (int ri = 1; ri < jobinfo.dc.Replication; ri++)
-                            {
-                                int firsthost = rnd.Next() % parts.Length;
-                                string sbmpinput = "";
-                                for (int pi = 0; pi < parts.Length; pi++)
-                                {
-                                    if (firsthost >= parts.Length)
-                                    {
-                                        firsthost = 0;
-                                    }
-                                    if (sbmpinput.Length > 0)
-                                    {
-                                        sbmpinput += "*";
-                                    }
-                                    sbmpinput += parts[firsthost++];
-                                }
-                                MapReduceBlockInfo repblock = allBlocks[ri * blockscount + block.BlockID];
-                                repblock.mapinputdfsnodes.Add(sbmpinput);
-                            }
-                        }
-                    }
-                }
-
-#if FAILOVER_DEBUG
-                //SANITY CHECK
-                //make sure each host doesn't have repeated blockid.
-                {
-                    Dictionary<string, Dictionary<int, MapReduceBlockInfo>> san = new Dictionary<string, Dictionary<int, MapReduceBlockInfo>>();
-                    foreach (MapReduceBlockInfo bl in allBlocks)
-                    {
-                        if (!san.ContainsKey(bl.SlaveHost.ToLower()))
-                        {
-                            san.Add(bl.SlaveHost.ToLower(), new Dictionary<int, MapReduceBlockInfo>());
-                        }
-                        san[bl.SlaveHost.ToLower()].Add(bl.BlockID, bl);
-                    }
-                    Log("====== SANITY CHECK PASSED #1 ======");
-
-                    Log("hostscount in allBlocks=" + san.Count.ToString());
-                    string debugtxt = "";
-                    foreach (string h in san.Keys)
-                    {
-                        debugtxt += h + ":" + san[h].Values.Count.ToString() + Environment.NewLine;
-                    }
-                    Log(debugtxt);
-
-                    foreach (string host in san.Keys)
-                    {
-                        Log("host " + host + " has " + san[host].Count.ToString() + " blocks");
-                    }
-
-                    Dictionary<int, int> repblockcountperhost = new Dictionary<int, int>();
-                    foreach (string host in san.Keys)
-                    {
-                        Dictionary<int, List<MapReduceBlockInfo>> repfactorToBlocks = new Dictionary<int, List<MapReduceBlockInfo>>();
-                        Dictionary<int, MapReduceBlockInfo> blocks = san[host];
-
-                        foreach (MapReduceBlockInfo block in blocks.Values)
-                        {
-                            int repf = (block.BlockCID - block.BlockID) / blockscount;
-                            if (!repfactorToBlocks.ContainsKey(repf))
-                            {
-                                repfactorToBlocks.Add(repf, new List<MapReduceBlockInfo>());
-                            }
-                            repfactorToBlocks[repf].Add(block);
-                        }
-
-                        Log("Distribution of blocks in host " + host);
-                        foreach (int repf in repfactorToBlocks.Keys)
-                        {
-                            Log("replication index=" + repf.ToString() + "; blocks=" + repfactorToBlocks[repf].Count);
-
-                            if (!repblockcountperhost.ContainsKey(repfactorToBlocks[repf].Count))
-                            {
-                                repblockcountperhost.Add(repfactorToBlocks[repf].Count, 0);
-                            }
-                        }
-                    }
-
-                    string txt = "";
-                    foreach (int r in repblockcountperhost.Keys)
-                    {
-                        txt += r.ToString() + ",";
-                    }
-                    Log("Replication blocks count per host:" + txt);
-                }
-
-                {
-                    if (blockscount != _blocks.Count)
-                    {
-                        throw new Exception("blockscount != _blocks.Count; blockscount=" + blockscount.ToString() + ";_blocks.count=" + _blocks.Count.ToString());
-                    }
-                    Log("====== SANITY CHECK PASSED #2 ======");
-                }
-
-                //make sure all blockid and blockcid are correct.
-                {
-                    for (int bi = 0; bi < allBlocks.Length; bi++)
-                    {
-                        MapReduceBlockInfo bl = allBlocks[bi];
-                        if (bi != bl.BlockCID)
-                        {
-                            throw new Exception("bi doesn't match bl.BlockCID. bi=" + bi.ToString() + ";bl.BlockCID=" + bl.BlockCID.ToString());
-                        }
-
-                        if ((bl.BlockCID - bl.BlockID) % blockscount != 0)
-                        {
-                            throw new Exception("(bl.BlockCID - bl.BlockID) % blockscount != 0.  bl.blockcid=" + bl.BlockCID.ToString() + ";bl.blockid=" + bl.BlockID.ToString());
-                        }
-                    }
-                    Log("====== SANITY CHECK PASSED #3 ======");
-                }
-
-                //check blockstatus
-                {
-                    if (blockStatus.Count != allblockscount)
-                    {
-                        throw new Exception("blockStatus.Count != allblockscount;blockstatuscount=" + blockStatus.Count.ToString() + ";allblockscount=" + allblockscount.ToString());
-                    }
-                    List<int> san = new List<int>(blockStatus.Keys);
-                    san.Sort();
-                    if (san[0] != 0)
-                    {
-                        throw new Exception("san[0] != 0; san[0]=" + san[0].ToString());
-                    }
-                    if (san[allblockscount - 1] != allblockscount - 1)
-                    {
-                        throw new Exception("san[allblockscount - 1] != allblockscount - 1; san[allblockscount-1]=" + san[allblockscount - 1].ToString() + ";allblockscount=" + allblockscount.ToString());
-                    }
-                    Log("====== SANITY CHECK PASSED #4 ======");
-                }
-
-                //make sure each block id has repfactor number of copies and on different host.
-                {
-                    Dictionary<int, Dictionary<string, MapReduceBlockInfo>> san = new Dictionary<int, Dictionary<string, MapReduceBlockInfo>>();
-                    foreach (MapReduceBlockInfo bl in allBlocks)
-                    {
-                        if (!san.ContainsKey(bl.BlockID))
-                        {
-                            san.Add(bl.BlockID, new Dictionary<string, MapReduceBlockInfo>());
-                        }
-                        san[bl.BlockID].Add(bl.SlaveHost, bl);
-                    }
-
-                    foreach (int blockid in san.Keys)
-                    {
-                        Dictionary<string, MapReduceBlockInfo> bls = san[blockid];
-                        if (bls.Count != jobinfo.dc.Replication)
-                        {
-                            throw new Exception("bls.Count != repfactor");
-                        }
-                    }
-                    Log("====== SANITY CHECK PASSED #5 ======");
-
-                    {
-                        string txt = "";
-                        foreach (int blockid in san.Keys)
-                        {
-                            txt += blockid.ToString() + Environment.NewLine;
-                            Dictionary<string, MapReduceBlockInfo> repbs = san[blockid];
-                            foreach (KeyValuePair<string, MapReduceBlockInfo> pair in repbs)
-                            {
-                                txt += pair.Value.BlockID.ToString() + ":" + pair.Value.BlockCID.ToString() + ":" + pair.Value.SlaveHost +
-                                    Environment.NewLine;
-                            }
-                        }
-                        Log("Blocks distribution:");
-                        Log(txt);
-                    }
-                }
-#endif
-            }
-
-            internal void AssignBlocksToHosts(MapReduceBlockInfo[] scrambled, string[] hosts, ref int nexthost, Dictionary<string, Dictionary<int, MapReduceBlockInfo>> hostToBlockIDs, List<MapReduceBlockInfo> collisions, Dictionary<string, Dictionary<int, MapReduceBlockInfo>> hostToBlockIDsPerReplication, int blocksperhost, int blockscount)
-            {
-                for (int bi = 0; bi < scrambled.Length; bi++)
-                {
-                    string thishost = hosts[nexthost].ToLower();                    
-                    MapReduceBlockInfo block = scrambled[bi];
-                    Dictionary<int, MapReduceBlockInfo> blocksalreadyonhost = null;
-                    if (hostToBlockIDs.ContainsKey(thishost))
-                    {
-                        blocksalreadyonhost = hostToBlockIDs[thishost];
-                    }
-                    else
-                    {
-                        blocksalreadyonhost = new Dictionary<int, MapReduceBlockInfo>(blocksperhost);
-                        hostToBlockIDs.Add(thishost, blocksalreadyonhost);
-                    }
-
-                    if (blocksalreadyonhost.ContainsKey(block.BlockID))
-                    {
-                        collisions.Add(block);
-                        continue;
-                    }
-
-                    block.SlaveHost = thishost;
-                    blocksalreadyonhost.Add(block.BlockID, block);
-                    if (!hostToBlockIDsPerReplication.ContainsKey(thishost))
-                    {
-                        hostToBlockIDsPerReplication.Add(thishost, new Dictionary<int, MapReduceBlockInfo>(blockscount));
-                    }
-                    hostToBlockIDsPerReplication[thishost].Add(block.BlockID, block);
-
-                    //move to the next host only if done assigning
-                    if (++nexthost >= hosts.Length)
-                    {
-                        nexthost = 0;
-                    }
-                }                
-
-                //swap with another host if nothing was assigned, we are stuck at one host, and this host has all the blockids from the collision list.
-                if (collisions.Count == scrambled.Length)
-                {
-#if FAILOVER_DEBUG
-                    Log("Swap begins... collisioncount=" + collisions.Count.ToString() + ";scrambledcount=" + scrambled.Length.ToString());
-#endif
-                    MapReduceBlockInfo xblock = collisions[0];
-                    string thishost = hosts[nexthost].ToLower();
-                    Dictionary<int, MapReduceBlockInfo> blocksalreadyonhost = null;
-                    if (hostToBlockIDs.ContainsKey(thishost))
-                    {
-                        blocksalreadyonhost = hostToBlockIDs[thishost];
-                    }
-                    else
-                    {
-                        blocksalreadyonhost = new Dictionary<int, MapReduceBlockInfo>(blocksperhost);
-                        hostToBlockIDs.Add(thishost, blocksalreadyonhost);
-                    }
-
-                    int phostindex = rnd.Next() % hosts.Length;
-                    for (int hi = 0; hi < hosts.Length; hi++)
-                    {
-                        string phost = hosts[phostindex].ToLower();
-                        if (++phostindex >= hosts.Length)
-                        {
-                            phostindex = 0;
-                        }                       
-                        
-                        if (!hostToBlockIDsPerReplication.ContainsKey(phost))
-                        {
-                            continue;
-                        }                     
-                       
-                        if (hostToBlockIDs.ContainsKey(phost))
-                        {
-                            if (hostToBlockIDs[phost].ContainsKey(xblock.BlockID))
-                            {
-                                continue;
-                            }
-                        }     
-                        
-                        MapReduceBlockInfo blocktoswap = null;
-                        Dictionary<int, MapReduceBlockInfo> pblocks = hostToBlockIDsPerReplication[phost];
-                        foreach (MapReduceBlockInfo pblock in pblocks.Values)
-                        {
-                            if (!blocksalreadyonhost.ContainsKey(pblock.BlockID))
-                            {
-                                blocktoswap = pblock;
-                                break;
-                            }
-                        }
-                        if (blocktoswap == null)
-                        {
-                            continue;
-                        }
-                        
-                        //swap
-                        {                            
-                            hostToBlockIDs[phost].Remove(blocktoswap.BlockID);
-                            pblocks.Remove(blocktoswap.BlockID);
-                            
-                            blocktoswap.SlaveHost = thishost;
-                            blocksalreadyonhost.Add(blocktoswap.BlockID, blocktoswap);
-                            if (!hostToBlockIDsPerReplication.ContainsKey(thishost))
-                            {
-                                hostToBlockIDsPerReplication.Add(thishost, new Dictionary<int, MapReduceBlockInfo>(blockscount));
-                            }
-                            hostToBlockIDsPerReplication[thishost].Add(blocktoswap.BlockID, blocktoswap);
-                            
-                            xblock.SlaveHost = phost;
-                            hostToBlockIDs[phost].Add(xblock.BlockID, xblock);
-                            pblocks.Add(xblock.BlockID, xblock);
-
-                            collisions.RemoveAt(0);
-#if FAILOVER_DEBUG
-                            Log("Swap done");
-#endif
-                            break; //done
-                        }
-                    }
-
-                    if (collisions.Count == scrambled.Length)
-                    {                        
-                        throw new Exception("Cannot resolve collisions");
-                    }
-
-                    if (++nexthost >= hosts.Length)
-                    {
-                        nexthost = 0;
-                    }
-                }
-            }
-
-            internal bool CheckMachineFailure(string host)
-            {
-                bool failure = false;
-                if (IsMachinePingable(host))
-                {
-                    string reason = null;
-                    failure = diskcheck.IsDiskFailure(host, out reason);                    
-                }
-                else
-                {
-                    failure = true;
-                }
-                return failure;
-            }            
-
-            internal int CheckMachineFailures()
-            {
-                int nthreads = goodHosts.Count;
-                if (nthreads > 15)
-                {
-                    nthreads = 15;
-                }
-
-                newBadHosts.Clear();
-
-                MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
-                new Action<string>(
-                delegate(string host)
-                {
-                    if (CheckMachineFailure(host))
-                    {
-                        lock (newBadHosts)
-                        {
-                            newBadHosts.Add(host);
-                        }
-                    }                                     
-                }), new List<string>(goodHosts.Keys), nthreads);
-
-                if (newBadHosts.Count > 0)
-                {
-                    foreach (string bh in newBadHosts)
-                    {
-                        goodHosts.Remove(bh);
-                        badHosts.Add(bh, 0);
-                    }
-                }
-
-                return newBadHosts.Count;
-            }
-
-            internal bool AllBlocksCompleted(int finalstatus)
-            {
-                lock (blockStatus)
-                {
-                    foreach(int bs in blockStatus.Values)
-                    {
-                        if (bs != finalstatus)
-                        {
-                            return false;
-                        }
-                    }
-                }                
-                return true;
-            }
-
-            internal void CloseAllBlocks()
-            {
-                for (int i = 0; i < allBlocks.Length; i++)
-                {
-                    if (allBlocks[i] != null)
-                    {
-                        allBlocks[i].acl.StopZMapBlockServer();
-                        allBlocks[i].acl.Close();
-                    }
-                }
-            }
-
-            internal void AbortBlocksFromFailedHost(string badhost)
-            {
-                if (hostToBlocks.ContainsKey(badhost))
-                {
-                    List<MapReduceBlockInfo> badblocks = hostToBlocks[badhost];
-#if FAILOVER_DEBUG
-                    Log(badhost + " contains badblocks; badblockscount=" + badblocks.Count.ToString());
-#endif
-                    foreach (MapReduceBlockInfo badblock in badblocks)
-                    {
-                        allBlocks[badblock.BlockCID] = null;
-
-                        lock (blockStatus)
-                        {
-                            blockStatus.Remove(badblock.BlockCID);
-#if FAILOVER_DEBUG
-                            Log("Removed badblock from blockstatus; blockcid=" + badblock.BlockCID.ToString());
-#endif
-                        }
-
-                        try
-                        {
-                            badblock.thread.Abort();
-#if FAILOVER_DEBUG
-                            Log("Aborted badblock; blockcid=" + badblock.BlockCID.ToString());
-#endif
-                            AELight_RemoveTraceThread(badblock.thread); //no join, just remove.
-#if FAILOVER_DEBUG
-                            Log("AELight removed trace badblock; blockcid=" + badblock.BlockCID.ToString());
-#endif
-                        }
-                        catch
-                        {
-                        }
-                    }
-
-                    hostToBlocks.Remove(badhost);
-                }
-            }
-
-            internal void UpdateBlockStatus(int blockcid, int status)
-            {
-                lock (blockStatus)
-                {
-                    if (blockStatus.ContainsKey(blockcid))
-                    {
-                        blockStatus[blockcid] = status;
-                    }
-                }
-            }
-
-            internal void Log(string msg)
-            {
-                string tempfile = @"c:\temp\failoverlog_102C5560-2012-4537-AFC8-C40ADF0AD2B8.txt";
-                lock (goodHosts)
-                {
-                    using (System.IO.StreamWriter w = new System.IO.StreamWriter(tempfile, true))
-                    {
-                        w.WriteLine("  [" + DateTime.Now.ToString() + "]");
-                        w.WriteLine(msg);
-                    }
-                }
-            }
-
-            internal class JobInfo
-            {
-                internal MapReduceBlockInfo.JobBlocksShared jobshared;
-                internal List<string> allinputsamples;
-                internal bool extraverbose;
-                internal List<string> outputfiles;
-                internal string outputfile;
-                internal dfs dc;
-                internal string[] execargs;
-                internal string logname;
-                internal List<int> outputrecordlengths;
-                internal string slaveconfigxml;
-                internal bool verbose;
-                internal SourceCode.Job cfgj;
-                internal List<dfs.DfsFile.FileNode> mapinputchunks;
-                internal List<string> mapfileswithnodes;
-                internal List<int> inputnodesoffsets;
-                internal List<int> inputrecordlengths;
-                internal System.Threading.Thread timethread;
-            }
-        }
-
+    {      
         internal class MapReduceBlockInfo
-        {
-            
+        {            
             // Shared between all blocks of one job.
             internal class JobBlocksShared
             {
@@ -988,6 +88,11 @@ namespace MySpace.DataMining.AELight
 
             internal int BlockCID = -1;
             internal FailoverInfo failover = null;
+            internal bool rehash = false;
+            internal string ownedzmapblocks = null;
+            internal string remotezmapblocks = null;
+            internal bool diskfailuredetected = false;
+            internal bool replicatingoutput = false;
 
             string codectx, mapctx;
 
@@ -1718,7 +823,15 @@ public void DSpace_LogResult(string name, bool passed)
                             throw new Exception("Unknown OutputMethod: " + cfgj.IOSettings.OutputMethod);
                         }
 
-                        acl.DoMap(mapinputdfsnodes, mapctx + cfgj.MapReduce.Map, cfgj.Usings, mapinputfilenames, mapinputnodesoffsets);
+                        if (rehash)
+                        {                            
+                            acl.DoMapRehash(mapinputdfsnodes, mapctx);
+                        }
+                        else
+                        {
+                            acl.DoMap(mapinputdfsnodes, mapctx + cfgj.MapReduce.Map, cfgj.Usings, mapinputfilenames, mapinputnodesoffsets);
+                        }
+                        
                         if (extraverbose)
                         {
                             {
@@ -1805,41 +918,63 @@ public void DSpace_LogResult(string name, bool passed)
 #endif
                     if (cfgj.MapReduce.Map.Length != 0)
                     {
-                        List<MySpace.DataMining.DistributedObjects5.ArrayComboList> aclall = new List<MySpace.DataMining.DistributedObjects5.ArrayComboList>(all.Count);
-                        if (0 == string.Compare("shuffle", ExchangeOrder, StringComparison.OrdinalIgnoreCase))
+                        List<MySpace.DataMining.DistributedObjects5.ArrayComboList> aclall = null;
+                        string zmbasepaths = null;
+                        if (failover == null)
                         {
-                            for (int i = 0; i < all.Count; i++)
+                            aclall = new List<MySpace.DataMining.DistributedObjects5.ArrayComboList>(all.Count);
+                            if (0 == string.Compare("shuffle", ExchangeOrder, StringComparison.OrdinalIgnoreCase))
                             {
-                                aclall.Add(all[i].acl);
-                            }
-                            for (int i = 0; i < aclall.Count; i++)
-                            {
-                                MySpace.DataMining.DistributedObjects5.ArrayComboList aclx = aclall[i];
-                                int ridx;
-                                lock (_erand)
+                                for (int i = 0; i < all.Count; i++)
                                 {
-                                    ridx = _erand.Next(0, aclall.Count);
+                                    aclall.Add(all[i].acl);
                                 }
-                                aclall[i] = aclall[ridx];
-                                aclall[ridx] = aclx;
+                                for (int i = 0; i < aclall.Count; i++)
+                                {
+                                    MySpace.DataMining.DistributedObjects5.ArrayComboList aclx = aclall[i];
+                                    int ridx;
+                                    lock (_erand)
+                                    {
+                                        ridx = _erand.Next(0, aclall.Count);
+                                    }
+                                    aclall[i] = aclall[ridx];
+                                    aclall[ridx] = aclx;
+                                }
                             }
-                        }
-                        else if (0 == string.Compare("next", ExchangeOrder, StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Start at current and wrap back around.
-                            for (int i = BlockID + 1; i < all.Count; i++)
+                            else if (0 == string.Compare("next", ExchangeOrder, StringComparison.OrdinalIgnoreCase))
                             {
-                                aclall.Add(all[i].acl);
+                                // Start at current and wrap back around.
+                                for (int i = BlockID + 1; i < all.Count; i++)
+                                {
+                                    aclall.Add(all[i].acl);
+                                }
+                                for (int i = 0; i <= BlockID; i++)
+                                {
+                                    aclall.Add(all[i].acl);
+                                }
                             }
-                            for (int i = 0; i <= BlockID; i++)
+                            else
                             {
-                                aclall.Add(all[i].acl);
+                                throw new Exception("Unsupported ExchangeOrder: " + ExchangeOrder);
                             }
                         }
                         else
                         {
-                            throw new Exception("Unsupported ExchangeOrder: " + ExchangeOrder);
+                            string[] remotezms = remotezmapblocks.Split(';');
+                            for (int zi = 0; zi < remotezms.Length; zi++)
+                            {
+                                string oldvalue = remotezms[zi];
+                                int ridx;
+                                lock (_erand)
+                                {
+                                    ridx = _erand.Next(0, remotezms.Length);
+                                }
+                                remotezms[zi] = remotezms[ridx];
+                                remotezms[ridx] = oldvalue;
+                            }
+                            zmbasepaths = string.Join(";", remotezms);                            
                         }
+                        
 #if MR_EXCHANGE_TIME_PRINT
                         lock (jobshared)
                         {
@@ -1849,7 +984,15 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                         }
 #endif
-                        acl.ZBlockExchange(aclall, ownedzmapblockIDs);
+                        if (failover == null)
+                        {
+                            acl.ZBlockExchange(aclall, ownedzmapblockIDs);
+                        }
+                        else
+                        {
+                            acl.ZBlockExchange(zmbasepaths, ownedzmapblockIDs);
+                        }
+                        
                         if (extraverbose)
                         {
                             {
@@ -1898,7 +1041,20 @@ public void DSpace_LogResult(string name, bool passed)
                 catch (Exception e)
                 {
                     LastThreadException = e;
+
+                    bool donelogging = false;
+                    if (failover != null)
+                    {
+                        if (failover.CheckMachineFailure(SlaveHost))
+                        {
+                            LogOutput("Thread exception: (exchange thread): Hardware failure at " + SlaveHost);
+                            LogOutputToFile("Thread exception: (exchange thread) Hardware failure at " + SlaveHost + ": " + e.ToString());
+                            donelogging = true;
+                        }                        
+                    }
+
                     //lock (typeof(BlockInfo))
+                    if (!donelogging)
                     {
                         if (-1 != e.ToString().IndexOf("[Note: ensure the Windows service is running]"))
                         {
@@ -1912,6 +1068,11 @@ public void DSpace_LogResult(string name, bool passed)
                             LogOutput("Thread exception: (exchange thread) " + e.ToString());
                         }
                     }
+                }
+
+                if (failover != null)
+                {
+                    failover.UpdateBlockStatus(BlockCID, 1);
                 }
             }
 
@@ -2561,6 +1722,12 @@ public void DSpace_LogResult(string name, bool passed)
                         SetFailure();
                         return;
                     }
+                    if (string.Compare(cfgj.ExchangeOrder, "shuffle", StringComparison.OrdinalIgnoreCase) != 0)
+                    {
+                        Console.Error.WriteLine("Error: Speculative computing supports only mapreduce with shuffle ExchangeOrder.");
+                        SetFailure();
+                        return;
+                    }
                     if (dc.Replication < 2)
                     {
                         Console.Error.WriteLine("Error: Speculative computing applies only when replication factor > 1.");
@@ -2568,8 +1735,8 @@ public void DSpace_LogResult(string name, bool passed)
                         return;
                     }
                     try
-                    {
-                        failover = new FailoverInfo(dc, cfgj.Computing.InputOrder);
+                    {                        
+                        failover = new FailoverInfo(dc);
                     }
                     catch (Exception e)
                     {
@@ -2667,12 +1834,11 @@ public void DSpace_LogResult(string name, bool passed)
                 {
                     throw new Exception("Invalid process count");
                 }
-                int removedslavescount = 0;
+                List<string> removedslaves = null;
                 if (dc.Replication > 1 || cfgj.IsJobFailoverEnabled)
                 {
-                    List<string> removedslaves = new List<string>();
+                    removedslaves = new List<string>();
                     slaves = ExcludeUnhealthySlaveMachines(slaves, removedslaves, true).ToArray();
-                    removedslavescount = removedslaves.Count;
                     if (removedslaves.Count >= dc.Replication)
                     {
                         throw new Exception("Not enough healthy machines to run job (hit replication count)");
@@ -2690,6 +1856,7 @@ public void DSpace_LogResult(string name, bool passed)
 
                 System.Threading.Thread timethread = new System.Threading.Thread(new System.Threading.ThreadStart(timethreadproc));
                 timethread.Name = "MapReduceJobTime";
+                bool aborting = false;
                 try
                 {
                     List<MapReduceBlockInfo> blocks = new List<MapReduceBlockInfo>(goodblockcount);
@@ -2720,9 +1887,9 @@ public void DSpace_LogResult(string name, bool passed)
                                 return; // ...
                             }
                         }*/
-                        
+
                         {
-                            mapinputchunks = new List<dfs.DfsFile.FileNode>();                            
+                            mapinputchunks = new List<dfs.DfsFile.FileNode>();
                             if (null != AddCacheNodes)
                             {
                                 mapinputchunks = AddCacheNodes;
@@ -2797,8 +1964,8 @@ public void DSpace_LogResult(string name, bool passed)
                                         inputnodesoffsets.Add(mapinputchunks.Count);
                                         inputrecordlengths.Add(inreclen);
                                         mapinputchunks.AddRange(df.Nodes);
-                                    }                                    
-                                    
+                                    }
+
                                 }
 
                                 MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength = inputrecordlengths.Count > 0 ? inputrecordlengths[0] : -1;
@@ -2894,7 +2061,7 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                             try
                             {
-                                System.IO.File.WriteAllText(NetworkPathForHost(slaves[si]) + @"\slaveconfig.j" +  sjid + ".xml", slaveconfigxml);
+                                System.IO.File.WriteAllText(NetworkPathForHost(slaves[si]) + @"\slaveconfig.j" + sjid + ".xml", slaveconfigxml);
                             }
                             catch
                             {
@@ -2983,7 +2150,7 @@ public void DSpace_LogResult(string name, bool passed)
                     //System.Threading.Thread.Sleep(1000 * 8);
 #endif
                     jobshared.blockcount = goodblockcount;
-                    jobshared.ExecOpts = ExecOpts;                    
+                    jobshared.ExecOpts = ExecOpts;
                     if (failover == null)
                     {
                         for (int BlockID = 0; BlockID < goodblockcount; BlockID++)
@@ -3023,7 +2190,7 @@ public void DSpace_LogResult(string name, bool passed)
                             bi.acl = new MySpace.DataMining.DistributedObjects5.ArrayComboList(cfgj.NarrativeName + "_BlockID" + sblockid, cfgj.IOSettings.KeyLength);
                             bi.acl.SetJID(jid, CurrentJobFileName + " MapReduce: " + cfgj.NarrativeName);
 #if DEBUG
-                        //System.Threading.Thread.Sleep(1000 * 8);
+                            //System.Threading.Thread.Sleep(1000 * 8);
 #endif
                             int IntermediateDataAddressing = cfgj.IntermediateDataAddressing;
                             if (0 == IntermediateDataAddressing)
@@ -3087,7 +2254,8 @@ public void DSpace_LogResult(string name, bool passed)
                                 bi.acl.AddUnsafe();
                             }
                             bi.gencodectx();
-                            bi.acl.AddBlock("1", "1", bi.SlaveHost + @"|" + bi.logname + @"|slaveid=0");
+                            bi.acl.AddBlock("1", "1", bi.SlaveHost + @"|"
+                                + (cfgj.ForceStandardError != null ? "&" : "") + bi.logname + @"|slaveid=0");
                             blocks.Add(bi);
                         }
                         timethread.Start();
@@ -3213,53 +2381,29 @@ public void DSpace_LogResult(string name, bool passed)
                     }
                     else
                     {
-                        FailoverInfo.JobInfo jobinfo = new FailoverInfo.JobInfo();
-                        jobinfo.allinputsamples = allinputsamples;
-                        jobinfo.cfgj = cfgj;
-                        jobinfo.dc = dc;
-                        jobinfo.execargs = ExecArgs;
-                        jobinfo.extraverbose = extraverbose;
-                        jobinfo.inputnodesoffsets = inputnodesoffsets;
-                        jobinfo.inputrecordlengths = inputrecordlengths;
-                        jobinfo.jobshared = jobshared;
-                        jobinfo.logname = logname;
-                        jobinfo.mapfileswithnodes = mapfileswithnodes;
-                        jobinfo.mapinputchunks = mapinputchunks;
-                        jobinfo.outputfile = outputfile;
-                        jobinfo.outputfiles = outputfiles;
-                        jobinfo.outputrecordlengths = outputrecordlengths;
-                        jobinfo.slaveconfigxml = slaveconfigxml;
-                        jobinfo.verbose = verbose;
-                        jobinfo.timethread = timethread;
-                        failover.CreateBlocks(slaves, blocks, goodblockcount, 0, jobinfo);
-#if FAILOVER_DEBUG
+                        FailoverInfo.FailoversShared failovershared = new FailoverInfo.FailoversShared();
+                        failovershared.cfgj = cfgj;
+                        failovershared.dc = dc;
+                        failovershared.execargs = ExecArgs;
+                        failovershared.execopts = ExecOpts;
+                        failovershared.extraverbose = extraverbose;
+                        failovershared.logname = logname;
+                        failovershared.outputfile = outputfile;
+                        failovershared.outputfiles = outputfiles;
+                        failovershared.outputrecordlengths = outputrecordlengths;
+                        failovershared.slaveconfigxml = slaveconfigxml;
+                        failovershared.verbose = verbose;
+                       
+                        //convert dfsfilenode to *network paths.
+                        List<string> mapinputstarpaths = new List<string>(mapinputchunks.Count);
+                        for (int mi = 0; mi < mapinputchunks.Count; mi++)
                         {
-                            failover.Log("Done CreateBlocks()...");
-                            string debugtxt = "==========failover.allBlocks==========" + Environment.NewLine;
-                            foreach (MapReduceBlockInfo bl in failover.allBlocks)
-                            {
-                                debugtxt += Environment.NewLine +
-                                    "****blockid=" + bl.BlockID.ToString() + ";blockcid=" + bl.BlockCID.ToString()
-                                    + ";host=" + bl.SlaveHost + Environment.NewLine +
-                                    string.Join(";", bl.mapinputdfsnodes.ToArray()) + Environment.NewLine;
-                            }
-                            failover.Log(debugtxt);
+                            mapinputstarpaths.Add(dfs.MapNodeToNetworkStarPath(mapinputchunks[mi]));
                         }
-                        {
-                            string debugtxt = "==========Blockstatus==========" + Environment.NewLine;
-                            lock (failover.blockStatus)
-                            {
-                                foreach (KeyValuePair<int, int> pair in failover.blockStatus)
-                                {
-                                    debugtxt += "****blockcid=" + pair.Key.ToString() + ";status=" + pair.Value.ToString() + Environment.NewLine;
-                                }
-                            }
-                            failover.Log(debugtxt);
-                        }
-                        failover.Log("FailoverTimeout=" + dc.FailoverTimeout.ToString() + ";FailoverDoCheck=" + dc.FailoverDoCheck.ToString());
-#endif
-                    }         
-                    
+                        failover.CreateBlocks(goodblockcount, mapinputstarpaths, mapfileswithnodes, inputnodesoffsets, inputrecordlengths, failovershared, slaves, removedslaves.ToArray(), false); //rehash=false
+                        timethread.Start();
+                    }
+
                     if (0 == string.Compare(jobshared.noutputmethod, "rsorted")
                         || 0 == string.Compare(jobshared.noutputmethod, "fsorted"))
                     {
@@ -3288,7 +2432,7 @@ public void DSpace_LogResult(string name, bool passed)
                             Console.WriteLine((extraverbose ? "\r\n" : "") + "    [{0}]        Distribution index done; starting map", System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond);
                         }
                     }
-                    
+
                     if (failover == null)
                     {
                         for (int i = 0; i < blocks.Count; i++)
@@ -3333,231 +2477,61 @@ public void DSpace_LogResult(string name, bool passed)
                                 }
                             }
                         }
+
+                        if (null != mapinputchunks) // Only null if DirectSlaveLoad
+                        {
+                            if (verbose)
+                            {
+                                Console.WriteLine((extraverbose ? "\r\n" : "") + "    [{0}]        Map done; starting map exchange", System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond);
+                            }
+                            for (int i = 0; i < blocks.Count; i++)
+                            {
+                                blocks[i].thread = new System.Threading.Thread(new System.Threading.ThreadStart(blocks[i].exchangethreadproc));
+                                blocks[i].thread.Name = "MapReduceJobBlock" + blocks[i].BlockID + "_aftermap";
+                                blocks[i].thread.IsBackground = true;
+                                AELight_StartTraceThread(blocks[i].thread);
+                            }
+                            {
+                                Exception ee = null;
+                                for (int i = 0; i < blocks.Count; i++)
+                                {
+                                    AELight_JoinTraceThread(blocks[i].thread);
+                                    // If failover, check failures..
+                                    if (cfgj.IsJobFailoverEnabled && blocks[i].blockfail)
+                                    {
+                                        ee = blocks[i].LastThreadException;
+                                        if (!CanClientExceptionFailover(ee))
+                                        {
+                                            throw ee; // Throw the worst one.
+                                        }
+                                    }
+                                }
+                                if (null != ee)
+                                {
+                                    if (cfgj.IsJobFailoverEnabled)
+                                    {
+                                        throw new ExceptionFailoverRetryable(ee, cfgj.IsJobFailoverEnabled && CheckFoFilesShouldFailover(slaves, logname));
+                                    }
+                                }
+                            }
+                        }
                     }
                     else
                     {
-                        foreach (MapReduceBlockInfo bl in failover.allBlocks)
-                        {
-                            bl.all = blocks; 
-                            bl.thread = new System.Threading.Thread(new System.Threading.ThreadStart(bl.firstthreadproc));
-                            bl.thread.Name = "MapReduceJobBlock" + bl.BlockID + "_map";
-                            bl.thread.IsBackground = true;
-                            AELight_StartTraceThread(bl.thread);
-                        }
-                        
-                        for (; ; )
-                        {
-#if FAILOVER_DEBUG       
-                            {
-                                failover.Log("Loop.  Sleepcnt=" + failover.sleepCnt.ToString());
-                                string debugtxt = "==========Blockstatus==========" + Environment.NewLine;
-                                lock (failover.blockStatus)
-                                {
-                                    foreach (KeyValuePair<int, int> pair in failover.blockStatus)
-                                    {
-                                        debugtxt += "****blockcid=" + pair.Key.ToString() + ";status=" + pair.Value.ToString() + Environment.NewLine;
-                                    }
-                                }                                
-                                failover.Log(debugtxt);
-                            }
-#endif
-
-                            if (failover.AllBlocksCompleted(1))
-                            {
-#if FAILOVER_DEBUG
-                                failover.Log("All blocks completed.  Breaking out of loop...");
-#endif
-                                break;
-                            }
-
-                            System.Threading.Thread.Sleep(dc.FailoverTimeout);
-
-                            if (failover.sleepCnt++ > dc.FailoverDoCheck)
-                            {
-                                failover.sleepCnt = 0;
-#if FAILOVER_DEBUG
-                                failover.Log("Health check;sleepCnt=" + failover.sleepCnt.ToString());
-#endif
-
-                                if (failover.CheckMachineFailures() > 0)
-                                {
-#if FAILOVER_DEBUG
-                                    failover.Log("Disk failure detected...");
-                                    {
-                                        string debugtxt = "======Bad hosts found=======" + Environment.NewLine +
-                                            string.Join(";", failover.newBadHosts.ToArray());
-                                        failover.Log(debugtxt);
-                                    }   
-#endif
-
-                                    {
-                                        int hoffset = (failover.badHosts.Count - failover.newBadHosts.Count) + removedslavescount;
-                                        string recovered = failover.badHosts.Count + removedslavescount >= dc.Replication ? "NoRecovery" : "Recovered";
-                                        for (int hi = 0; hi < failover.newBadHosts.Count; hi++)
-                                        {
-                                            string badhost = failover.newBadHosts[hi];
-                                            Console.WriteLine(Environment.NewLine + "HWFailure:{0}:{1}:{2}/{3}", recovered, badhost, hi + 1 + hoffset, dc.Replication);
-                                            ConsoleFlush();
-                                            failover.AbortBlocksFromFailedHost(badhost);
-                                        }
-                                    }
-                                    
-#if FAILOVER_DEBUG                                    
-                                    {
-                                        failover.Log("Done removing all bad blocks");
-                                        string debugtxt = "";
-                                        failover.Log("========failover.allblocks========");
-                                        foreach (MapReduceBlockInfo bl in failover.allBlocks)
-                                        {
-                                            if (bl != null)
-                                            {
-                                                debugtxt += Environment.NewLine + 
-                                                "****blockid=" + bl.BlockID.ToString() + ";blockcid=" + bl.BlockCID.ToString()
-                                                + ";host=" + bl.SlaveHost + Environment.NewLine +
-                                                string.Join(";", bl.mapinputdfsnodes.ToArray()) + Environment.NewLine;
-                                            }
-                                        }
-                                        failover.Log(debugtxt);
-                                    }
-                                    {
-                                        string debugtxt = "==========Blockstatus==========" + Environment.NewLine;
-                                        lock (failover.blockStatus)
-                                        {
-                                            foreach (KeyValuePair<int, int> pair in failover.blockStatus)
-                                            {
-                                                debugtxt += "****blockcid=" + pair.Key.ToString() + ";status=" + pair.Value.ToString() + Environment.NewLine;
-                                            }
-                                        }                                        
-                                        failover.Log(debugtxt);
-                                        failover.Log("hostToBlocksCount=" + failover.hostToBlocks.Count.ToString());
-                                    }
-#endif
-                                }
-                            }
-                        }
-                                         
-                        if (failover.CheckMachineFailures() > 0)
-                        {
-                            int hoffset = (failover.badHosts.Count - failover.newBadHosts.Count) + removedslavescount;
-                            string recovered = failover.badHosts.Count + removedslavescount >= dc.Replication ? "NoRecovery" : "Recovered";
-                            for (int hi = 0; hi < failover.newBadHosts.Count; hi++)
-                            {
-                                string badhost = failover.newBadHosts[hi];                                
-                                Console.WriteLine(Environment.NewLine + "HWFailure:{0}:{1}:{2}/{3}", recovered, badhost, hi + 1 + hoffset, dc.Replication);                               
-                                failover.AbortBlocksFromFailedHost(badhost);
-                            }
-                        }
-
-                        if (failover.badHosts.Count > 0)
-                        {
-                            string sbadhosts = "";
-                            foreach (string badhost in failover.badHosts.Keys)
-                            {
-                                if (sbadhosts.Length > 0)
-                                {
-                                    sbadhosts += ", ";
-                                }
-                                sbadhosts += badhost;
-                            }
-                            ConsoleColor oldcolor = Console.ForegroundColor;
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine(Environment.NewLine + 
-                                "{0}{1} machine(s) with hardware failure during map: {2}{3}", isdspace ? "\u00014" : "", failover.badHosts.Count, sbadhosts, isdspace ? "\u00010" : "");                            
-                            Console.ForegroundColor = oldcolor;
-                        }
-
-                        for (int bi = 0; bi < failover.allBlocks.Length; bi++)
-                        {
-                            MapReduceBlockInfo bl = failover.allBlocks[bi];
-                            if (bl != null)
-                            {
-                                AELight_JoinTraceThread(bl.thread);
-                            }
-                        }                  
-#if FAILOVER_DEBUG
-                        failover.Log("All blocks joined.");
-#endif
-                        if (failover.badHosts.Count + removedslavescount >= dc.Replication)
+                        HeartBeats.Start(slaves, cfgj.Computing.HeartBeatTimeout, cfgj.Computing.HeartBeatRetries, cfgj.Computing.HeartBeatExpired);
+                        //parent=null
+                        failover.ExecOneMapReduceFailover();
+                        if (failover.LastException != null)
                         {
                             failover.CloseAllBlocks();
-                            throw new Exception("Error: Cannot continue to exchange/sort/reduce phase.  The number of machines with hardware failure (" + (failover.badHosts.Count + removedslavescount).ToString() + ") is greater than or equal to replication factor (" + dc.Replication.ToString() + ").");
+                            HeartBeats.Stop();
+                            Console.WriteLine("failover.ExecOneMapReduceFailover() exception detected: " + failover.LastException.ToString());
+                            throw new Exception("failover.ExecOneMapReduceFailover() exception detected: " + failover.LastException.ToString());
                         }
-                      
-                        for (int bi = 0; bi < blocks.Count; bi++)
-                        {
-                            MapReduceBlockInfo bl = blocks[bi];
-                            if (failover.allBlocks[bl.BlockCID] == null || bl.blockfail)
-                            {
-                                bool foundgoodblock = false;
-                                for (int ri = 0; ri < dc.Replication - 1; ri++)
-                                {
-                                    int nextrepblockcid = (ri + 1) * blocks.Count + bl.BlockCID;
-                                    MapReduceBlockInfo nextrepblock = failover.allBlocks[nextrepblockcid];
-                                    if (nextrepblock != null && !nextrepblock.blockfail)
-                                    {
-                                        foundgoodblock = true;
-                                        blocks[bi] = nextrepblock;
-                                        break;
-                                    }
-                                }
-                                if (!foundgoodblock)
-                                {
-                                    failover.CloseAllBlocks();
-                                    throw new Exception("Error: Cannot find a good replicated map block to replace the failed block.  Block index = " + bi.ToString());
-                                }
-                            }
-                        }
-#if FAILOVER_DEBUG
-                        {
-                            failover.Log("=======Blocks going forward to exchange=========");
-                            string debugtxt = "";
-                            foreach (MapReduceBlockInfo bl in blocks)
-                            {
-                                debugtxt += Environment.NewLine +
-                                    "****blockid=" + bl.BlockID.ToString() + ";blockcid=" + bl.BlockCID.ToString() + ";host=" + bl.SlaveHost +
-                                    ";inputfiles=" + string.Join(";", bl.mapinputdfsnodes.ToArray()) + Environment.NewLine;     
-                            }
-                            failover.Log(debugtxt);
-                        }
-#endif
                     }                    
-                    
+
                     if (null != mapinputchunks) // Only null if DirectSlaveLoad
-                    {
-                        if (verbose)
-                        {
-                            Console.WriteLine((extraverbose ? "\r\n" : "") + "    [{0}]        Map done; starting map exchange", System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond);
-                        }
-                        for (int i = 0; i < blocks.Count; i++)
-                        {
-                            blocks[i].thread = new System.Threading.Thread(new System.Threading.ThreadStart(blocks[i].exchangethreadproc));
-                            blocks[i].thread.Name = "MapReduceJobBlock" + blocks[i].BlockID + "_aftermap";
-                            blocks[i].thread.IsBackground = true;
-                            AELight_StartTraceThread(blocks[i].thread);
-                        }
-                        {
-                            Exception ee = null;
-                            for (int i = 0; i < blocks.Count; i++)
-                            {
-                                AELight_JoinTraceThread(blocks[i].thread);
-                                // If failover, check failures..
-                                if (cfgj.IsJobFailoverEnabled && blocks[i].blockfail)
-                                {
-                                    ee = blocks[i].LastThreadException;
-                                    if (!CanClientExceptionFailover(ee))
-                                    {
-                                        throw ee; // Throw the worst one.
-                                    }
-                                }
-                            }
-                            if (null != ee)
-                            {
-                                if (cfgj.IsJobFailoverEnabled)
-                                {
-                                    throw new ExceptionFailoverRetryable(ee, cfgj.IsJobFailoverEnabled && CheckFoFilesShouldFailover(slaves, logname));
-                                }
-                            }
-                        }
+                    {                        
                         int TotalZBlockSplits = 0;
                         checked
                         {
@@ -3575,13 +2549,25 @@ public void DSpace_LogResult(string name, bool passed)
                             }
                         }
                         else
-                        {
-                            failover.CloseAllBlocks();
-#if FAILOVER_DEBUG
-                            failover.Log("done StopZMapBlockServer()");
+                        {                           
+
+#if FAILOVER_DEBUG                            
+                            {
+                                string debugtxt = "FinalFINALFINAL esrblocks before replication:" + Environment.NewLine;
+                                foreach (KeyValuePair<string, List<MapReduceBlockInfo>> pair in failover.hostToESRBlocks)
+                                {
+                                    debugtxt += "host=" + pair.Key + ":" + pair.Value.Count.ToString() + Environment.NewLine;
+                                    foreach (MapReduceBlockInfo bl in pair.Value)
+                                    {
+                                        debugtxt += "blockid=" + bl.BlockID.ToString() + ";blockcid=" + bl.BlockCID.ToString() + Environment.NewLine +
+                                            "owned=" + bl.ownedzmapblocks + Environment.NewLine;
+                                    }
+                                }
+                                failover.Log(debugtxt);
+                            }
 #endif
                         }
-                        
+
                         if (verbose)
                         {
                             Console.WriteLine(); // Separate the 'r's and stuff from following stuff.
@@ -3595,149 +2581,150 @@ public void DSpace_LogResult(string name, bool passed)
                         }
                         if (null == AddCacheNodes && outputfiles.Count > 0) // If not just caching...
                         {
-                            bool anyoutput = false;
+                            if (failover == null)
                             {
-                                List<string> dfsnames = new List<string>();
-                                List<string> dfsnamesreplicating = new List<string>();
-                                // Reload DFS config to make sure changes since starting get rolled in, and make sure the output file wasn't created in that time...
-                                using (LockDfsMutex()) // Needed: change between load & save should be atomic.
+                                bool anyoutput = false;
                                 {
-                                    dc = LoadDfsConfig(); // Reload in case of change or user modifications.
+                                    List<string> dfsnames = new List<string>();
+                                    List<string> dfsnamesreplicating = new List<string>();
+                                    // Reload DFS config to make sure changes since starting get rolled in, and make sure the output file wasn't created in that time...
+                                    using (LockDfsMutex()) // Needed: change between load & save should be atomic.
                                     {
-                                        for (int nfile = 0; nfile < outputfiles.Count; nfile++)
+                                        dc = LoadDfsConfig(); // Reload in case of change or user modifications.
                                         {
-                                            dfs.DfsFile df = new dfs.DfsFile();
-                                            string ofile = outputfiles[nfile];
-                                            if (ofile.Length == 0)
+                                            for (int nfile = 0; nfile < outputfiles.Count; nfile++)
                                             {
-                                                continue;
-                                            }
-                                            if (outputrecordlengths[nfile] > 0)
-                                            {
-                                                df.XFileType = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[nfile].ToString();
-                                            }
-                                            df.Nodes = new List<dfs.DfsFile.FileNode>();
-                                            df.Size = -1; // Preset
-                                            string dfsname = ofile;
-                                            if (dfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
-                                            {
-                                                dfsname = dfsname.Substring(6);
-                                            }
-                                            string dfsnamereplicating = ".$" + dfsname + ".$replicating-" + Guid.NewGuid().ToString();
-                                            df.Name = dfsnamereplicating;
-                                            if (null != DfsFind(dc, df.Name))
-                                            {
-                                                Console.Error.WriteLine("Error:  output file '{0}' was created during job: " + df.Name, ofile);
-                                                continue;
-                                            }
-                                            dfsnames.Add(dfsname);
-                                            dfsnamesreplicating.Add(dfsnamereplicating);
-                                            long totalsize = 0;
-                                            bool anybad = false;
-                                            bool foundzero = false;
-                                            for (int i = 0; i < blocks.Count; i++)
-                                            {
-                                                MapReduceBlockInfo block = blocks[i];
-                                                List<string> nodes = block.reduceoutputdfsnodeses[nfile];
-                                                List<long> sizes = block.reduceoutputsizeses[nfile];
-                                                if (nodes.Count != sizes.Count)
+                                                dfs.DfsFile df = new dfs.DfsFile();
+                                                string ofile = outputfiles[nfile];
+                                                if (ofile.Length == 0)
                                                 {
-                                                    Console.Error.WriteLine("Warning: chunk accounting error");
+                                                    continue;
                                                 }
-                                                for (int j = 0; j < nodes.Count; j++)
+                                                if (outputrecordlengths[nfile] > 0)
                                                 {
-                                                    dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
-                                                    fn.Host = block.SlaveHost;
-                                                    fn.Name = nodes[j];
-                                                    df.Nodes.Add(fn);
-                                                    fn.Length = -1; // Preset
-                                                    fn.Position = -1; // Preset
-                                                    if (anybad)
+                                                    df.XFileType = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[nfile].ToString();
+                                                }
+                                                df.Nodes = new List<dfs.DfsFile.FileNode>();
+                                                df.Size = -1; // Preset
+                                                string dfsname = ofile;
+                                                if (dfsname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    dfsname = dfsname.Substring(6);
+                                                }
+                                                string dfsnamereplicating = ".$" + dfsname + ".$replicating-" + Guid.NewGuid().ToString();
+                                                df.Name = dfsnamereplicating;
+                                                if (null != DfsFind(dc, df.Name))
+                                                {
+                                                    Console.Error.WriteLine("Error:  output file '{0}' was created during job: " + df.Name, ofile);
+                                                    continue;
+                                                }
+                                                dfsnames.Add(dfsname);
+                                                dfsnamesreplicating.Add(dfsnamereplicating);
+                                                long totalsize = 0;
+                                                bool anybad = false;
+                                                bool foundzero = false;
+                                                for (int i = 0; i < blocks.Count; i++)
+                                                {
+                                                    MapReduceBlockInfo block = blocks[i];
+                                                    List<string> nodes = block.reduceoutputdfsnodeses[nfile];
+                                                    List<long> sizes = block.reduceoutputsizeses[nfile];
+                                                    if (nodes.Count != sizes.Count)
                                                     {
-                                                        continue;
+                                                        Console.Error.WriteLine("Warning: chunk accounting error");
                                                     }
-                                                    fn.Position = totalsize; // Position must be set before totalsize updated!
-                                                    if (j >= sizes.Count)
+                                                    for (int j = 0; j < nodes.Count; j++)
                                                     {
-                                                        Console.Error.WriteLine("Warning: size not provided for data node chunk from host " + fn.Host);
-                                                        anybad = true;
-                                                        continue;
-                                                    }
-                                                    if (0 == sizes[j])
-                                                    {
-                                                        if (!foundzero)
+                                                        dfs.DfsFile.FileNode fn = new dfs.DfsFile.FileNode();
+                                                        fn.Host = block.SlaveHost;
+                                                        fn.Name = nodes[j];
+                                                        df.Nodes.Add(fn);
+                                                        fn.Length = -1; // Preset
+                                                        fn.Position = -1; // Preset
+                                                        if (anybad)
                                                         {
-                                                            foundzero = true;
-                                                            Console.Error.WriteLine("Warning: zero-size data node chunk encountered from host " + fn.Host);
+                                                            continue;
                                                         }
+                                                        fn.Position = totalsize; // Position must be set before totalsize updated!
+                                                        if (j >= sizes.Count)
+                                                        {
+                                                            Console.Error.WriteLine("Warning: size not provided for data node chunk from host " + fn.Host);
+                                                            anybad = true;
+                                                            continue;
+                                                        }
+                                                        if (0 == sizes[j])
+                                                        {
+                                                            if (!foundzero)
+                                                            {
+                                                                foundzero = true;
+                                                                Console.Error.WriteLine("Warning: zero-size data node chunk encountered from host " + fn.Host);
+                                                            }
+                                                        }
+                                                        fn.Length = sizes[j];
+                                                        totalsize += sizes[j];
                                                     }
-                                                    fn.Length = sizes[j];
-                                                    totalsize += sizes[j];
                                                 }
+                                                if (!anybad)
+                                                {
+                                                    df.Size = totalsize;
+                                                }
+                                                if (totalsize != 0)
+                                                {
+                                                    anyoutput = true;
+                                                }
+                                                // Always produce output file, even if no data.
+                                                dc.Files.Add(df);
                                             }
-                                            if (!anybad)
+                                            UpdateDfsXml(dc);
+                                        }
+                                    }
+                                    {
+#if MR_REPLICATION_TIME_PRINT
+                                        DateTime replstart = DateTime.Now;
+#endif                                        
+                                        if (ReplicationPhase(verbosereplication, jobshared.blockcount, slaves, dfsnamesreplicating))
+                                        {
+#if MR_REPLICATION_TIME_PRINT
+                                            int replsecs = (int)Math.Round((DateTime.Now - replstart).TotalSeconds);
+                                            ConsoleColor oldcolor = Console.ForegroundColor;
+                                            Console.ForegroundColor = ConsoleColor.Green;
+                                            Console.WriteLine("{0}[replication completed {1}]{2}", isdspace ? "\u00011" : "", DurationString(replsecs), isdspace ? "\u00010" : "");
+                                            Console.ForegroundColor = oldcolor;
+#endif
+                                        }
+                                    }
+                                    using (LockDfsMutex()) // Needed: change between load & save should be atomic.
+                                    {
+                                        dc = LoadDfsConfig(); // Reload in case of change or user modifications.
+                                        for (int nfile = 0; nfile < dfsnames.Count; nfile++)
+                                        {
+                                            string dfsname = dfsnames[nfile];
+                                            string dfsnamereplicating = dfsnamesreplicating[nfile];
+                                            dfs.DfsFile dfu = dc.FindAny(dfsnamereplicating);
+                                            if (null != dfu)
                                             {
-                                                df.Size = totalsize;
+                                                if (null != DfsFindAny(dc, dfsname))
+                                                {
+                                                    Console.Error.WriteLine("Error:  output file '{0}' was created during job", dfsname);
+                                                    continue;
+                                                }
+                                                dfu.Name = dfsname;
                                             }
-                                            if (totalsize != 0)
-                                            {
-                                                anyoutput = true;
-                                            }
-                                            // Always produce output file, even if no data.
-                                            dc.Files.Add(df);
                                         }
                                         UpdateDfsXml(dc);
                                     }
                                 }
+                                if (!anyoutput && verbose)
                                 {
-#if MR_REPLICATION_TIME_PRINT
-                                    DateTime replstart = DateTime.Now;
-#endif
-                                    string[] replicatehosts = slaves;
-                                    if (failover != null)
-                                    {
-                                        if (failover.badHosts.Count > 0)
-                                        {
-                                            replicatehosts = new List<string>(failover.goodHosts.Keys).ToArray();
-                                        }                                        
-                                    }
-                                    if (ReplicationPhase(verbosereplication, jobshared.blockcount, replicatehosts, dfsnamesreplicating))
-                                    {
-#if MR_REPLICATION_TIME_PRINT
-                                        int replsecs = (int)Math.Round((DateTime.Now - replstart).TotalSeconds);
-                                        ConsoleColor oldcolor = Console.ForegroundColor;
-                                        Console.ForegroundColor = ConsoleColor.Green;
-                                        Console.WriteLine("{0}[replication completed {1}]{2}", isdspace ? "\u00011" : "", DurationString(replsecs), isdspace ? "\u00010" : "");
-                                        Console.ForegroundColor = oldcolor;
-#endif
-                                    }
-                                }
-                                using (LockDfsMutex()) // Needed: change between load & save should be atomic.
-                                {
-                                    dc = LoadDfsConfig(); // Reload in case of change or user modifications.
-                                    for (int nfile = 0; nfile < dfsnames.Count; nfile++)
-                                    {
-                                        string dfsname = dfsnames[nfile];
-                                        string dfsnamereplicating = dfsnamesreplicating[nfile];
-                                        dfs.DfsFile dfu = dc.FindAny(dfsnamereplicating);
-                                        if (null != dfu)
-                                        {
-                                            if (null != DfsFindAny(dc, dfsname))
-                                            {
-                                                Console.Error.WriteLine("Error:  output file '{0}' was created during job", dfsname);
-                                                continue;
-                                            }
-                                            dfu.Name = dfsname;
-                                        }
-                                    }
-                                    UpdateDfsXml(dc);
+                                    Console.Write(" (no DFS output) ");
+                                    ConsoleFlush();
                                 }
                             }
-                            if (!anyoutput && verbose)
+                            else
                             {
-                                Console.Write(" (no DFS output) ");
-                                ConsoleFlush();
-                            }
+                                failover.ReplicationPhaseFailover();
+                                failover.CloseAllBlocks();
+                                HeartBeats.Stop();
+                            }                            
                         }
                     }
                     else
@@ -3747,6 +2734,10 @@ public void DSpace_LogResult(string name, bool passed)
                             blocks[i].acl.Close();
                         }
                     }
+                }
+                catch (System.Threading.ThreadAbortException)
+                {
+                    aborting = true;
                 }
                 catch (Exception e)
                 {
@@ -3791,7 +2782,10 @@ public void DSpace_LogResult(string name, bool passed)
 
                     timethread.Abort();
                     DeleteRemoteFoFiles(slaves, logname);
-                    AELight.CheckUserLogs(slaves, logname);
+                    if (!aborting)
+                    {
+                        AELight.CheckUserLogs(slaves, logname);
+                    }
                 }
 
                 if (verbose && null == AddCacheNodes)

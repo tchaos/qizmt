@@ -60,10 +60,13 @@
     <Compile Include="DbAggregators_LAST.cs" />
     <Compile Include="DbAggregators_MAX.cs" />
     <Compile Include="DbAggregators_MIN.cs" />
+    <Compile Include="DbFunctions_ARITHMETIC.cs" />
     <Compile Include="DbFunctions_CAST.cs" />
     <Compile Include="DbFunctions_DATEADD.cs" />
     <Compile Include="DbFunctions_DATEDIFF.cs" />
+    <Compile Include="DbFunctions_DATEPART.cs" />
     <Compile Include="DbFunctions_FORMAT.cs" />
+    <Compile Include="DbFunctions_IIF.cs" />
     <Compile Include="DbFunctions_MONTHS_BETWEEN.cs" />
     <Compile Include="DbAggregators_STD.cs" />
     <Compile Include="DbAggregators_STD_SAMP.cs" />

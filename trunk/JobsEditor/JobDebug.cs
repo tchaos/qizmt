@@ -21,7 +21,7 @@ namespace MySpace.DataMining.AELight
         public string MapSource = null;
         public string MapClassName = null;
 
-        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
+        public override void DoMapFullSource(IList<string> inputdfsnodes, string code, string classname, List<string> inputdfsfilenames, List<int> inputnodesoffsets, bool rehash)
         {
             MapSource = code;
             MapClassName = classname;

@@ -6,6 +6,7 @@
         <JobType>local</JobType>
         <Setting name="//MaxUserLogs" value="1000000" />
       </IOSettings>
+      <ForceStandardError/>
       <Add Reference="RDBMS_DBCORE.dll" Type="dfs"/>
       <Using>RDBMS_DBCORE</Using>
       <Local>
