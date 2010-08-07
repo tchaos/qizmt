@@ -9,6 +9,10 @@
         <OutputMethod>grouped</OutputMethod>
 		<Setting name="Subprocess_TotalPrime" value="NearPrimeBelowCoreCount" />
       </IOSettings>
+      <FaultTolerantExecution>
+        <Mode>disabled</Mode>
+        <MapInputOrder>shuffle</MapInputOrder>
+      </FaultTolerantExecution>
       <ForceStandardError/>
       <DynamicFoil/>
       <IntermediateDataAddressing>64</IntermediateDataAddressing>

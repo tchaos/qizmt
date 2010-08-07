@@ -634,6 +634,7 @@ namespace MySpace.DataMining.DistributedObjects5
         // args: <ipaddr> <portnum> <typechar> <capacity> <logfile> <jid>
         static void Main(string[] args)
         {
+            MySpace.DataMining.AELight.Surrogate.LogonMachines();
 
             try
             {

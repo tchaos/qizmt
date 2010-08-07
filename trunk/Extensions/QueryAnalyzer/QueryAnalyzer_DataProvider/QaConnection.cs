@@ -534,6 +534,8 @@ namespace QueryAnalyzer_DataProvider
                     optindex += 8;
                     Utils.Int32ToBytes(connstr.QOLimit, buf, optindex);
                     optindex += 4;
+                    buf[optindex] = (byte)(connstr.FaultTolerantExecution ? 1 : 0);
+                    optindex += 1;
                     XContent.SendXContent(netstm, buf, optindex);
                 }
                 XContent.SendXContent(netstm, string.Join(";", hosts));
@@ -786,6 +788,7 @@ namespace QueryAnalyzer_DataProvider
             public int RetryMaxCount;
             public int RetrySleep;
             public int QOLimit; // -1 is "use default".
+            public bool FaultTolerantExecution;
 
             internal enum RIndexType
             {
@@ -810,6 +813,7 @@ namespace QueryAnalyzer_DataProvider
                 cs.RetryMaxCount = 20;
                 cs.RetrySleep = 1000 * 5;
                 cs.QOLimit = -1;
+                cs.FaultTolerantExecution = false;
 
                 string[] parts = connstr.Trim(';').Split(';');
                 for (int i = 0; i < parts.Length; i++)
@@ -890,6 +894,22 @@ namespace QueryAnalyzer_DataProvider
                         case "mr bypass":
                             {
                                 cs.QOLimit = checked((int)ParseLongCapacity(val));
+                            }
+                            break;
+                        case "fault tolerant execution":
+                            {
+                                if ((string.Compare(val, "enabled", true) == 0))
+                                {
+                                    cs.FaultTolerantExecution = true;
+                                }
+                                else if (string.Compare(val, "disabled", true) == 0)
+                                {
+                                    cs.FaultTolerantExecution = false;
+                                }
+                                else
+                                {
+                                    throw new Exception("Invalid value for Fault Tolerant Execution=" + val);
+                                }                                                              
                             }
                             break;
                     }

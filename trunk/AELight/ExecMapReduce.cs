@@ -144,7 +144,7 @@ namespace MySpace.DataMining.AELight
                         }
                         else
                         {
-                            Console.Write("(split occured; consider increasing zblock count)");
+                            Console.Write("(split occurred; consider increasing zblock count)");
                         }
                         ConsoleFlush();
                     }
@@ -829,7 +829,7 @@ public void DSpace_LogResult(string name, bool passed)
                         }
                         else
                         {
-                            acl.DoMap(mapinputdfsnodes, mapctx + cfgj.MapReduce.Map, cfgj.Usings, mapinputfilenames, mapinputnodesoffsets);
+                            acl.DoMap(mapinputdfsnodes, mapctx + cfgj.MapReduce.Map + (acl.PartialReduce ? cfgj.MapReduce.Reduce : ""), cfgj.Usings, mapinputfilenames, mapinputnodesoffsets);
                         }
                         
                         if (extraverbose)
@@ -874,13 +874,10 @@ public void DSpace_LogResult(string name, bool passed)
 
                     bool donelogging = false;
                     if (failover != null)
-                    {
-                        if (failover.CheckMachineFailure(SlaveHost))
-                        {
-                            LogOutput("Thread exception: (first thread): Hardware failure at " + SlaveHost);
-                            LogOutputToFile("Thread exception: (first thread) " + e.ToString());
-                            donelogging = true;
-                        }
+                    {      
+                        LogOutput("Thread exception: (first thread): on " + SlaveHost);
+                        LogOutputToFile("Thread exception: (first thread): on " + SlaveHost + ".  Error:" + e.ToString());
+                        donelogging = true;                        
                     }
 
                     //lock (typeof(BlockInfo))
@@ -1045,12 +1042,9 @@ public void DSpace_LogResult(string name, bool passed)
                     bool donelogging = false;
                     if (failover != null)
                     {
-                        if (failover.CheckMachineFailure(SlaveHost))
-                        {
-                            LogOutput("Thread exception: (exchange thread): Hardware failure at " + SlaveHost);
-                            LogOutputToFile("Thread exception: (exchange thread) Hardware failure at " + SlaveHost + ": " + e.ToString());
-                            donelogging = true;
-                        }                        
+                        LogOutput("Thread exception: (exchange thread): on " + SlaveHost);
+                        LogOutputToFile("Thread exception: (exchange thread): on " + SlaveHost + ".  Error: " + e.ToString());
+                        donelogging = true;                                                
                     }
 
                     //lock (typeof(BlockInfo))
@@ -1488,7 +1482,7 @@ public void DSpace_LogResult(string name, bool passed)
                         {
                             // New flake:
                             dfs.DfsFile df = null;
-                            if (RecordLength > 0)
+                            if (RecordLength > 0 || RecordLength == -2)
                             {
                                 df = DfsFind(dc, cachefile, DfsFileTypes.BINARY_RECT);
                                 if (null != df && RecordLength != df.RecordLength)
@@ -1700,6 +1694,14 @@ public void DSpace_LogResult(string name, bool passed)
                 }
             }
 
+            if (cfgj.PartialReduce != null && (cfgj.MemCache != null || cfgj.IsDeltaSpecified 
+                || string.Compare(cfgj.IOSettings.OutputMethod, "grouped", StringComparison.OrdinalIgnoreCase) != 0))
+            {
+                Console.Error.WriteLine("Error: Partial Reduce does not support MemCache, caching, or sorted job.");
+                SetFailure();
+                return;
+            }
+
             string outputfile = cfgj.IOSettings.DFSOutput;
             string logname = Surrogate.SafeTextPath(cfgj.NarrativeName) + "_" + Guid.NewGuid().ToString() + ".j" + sjid + "_log.txt";
 
@@ -1708,29 +1710,29 @@ public void DSpace_LogResult(string name, bool passed)
          
                 FailoverInfo failover = null;
 
-                if (cfgj.Computing != null && string.Compare(cfgj.Computing.Mode, "speculative", StringComparison.OrdinalIgnoreCase) == 0)
+                if (cfgj.FaultTolerantExecution != null && string.Compare(cfgj.FaultTolerantExecution.Mode, "enabled", StringComparison.OrdinalIgnoreCase) == 0)
                 {
                     if (cfgj.IsDeltaSpecified)
                     {
-                        Console.Error.WriteLine("Error: Speculative computing does not support caching.");
+                        Console.Error.WriteLine("Error: FaultTolerantExecution does not support caching.");
                         SetFailure();
                         return;
                     }
                     if(string.Compare(cfgj.IOSettings.OutputMethod, "grouped", StringComparison.OrdinalIgnoreCase) != 0)
                     {
-                        Console.Error.WriteLine("Error: Speculative computing supports only mapreduce with groupted OutputMethod.");
+                        Console.Error.WriteLine("Error: FaultTolerantExecution supports only mapreduce with grouped OutputMethod.");
                         SetFailure();
                         return;
                     }
                     if (string.Compare(cfgj.ExchangeOrder, "shuffle", StringComparison.OrdinalIgnoreCase) != 0)
                     {
-                        Console.Error.WriteLine("Error: Speculative computing supports only mapreduce with shuffle ExchangeOrder.");
+                        Console.Error.WriteLine("Error: FaultTolerantExecution supports only mapreduce with shuffle ExchangeOrder.");
                         SetFailure();
                         return;
                     }
                     if (dc.Replication < 2)
                     {
-                        Console.Error.WriteLine("Error: Speculative computing applies only when replication factor > 1.");
+                        Console.Error.WriteLine("Error: FaultTolerantExecution applies only when replication factor > 1.");
                         SetFailure();
                         return;
                     }
@@ -1938,7 +1940,7 @@ public void DSpace_LogResult(string name, bool passed)
                                         }
                                     }
                                     dfs.DfsFile df;
-                                    if (inreclen > 0)
+                                    if (inreclen > 0 || inreclen == -2)
                                     {
                                         df = DfsFind(dc, dp, DfsFileTypes.BINARY_RECT);
                                         if (null != df && inreclen != df.RecordLength)
@@ -2202,6 +2204,8 @@ public void DSpace_LogResult(string name, bool passed)
                             {
                                 throw new InvalidOperationException("Invalid value for IntermediateDataAddressing: " + IntermediateDataAddressing.ToString());
                             }
+                            bi.acl.NoSpill = (cfgj.NoSpill != null);
+                            bi.acl.PartialReduce = (cfgj.PartialReduce != null);
                             bi.acl.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
                             bi.acl.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
                             bi.acl.OutputRecordLengths = outputrecordlengths;
@@ -2248,6 +2252,10 @@ public void DSpace_LogResult(string name, bool passed)
                             if (cfgj.OpenCVExtension != null)
                             {
                                 bi.acl.AddOpenCVExtension();
+                            }
+                            if (cfgj.MemCache != null)
+                            {
+                                bi.acl.AddMemCacheExtension();
                             }
                             if (cfgj.Unsafe != null)
                             {
@@ -2518,13 +2526,13 @@ public void DSpace_LogResult(string name, bool passed)
                     }
                     else
                     {
-                        HeartBeats.Start(slaves, cfgj.Computing.HeartBeatTimeout, cfgj.Computing.HeartBeatRetries, cfgj.Computing.HeartBeatExpired);
+                        VitalsMonitor.Start(slaves, cfgj.FaultTolerantExecution.HeartBeatTimeout, cfgj.FaultTolerantExecution.HeartBeatRetries, cfgj.FaultTolerantExecution.HeartBeatExpired, cfgj.FaultTolerantExecution.TattleTimeout);
                         //parent=null
                         failover.ExecOneMapReduceFailover();
                         if (failover.LastException != null)
                         {
                             failover.CloseAllBlocks();
-                            HeartBeats.Stop();
+                            VitalsMonitor.Stop();
                             Console.WriteLine("failover.ExecOneMapReduceFailover() exception detected: " + failover.LastException.ToString());
                             throw new Exception("failover.ExecOneMapReduceFailover() exception detected: " + failover.LastException.ToString());
                         }
@@ -2603,6 +2611,10 @@ public void DSpace_LogResult(string name, bool passed)
                                                 if (outputrecordlengths[nfile] > 0)
                                                 {
                                                     df.XFileType = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[nfile].ToString();
+                                                }
+                                                else if (outputrecordlengths[nfile] == -2)
+                                                {
+                                                    df.XFileType = DfsFileTypes.BINARY_RECT + "@?";
                                                 }
                                                 df.Nodes = new List<dfs.DfsFile.FileNode>();
                                                 df.Size = -1; // Preset
@@ -2723,7 +2735,7 @@ public void DSpace_LogResult(string name, bool passed)
                             {
                                 failover.ReplicationPhaseFailover();
                                 failover.CloseAllBlocks();
-                                HeartBeats.Stop();
+                                VitalsMonitor.Stop();
                             }                            
                         }
                     }
@@ -2781,10 +2793,10 @@ public void DSpace_LogResult(string name, bool passed)
                     }
 
                     timethread.Abort();
-                    DeleteRemoteFoFiles(slaves, logname);
-                    if (!aborting)
+                    DeleteRemoteFoFiles(slaves, logname);                    
+                    if(!aborting)
                     {
-                        AELight.CheckUserLogs(slaves, logname);
+                        AELight.CheckUserLogs(slaves, logname, failover != null);
                     }
                 }
 

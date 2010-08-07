@@ -150,7 +150,8 @@ namespace MySpace.DataMining.DistributedObjects
         MAP,
         LOCAL,
         REDUCE,
-        REMOTE
+        REMOTE,
+        PARTIALREDUCE
         //REDUCEINITIALIZE,
         //REDUCEFINALIZE
     }

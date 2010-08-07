@@ -1,0 +1,393 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="Cleanup" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_JaggedBinary_Dummy.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Input*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Expected*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Output*.txt");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="CreateData" Custodian="" Email="" Description="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_JaggedBinary_Dummy.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("1");
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="Test_Reduce_Output" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_JaggedBinary_Dummy.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_JaggedBinary_Input1.txt@?;regression_test_JaggedBinary_Expected1.txt;regression_test_JaggedBinary_Input_2097152.txt@?;regression_test_JaggedBinary_Input_2097153.txt@?;regression_test_JaggedBinary_Input_268435456.txt@?;regression_test_JaggedBinary_Input_268435457.txt@?</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                byte[] buf = new byte[1];
+                output.Add(ByteSlice.Prepare(buf, 0, 1), ByteSlice.Prepare());
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            Random rnd = new Random(unchecked(System.DateTime.Now.Millisecond + System.Threading.Thread.CurrentThread.ManagedThreadId));         
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {               
+                {
+                    //Test all data types, spilling to the next chunk, and record length < 2097152
+                    int maxrows = (1024 * 1024 * 65) / (4 + 8 + 2 + 128 + 9 + 8 + 128); // want to spill to the next chunk
+                                        
+                    string s2 = "";
+                    for(int si = 0; si < 63; si++)
+                    {
+                        s2 += (char)rnd.Next(97, 123);
+                    }                
+                    mstring ms2 = mstring.Prepare(s2);
+                    
+                    string s3 = "";
+                    for(int si = 0; si < 8191; si++)
+                    {
+                        s3 += (char)rnd.Next(97, 123);
+                    }
+                    mstring ms3 = mstring.Prepare(s3);
+                    
+                    for(int i = 0; i < maxrows; i++)
+                    {
+                        {                            
+                            //record length = 4 + 8 + 2 < 128
+                            recordset rs = recordset.Prepare();
+                            int x = rnd.Next(Int32.MinValue, Int32.MaxValue);
+                            long y = rnd.Next(Int32.MinValue, Int32.MaxValue);
+                            short z = (short)rnd.Next(Int16.MinValue, Int16.MaxValue);
+                            rs.PutInt(x);
+                            rs.PutLong(y);
+                            rs.PutShort(z);
+                            
+                            output.Add(rs.ToByteSlice());     
+                            output.GetOutputByIndex(1).WriteLine(mstring.Prepare(x.ToString() + "," + y.ToString() + "," + z.ToString()));
+                        }
+                        {                            
+                            //record length = 128
+                            recordset rs = recordset.Prepare();
+                            rs.PutString(ms2);                            
+                            output.Add(rs);            
+                            output.GetOutputByIndex(1).WriteLine(mstring.Prepare(s2));
+                        }
+                        {        
+                            //record length = 9 + 8 + 128 < 16384
+                            recordset rs = recordset.Prepare();
+                            double x = rnd.NextDouble();
+                            DateTime y = DateTime.Now;                            
+                            rs.PutDouble(x);
+                            rs.PutDateTime(y);
+                            rs.PutString(ms2);
+                            
+                            output.WriteRecord(rs.ToByteSlice());  
+                            output.GetOutputByIndex(1).WriteLine(mstring.Prepare(x.ToString() + "," + y.ToString() + "," + s2));
+                        }                         
+                    }                    
+                    {        
+                        //record length = 16384
+                        recordset rs = recordset.Prepare();
+                        rs.PutString(ms3);
+                        
+                        output.Add(rs);      
+                        output.GetOutputByIndex(1).WriteLine(mstring.Prepare(s3));
+                    }
+                    {        
+                        //record length = 16384 + 4 < 2097152
+                        recordset rs = recordset.Prepare();
+                        int x = rnd.Next(Int32.MinValue, Int32.MaxValue);
+                        rs.PutString(ms3);
+                        rs.PutInt(x);
+                        
+                        output.Add(rs);                        
+                        output.GetOutputByIndex(1).WriteLine(mstring.Prepare(s3 + "," + x.ToString()));
+                    } 
+                }
+                
+                Stack.ResetStack();
+                recordset.ResetBuffers();   
+                
+                //Test record length >= 2097152
+                {
+                    {
+                        //record length = 2097152
+                        recordset rs = recordset.Prepare();
+                        for(int bi = 0; bi < 2097152; bi++)
+                        {
+                            rs.PutByte(1);
+                        } 
+                        output.GetOutputByIndex(2).Add(rs);    
+                    }           
+                    
+                    Stack.ResetStack();
+                    recordset.ResetBuffers(); 
+                
+                    {
+                        //record length < 268435456
+                        recordset rs = recordset.Prepare();
+                        for(int bi = 0; bi < 2097152 + 1; bi++)
+                        {
+                            rs.PutByte(1);
+                        }                            
+                        output.GetOutputByIndex(3).Add(rs);       
+                    }                    
+                                          
+                    if(StaticGlobals.DSpace_Hosts.Length > 1)   // if testing on cluster
+                    {                        
+                        Stack.ResetStack();
+                        recordset.ResetBuffers();   
+                        
+                        {
+                            //record length = 268435456
+                            recordset rs = recordset.Prepare();
+                            for(int bi = 0; bi < 268435456; bi++)
+                            {
+                                rs.PutByte(1);
+                            }                            
+                            output.GetOutputByIndex(4).Add(rs);    
+                        }
+                        
+                        Stack.ResetStack();
+                        recordset.ResetBuffers();  
+                        
+                        {
+                            //record length > 268435456
+                            recordset rs = recordset.Prepare();
+                            for(int bi = 0; bi < 268435456 + 1; bi++)
+                            {
+                                rs.PutByte(1);
+                            }                            
+                            output.GetOutputByIndex(5).Add(rs);    
+                        }
+                    }                    
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="Test_map_input" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_JaggedBinary_Input*.txt@?</DFSInput>
+        <DFSOutput>regression_test_JaggedBinary_Output1.txt;regression_test_JaggedBinary_Output_2097152.txt;regression_test_JaggedBinary_Output_2097153.txt;regression_test_JaggedBinary_Output_268435456.txt;regression_test_JaggedBinary_Output_268435457.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                int reclen = line.Length;
+                recordset rkey = recordset.Prepare();
+                rkey.PutInt(reclen);
+                
+                if(reclen > 200000000)
+                {
+                    //too big for key+value                    
+                    byte[] buffer = line.ToBytes();
+                    long sum = 0;
+                    foreach(byte b in buffer)
+                    {
+                        sum += (int)b;
+                    }
+                    recordset rvalue = recordset.Prepare();
+                    rvalue.PutLong(sum);
+                    output.Add(rkey.ToByteSlice(), rvalue.ToByteSlice());
+                }
+                else
+                {
+                    output.Add(rkey.ToByteSlice(), line);
+                }                
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[        
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {                       
+                recordset rkey = recordset.Prepare(key);
+                int reclen = rkey.GetInt();
+                
+                for(int vi = 0; vi < values.Length; vi++)
+                {                    
+                    ByteSlice bs = values[vi].Value;
+                    recordset rs = recordset.Prepare(bs);
+                    
+                    if(reclen < 128)
+                    {
+                        int i = rs.GetInt();
+                        long l = rs.GetLong();
+                        short s = rs.GetShort();
+                        output.WriteLine(mstring.Prepare(i.ToString() + "," + l.ToString() + "," + s.ToString()));
+                    }
+                    else if(reclen == 128)
+                    {
+                        string s = rs.GetString().ToString();
+                        output.WriteLine(mstring.Prepare(s));
+                    }
+                    else if(reclen < 16384)
+                    {
+                        double i = rs.GetDouble();
+                        DateTime l = rs.GetDateTime();
+                        string s = rs.GetString().ToString();
+                        output.WriteLine(mstring.Prepare(i.ToString() + "," + l.ToString() + "," + s));
+                    }
+                    else if(reclen == 16384)
+                    {
+                        string s = rs.GetString().ToString();
+                        output.WriteLine(mstring.Prepare(s));
+                    }                    
+                    else if(reclen < 2097152)
+                    {
+                        string s = rs.GetString().ToString();
+                        int i = rs.GetInt();
+                        output.WriteLine(mstring.Prepare(s + "," + i.ToString()));
+                    }
+                    else if(reclen == 2097152)
+                    {
+                        long sum = 0;
+                        byte[] buf = bs.ToBytes();
+                        foreach(byte b in buf)
+                        {
+                            sum += (int)b;
+                        }
+                        output.GetOutputByIndex(1).WriteLine(mstring.Prepare(sum));
+                    }
+                    else if(reclen == 2097153)
+                    {
+                        long sum = 0;
+                        byte[] buf = bs.ToBytes();
+                        foreach(byte b in buf)
+                        {
+                            sum += (int)b;
+                        }
+                        output.GetOutputByIndex(2).WriteLine(mstring.Prepare(sum));
+                    }
+                    else if(reclen == 268435456)
+                    {
+                        long sum = rs.GetLong();
+                        output.GetOutputByIndex(3).WriteLine(mstring.Prepare(sum));
+                    }
+                    else if(reclen == 268435457)
+                    {
+                        long sum = rs.GetLong();
+                        output.GetOutputByIndex(4).WriteLine(mstring.Prepare(sum));
+                    }
+                    else
+                    {                        
+                        throw new Exception("Buffer byte count invalid.");
+                    }
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>    
+    <Job Name="CheckResults" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                string expected1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                string output1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                
+                Shell(@"Qizmt get regression_test_JaggedBinary_Expected1.txt " + expected1);
+                Shell(@"Qizmt get regression_test_JaggedBinary_Output1.txt " + output1);
+                
+                bool ok = true;
+                {
+                    List<string> elines = new List<string>(System.IO.File.ReadAllLines(expected1));
+                    List<string> rlines = new List<string>(System.IO.File.ReadAllLines(output1));
+                    elines.Sort();
+                    rlines.Sort();
+                    
+                    if(elines.Count != rlines.Count)
+                    {
+                        ok = false;
+                    }
+                    else
+                    {
+                        for(int i = 0; i < elines.Count; i++)
+                        {
+                            if(elines[i] != rlines[i])
+                            {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }                    
+                }
+                
+                if(ok)
+                {
+                    ok = Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_2097152.txt")) == 2097152 &&
+                            Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_2097153.txt")) == 2097153;              
+                }
+                
+                if(ok && StaticGlobals.DSpace_Hosts.Length > 1)
+                {
+                    ok = Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_268435456.txt")) == 268435456 &&
+                            Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_268435457.txt")) == 268435457;
+                }
+                
+                if(ok)
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_JaggedBinary_MR.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_JaggedBinary_MR.xml 0");
+                }
+                
+                System.IO.File.Delete(expected1);
+                System.IO.File.Delete(output1);
+                
+                Shell(@"Qizmt del regression_test_JaggedBinary_Dummy.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Input*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Expected*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Output*.txt");
+            }
+            
+            string GetFileContent(string dfs)
+            {
+                string temp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                Shell(@"Qizmt get " + dfs + " " + temp);
+                string content = System.IO.File.ReadAllText(temp);
+                System.IO.File.Delete(temp);
+                return content;
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

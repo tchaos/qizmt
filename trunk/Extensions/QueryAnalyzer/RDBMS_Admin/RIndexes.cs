@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Data;
+using System.Data.Common;
 
 namespace RDBMS_Admin
 {
@@ -514,6 +516,229 @@ namespace RDBMS_Admin
                 "  Ordinal: " + node["ordinal"].InnerText + Environment.NewLine +
                 "  PinMemory: " + node["pin"].InnerText + Environment.NewLine +
                 "  PinMemoryHash: " + node["pinHash"].InnerText + Environment.NewLine;
+        }
+
+        private static void RepairRIndexes(string[] args)
+        {
+            string[] hosts = Utils.GetQizmtHosts();
+            if (hosts.Length == 0)
+            {
+                Console.Error.WriteLine("No Qizmt host is found.");
+                return;
+            }
+
+            ConsoleColor oldcolor = Console.ForegroundColor;
+
+            Console.WriteLine();
+            Console.WriteLine("Getting the master index...");
+            {
+                string currentdir = CurrentDir.Replace(':', '$');
+                Dictionary<string, int> mihash = new Dictionary<string, int>(hosts.Length);
+                foreach (string host in hosts)
+                {
+                    string mipath = @"\\" + host + @"\" + currentdir + @"\sys.indexes";
+                    try
+                    {
+                        string mitext = System.IO.File.ReadAllText(mipath);
+                        if (!mihash.ContainsKey(mitext))
+                        {
+                            mihash.Add(mitext, 1);
+                        }
+                        else
+                        {
+                            mihash[mitext]++;
+                        }
+                    }
+                    catch
+                    {
+                        Console.WriteLine("Master index is skipped at:" + mipath);
+                    }
+                }
+
+                //Get master index with the highest count.
+                System.Xml.XmlDocument mi = null;
+                {
+                    string themi = "";
+                    int max = Int32.MinValue;
+                    foreach (KeyValuePair<string, int> pair in mihash)
+                    {
+                        if (pair.Value > max)
+                        {
+                            max = pair.Value;
+                            themi = pair.Key;
+                        }
+                    }
+                    if (themi.Length == 0)
+                    {
+                        Console.Error.WriteLine("Cannot find the master index.");
+                        return;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Master index found.  Copies count: {0}", max);
+                        mi = new System.Xml.XmlDocument();
+                        mi.LoadXml(themi);
+                    }
+                }
+
+                //Create statements                
+                List<string> skipped = new List<string>();
+                Dictionary<string, string> creates = null;
+                {
+                    System.Xml.XmlNodeList indexes = mi.SelectNodes("indexes/index");
+                    if (indexes.Count == 0)
+                    {
+                        Console.WriteLine("There is no rindex in the master index.  Nothing to repair.");
+                        return;
+                    }
+
+                    Console.WriteLine();
+                    Console.WriteLine(indexes.Count.ToString() + " rindexes were found from the master index.");
+
+                    Console.WriteLine();
+                    Console.WriteLine("Preparing RINDEX CREATE statements...");
+
+                    creates = new Dictionary<string, string>(indexes.Count);
+
+                    foreach (System.Xml.XmlNode index in indexes)
+                    {
+                        string iname = index["name"].InnerText;
+                        int ordinal = Int32.Parse(index["ordinal"].InnerText);
+                        bool updatememoryonly = (index["updatememoryonly"] != null && index["updatememoryonly"].InnerText == "1");
+                        bool pin = (index["pin"].InnerText == "1");
+                        bool pinHash = (index["pinHash"].InnerText == "1");
+                        bool keepvalueorder = (index["keepValueOrder"].InnerText == "1");
+                        string outliermode = index["outlier"]["mode"].InnerText;
+                        int outliermax = Int32.Parse(index["outlier"]["max"].InnerText);
+                        string tablename = index["table"]["name"].InnerText;
+                        System.Xml.XmlNodeList cols = index.SelectNodes("table/column");
+                        if (ordinal >= cols.Count)
+                        {
+                            string msg = "Skipped: Cannot generate CREATE statement for rindex: " + iname +
+                                ".  Reason: ordinal >= columns count of table; ordinal: " +
+                                ordinal.ToString() + "; columns count=" + cols.Count.ToString();
+                            skipped.Add(msg);
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine(msg);
+                            Console.ForegroundColor = oldcolor;
+                        }
+                        else
+                        {
+                            string keycol = cols[ordinal]["name"].InnerText;
+                            string create = "CREATE RINDEX " + iname + " FROM " + tablename;
+
+                            if (updatememoryonly)
+                            {
+                                create += " updatememoryonly";
+                            }
+
+                            if (pin & pinHash)
+                            {
+                                create += " pinmemoryhash";
+                            }
+                            else if (pin)
+                            {
+                                create += " pinmemory";
+                            }
+                            else if (pinHash) // should never be this case.
+                            {
+                                create += " pinmemoryhash";
+                            }
+                            else
+                            {
+                                create += " diskonly";
+                            }
+
+                            if (keepvalueorder)
+                            {
+                                create += " keepvalueorder";
+                            }
+
+                            if (string.Compare(outliermode, "none", true) != 0)
+                            {
+                                create += " outlier " + outliermode + " " + outliermax.ToString();
+                            }
+
+                            create += " on " + keycol;
+                            creates.Add(iname, create);
+                        }
+                    }
+                }
+
+                {
+                    string log = "rdbms_admin repairrindexes command issued:" + Environment.NewLine +
+                        "CREATE RINDEX statements prepared:" + Environment.NewLine;
+                    foreach (KeyValuePair<string, string> pair in creates)
+                    {
+                        log += pair.Value + Environment.NewLine;
+                    }
+                    LogOutputToFile(log);
+                }
+
+                Console.WriteLine();
+                Console.WriteLine(creates.Count.ToString() + " statements prepared.");
+                if (skipped.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(skipped.Count.ToString() + " statements skipped.");
+                    Console.ForegroundColor = oldcolor;
+                }
+                if (creates.Count == 0)
+                {
+                    Console.WriteLine("All statements were skipped.  Nothing to repair.");
+                    return;
+                }
+
+                //Drop all indexes
+                Console.WriteLine();
+                Console.WriteLine("Dropping all rindexes...");
+                DeleteRIndexes(args);
+                Console.WriteLine("Rindexes dropped.");
+
+                //Create rindexes
+                Console.WriteLine();
+                Console.WriteLine("Creating rindexes...");
+                System.Data.Common.DbProviderFactory fact = DbProviderFactories.GetFactory("Qizmt_DataProvider");
+                Dictionary<string, string> failed = new Dictionary<string, string>(creates.Count);
+                int createdcount = 0;
+                using (DbConnection conn = fact.CreateConnection())
+                {
+                    conn.ConnectionString = "Data Source = localhost";
+                    foreach (KeyValuePair<string, string> pair in creates)
+                    {
+                        string iname = pair.Key;
+                        string create = pair.Value;
+                        try
+                        {
+                            Console.WriteLine("Creating rindex {0}...", iname);
+                            conn.Open();
+                            DbCommand cmd = conn.CreateCommand();
+                            cmd.CommandText = create;
+                            cmd.ExecuteNonQuery();
+                            conn.Close();
+                            createdcount++;
+                            Console.WriteLine("Created successfully");
+                        }
+                        catch (Exception e)
+                        {
+                            string msg = "Failed to create rindex: " + iname + ".  Statement:" + create + ".  Error:" + e.ToString();
+                            failed.Add(iname, msg);
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine(msg);
+                            Console.ForegroundColor = oldcolor;
+                        }
+                    }
+                }
+
+                Console.WriteLine();
+                Console.WriteLine(createdcount.ToString() + " RIndexes were created successfully.");
+                if (failed.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(failed.Count.ToString() + " RIndexes were skipped because of error.");
+                    Console.ForegroundColor = oldcolor;
+                }
+            }
         }
 
         private struct Column

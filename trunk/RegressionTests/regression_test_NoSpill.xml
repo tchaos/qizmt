@@ -1,0 +1,231 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_NoSpill_Input.txt");
+                Shell(@"Qizmt del regression_test_NoSpill_Output*.txt");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_NoSpill_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                dfsoutput.WriteLine("65");
+                dfsoutput.WriteLine("66");
+                dfsoutput.WriteLine("67");
+                dfsoutput.WriteLine("68");
+            }
+        ]]>
+      </Remote>
+      
+    </Job>
+    <Job Name="mr" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_NoSpill_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_NoSpill_Output1.txt;dfs://regression_test_NoSpill_Output2.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>        
+      </IOSettings>
+      <NoSpill/>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                mstring sLine = mstring.Prepare(line);
+                int year = sLine.NextItemToInt(',');
+                                
+                recordset rKey = recordset.Prepare();
+                rKey.PutInt(year);
+                
+                recordset rValue = recordset.Prepare();
+                
+                output.Add(rKey, rValue);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            byte[] buf = new byte[1024];
+          
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {                
+                recordset rkey = recordset.Prepare(key);
+                int year = rkey.GetInt();
+                
+                DSpace_Log("reduce executed for key:" + year.ToString());
+                                
+                long basesize = 67108864 + 1024; // 64 MB + 1 KB
+                
+                for(int i = 0; i < buf.Length; i++)
+                {
+                    buf[i] = (byte)year;
+                }                                            
+              
+                {
+                    int max = (int)(basesize / buf.Length);  
+                    if(year == 67 || year == 68)
+                    {
+                       max = (int)(basesize / (buf.Length * 2));
+                    }
+                    
+                    for(int j = 0; j < max; j++)
+                    {
+                        ByteSlice bs = ByteSlice.Prepare(buf);
+                        output.GetOutputByIndex(0).Add(bs);
+                    }                
+                }
+                                
+                {
+                    int max = (int)(basesize / buf.Length);  
+                    if(year == 65 || year == 66)
+                    {
+                       max = (int)(basesize / (buf.Length * 2));
+                    }
+                    
+                    for(int j = 0; j < max; j++)
+                    {
+                        ByteSlice bs = ByteSlice.Prepare(buf);
+                        output.GetOutputByIndex(1).Add(bs);
+                    }                
+                }       
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="checkresults" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+           {
+            
+            
+            if(CheckOutputFile(1) && CheckOutputFile(2))
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_NoSpill.xml 1");
+            }
+            else
+            {
+                Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_NoSpill.xml 0");
+            }
+            
+
+            Shell(@"Qizmt del regression_test_NoSpill_Input.txt");
+            Shell(@"Qizmt del regression_test_NoSpill_Output*.txt");
+        }
+        
+        public bool CheckOutputFile(int index)
+        {
+            string root = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location).Replace(':', '$');
+
+            Dictionary<int, Dictionary<string, int>> keytochunk = new Dictionary<int, Dictionary<string, int>>(4);
+
+            try
+            {
+                foreach (string host in StaticGlobals.DSpace_Hosts)
+                {
+                    string[] lines = Shell("qizmt info regression_test_NoSpill_Output" + index.ToString() + ".txt:" + host).Split('\n');
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        string line = lines[i].Trim();
+                        if (line.StartsWith("zd."))
+                        {
+                            string fn = line.Split(' ')[0];
+
+                            using (System.IO.FileStream fs = new System.IO.FileStream(@"\\" + host + @"\" + root + @"\" + fn, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                            {
+                                //skip header
+                                fs.Position = 12;
+
+                                //gather all keys in this file.
+                                int prevb = -1;
+
+                                for (; ; )
+                                {
+                                    int curb = fs.ReadByte();
+
+                                    if (curb == -1)
+                                    {
+                                        break;
+                                    }
+
+                                    if (curb == (byte)'\r' || curb == (byte)'\n')
+                                    {
+                                        continue;
+                                    }
+
+                                    if (prevb != curb)
+                                    {
+                                        Dictionary<string, int> chunks = null;
+                                        if (!keytochunk.ContainsKey(curb))
+                                        {
+                                            chunks = new Dictionary<string, int>(5);
+                                            keytochunk.Add(curb, chunks);
+                                        }
+                                        else
+                                        {
+                                            chunks = keytochunk[curb];
+                                        }
+
+                                        //this key should not appear in more than 1 chunk
+                                        if (!chunks.ContainsKey(fn))
+                                        {
+                                            if (chunks.Count > 0)
+                                            {
+                                                throw new Exception("Key appears in more than 1 chunk file.  Key=" + curb.ToString() + "; in chunks=" + fn + ";" + string.Join(";", (new List<string>(chunks.Keys)).ToArray()));
+                                            }
+                                            else
+                                            {
+                                                chunks.Add(fn, 1);
+                                            }
+                                        }
+
+                                        prevb = curb;
+                                    }
+                                }
+                                fs.Close();
+                            }
+                        }
+                    }
+                }
+                
+                foreach (KeyValuePair<int, Dictionary<string, int>> pair in keytochunk)
+                {
+                    Dictionary<string, int> chunks = pair.Value;
+                    DSpace_Log(pair.Key.ToString() + ":" + string.Join(";", (new List<string>(chunks.Keys)).ToArray()));
+                }
+            
+                return true;
+            }
+            catch (Exception e)
+            {
+                DSpace_Log(e.ToString());
+                return false;
+            }           
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

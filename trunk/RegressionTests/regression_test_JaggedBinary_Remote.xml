@@ -1,0 +1,383 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="Cleanup" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_JaggedBinary_Input*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Output*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Expected*.txt");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="CreateData" Custodian="" Email="" Description="">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_JaggedBinary_Input1.txt@?;regression_test_JaggedBinary_Expected1.txt;regression_test_JaggedBinary_Input_2097152.txt@?;regression_test_JaggedBinary_Input_2097153.txt@?;regression_test_JaggedBinary_Input_268435456.txt@?;regression_test_JaggedBinary_Input_268435457.txt@?</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                Random rnd = new Random(unchecked(System.DateTime.Now.Millisecond + System.Threading.Thread.CurrentThread.ManagedThreadId));                
+               
+                {
+                    //Test all data types, spilling to the next chunk, and record length < 2097152
+                    int maxrows = (1024 * 1024 * 65) / (4 + 8 + 2 + 128 + 9 + 8 + 128); // want to spill to the next chunk
+                                        
+                    string s2 = "";
+                    for(int si = 0; si < 63; si++)
+                    {
+                        s2 += (char)rnd.Next(97, 123);
+                    }                
+                    mstring ms2 = mstring.Prepare(s2);
+                    
+                    string s3 = "";
+                    for(int si = 0; si < 8191; si++)
+                    {
+                        s3 += (char)rnd.Next(97, 123);
+                    }
+                    mstring ms3 = mstring.Prepare(s3);
+                    
+                    for(int i = 0; i < maxrows; i++)
+                    {
+                        {                            
+                            //record length = 4 + 8 + 2 < 128
+                            recordset rs = recordset.Prepare();
+                            int x = rnd.Next(Int32.MinValue, Int32.MaxValue);
+                            long y = rnd.Next(Int32.MinValue, Int32.MaxValue);
+                            short z = (short)rnd.Next(Int16.MinValue, Int16.MaxValue);
+                            rs.PutInt(x);
+                            rs.PutLong(y);
+                            rs.PutShort(z);
+                            
+                            dfsoutput.WriteRecord(rs.ToByteSlice().ToBytes());                            
+                            dfsoutput.GetOutputByIndex(1).WriteLine(x.ToString() + "," + y.ToString() + "," + z.ToString());
+                        }
+                        {                            
+                            //record length = 128
+                            recordset rs = recordset.Prepare();
+                            rs.PutString(ms2);                            
+                            dfsoutput.WriteRecord(rs.ToByteSlice().ToBytes());                            
+                            dfsoutput.GetOutputByIndex(1).WriteLine(s2);
+                        }
+                        {        
+                            //record length = 9 + 8 + 128 < 16384
+                            recordset rs = recordset.Prepare();
+                            double x = rnd.NextDouble();
+                            DateTime y = DateTime.Now;                            
+                            rs.PutDouble(x);
+                            rs.PutDateTime(y);
+                            rs.PutString(ms2);
+                            
+                            dfsoutput.WriteRecord(rs.ToByteSlice().ToBytes());                            
+                            dfsoutput.GetOutputByIndex(1).WriteLine(x.ToString() + "," + y.ToString() + "," + s2);
+                        }                         
+                    }                    
+                    {        
+                        //record length = 16384
+                        recordset rs = recordset.Prepare();
+                        rs.PutString(ms3);
+                        
+                        dfsoutput.WriteRecord(rs.ToByteSlice().ToBytes());                            
+                        dfsoutput.GetOutputByIndex(1).WriteLine(s3);
+                    }
+                    {        
+                        //record length = 16384 + 4 < 2097152
+                        recordset rs = recordset.Prepare();
+                        int x = rnd.Next(Int32.MinValue, Int32.MaxValue);
+                        rs.PutString(ms3);
+                        rs.PutInt(x);
+                        
+                        dfsoutput.WriteRecord(rs.ToByteSlice().ToBytes());                            
+                        dfsoutput.GetOutputByIndex(1).WriteLine(s3 + "," + x.ToString());
+                    } 
+                }
+                
+                Stack.ResetStack();
+                recordset.ResetBuffers();   
+                
+                //Test record length >= 2097152
+                {
+                    {
+                        //record length = 2097152
+                        recordset rs = recordset.Prepare();
+                        for(int bi = 0; bi < 2097152; bi++)
+                        {
+                            rs.PutByte(1);
+                        }                        
+                        dfsoutput.GetOutputByIndex(2).WriteRecord(rs.ToByteSlice().ToBytes());         
+                    }           
+                    
+                    Stack.ResetStack();
+                    recordset.ResetBuffers(); 
+                
+                    {
+                        //record length < 268435456
+                        recordset rs = recordset.Prepare();
+                        for(int bi = 0; bi < 2097152 + 1; bi++)
+                        {
+                            rs.PutByte(1);
+                        }                            
+                        dfsoutput.GetOutputByIndex(3).WriteRecord(rs.ToByteSlice().ToBytes());         
+                    }                    
+                                          
+                    if(StaticGlobals.DSpace_Hosts.Length > 1)   // if testing on cluster
+                    {                        
+                        Stack.ResetStack();
+                        recordset.ResetBuffers();   
+                        
+                        {
+                            //record length = 268435456
+                            recordset rs = recordset.Prepare();
+                            for(int bi = 0; bi < 268435456; bi++)
+                            {
+                                rs.PutByte(1);
+                            }                            
+                            dfsoutput.GetOutputByIndex(4).WriteRecord(rs.ToByteSlice().ToBytes());         
+                        }
+                        
+                        Stack.ResetStack();
+                        recordset.ResetBuffers();  
+                        
+                        {
+                            //record length > 268435456
+                            recordset rs = recordset.Prepare();
+                            for(int bi = 0; bi < 268435456 + 1; bi++)
+                            {
+                                rs.PutByte(1);
+                            }                            
+                            dfsoutput.GetOutputByIndex(5).WriteRecord(rs.ToByteSlice().ToBytes());         
+                        }
+                    }                    
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>    
+    <Job Name="ReadData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_JaggedBinary_Input*.txt@?</DFSReader>
+          <DFSWriter>regression_test_JaggedBinary_Output1.txt;regression_test_JaggedBinary_Output_2097152.txt;regression_test_JaggedBinary_Output_2097153.txt;regression_test_JaggedBinary_Output_268435456.txt;regression_test_JaggedBinary_Output_268435457.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                List<byte> buf = new List<byte>();
+                while(dfsinput.ReadRecordAppend(buf))
+                {
+                    recordset rs = recordset.Prepare(ByteSlice.Prepare(buf));
+                    if(buf.Count < 128)
+                    {
+                        int i = rs.GetInt();
+                        long l = rs.GetLong();
+                        short s = rs.GetShort();
+                        dfsoutput.WriteLine(i.ToString() + "," + l.ToString() + "," + s.ToString());
+                    }
+                    else if(buf.Count == 128)
+                    {
+                        string s = rs.GetString().ToString();
+                        dfsoutput.WriteLine(s);
+                    }
+                    else if(buf.Count < 16384)
+                    {
+                        double i = rs.GetDouble();
+                        DateTime l = rs.GetDateTime();
+                        string s = rs.GetString().ToString();
+                        dfsoutput.WriteLine(i.ToString() + "," + l.ToString() + "," + s);
+                    }
+                    else if(buf.Count == 16384)
+                    {
+                        string s = rs.GetString().ToString();
+                        dfsoutput.WriteLine(s);
+                    }                    
+                    else if(buf.Count < 2097152)
+                    {
+                        string s = rs.GetString().ToString();
+                        int i = rs.GetInt();
+                        dfsoutput.WriteLine(s + "," + i.ToString());
+                    }
+                    else if(buf.Count == 2097152)
+                    {
+                        long sum = 0;
+                        foreach(byte b in buf)
+                        {
+                            sum += (int)b;
+                        }
+                        dfsoutput.GetOutputByIndex(1).WriteLine(sum.ToString());
+                    }
+                    else if(buf.Count == 2097153)
+                    {
+                        long sum = 0;
+                        foreach(byte b in buf)
+                        {
+                            sum += (int)b;
+                        }
+                        dfsoutput.GetOutputByIndex(2).WriteLine(sum.ToString());
+                    }
+                    else if(buf.Count == 268435456)
+                    {
+                        long sum = 0;
+                        foreach(byte b in buf)
+                        {
+                            sum += (int)b;
+                        }
+                        dfsoutput.GetOutputByIndex(3).WriteLine(sum.ToString());
+                    }
+                    else if(buf.Count == 268435457)
+                    {
+                        long sum = 0;
+                        foreach(byte b in buf)
+                        {
+                            sum += (int)b;
+                        }
+                        dfsoutput.GetOutputByIndex(4).WriteLine(sum.ToString());
+                    }
+                    else
+                    {                        
+                        throw new Exception("Buffer byte count invalid.");
+                    }
+                    
+                    buf.Clear();
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    
+    
+    <Job Name="ReadData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>regression_test_JaggedBinary_Input_2097153.txt@?</DFSReader>
+          <DFSWriter>regression_test_JaggedBinary_Output2_2097153.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {                
+                while(dfsinput.ReadRecordAppend(dfsoutput))
+                {
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    
+    <Job Name="Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                string expected1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                string output1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                
+                Shell(@"Qizmt get regression_test_JaggedBinary_Expected1.txt " + expected1);
+                Shell(@"Qizmt get regression_test_JaggedBinary_Output1.txt " + output1);
+                
+                bool ok = true;
+                {
+                    List<string> elines = new List<string>(System.IO.File.ReadAllLines(expected1));
+                    List<string> rlines = new List<string>(System.IO.File.ReadAllLines(output1));
+                    elines.Sort();
+                    rlines.Sort();
+                    
+                    if(elines.Count != rlines.Count)
+                    {
+                        ok = false;
+                    }
+                    else
+                    {
+                        for(int i = 0; i < elines.Count; i++)
+                        {
+                            if(elines[i] != rlines[i])
+                            {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }                    
+                }
+                
+                if(ok)
+                {
+                    ok = Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_2097152.txt")) == 2097152 &&
+                            Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_2097153.txt")) == 2097153;              
+                }
+                
+                if(ok)
+                {
+                    string output2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    Shell(@"qizmt get regression_test_JaggedBinary_Output2_2097153.txt " + output2);
+                    long sum = 0;
+                    using (System.IO.FileStream fs = new System.IO.FileStream(output2, System.IO.FileMode.Open, System.IO.FileAccess.Read))
+                    {
+                        for(;;)
+                        {
+                            int ib = fs.ReadByte();
+                            if(ib == -1)
+                            {
+                                break;
+                            }
+                            sum += ib;
+                        }  
+                        fs.Close();
+                    }
+                    if(sum != 2097153)
+                    {
+                        ok = false;
+                    }
+                }
+                
+                if(ok && StaticGlobals.DSpace_Hosts.Length > 1)
+                {
+                    ok = Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_268435456.txt")) == 268435456 &&
+                            Int32.Parse(GetFileContent("regression_test_JaggedBinary_Output_268435457.txt")) == 268435457;
+                }
+                
+                if(ok)
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_JaggedBinary_Remote.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_JaggedBinary_Remote.xml 0");
+                }
+                
+                System.IO.File.Delete(expected1);
+                System.IO.File.Delete(output1);
+                Shell(@"Qizmt del regression_test_JaggedBinary_Input*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Output*.txt");
+                Shell(@"Qizmt del regression_test_JaggedBinary_Expected*.txt");
+            }
+            
+            string GetFileContent(string dfs)
+            {
+                string temp = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                Shell(@"Qizmt get " + dfs + " " + temp);
+                string content = System.IO.File.ReadAllText(temp);
+                System.IO.File.Delete(temp);
+                return content;
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

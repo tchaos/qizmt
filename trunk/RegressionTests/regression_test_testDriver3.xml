@@ -1,0 +1,91 @@
+<SourceCode>
+	<Jobs>
+		<Job>
+			<Narrative>
+				<Name>regression_test_testDriver_run_all_jobs</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>test</JobType>
+			</IOSettings>
+			<Test>
+				<![CDATA[
+        public virtual void Test()
+        {
+            string[] jobfiles = new string[]
+            {
+              
+	        	 "regression_test_Entry.ToUInt32.xml",
+                 "regression_test_KeyLength_UInt32.xml",
+                 "regression_test_KeyLength_UInt.xml",
+                 "regression_test_KeyLength_Short.xml",
+                 "regression_test_KeyLength_Int16.xml",
+                 "regression_test_KeyLength_UShort.xml",
+                 "regression_test_KeyLength_UInt16.xml",
+                 "regression_test_KeyLength_UInt64.xml",
+				 "regression_test_output.Add(cSharp_string).xml",
+                  "regression_test_KeyLength_ULong.xml"
+                
+            };
+            
+            int iarg = 0;
+            
+            bool IsTestTest = false;
+            bool IsBasicTest = false;
+            if(Qizmt_ExecArgs.Length > iarg && "-test" == Qizmt_ExecArgs[iarg])
+            {
+                iarg++;
+                IsTestTest = true;
+            }
+            if(Qizmt_ExecArgs.Length > iarg && "-basic" == Qizmt_ExecArgs[iarg])
+            {
+                iarg++;
+                IsBasicTest = true;
+            }
+            if(IsTestTest)
+            {
+                Console.WriteLine("TESTING: only running one test!");
+                if(jobfiles.Length > 0)
+                {
+                    jobfiles = new string[] { jobfiles[0] };
+                }
+            }
+            if(IsBasicTest)
+            {
+                jobfiles = new string[]
+                {
+                "regression_test_Entry.ToUInt32.xml",
+                
+                };
+            }
+            
+            foreach(string jobfile in jobfiles)
+            {
+                Qizmt_Log("Qizmt exec " + jobfile);
+                Qizmt_Log(Shell("Qizmt exec " + jobfile, true));
+                Qizmt_Log("-");
+            }
+            
+            for(int i = 0; i < jobfiles.Length; i++)
+            {            
+                string[] info = Shell(@"Qizmt info " + jobfiles[i] + ".PASSED", true).Split('\n');
+                
+        if(info.Length > 2 && info[0].IndexOf("file information") > -1)
+        {
+            Qizmt_LogResult("Qizmt exec " + jobfiles[i], true);
+        }
+        else
+        {
+            Qizmt_LogResult("Qizmt exec " + jobfiles[i], false);
+        }
+                
+                Shell(@"Qizmt del " + jobfiles[i] + ".FAILED", true);
+                Shell(@"Qizmt del " + jobfiles[i] + ".PASSED", true);
+            }
+        }
+        ]]>
+			</Test>
+		</Job>
+	</Jobs>
+</SourceCode>

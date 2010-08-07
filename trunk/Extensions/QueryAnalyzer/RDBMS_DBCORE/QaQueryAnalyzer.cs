@@ -248,7 +248,7 @@ namespace RDBMS_DBCORE
                                         if (distinct)
                                         {
                                             throw new Exception("ORDER BY is not supported with SELECT DISTINCT");
-                                        }
+                                        }                                        
                                         OrderBy = true;
                                     }
                                 }

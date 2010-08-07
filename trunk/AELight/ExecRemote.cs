@@ -475,6 +475,10 @@ public static void DSpace_LogResult(string name, bool passed)
                     {
                         bi.rem.AddOpenCVExtension();
                     }
+                    if (cfgj.MemCache != null)
+                    {
+                        bi.rem.AddMemCacheExtension();
+                    }
                     if (cfgj.Unsafe != null)
                     {
                         bi.rem.AddUnsafe();
@@ -524,7 +528,7 @@ public static void DSpace_LogResult(string name, bool passed)
                                     }
                                 }
                                 dfs.DfsFile df;
-                                if (inreclen > 0)
+                                if (inreclen > 0 || inreclen == -2)
                                 {
                                     df = DfsFind(dc, dp, DfsFileTypes.BINARY_RECT);
                                     if (null != df && inreclen != df.RecordLength)
@@ -605,7 +609,7 @@ public static void DSpace_LogResult(string name, bool passed)
                         }
                         {
                             bool anyoutput = false;
-                            bool nonemptyoutputpath = false;
+                            bool nonemptyoutputpath = false;                           
                             for (int oi = 0; oi < blocks[BlockID].DFSWriters.Count; oi++)
                             {
                                 string dfswriter = blocks[BlockID].DFSWriters[oi];
@@ -634,6 +638,10 @@ public static void DSpace_LogResult(string name, bool passed)
                                             if (blocks[BlockID].rem.OutputRecordLengths[oi] > 0)
                                             {
                                                 df.XFileType = DfsFileTypes.BINARY_RECT + "@" + blocks[BlockID].rem.OutputRecordLengths[oi].ToString();
+                                            }
+                                            else if (blocks[BlockID].rem.OutputRecordLengths[oi] == -2)
+                                            {
+                                                df.XFileType = DfsFileTypes.BINARY_RECT + "@?";
                                             }
                                             df.Nodes = new List<dfs.DfsFile.FileNode>();
                                             df.Size = -1; // Preset

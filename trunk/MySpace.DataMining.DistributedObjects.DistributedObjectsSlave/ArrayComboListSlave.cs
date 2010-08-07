@@ -30,7 +30,8 @@
 //#define DEBUG_TESTREDUCECOOKING
 #endif
 
-//#define FAILOVER_TEST
+//#define TESTFAULTTOLERANT
+//#define FAILOVER_DEBUG
 
 //#define REDUCE_SPLIT_CALLS_GC
 
@@ -208,8 +209,16 @@ namespace MySpace.DataMining.DistributedObjects5
 
             internal void ensurefzblock(bool sorting, bool zballing)
             {
+                int defCookTimeout = parent.CookTimeout;
+                int defCookRetries = parent.CookRetries;                
+                if (parent.FaultTolerant)
+                {
+                    defCookTimeout = parent.FTReadTimeout;
+                    defCookRetries = parent.FTReadRetries;                    
+                }
+
                 //----------------------------COOKING--------------------------------
-                int cooking_cooksremain = parent.CookRetries;
+                int cooking_cooksremain = defCookRetries;
                 for (; ; )
                 {
                     try
@@ -250,7 +259,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     catch (Exception e)
                     {
-                        bool firstcook = cooking_cooksremain == parent.CookRetries;
+                        bool firstcook = cooking_cooksremain == defCookRetries;
                         if (cooking_cooksremain-- <= 0)
                         {
                             string ns = " (unable to get connection count)";
@@ -262,18 +271,26 @@ namespace MySpace.DataMining.DistributedObjects5
                             catch
                             {
                             }
+
+                            if (parent.FaultTolerant)
+                            {
+                                parent.ReportRogueHost(System.Net.Dns.GetHostName());
+                            }                            
+
                             throw new System.IO.IOException("cooked too many times (retries="
-                                + parent.CookRetries.ToString()
-                                + "; timeout=" + parent.CookTimeout.ToString()
+                                + defCookRetries.ToString()
+                                + "; timeout=" + defCookTimeout.ToString()
+                                + "; faulttolerant=" + parent.FaultTolerant.ToString()
                                 + ") on " + System.Net.Dns.GetHostName() + ns, e);
                         }
-                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(parent.CookTimeout));
+                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                         if (firstcook)
                         {
                             try
                             {
-                                XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
-                                    + "; timeout=" + parent.CookTimeout.ToString()
+                                XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                    + "; timeout=" + defCookTimeout.ToString()
+                                    + "; faulttolerant=" + parent.FaultTolerant.ToString()
                                     + ") on " + System.Net.Dns.GetHostName()
                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
                             }
@@ -285,11 +302,12 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                             try
                             {
-                                if ((parent.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                 {
                                     XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                        + " more retries (retries=" + parent.CookRetries.ToString()
-                                        + "; timeout=" + parent.CookTimeout.ToString()
+                                        + " more retries (retries=" + defCookRetries.ToString()
+                                        + "; timeout=" + defCookTimeout.ToString()
+                                        + "; faulttolerant=" + parent.FaultTolerant.ToString()
                                         + ") on " + System.Net.Dns.GetHostName()
                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                         + Environment.NewLine + e.ToString());
@@ -520,8 +538,16 @@ namespace MySpace.DataMining.DistributedObjects5
                 int bufoffset = 0;
                 long curkey = 0;
 
+                int defCookTimeout = parent.CookTimeout;
+                int defCookRetries = parent.CookRetries;
+                if (parent.FaultTolerant)
+                {
+                    defCookTimeout = parent.FTReadTimeout;
+                    defCookRetries = parent.FTReadRetries;
+                }
+
                 //----------------------------COOKING--------------------------------
-                int cooking_cooksremain = parent.CookRetries;
+                int cooking_cooksremain = defCookRetries;
                 //----------------------------COOKING--------------------------------
                 for (; ; )
                 {
@@ -534,7 +560,6 @@ namespace MySpace.DataMining.DistributedObjects5
                         bool _dtec_wasatbeginningvalues = (curvalueoffset == 0);
                         bool _dtec_wasatbeginningkeys = (curkeyoffset == 0);
 #endif
-
                         if (first)
                         {
                             net.Clear();
@@ -596,6 +621,10 @@ namespace MySpace.DataMining.DistributedObjects5
                         }
                         byte[] valuesbuf = evaluesbuf;
                         byte[] buf = ebuf;
+
+#if TESTFAULTTOLERANT                        
+                        parent.fttest.BreakPoint(System.Net.Dns.GetHostName(), "reduce", new Exception("FAULTTOLERANT reduce test exception"));
+#endif
 
                         {
 
@@ -763,7 +792,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     catch(Exception e)
                     {
                         //----------------------------COOKING--------------------------------
-                        bool firstcook = cooking_cooksremain == parent.CookRetries;
+                        bool firstcook = cooking_cooksremain == defCookRetries;
                         if (cooking_cooksremain-- <= 0)
                         {
                             string ns = " (unable to get connection count)";
@@ -775,9 +804,14 @@ namespace MySpace.DataMining.DistributedObjects5
                             catch
                             {
                             }
+                            if (parent.FaultTolerant)
+                            {
+                                parent.ReportRogueHost(System.Net.Dns.GetHostName());
+                            }
                             throw new System.IO.IOException("cooked too many times (retries="
-                                + parent.CookRetries.ToString()
-                                + "; timeout=" + parent.CookTimeout.ToString()
+                                + defCookRetries.ToString()
+                                + "; timeout=" + defCookTimeout.ToString()
+                                + "; faulttolerant=" + parent.FaultTolerant.ToString()
                                 + ") on " + System.Net.Dns.GetHostName() + ns
                                 + " with file " + fpsummary
                                 + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id, e);
@@ -789,13 +823,14 @@ namespace MySpace.DataMining.DistributedObjects5
                         catch
                         {
                         }
-                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(parent.CookTimeout));
+                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                         if (firstcook)
                         {
                             try
                             {
-                                XLog.errorlog("cooking started (retries=" + parent.CookRetries.ToString()
-                                    + "; timeout=" + parent.CookTimeout.ToString()
+                                XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                    + "; timeout=" + defCookTimeout.ToString()
+                                    + "; faulttolerant=" + parent.FaultTolerant.ToString()
                                     + ") on " + System.Net.Dns.GetHostName()
                                     + " with file " + fpsummary
                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -810,11 +845,12 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                             try
                             {
-                                if ((parent.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                 {
                                     XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                        + " more retries (retries=" + parent.CookRetries.ToString()
-                                        + "; timeout=" + parent.CookTimeout.ToString()
+                                        + " more retries (retries=" + defCookRetries.ToString()
+                                        + "; timeout=" + defCookTimeout.ToString()
+                                        + "; faulttolerant=" + parent.FaultTolerant.ToString()
                                         + ") on " + System.Net.Dns.GetHostName()
                                         + " with file " + fpsummary
                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -1127,8 +1163,16 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
 #endif
 
+                    int defCookTimeout = acl.CookTimeout;
+                    int defCookRetries = acl.CookRetries;
+                    if (acl.FaultTolerant)
+                    {
+                        defCookTimeout = acl.FTReadTimeout;
+                        defCookRetries = acl.FTReadRetries;
+                    }
+
                     //----------------------------COOKING--------------------------------
-                    int cooking_cooksremain = acl.CookRetries;
+                    int cooking_cooksremain = defCookRetries;
                     bool cooking_inIO = false;
                     long cooking_pos = 0;
                     //----------------------------COOKING--------------------------------
@@ -1149,6 +1193,12 @@ namespace MySpace.DataMining.DistributedObjects5
                                 cooking_inIO = false;
 
                                 int NumberOfKeysLimit = int.MaxValue;
+
+#if TESTFAULTTOLERANT
+                                acl.fttest.BreakPoint(System.Net.Dns.GetHostName(), "sort", new NeedCookingException(new Exception("FAULTTOLERANT sort test exception")));
+#endif
+
+
                                 _XCopyLimitInto_needcooking(stm, ref cooking_pos, ref NumberOfKeysLimit, kentries, ref ebuf, ref ebufoffset);
 
                             }
@@ -1156,7 +1206,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         catch (NeedCookingException e)
                         {
                             //----------------------------COOKING--------------------------------
-                            bool firstcook = cooking_cooksremain == acl.CookRetries;
+                            bool firstcook = cooking_cooksremain == defCookRetries;
                             if (cooking_cooksremain-- <= 0)
                             {
                                 string ns = " (unable to get connection count)";
@@ -1168,21 +1218,29 @@ namespace MySpace.DataMining.DistributedObjects5
                                 catch
                                 {
                                 }
+
+                                if (acl.FaultTolerant)
+                                {
+                                    acl.ReportRogueHost(System.Net.Dns.GetHostName());
+                                }
+
                                 throw new System.IO.IOException("cooked too many times (retries="
-                                    + acl.CookRetries.ToString()
-                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                    + defCookRetries.ToString()
+                                    + "; timeout=" + defCookTimeout.ToString()
+                                    + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                     + ") on " + System.Net.Dns.GetHostName() + ns
                                     + " with file " + keyblockfilename
                                     + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id,
                                     e.InnerException); // InnerException!
                             }
-                            System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(acl.CookTimeout));
+                            System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                             if (firstcook)
                             {
                                 try
                                 {
-                                    XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
-                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                    XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                        + "; timeout=" + defCookTimeout.ToString()
+                                        + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                         + ") on " + System.Net.Dns.GetHostName()
                                         + " with file " + keyblockfilename
                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -1197,11 +1255,12 @@ namespace MySpace.DataMining.DistributedObjects5
                             {
                                 try
                                 {
-                                    if ((acl.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                    if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                     {
                                         XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                            + " more retries (retries=" + acl.CookRetries.ToString()
-                                            + "; timeout=" + acl.CookTimeout.ToString()
+                                            + " more retries (retries=" + defCookRetries.ToString()
+                                            + "; timeout=" + defCookTimeout.ToString()
+                                            + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                             + ") on " + System.Net.Dns.GetHostName()
                                             + " with file " + keyblockfilename
                                             + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -1223,7 +1282,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                 throw;
                             }
                             //----------------------------COOKING--------------------------------
-                            bool firstcook = cooking_cooksremain == acl.CookRetries;
+                            bool firstcook = cooking_cooksremain == defCookRetries;
                             if (cooking_cooksremain-- <= 0)
                             {
                                 string ns = " (unable to get connection count)";
@@ -1235,19 +1294,25 @@ namespace MySpace.DataMining.DistributedObjects5
                                 catch
                                 {
                                 }
+                                if (acl.FaultTolerant)
+                                {
+                                    acl.ReportRogueHost(System.Net.Dns.GetHostName());
+                                }
                                 throw new System.IO.IOException("cooked too many times (retries="
-                                    + acl.CookRetries.ToString()
-                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                    + defCookRetries.ToString()
+                                    + "; timeout=" + defCookTimeout.ToString()
+                                    + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                     + ") on " + System.Net.Dns.GetHostName() + ns
                                     + " with file " + keyblockfilename + " Worker PID = ", e);
                             }
-                            System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(acl.CookTimeout));
+                            System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                             if (firstcook)
                             {
                                 try
                                 {
-                                    XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
-                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                    XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                        + "; timeout=" + defCookTimeout.ToString()
+                                        + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                         + ") on " + System.Net.Dns.GetHostName()
                                         + " with file " + keyblockfilename
                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -1262,11 +1327,12 @@ namespace MySpace.DataMining.DistributedObjects5
                             {
                                 try
                                 {
-                                    if ((acl.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                    if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                     {
                                         XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                            + " more retries (retries=" + acl.CookRetries.ToString()
-                                            + "; timeout=" + acl.CookTimeout.ToString()
+                                            + " more retries (retries=" + defCookRetries.ToString()
+                                            + "; timeout=" + defCookTimeout.ToString()
+                                            + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                             + ") on " + System.Net.Dns.GetHostName()
                                             + " with file " + keyblockfilename
                                             + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -1308,7 +1374,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     return 0;
                 }
 
-                class _kcmpComparer : IComparer<TKeyBlockEntry>
+                internal class _kcmpComparer : IComparer<TKeyBlockEntry>
                 {
                     public int Compare(TKeyBlockEntry x, TKeyBlockEntry y)
                     {
@@ -1945,8 +2011,16 @@ namespace MySpace.DataMining.DistributedObjects5
 
                             if (zblock.ZBlockSplit)
                             {
+                                int defCookTimeout = acl.CookTimeout;
+                                int defCookRetries = acl.CookRetries;
+                                if (acl.FaultTolerant)
+                                {
+                                    defCookTimeout = acl.FTReadTimeout;
+                                    defCookRetries = acl.FTReadRetries;
+                                }
+
                                 //----------------------------COOKING--------------------------------
-                                int cooking_cooksremain = acl.CookRetries;
+                                int cooking_cooksremain = defCookRetries;
                                 bool cooking_inIO = false;
                                 long cooking_seekpos = 0;
                                 //----------------------------COOKING--------------------------------
@@ -1976,6 +2050,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                                 }
                                                 cooking_inIO = false;
                                             }
+
                                             if (null == valuestm)
                                             {
                                                 cooking_inIO = true;
@@ -1994,6 +2069,12 @@ namespace MySpace.DataMining.DistributedObjects5
                                                 kentries.Clear();
                                                 keysremain = keyspersplit;
                                             }
+
+#if TESTFAULTTOLERANT
+                                            acl.fttest.BreakPoint(System.Net.Dns.GetHostName(), "splitsort", new NeedCookingException(new Exception("FAULTTOLERANT splitsort test exception")));
+#endif
+
+
                                             again = _XCopyLimitInto_needcooking(keystm, ref cooking_seekpos, ref keysremain, kentries, ref ebuf, ref ebufoffset);
                                             if (0 != keysremain)
                                             {
@@ -2052,7 +2133,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                         keystm = null; // Reopen.
                                         valuestm = null; // Reopen.
                                         //----------------------------COOKING--------------------------------
-                                        bool firstcook = cooking_cooksremain == acl.CookRetries;
+                                        bool firstcook = cooking_cooksremain == defCookRetries;
                                         if (cooking_cooksremain-- <= 0)
                                         {
                                             string ns = " (unable to get connection count)";
@@ -2064,20 +2145,26 @@ namespace MySpace.DataMining.DistributedObjects5
                                             catch
                                             {
                                             }
+                                            if (acl.FaultTolerant)
+                                            {
+                                                acl.ReportRogueHost(System.Net.Dns.GetHostName());
+                                            }
                                             throw new System.IO.IOException("cooked too many times (retries="
-                                                + acl.CookRetries.ToString()
-                                                + "; timeout=" + acl.CookTimeout.ToString()
+                                                + defCookRetries.ToString()
+                                                + "; timeout=" + defCookTimeout.ToString()
+                                                + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                                 + ") on " + System.Net.Dns.GetHostName() + ns
                                                 + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id,
                                                 e.InnerException); // InnerException!
                                         }
-                                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(acl.CookTimeout));
+                                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                                         if (firstcook)
                                         {
                                             try
                                             {
-                                                XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
-                                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                                XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                                    + "; timeout=" + defCookTimeout.ToString()
+                                                    + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                                     + ") on " + System.Net.Dns.GetHostName()
                                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                                     + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id
@@ -2091,11 +2178,12 @@ namespace MySpace.DataMining.DistributedObjects5
                                         {
                                             try
                                             {
-                                                if ((acl.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                                if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                                 {
                                                     XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                                        + " more retries (retries=" + acl.CookRetries.ToString()
-                                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                                        + " more retries (retries=" + defCookRetries.ToString()
+                                                        + "; timeout=" + defCookTimeout.ToString()
+                                                        + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                                         + ") on " + System.Net.Dns.GetHostName()
                                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                                         + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id
@@ -2117,7 +2205,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                         }
                                         keystm = null; // Reopen.
                                         //----------------------------COOKING--------------------------------
-                                        bool firstcook = cooking_cooksremain == acl.CookRetries;
+                                        bool firstcook = cooking_cooksremain == defCookRetries;
                                         if (cooking_cooksremain-- <= 0)
                                         {
                                             string ns = " (unable to get connection count)";
@@ -2129,19 +2217,25 @@ namespace MySpace.DataMining.DistributedObjects5
                                             catch
                                             {
                                             }
+                                            if (acl.FaultTolerant)
+                                            {
+                                                acl.ReportRogueHost(System.Net.Dns.GetHostName());
+                                            }
                                             throw new System.IO.IOException("cooked too many times (retries="
-                                                + acl.CookRetries.ToString()
-                                                + "; timeout=" + acl.CookTimeout.ToString()
+                                                + defCookRetries.ToString()
+                                                + "; timeout=" + defCookTimeout.ToString()
+                                                + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                                 + ") on " + System.Net.Dns.GetHostName() + ns
                                                 + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id, e);
                                         }
-                                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(acl.CookTimeout));
+                                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                                         if (firstcook)
                                         {
                                             try
                                             {
-                                                XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
-                                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                                XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                                    + "; timeout=" + defCookTimeout.ToString()
+                                                    + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                                     + ") on " + System.Net.Dns.GetHostName()
                                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                                     + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id
@@ -2155,11 +2249,12 @@ namespace MySpace.DataMining.DistributedObjects5
                                         {
                                             try
                                             {
-                                                if ((acl.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                                if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                                 {
                                                     XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                                        + " more retries (retries=" + acl.CookRetries.ToString()
-                                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                                        + " more retries (retries=" + defCookRetries.ToString()
+                                                        + "; timeout=" + defCookTimeout.ToString()
+                                                        + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                                         + ") on " + System.Net.Dns.GetHostName()
                                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                                         + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id
@@ -2741,8 +2836,15 @@ namespace MySpace.DataMining.DistributedObjects5
         internal System.IO.FileStream openfilewithcooking(string fp, System.IO.FileMode mode,
                 System.IO.FileAccess access, System.IO.FileShare share)
         {
+            int defCookTimeout = CookTimeout;
+            int defCookRetries = CookRetries;
+            if (FaultTolerant)
+            {
+                defCookTimeout = FTReadTimeout;
+                defCookRetries = FTReadRetries;
+            }
             //----------------------------COOKING--------------------------------
-            int cooking_cooksremain = CookRetries;
+            int cooking_cooksremain = defCookRetries;
             for (; ; )
             {
                 try
@@ -2755,7 +2857,7 @@ namespace MySpace.DataMining.DistributedObjects5
                 }
                 catch (Exception e)
                 {
-                    bool firstcook = cooking_cooksremain == CookRetries;
+                    bool firstcook = cooking_cooksremain == defCookRetries;
                     if (cooking_cooksremain-- <= 0)
                     {
                         string ns = " (unable to get connection count)";
@@ -2767,19 +2869,25 @@ namespace MySpace.DataMining.DistributedObjects5
                         catch
                         {
                         }
+                        if (FaultTolerant)
+                        {
+                            ReportRogueHost(System.Net.Dns.GetHostName());
+                        }
                         throw new System.IO.IOException("cooked too many times (retries="
-                            + CookRetries.ToString()
-                            + "; timeout=" + CookTimeout.ToString()
+                            + defCookRetries.ToString()
+                            + "; timeout=" + defCookTimeout.ToString()
+                            + "; faulttolerant=" + FaultTolerant.ToString()
                             + ") on " + System.Net.Dns.GetHostName() + ns
                             + " with file " + fp, e);
                     }
-                    System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(CookTimeout));
+                    System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                     if (firstcook)
                     {
                         try
                         {
-                            XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
-                                + "; timeout=" + CookTimeout.ToString()
+                            XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                + "; timeout=" + defCookTimeout.ToString()
+                                + "; faulttolerant=" + FaultTolerant.ToString()
                                 + ") on " + System.Net.Dns.GetHostName()
                                 + " with file " + fp
                                 + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
@@ -2792,11 +2900,12 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         try
                         {
-                            if ((CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                            if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                             {
                                 XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                    + " more retries (retries=" + CookRetries.ToString()
-                                    + "; timeout=" + CookTimeout.ToString()
+                                    + " more retries (retries=" + defCookRetries.ToString()
+                                    + "; timeout=" + defCookTimeout.ToString()
+                                    + "; faulttolerant=" + FaultTolerant.ToString()
                                     + ") on " + System.Net.Dns.GetHostName()
                                     + " with file " + fp
                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -2871,8 +2980,16 @@ namespace MySpace.DataMining.DistributedObjects5
 
         bool jobfailover = false;
 
+        internal bool FaultTolerant = false;
+        internal int FTReadTimeout = 5000;
+        internal int FTReadRetries = 10;
+        internal int FTConnectRetries = 10;
+        internal byte[] ftbuf = null;
 
         Compiler _pluginslavecompiler = null;
+
+        internal IMap _imap;
+        internal MapOutput _mapoutput;
 
         Compiler compiler
         {
@@ -2914,6 +3031,10 @@ namespace MySpace.DataMining.DistributedObjects5
             : this(count_capacity, estimated_row_capacity, keylength, true)
         {
         }
+
+#if TESTFAULTTOLERANT
+        internal MySpace.DataMining.AELight.FTTest fttest = new MySpace.DataMining.AELight.FTTest(DistributedObjectsSlave.jid);
+#endif
 
         internal ArrayComboListPart(int count_capacity, int estimated_row_capacity, int keylength, bool startzblocks)
         {
@@ -3087,7 +3208,6 @@ namespace MySpace.DataMining.DistributedObjects5
                     zblocks[i] = new ZBlock(this, i, zblockkeybufsize, zblockvaluebufsize);
                 }
             }
-
         }
 
 
@@ -3360,6 +3480,11 @@ namespace MySpace.DataMining.DistributedObjects5
             //public System.IO.Stream Stream; // Relative to this input; may be a logical EndOfStream!
 
             public override void Reopen(long position)
+            {
+                throw new Exception("method not supported");
+            }
+
+            public override void ReportRogueHost(string roguehost)
             {
                 throw new Exception("method not supported");
             }
@@ -4165,8 +4290,16 @@ namespace MySpace.DataMining.DistributedObjects5
             // Depends on Name being the full file path.
             internal void _open()
             {
+                int defCookTimeout = acl.CookTimeout;
+                int defCookRetries = acl.CookRetries;
+                if (acl.FaultTolerant)
+                {
+                    defCookTimeout = acl.FTReadTimeout;
+                    defCookRetries = acl.FTReadRetries;
+                }
+
                 //----------------------------COOKING--------------------------------
-                int cooking_cooksremain = acl.CookRetries;
+                int cooking_cooksremain = defCookRetries;
                 bool cooking_stream_is_open = false;
 #if DEBUGcook
                 int tester = 2;
@@ -4183,7 +4316,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         }
 #endif
                         //Stream = new System.IO.FileStream(Name, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, DISTBUF_SIZE);
-                        if (acl.diskcheck == null)
+                        if (!acl.FaultTolerant)
                         {
                             Stream = new MySpace.DataMining.AELight.DfsFileNodeStream(Name, true, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
                         }
@@ -4234,7 +4367,7 @@ namespace MySpace.DataMining.DistributedObjects5
 #if DEBUG
                         //System.Threading.Thread.Sleep(1000 * 8);
 #endif
-                        bool firstcook = cooking_cooksremain == acl.CookRetries;
+                        bool firstcook = cooking_cooksremain == defCookRetries;
                         if (cooking_cooksremain-- <= 0)
                         {
                             string ns = " (unable to get connection count)";
@@ -4246,9 +4379,21 @@ namespace MySpace.DataMining.DistributedObjects5
                             catch
                             {
                             }
+                            if (acl.FaultTolerant)
+                            {
+                                string[] xnames = Name.Split('*');
+                                foreach (string xn in xnames)
+                                {
+                                    int xdel = xn.IndexOf(@"\", 2);
+                                    string xhost = xn.Substring(2, xdel - 2);
+                                    acl.ReportRogueHost(xhost);
+                                }
+                                acl.ReportRogueHost(System.Net.Dns.GetHostName());
+                            }
                             throw new System.IO.IOException("cooked too many times (retries="
-                                + acl.CookRetries.ToString()
-                                + "; timeout=" + acl.CookTimeout.ToString()
+                                + defCookRetries.ToString()
+                                + "; timeout=" + defCookTimeout.ToString()
+                                + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                 + ") on " + System.Net.Dns.GetHostName() + ns, e);
                         }
                         if (cooking_stream_is_open)
@@ -4257,13 +4402,14 @@ namespace MySpace.DataMining.DistributedObjects5
                             Stream = null;
                             cooking_stream_is_open = false;
                         }
-                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(acl.CookTimeout));
+                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                         if (firstcook)
                         {
                             try
                             {
-                                XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
-                                    + "; timeout=" + acl.CookTimeout.ToString()
+                                XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                    + "; timeout=" + defCookTimeout.ToString()
+                                    + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                     + ") on " + System.Net.Dns.GetHostName()
                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod() + " Error: " + e.ToString());
                             }
@@ -4275,11 +4421,12 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                             try
                             {
-                                if ((acl.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                 {
                                     XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                        + " more retries (retries=" + acl.CookRetries.ToString()
-                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                        + " more retries (retries=" + defCookRetries.ToString()
+                                        + "; timeout=" + defCookTimeout.ToString()
+                                        + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                         + ") on " + System.Net.Dns.GetHostName()
                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                         + Environment.NewLine + e.ToString());
@@ -4309,6 +4456,10 @@ namespace MySpace.DataMining.DistributedObjects5
                 Stream.Seek(position, System.IO.SeekOrigin.Current); // SeekOrigin.Current because the position passed in is relative to after-header.
             }
 
+            public override void ReportRogueHost(string roguehost)
+            {
+                acl.ReportRogueHost(roguehost);  
+            }
 
             ArrayComboListPart acl;
         }
@@ -4316,7 +4467,6 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public class ZBufferOutputFile : System.IO.Stream
         {
-
             int zbuffersize;
             string filepath;
             System.IO.FileMode mode;
@@ -4324,8 +4474,9 @@ namespace MySpace.DataMining.DistributedObjects5
             byte[] zbuf;
             int zbufoffset;
             long fpos;
+            ZMapBlock parent;
 
-            public ZBufferOutputFile(int zbuffersize, string filepath, System.IO.FileMode mode, System.IO.FileShare share)
+            public ZBufferOutputFile(int zbuffersize, string filepath, System.IO.FileMode mode, System.IO.FileShare share, ZMapBlock parent)
             {
                 this.zbuffersize = zbuffersize;
                 this.filepath = filepath;
@@ -4335,6 +4486,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     throw new NotSupportedException("ZBufferOutputFile: FileMode.Append not supported");
                 }
                 this.share = share;
+                this.parent = parent;
                 zbuf = new byte[zbuffersize];
                 zbufoffset = 0;
                 fpos = 0;
@@ -4362,6 +4514,10 @@ namespace MySpace.DataMining.DistributedObjects5
             }
             protected override void Dispose(bool disposing)
             {
+                if (parent.partialreduce && !_inpartialreduce)
+                {
+                    PartialReduce();
+                }
                 Flush();
 
                 // If mode is still one of these modes,
@@ -4450,22 +4606,107 @@ namespace MySpace.DataMining.DistributedObjects5
             {
                 throw new NotSupportedException("ZBufferOutputFile: cannot SetLength");
             }
+
+            bool _inpartialreduce = false;
+            byte[] prbuf = null;            
+            List<byte[]> prnet = null;
+            List<Entry> prentries = null;
+            void PartialReduce()
+            {
+                _inpartialreduce = true;
+                if (prentries == null)
+                {
+                    prbuf = new byte[zbuffersize];
+                    prnet = new List<byte[]>(1);
+                    prnet.Add(prbuf);
+                    prentries = new List<Entry>();
+                }
+                else
+                {
+                    prentries.Clear();
+                }
+                Buffer.BlockCopy(zbuf, 0, prbuf, 0, zbufoffset);
+
+                int keylen = parent.parent.keylen;
+                int readpos = 0;
+                while (readpos < zbufoffset)
+                {
+                    Entry ent;
+                    ent.NetIndex = 0;
+                    ent.NetEntryOffset = readpos;
+
+                    readpos += keylen;
+                    int valuelen = Entry.BytesToInt(prbuf, readpos);
+                    readpos += 4;
+                    readpos += valuelen;
+                    prentries.Add(ent);
+                }
+
+                if (zbufoffset != readpos)
+                {
+                    throw new Exception("Unexpected end of buffer while reading zmap buffer in partial reduce preparation:  zbufoffset (" + zbufoffset.ToString() + ") != readpos (" + readpos.ToString() + ")");
+                }
+
+                prentries.Sort(delegate(Entry x, Entry y)
+                {
+                    for (int i = 0; i != keylen; i++)
+                    {
+                        int diff = (int)prbuf[x.NetEntryOffset + i] - (int)prbuf[y.NetEntryOffset + i];
+                        if (0 != diff)
+                        {
+                            return diff;
+                        }
+                    }
+                    return 0;
+                });
+
+                EntriesInput entriesinput = new EntriesInput();
+                entriesinput.net = prnet;
+                entriesinput.entries = prentries;
+                entriesinput.KeyLength = keylen;
+
+#if DEBUG
+                XLog.log("zbuf.Length before PartialReduce: " + zbufoffset.ToString());
+#endif
+
+                zbufoffset = 0;
+
+                this.parent.parent._imap.OnPartialReduce(entriesinput, this.parent.parent._mapoutput);
+#if DEBUG
+                XLog.log("zbuf.Length after PartialReduce: " + zbufoffset.ToString());
+#endif              
+                _inpartialreduce = false;
+            }
+
+            byte[] remainbuf = null;
             public override void Write(byte[] buffer, int offset, int count)
             {
                 if (zbufoffset + count > zbuf.Length)
                 {
+                    byte[] addbuf = buffer;                    
+                    if (parent.partialreduce && !_inpartialreduce)
+                    {
+                        if (remainbuf == null || remainbuf.Length < buffer.Length)
+                        {
+                            remainbuf = new byte[buffer.Length];
+                        }
+                        Buffer.BlockCopy(buffer, offset, remainbuf, 0, count);
+                        addbuf = remainbuf;
+                        offset = 0;
+                        PartialReduce();
+                    }
                     _open();
                     Flush();
                     if (count >= zbuf.Length)
                     {
-                        Flush(buffer, offset, count);
+                        Flush(addbuf, offset, count);
                     }
                     else
                     {
-                        Buffer.BlockCopy(buffer, offset, zbuf, zbufoffset, count);
+                        Buffer.BlockCopy(addbuf, offset, zbuf, zbufoffset, count);
                         zbufoffset += count;
                     }
-                    _close();
+                    _close();                                        
                 }
                 else
                 {
@@ -4497,25 +4738,26 @@ namespace MySpace.DataMining.DistributedObjects5
 
         public class ZMapBlock
         {
-            ArrayComboListPart parent;
+            internal ArrayComboListPart parent;
 
             int zmblockID; // ZMapBlock ID (0-based n)
             internal string fzmblockfilename = null;
             long zmblocksize = 0;
             System.IO.Stream fzmblock;
             bool xchg = false;
+            internal bool partialreduce = false;
 
-
-            public ZMapBlock(ArrayComboListPart parent, int zmblockID, string zmapblockbasename)
+            public ZMapBlock(ArrayComboListPart parent, int zmblockID, string zmapblockbasename, bool partialreduce)
             {
                 this.parent = parent;
                 this.zmblockID = zmblockID;
+                this.partialreduce = partialreduce;
 
                 //fzmblockfilename = CreateZMapBlockFileName(zmblockID);
                 fzmblockfilename = zmapblockbasename.Replace("%n", zmblockID.ToString());
 
                 {
-                    fzmblock = new ZBufferOutputFile(parent.ZMapBlockFileBufferSize, fzmblockfilename, System.IO.FileMode.Create, System.IO.FileShare.Read);
+                    fzmblock = new ZBufferOutputFile(parent.ZMapBlockFileBufferSize, fzmblockfilename, System.IO.FileMode.Create, System.IO.FileShare.Read, this);
                     if (parent.compresszmaps)
                     {
                         fzmblock = new System.IO.Compression.GZipStream(fzmblock, System.IO.Compression.CompressionMode.Compress);
@@ -4530,10 +4772,11 @@ namespace MySpace.DataMining.DistributedObjects5
                 {
                     throw new Exception("Cannot exchange ZMapBlock more than once");
                 }
-                xchg = true;
+                
 
                 //fzmblock.Seek(0, System.IO.SeekOrigin.Begin);
                 fzmblock.Close();
+                xchg = true;
             }
 
 
@@ -4544,10 +4787,34 @@ namespace MySpace.DataMining.DistributedObjects5
                     throw new Exception("Cannot add to ZMapBlock while/after exchange");
                 }
 
-                parent.StreamWrite(fzmblock, keybuf, keyoffset, parent.keylen);
-                Entry.ToBytes(valuelength, parent._smallbuf, 0);
-                fzmblock.Write(parent._smallbuf, 0, 4);
-                parent.StreamWrite(fzmblock, valuebuf, valueoffset, valuelength);
+                if (partialreduce)
+                {
+                    //must do as one write.
+                    int wlen = parent.keylen + 4 + valuelength;
+                    if (wlen > parent.streamwritebuf.Length)
+                    {
+                        parent.streamwritebuf = new byte[wlen * 2];                        
+                    }
+                    int bi = 0;
+                    for (int i = 0; i < parent.keylen; i++)
+                    {
+                        parent.streamwritebuf[bi++] = keybuf[keyoffset + i];
+                    }
+                    Entry.ToBytes(valuelength, parent.streamwritebuf, bi);
+                    bi += 4;
+                    for (int i = 0; i < valuelength; i++)
+                    {
+                        parent.streamwritebuf[bi++] = valuebuf[valueoffset + i];
+                    }
+                    fzmblock.Write(parent.streamwritebuf, 0, bi);
+                }
+                else
+                {
+                    parent.StreamWrite(fzmblock, keybuf, keyoffset, parent.keylen);
+                    Entry.ToBytes(valuelength, parent._smallbuf, 0);
+                    fzmblock.Write(parent._smallbuf, 0, 4);
+                    parent.StreamWrite(fzmblock, valuebuf, valueoffset, valuelength);
+                }                
 
                 zmblocksize += parent.keylen + 4 + valuelength;
                 /* // Can't do .Length on gzip stream...
@@ -4864,7 +5131,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     break;
 
                 case 'M': // 'M' for Map
-                    {
+                    {                        
                         string classname = XContent.ReceiveXString(nstm, buf);
 
                         string xlibfn = CreateXlibFileName("map");
@@ -4931,13 +5198,39 @@ namespace MySpace.DataMining.DistributedObjects5
                                         dfsfilenames[xi] = fname;
                                         nodesoffsets[xi] = offset;
                                     }
-                                }                                
+                                }
                             }
                             else
                             {
                                 dfsfiles = new string[0];
                             }
                         }
+
+#if TESTFAULTTOLERANT                                                   
+                        for (int xi = 0; xi < dfsfiles.Length; xi++)
+                        {
+                            string newfile = "";
+                            string[] repls = dfsfiles[xi].Split('*');
+                            foreach (string repl in repls)
+                            {
+                                if (newfile.Length > 0)
+                                {
+                                    newfile += "*";
+                                }
+                                int xdel = repl.IndexOf(@"\", 2);
+                                string xhost = repl.Substring(2, xdel - 2);
+                                if (fttest.CanBreak(xhost, "map"))
+                                {
+                                    newfile += repl + ".fttest";
+                                }
+                                else
+                                {
+                                    newfile += repl;
+                                }
+                            }
+                            dfsfiles[xi] = newfile;
+                        }                       
+#endif
 
                         XContent.ReceiveXBytes(nstm, out len, buf); // !
                         int numzmblocks = 0;
@@ -4955,12 +5248,9 @@ namespace MySpace.DataMining.DistributedObjects5
                             throw new Exception("Map already called (zmblocks is set)");
                         }
 
-                        bool rehash = false;
-                        {
-                            string srehash = XContent.ReceiveXString(nstm, buf);
-                            rehash = srehash == "1";                           
-                        }
-
+                        bool rehash = buf[4] == 1;
+                        bool partialreduce = buf[5] == 1;
+                       
                         if (ZMapBlockFileBufferSize < 0)
                         {
                             ZMapBlockFileBufferSize = 0x400 * 400;
@@ -4979,8 +5269,8 @@ namespace MySpace.DataMining.DistributedObjects5
                         zmblocks = new ZMapBlock[numzmblocks];
                         for (int i = 0; i < numzmblocks; i++)
                         {
-                            zmblocks[i] = new ZMapBlock(this, i, zmapblockbasename);
-                        }                        
+                            zmblocks[i] = new ZMapBlock(this, i, zmapblockbasename, partialreduce);
+                        }
 
                         if (XLog.logging)
                         {
@@ -5097,8 +5387,16 @@ namespace MySpace.DataMining.DistributedObjects5
                         //System.Threading.Thread.Sleep(1000 * 10);
                         //IMap mp = LoadPluginInterface<IMap>(dllfn, classname);
                         IMap mp = null == asm ? LoadPluginInterface<IMap>(dllfn, classname) : LoadPluginInterface<IMap>(asm, dllfn, classname);
+                        
                         ACLMapInput mapinput = new ACLMapInput(this);
                         ACLMapOutput mapoutput = new ACLMapOutput(this);
+
+                        if (partialreduce)
+                        {
+                            _imap = mp;
+                            _mapoutput = mapoutput;
+                        }
+
                         int maxerrors = 10;
                         StaticGlobals.DSpace_Last = false;
                         int curoffset = -1;
@@ -5127,7 +5425,7 @@ namespace MySpace.DataMining.DistributedObjects5
                             {
                                 mapinput.Name = dfsfiles[i];
                                 mapinput._compression = compressdfschunks;
-                                mapinput._rehash = rehash;    
+                                mapinput._rehash = rehash;
                                 mapinput._open(); // Depends on MapInput.Name being the full file path.                              
                                 StaticGlobals.DSpace_InputBytesRemain = (i == dfsfiles.Length - 1 ? mapinput.Stream.Length - mapinput.Stream.Position : Int64.MaxValue);
                                 mp.OnMap(mapinput, mapoutput);
@@ -5135,6 +5433,15 @@ namespace MySpace.DataMining.DistributedObjects5
                             }
                             catch (Exception e)
                             {
+                                if (FaultTolerant)
+                                {
+                                    string xmsg = "Problem during Map with file='" + dfsfiles[i]
+                                        + "'; worker host=" + System.Net.Dns.GetHostName()
+                                        + ";faulttolerant=true;  error=" + e.ToString();
+                                    XLog.log(xmsg);
+                                    throw new Exception(xmsg);
+                                }
+
                                 if (jobfailover
                                     && null != e as System.IO.IOException)
                                 {
@@ -5335,6 +5642,15 @@ namespace MySpace.DataMining.DistributedObjects5
 #if DEBUG
                         System.Threading.Thread.Sleep(1000 * 8);
 #endif
+
+#if TESTFAULTTOLERANT
+                        {
+                            while (System.IO.File.Exists(@"c:\temp\failoverslavetest1.txt"))
+                            {
+                                System.Threading.Thread.Sleep(10000);
+                            }
+                        }
+#endif
                         if (8 == TValueOffset_Size)
                         {
                             foreach (ZBlock zb in zblocks)
@@ -5351,15 +5667,6 @@ namespace MySpace.DataMining.DistributedObjects5
                             }
                             kentries32 = new List<ZBlock.KeyBlockEntry32v>(1);
                         }
-
-#if FAILOVER_TEST
-                        {
-                            while (System.IO.File.Exists(@"c:\temp\failoverslavetest1.txt"))
-                            {
-                                System.Threading.Thread.Sleep(10000);
-                            }                            
-                        }
-#endif
 
 #if ENABLE_TIMING
                         if(XLog.logging)
@@ -5506,6 +5813,10 @@ namespace MySpace.DataMining.DistributedObjects5
 
                 case 'X': // Stop ZMapBlockServer.
                     StopZMapBlockServer();
+
+#if TESTFAULTTOLERANT
+                    fttest.Close();
+#endif
                     break;
 
                 case 'k':
@@ -5596,7 +5907,7 @@ namespace MySpace.DataMining.DistributedObjects5
                         string pp = XContent.ReceiveXString(nstm, buf);
                         if (pp.Length == 0)
                         {
-                            throw new Exception("Plugin path is empty.");
+                            throw new Exception("DiskCheck Health Plugin path is empty.");
                         }
                         else
                         {
@@ -5609,6 +5920,19 @@ namespace MySpace.DataMining.DistributedObjects5
                         nstm.WriteByte((byte)'-');
                         throw;
                     }                    
+                    break;
+
+                case 'u': //Turn on fault tolerant execution
+                    {
+                        FaultTolerant = true;
+                        buf = XContent.ReceiveXBytes(nstm, out len, buf);
+                        if (len >= 4 + 4 + 4)
+                        {
+                            FTReadTimeout = Entry.BytesToInt(buf, 0);
+                            FTReadRetries = Entry.BytesToInt(buf, 4);
+                            FTConnectRetries = Entry.BytesToInt(buf, 4 + 4);
+                        }
+                    }
                     break;
 
                 case 'y': // ZMapBlock Exchange.
@@ -5656,7 +5980,41 @@ namespace MySpace.DataMining.DistributedObjects5
                                         }
                                     }
                                 }
+
+#if TESTFAULTTOLERANT
+                                for (int xi = 0; xi < rzmfiles.Count; xi++)
                                 {
+                                    string newfile = "";
+                                    string[] repls = rzmfiles[xi].Key.Split('*');
+                                    foreach (string repl in repls)
+                                    {
+                                        if (newfile.Length > 0)
+                                        {
+                                            newfile += "*";
+                                        }
+                                        int xdel = repl.IndexOf(@"\", 2);
+                                        string xhost = repl.Substring(2, xdel - 2);
+                                        if (fttest.CanBreak(xhost, "exchangeremote"))
+                                        {
+                                            newfile += repl + ".fttest";
+                                        }
+                                        else
+                                        {
+                                            newfile += repl;
+                                        }
+                                    }
+                                    rzmfiles[xi] = new KeyValuePair<string, long>(newfile, 0);
+                                }
+#endif
+
+                                {
+                                    int defCookTimeout = CookTimeout;
+                                    int defCookRetries = CookRetries;
+                                    if (FaultTolerant)
+                                    {
+                                        defCookTimeout = FTReadTimeout;
+                                        defCookRetries = FTReadRetries;
+                                    }
                                     for (int irzmf = 0; irzmf < rzmfiles.Count; irzmf++)
                                     {
                                         KeyValuePair<string, long> rzmf = rzmfiles[irzmf];
@@ -5664,7 +6022,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                         {
                                             {
                                                 //----------------------------COOKING--------------------------------
-                                                int cooking_cooksremain = CookRetries;
+                                                int cooking_cooksremain = defCookRetries;
                                                 bool cooking_stream_is_open = false;
                                                 //----------------------------COOKING--------------------------------
                                                 for (; ; )
@@ -5679,7 +6037,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                                             System.IO.Stream gzs = null;
                                                             try
                                                             {
-                                                                if (diskcheck == null)
+                                                                if (!FaultTolerant)
                                                                 {
                                                                     gzs = new System.IO.FileStream(fn, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, FILE_BUFFER_SIZE);
                                                                 }
@@ -5709,7 +6067,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                                     catch (Exception e)
                                                     {
                                                         //----------------------------COOKING--------------------------------
-                                                        bool firstcook = cooking_cooksremain == CookRetries;
+                                                        bool firstcook = cooking_cooksremain == defCookRetries;
                                                         if (cooking_cooksremain-- <= 0)
                                                         {
                                                             string ns = " (unable to get connection count)";
@@ -5721,9 +6079,20 @@ namespace MySpace.DataMining.DistributedObjects5
                                                             catch
                                                             {
                                                             }
+                                                            if (FaultTolerant)
+                                                            {
+                                                                string[] xfns = fn.Split('*');
+                                                                foreach (string xfn in xfns)
+                                                                {
+                                                                    int xdel = xfn.IndexOf(@"\", 2);
+                                                                    string xhost = xfn.Substring(2, xdel - 2);
+                                                                    ReportRogueHost(xhost);
+                                                                }
+                                                            }
                                                             throw new System.IO.IOException("cooked too many times (retries="
-                                                                + CookRetries.ToString()
-                                                                + "; timeout=" + CookTimeout.ToString()
+                                                                + defCookRetries.ToString()
+                                                                + "; timeout=" + defCookTimeout.ToString()
+                                                                + "; faulttolerant=" + FaultTolerant.ToString()
                                                                 + ") on " + System.Net.Dns.GetHostName() + ns, e);
                                                         }
                                                         if (cooking_stream_is_open
@@ -5731,13 +6100,14 @@ namespace MySpace.DataMining.DistributedObjects5
                                                         {
                                                             throw;
                                                         }
-                                                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(CookTimeout));
+                                                        System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                                                         if (firstcook)
                                                         {
                                                             try
                                                             {
-                                                                XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
-                                                                    + "; timeout=" + CookTimeout.ToString()
+                                                                XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                                                    + "; timeout=" + defCookTimeout.ToString()
+                                                                    + "; faulttolerant=" + FaultTolerant.ToString()
                                                                     + ") on " + System.Net.Dns.GetHostName()
                                                                     + " with file " + lastxfile
                                                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
@@ -5750,11 +6120,12 @@ namespace MySpace.DataMining.DistributedObjects5
                                                         {
                                                             try
                                                             {
-                                                                if ((CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                                                if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                                                 {
                                                                     XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                                                        + " more retries (retries=" + CookRetries.ToString()
-                                                                        + "; timeout=" + CookTimeout.ToString()
+                                                                        + " more retries (retries=" + defCookRetries.ToString()
+                                                                        + "; timeout=" + defCookTimeout.ToString()
+                                                                        + "; faulttolerant=" + FaultTolerant.ToString()
                                                                         + ") on " + System.Net.Dns.GetHostName()
                                                                         + " with file " + lastxfile
                                                                         + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -5785,6 +6156,13 @@ namespace MySpace.DataMining.DistributedObjects5
 #if DEBUG
                                             System.Diagnostics.Debugger.Launch();
 #endif
+                                            if (FaultTolerant)
+                                            {
+                                                throw new Exception("Problem loading remote zMapBlock='" + lastxfile + "'"
+                                                    + "; worker host=" + System.Net.Dns.GetHostName()
+                                                    + "; faulttolerant=true; error:" + e.ToString());
+                                            }
+
                                             if (jobfailover
                                                 && null != e as System.IO.IOException)
                                             {
@@ -5819,6 +6197,13 @@ namespace MySpace.DataMining.DistributedObjects5
                                 }
                                 catch (Exception e)
                                 {
+                                    if (FaultTolerant)
+                                    {
+                                        throw new Exception("Problem loading local zMapBlock='" + zmfn + "'"
+                                            + "; worker host=" + System.Net.Dns.GetHostName()
+                                            + "; faulttolerant=true; error=" + e.ToString());
+                                    }
+
                                     if (jobfailover
                                         && null != e as System.IO.IOException)
                                     {
@@ -5978,7 +6363,7 @@ namespace MySpace.DataMining.DistributedObjects5
             int throwon = 2;
 #endif
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
             int failoverteston = 10;
 #endif
 
@@ -6024,7 +6409,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
 #endif
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                     {
                         if (failoverteston > 0 && --failoverteston == 0)
                         {
@@ -6064,9 +6449,16 @@ namespace MySpace.DataMining.DistributedObjects5
 
         void ZMapStreamToZBlocks(System.IO.Stream stm, long len, string sfn, int iFILE_BUFFER_SIZE)
         {
+            int defCookTimeout = CookTimeout;
+            int defCookRetries = CookRetries;
+            if (FaultTolerant)
+            {
+                defCookTimeout = FTReadTimeout;
+                defCookRetries = FTReadRetries;
+            }
             //----------------------------COOKING--------------------------------
             bool cooking_is_cooked = false;
-            int cooking_cooksremain = CookRetries;
+            int cooking_cooksremain = defCookRetries;
             long cooking_pos = 0;
             bool cooking_is_read = false;
             //----------------------------COOKING--------------------------------
@@ -6093,6 +6485,11 @@ namespace MySpace.DataMining.DistributedObjects5
                     }
                     cooking_is_read = false;
                     //----------------------------COOKING--------------------------------
+
+#if TESTFAULTTOLERANT
+                    fttest.BreakPoint(System.Net.Dns.GetHostName(), "exchangeowned", new NeedCookingException(new Exception("TESTFAULTTOLERANT test exchangeowned")));
+#endif
+
                     ZMapStreamToZBlocks_needcooking(stm, len, sfn, iFILE_BUFFER_SIZE, ref cooking_pos);
                     break;
                 }
@@ -6103,7 +6500,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         throw;
                     }
-                    bool firstcook = cooking_cooksremain == CookRetries;
+                    bool firstcook = cooking_cooksremain == defCookRetries;
                     if (cooking_cooksremain-- <= 0)
                     {
                         string ns = " (unable to get connection count)";
@@ -6115,14 +6512,19 @@ namespace MySpace.DataMining.DistributedObjects5
                         catch
                         {
                         }
+                        if (FaultTolerant)
+                        {
+                            ReportRogueHost(System.Net.Dns.GetHostName());
+                        }
                         throw new System.IO.IOException("cooked too many times (retries="
-                            + CookRetries.ToString()
-                            + "; timeout=" + CookTimeout.ToString()
+                            + defCookRetries.ToString()
+                            + "; timeout=" + defCookTimeout.ToString()
+                            + "; faulttolerant=" + FaultTolerant.ToString()
                             + ") on " + System.Net.Dns.GetHostName() + ns
                             + " with file " + sfn
                             + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod(), e);
                     }
-                    System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(CookTimeout));
+                    System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                     if (firstcook)
                     {
                         try
@@ -6136,8 +6538,9 @@ namespace MySpace.DataMining.DistributedObjects5
                             catch
                             {
                             }
-                            XLog.errorlog("cooking started (retries=" + CookRetries.ToString()
-                                + "; timeout=" + CookTimeout.ToString()
+                            XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                + "; timeout=" + defCookTimeout.ToString()
+                                + "; faulttolerant=" + FaultTolerant.ToString()
                                 + ") on " + System.Net.Dns.GetHostName() + ns
                                 + " with file " + sfn
                                 + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
@@ -6150,11 +6553,12 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         try
                         {
-                            if ((CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                            if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                             {
                                 XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                    + " more retries (retries=" + CookRetries.ToString()
-                                    + "; timeout=" + CookTimeout.ToString()
+                                    + " more retries (retries=" + defCookRetries.ToString()
+                                    + "; timeout=" + defCookTimeout.ToString()
+                                    + "; faulttolerant=" + FaultTolerant.ToString()
                                     + ") on " + System.Net.Dns.GetHostName()
                                     + " with file " + sfn
                                     + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -6191,7 +6595,56 @@ namespace MySpace.DataMining.DistributedObjects5
             CloseZMapBlocks(); // !
         }
 
+        internal void ReportRogueHost(string roguehost)
+        {
+            if (ftbuf == null)
+            {
+                ftbuf = new byte[8];
+            }
+            
+            int triesremain = FTConnectRetries;          
 
+            for (; ; )
+            {
+                System.Net.Sockets.Socket sock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                    System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                System.Net.Sockets.NetworkStream netsm = null;
+
+                try
+                {                    
+                    sock.Connect(System.Net.Dns.GetHostName(), 55900);                    
+                    netsm = new NetworkStream(sock);                    
+                    netsm.WriteByte((byte)'a');                    
+                    Entry.LongToBytes(DistributedObjectsSlave.jid, ftbuf, 0);                   
+                    XContent.SendXContent(netsm, ftbuf);                   
+                    XContent.SendXContent(netsm, roguehost);
+                    break;
+                }
+                catch(Exception e)
+                {
+                    try
+                    {
+                        if (netsm != null)
+                        {
+                            netsm.Close();
+                            netsm = null;
+                        }
+                        sock.Close();
+                    }
+                    catch
+                    {
+                    }                    
+                    
+                    if (--triesremain <= 0)
+                    {
+                        throw new Exception("ReportRogueHost error: retries=" + FTConnectRetries.ToString() + 
+                            " ;reporter=" + System.Net.Dns.GetHostName() +
+                            " ;roguehost to report=" + roguehost + " ; error=" + e.ToString());
+                    }                                  
+                }    
+            }
+        }
+        
         static bool nofreedisklog = false;
 
 
@@ -6508,8 +6961,16 @@ namespace MySpace.DataMining.DistributedObjects5
 
                         input.net.Add(buf);
 
+                        int defCookTimeout = acl.CookTimeout;
+                        int defCookRetries = acl.CookRetries;
+                        if (acl.FaultTolerant)
+                        {
+                            defCookTimeout = acl.FTReadTimeout;
+                            defCookRetries = acl.FTReadRetries;
+                        }
+
                         //----------------------------COOKING--------------------------------
-                        int cooking_cooksremain = acl.CookRetries;
+                        int cooking_cooksremain = defCookRetries;
                         bool cooking_inIO = false;
                         long cooking_seekpos = long.MinValue;
                         //----------------------------COOKING--------------------------------
@@ -6518,7 +6979,6 @@ namespace MySpace.DataMining.DistributedObjects5
                         {
                             try
                             {
-
                                 if (long.MinValue == cooking_seekpos)
                                 {
                                     cooking_inIO = true;
@@ -6540,6 +7000,9 @@ namespace MySpace.DataMining.DistributedObjects5
                                 bool needread = (0 == _laregezblockprevinfo.Count);
 
                                 cooking_inIO = true;
+#if TESTFAULTTOLERANT
+                                acl.fttest.BreakPoint(System.Net.Dns.GetHostName(), "reducelargezblock", new Exception("FAULTTOLERANT reducelargezblock test exception"));
+#endif
                                 if (needread
                                     && (keylen + 4 != _largezblockresultfile.Read(buf, 0, keylen + 4)))
                                 {
@@ -6657,7 +7120,7 @@ namespace MySpace.DataMining.DistributedObjects5
                                     throw;
                                 }
                                 //----------------------------COOKING--------------------------------
-                                bool firstcook = cooking_cooksremain == acl.CookRetries;
+                                bool firstcook = cooking_cooksremain == defCookRetries;
                                 if (cooking_cooksremain-- <= 0)
                                 {
                                     string ns = " (unable to get connection count)";
@@ -6669,14 +7132,19 @@ namespace MySpace.DataMining.DistributedObjects5
                                     catch
                                     {
                                     }
+                                    if (acl.FaultTolerant)
+                                    {
+                                        acl.ReportRogueHost(System.Net.Dns.GetHostName());
+                                    }
                                     throw new System.IO.IOException("cooked too many times (retries="
-                                        + acl.CookRetries.ToString()
-                                        + "; timeout=" + acl.CookTimeout.ToString()
+                                        + defCookRetries.ToString()
+                                        + "; timeout=" + defCookTimeout.ToString()
+                                        + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                         + ") on " + System.Net.Dns.GetHostName() + ns
                                         + " with file " + fp
                                         + " Worker PID = " + System.Diagnostics.Process.GetCurrentProcess().Id, e);
                                 }
-                                System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(acl.CookTimeout));
+                                System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(defCookTimeout));
                                 if (null != _largezblockresultfile)
                                 {
                                     try
@@ -6692,8 +7160,9 @@ namespace MySpace.DataMining.DistributedObjects5
                                 {
                                     try
                                     {
-                                        XLog.errorlog("cooking started (retries=" + acl.CookRetries.ToString()
-                                            + "; timeout=" + acl.CookTimeout.ToString()
+                                        XLog.errorlog("cooking started (retries=" + defCookRetries.ToString()
+                                            + "; timeout=" + defCookTimeout.ToString()
+                                            + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                             + ") on " + System.Net.Dns.GetHostName()
                                             + " with file " + fp
                                             + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -6708,11 +7177,12 @@ namespace MySpace.DataMining.DistributedObjects5
                                 {
                                     try
                                     {
-                                        if ((acl.CookRetries - (cooking_cooksremain + 1)) % 60 == 0)
+                                        if ((defCookRetries - (cooking_cooksremain + 1)) % 60 == 0)
                                         {
                                             XLog.errorlog("cooking continues with " + cooking_cooksremain
-                                                + " more retries (retries=" + acl.CookRetries.ToString()
-                                                + "; timeout=" + acl.CookTimeout.ToString()
+                                                + " more retries (retries=" + defCookRetries.ToString()
+                                                + "; timeout=" + defCookTimeout.ToString()
+                                                + "; faulttolerant=" + acl.FaultTolerant.ToString()
                                                 + ") on " + System.Net.Dns.GetHostName()
                                                 + " with file " + fp
                                                 + " in " + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()

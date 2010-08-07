@@ -1,0 +1,255 @@
+<SourceCode>
+	<Jobs>
+		<Job Name=" regression_test_mstring_Common(UInt_UInt32)_Preprocessing" Custodian="" Email="">
+			<IOSettings>
+				<JobType>local</JobType>
+				<!--<LocalHost>localhost</LocalHost>-->
+			</IOSettings>
+			<Local>
+				<![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del  regression_test_mstring_Common(UInt_UInt32)_Input.txt");
+                Shell(@"Qizmt del  regression_test_mstring_Common(UInt_UInt32)_Output.txt");
+            }
+        ]]>
+			</Local>
+		</Job>
+		<Job Name=" regression_test_mstring_Common(UInt_UInt32)_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+			<IOSettings>
+				<JobType>remote</JobType>
+				<DFS_IO>
+					<DFSReader></DFSReader>
+					<DFSWriter>dfs://regression_test_mstring_Common(UInt_UInt32)_Input.txt</DFSWriter>
+				</DFS_IO>
+			</IOSettings>
+			<Remote>
+				<![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                  //Create sample data.
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                {
+                    UInt32 x = UInt32.MaxValue;
+                    string s = x.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    x = UInt32.MinValue;
+                    s = x.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                 
+                
+                     onerow.Add((byte)del);
+                    
+                    x = UInt32.MinValue;
+                    s = x.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    dfsoutput.WriteLine(onerow);       
+                }
+
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //UInt32 
+                    UInt32 x = (UInt32)rnd.Next();
+                    
+                    string s = x.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //UInt32  
+                    x = (UInt32)rnd.Next();
+                    
+                    s = x.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    
+                       onerow.Add((byte)del);
+                    
+                    //UInt32  
+                    x = (UInt32)rnd.Next();
+                    
+                    s = x.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+            }
+        ]]>
+			</Remote>
+		</Job>
+		<Job Name=" regression_test_mstring_Common(UInt_UInt32)" Custodian="" Email="">
+			<IOSettings>
+				<JobType>mapreduce</JobType>
+				<KeyLength>uint</KeyLength>
+				<DFSInput>dfs://regression_test_mstring_Common(UInt_UInt32)_Input.txt</DFSInput>
+				<DFSOutput>dfs://regression_test_mstring_Common(UInt_UInt32)_Output.txt</DFSOutput>
+				<OutputMethod>grouped</OutputMethod>
+			</IOSettings>
+			<MapReduce>
+				<Map>
+					<![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                
+              int j ,del1,del2,leng;
+              j=0;
+              uint  i,k;
+              UInt32 i2,i3;
+              string s;
+              mstring val;
+      
+                       
+           if ( j % 2 == 0)
+             {         
+                s = line.ToString();                                        //mstring.ToString() test
+                del1 = s.IndexOf(',');
+                i = uint.Parse(s.Substring(0,del1)); 
+                del2 = s.IndexOf(',',del1+1);
+                i2 = UInt32.Parse(s.Substring(del1+1,del2-1-del1));
+                i3 = UInt32.Parse(s.Substring(del2+1,s.Length-1-del2));
+                val = mstring.Prepare(i);                               //mstring.Prepare(uint) test
+                val.AppendM(',');                                           //mstring.AppendM(char) test
+                val.MAppend(i2);                                           //mstring.MAppend(Uint32) test
+                val.AppendM(',');
+                val.Consume(ref i3);
+                j++;
+                k = i;
+             }
+              else
+           {
+                s = line.ToString();                                          //mstring.ToString() test
+                del1 = s.IndexOf(',');  
+                 i=    uint.Parse(s.Substring(0,del1)); 
+                del2 = s.IndexOf(',',del1+1);
+                i2 = UInt32.Parse(s.Substring(del1 + 1,del2-1-del1));
+                i3 = UInt32.Parse(s.Substring(del2+1,s.Length-1-del2));
+                val = mstring.Prepare(i);                                //mstring.Prepare(uint) test
+                val.MAppend(',');                                            //mstring.MAppend(char) test
+                val.AppendM(i2);                                            //mstring.AppendM(Uint32) test
+                val.AppendM(',');
+                val.Consume(ref i3);                                      //mstring.Consume(ref UInt32) test
+                 j++; 
+                 k = i;
+              }
+              
+                
+                string key = k.ToString();
+                output.Add(mstring.Prepare(key), val);               
+              
+               
+            }
+        ]]>
+				</Map>
+				<Reduce>
+					<![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+               int del;
+               int j;
+               j = 0;
+               UInt32 i;
+               uint i2,i3;
+               mstring val,sLine;
+               string s;
+             
+              
+              
+              for(int k = 0; k < values.Length; k++)
+                {
+                               
+                    if(k % 2 == 0)
+                    {
+                     sLine = mstring.Prepare(values.Items[k]);
+                     i=  sLine.NextItemToUInt32(',');
+                      i2 = sLine.NextItemToUInt(',');
+                      i3 = sLine.NextItemToUInt(',');
+                      val = mstring.Prepare(i);                                            //mstring.Prepare(UInt32) test
+                      val.AppendM(',');                                                        //mstring.AppendM(char) test
+                      val.MAppend(i2);                                                        //mstring.MAppend(uint) 
+                      output.Add(val);
+                    }
+                    else
+                    {
+                     sLine = mstring.Prepare(values.Items[k]);
+                     i=  sLine.NextItemToUInt32(',');
+                      i2 = sLine.NextItemToUInt(',');
+                      i3 = sLine.NextItemToUInt(',');
+                      val = mstring.Prepare(i);     
+                     val.AppendM(',');                                                           //mstring.AppendM(char) test
+                     val.AppendM(i2);                                                          //mstring.AppendM(uint) 
+                     j++;                                                                           
+                     output.Add(val);                                                        
+                    }
+                    
+                }                        
+                
+            }
+        ]]>
+				</Reduce>
+			</MapReduce>
+		</Job>
+		<Job>
+			<Narrative>
+				<Name>regression_test_mstring_Common(string_msring)_post-processing</Name>
+				<Custodian></Custodian>
+				<email></email>
+			</Narrative>
+			<IOSettings>
+				<JobType>local</JobType>
+			</IOSettings>
+			<Local>
+				<![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+           Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring_Common(UInt_UInt32)_Input.txt regression_test_mstring_Common(UInt_UInt32)_Output.txt regression_test_mstring_Common(UInt_UInt32).xml");     
+            
+            Shell(@"Qizmt del regression_test_mstring_Common(UInt_UInt32)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring_Common(UInt_UInt32)_Output.txt", true); 
+        }
+        ]]>
+			</Local>
+		</Job>
+	</Jobs>
+</SourceCode>

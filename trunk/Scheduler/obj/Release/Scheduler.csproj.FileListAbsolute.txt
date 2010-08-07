@@ -3,3 +3,5 @@ C:\SimpleSolutions\DataMining\Open\Scheduler\bin\Release\Scheduler.pdb
 C:\SimpleSolutions\DataMining\Open\Scheduler\obj\Release\ResolveAssemblyReference.cache
 C:\SimpleSolutions\DataMining\Open\Scheduler\obj\Release\Scheduler.dll
 C:\SimpleSolutions\DataMining\Open\Scheduler\obj\Release\Scheduler.pdb
+C:\SimpleSolutions\DataMining\Open\Scheduler\bin\Release\Surrogate.dll
+C:\SimpleSolutions\DataMining\Open\Scheduler\bin\Release\Surrogate.pdb

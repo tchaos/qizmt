@@ -97,7 +97,7 @@ namespace MySpace.DataMining.DistributedObjects5
                     XContent.SendXContent(slave.nstm, buf, 4);
                 }
 
-                if(HealthPluginPaths != null)
+                if (HealthPluginPaths != null && HealthPluginPaths.Length > 0)
                 {
                     slave.nstm.WriteByte((byte)'h');                    
                     XContent.SendXContent(slave.nstm, string.Join(";", HealthPluginPaths));
@@ -105,6 +105,15 @@ namespace MySpace.DataMining.DistributedObjects5
                     {
                         throw new Exception("Error while loading DiskCheck object on host: " + slave.Host);
                     }
+                }
+
+                if (FaultTolerant)
+                {                    
+                    slave.nstm.WriteByte((byte)'u');  //Turn on fault tolerant exec
+                    Entry.ToBytes(FTReadTimeout, buf, 0);
+                    Entry.ToBytes(FTReadRetries, buf, 4);
+                    Entry.ToBytes(FTConnectRetries, buf, 4 + 4);
+                    XContent.SendXContent(slave.nstm, buf, 4 + 4 + 4);                    
                 }
 
                 // Send assembly references if not local compile.
@@ -456,6 +465,11 @@ namespace MySpace.DataMining.DistributedObjects5
             AddOpenCVExtension(0);
         }
 
+        public void AddMemCacheExtension()
+        {
+            CompilerAssemblyReferences.Add("MemCache.dll");
+        }
+
 
 
 
@@ -770,6 +784,14 @@ namespace UserLoader
 
         public int ValueOffsetSize = 4;
         public string[] HealthPluginPaths = null;
+        
+        public bool FaultTolerant = false;
+        public int FTReadTimeout = 5000;
+        public int FTReadRetries = 10;
+        public int FTConnectRetries = 10;
+
+        public bool NoSpill = false;
+        public bool PartialReduce = false;
 
         void _DoMap(IList<string> inputdfsnodes, byte[] dlldata, string classname, string pluginsource, List<string> inputdfsfilenames, List<int> inputnodesoffsets, bool rehash)
         {
@@ -826,9 +848,9 @@ namespace UserLoader
                 
                 XContent.SendXContent(slave.nstm, fns); // All slaves of same DistObj get same input files.
                 Entry.ToBytes(_zmaps, buf, 0);
-                XContent.SendXContent(slave.nstm, buf, 4);
-
-                XContent.SendXContent(slave.nstm, rehash ? "1" : "0");               
+                buf[4] = (byte)(rehash ? 1 : 0);
+                buf[5] = (byte)((PartialReduce & !rehash) ? 1 : 0);
+                XContent.SendXContent(slave.nstm, buf, 6);
             }
 
             // "Join"...
@@ -870,7 +892,7 @@ namespace UserLoader
         }
 
 
-        public virtual string GetMapSource(string code, string[] usings, string classname)
+        public virtual string GetMapSource(string code, string[] usings, string classname, bool partialreduce)
         {
             string susings = "";
             if (usings != null)
@@ -879,6 +901,11 @@ namespace UserLoader
                 {
                     susings += "using " + nm + ";" + Environment.NewLine;
                 }
+            }
+            if (partialreduce)
+            {
+                susings += "using ByteSliceList = UserMapper. " + classname + ".RandomAccessEntries;" + Environment.NewLine
+                    + "using ReduceOutput = UserMapper. " + classname + ".RandomAccessOutput;" + Environment.NewLine;
             }
             return (@"using System;
 using System.Collections.Generic;
@@ -899,7 +926,18 @@ namespace UserMapper
         }
     }
 
-    public class " + classname + @" : MySpace.DataMining.DistributedObjects.IMap
+    " + (partialreduce ? @"
+    public class PartialReducer
+    {
+        public virtual void Reduce(ByteSlice key, " + classname + @".RandomAccessEntries values, " + classname + @".RandomAccessOutput output)
+        {
+        }
+    }
+" : "") +            
+
+   @"
+
+    public class " + classname + @" : " + (partialreduce ? @"PartialReducer," : "") + @"MySpace.DataMining.DistributedObjects.IMap
     {
         public bool MapSampling
         {
@@ -915,8 +953,10 @@ namespace UserMapper
         List<byte> _mapbuf = new List<byte>();
         bool _prevCr = false;
         bool _atype = " + (atype ? "true" : "false") + @";
-        const int _CookTimeout = " + CookTimeout.ToString() + @";
-        const int _CookRetries = " + CookRetries.ToString() + @";
+        const int _CookTimeout = " + (FaultTolerant ? FTReadTimeout.ToString() : CookTimeout.ToString()) + @";
+        const int _CookRetries = " + (FaultTolerant ? FTReadRetries.ToString() : CookRetries.ToString()) + @";
+        bool _FaultTolerant = " + (FaultTolerant ? "true" : "false") + @";
+        byte[] varlenbuf = null;
         public void OnMap(MapInput input, MapOutput output)
         {
                 StaticGlobals.MapIteration = -1;
@@ -934,6 +974,11 @@ namespace UserMapper
                 StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
                 StaticGlobals.DSpace_MaxDGlobals = " + StaticGlobals.DSpace_MaxDGlobals.ToString() + @";
                 ").Replace('`', '"') + DGlobalsM.ToCode() + (@"
+
+                if(InputRecordLength == -2 && varlenbuf == null)
+                {
+                    varlenbuf = new byte[5];
+                }
             
             //----------------------------COOKING--------------------------------
             bool cooking_is_cooked = false;
@@ -964,6 +1009,9 @@ namespace UserMapper
                     {
                         _mapbuf.Clear();
                         long recordlen = 0;
+                        int varlenBytesOccupy = -1;
+                        int varlen = -1;
+                        int ivarlenbuf = 0;
                         int ib;
                         for(;;)//foreach byte
                         {
@@ -993,6 +1041,10 @@ namespace UserMapper
                                     {
                                         throw new Exception(`DEBUG: EOF && (0 != _mapbuf.Count{` + _mapbuf.Count + `}) && (InputRecordLength > 0)`);
                                     }
+                                    else if(InputRecordLength == -2)
+                                    {
+                                        throw new Exception(`DEBUG: EOF && (0 != _mapbuf.Count{` + _mapbuf.Count + `}) && (InputRecordLength == -2) && (varlen ==` + varlen.ToString() + `)`);
+                                    }
                                     #endif
                                     Stack.ResetStack();
                                     recordset.ResetBuffers();
@@ -1017,6 +1069,29 @@ namespace UserMapper
                                 if(recordlen == InputRecordLength)
                                 {
                                     break;
+                                }
+                            }
+                            else if(InputRecordLength == -2)
+                            {
+                                if(varlen == -1)
+                                {
+                                    varlenbuf[ivarlenbuf++] = (byte)ib;
+                                    if(varlenBytesOccupy == -1)
+                                    {
+                                        varlenBytesOccupy = Entry.BytesRecordLengthOccupy((byte)ib);
+                                    }
+                                    if(ivarlenbuf == varlenBytesOccupy)
+                                    {
+                                        varlen = Entry.BytesToRecordLength(varlenbuf);
+                                    }
+                                }
+                                else
+                                {                                        
+                                     _mapbuf.Add((byte)ib);
+                                    if(_mapbuf.Count == varlen)
+                                    {
+                                        break;
+                                    }
                                 }
                             }
                             else
@@ -1056,11 +1131,7 @@ namespace UserMapper
                     }
                 }
                 catch(Exception e)
-                {
-                    if(null != e as MySpace.DataMining.DistributedObjects.FailoverFileStreamFatalException)
-                    {
-                        throw;
-                    }
+                {                    
                     //----------------------------COOKING--------------------------------
                     if(!cooking_is_read)
                     {
@@ -1069,18 +1140,30 @@ namespace UserMapper
                     bool firstcook = cooking_cooksremain == _CookRetries;
                     if(cooking_cooksremain-- <= 0)
                     {
-                            string ns = ` (unable to get connection count)`;
-                            try
+                        string ns = ` (unable to get connection count)`;
+                        try
+                        {
+                            ns = ` (` + NetUtils.GetActiveConnections().Length.ToString()
+                                + ` total connections on this machine)`;
+                        }
+                        catch
+                        {
+                        }
+                        if(_FaultTolerant)
+                        {
+                            string[] xnames = input.Name.Split('*');
+                            foreach (string xn in xnames)
                             {
-                                ns = ` (` + NetUtils.GetActiveConnections().Length.ToString()
-                                    + ` total connections on this machine)`;
+                                int xdel = xn.IndexOf(@`\`, 2);
+                                string xhost = xn.Substring(2, xdel - 2);
+                                input.ReportRogueHost(xhost);
                             }
-                            catch
-                            {
-                            }
+                            input.ReportRogueHost(System.Net.Dns.GetHostName());
+                        }
                         throw new System.IO.IOException(`cooked too many times (retries=`
                             + _CookRetries.ToString()
                             + `; timeout=` + _CookTimeout.ToString()
+                            + `; faulttolerant=` + _FaultTolerant.ToString()
                             + `) on ` + System.Net.Dns.GetHostName() + ns, e);
                     }
                     System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(_CookTimeout));
@@ -1090,6 +1173,7 @@ namespace UserMapper
                         {
                             Qizmt_Log(`cooking started (retries=` + _CookRetries.ToString()
                                 + `; timeout=` + _CookTimeout.ToString()
+                                + `; faulttolerant=` + _FaultTolerant.ToString()
                                 + `) on ` + System.Net.Dns.GetHostName()
                                 + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
                         }
@@ -1106,6 +1190,7 @@ namespace UserMapper
                                 Qizmt_Log(`cooking continues with ` + cooking_cooksremain
                                     + ` more retries (retries=` + _CookRetries.ToString()
                                     + `; timeout=` + _CookTimeout.ToString()
+                                    + `; faulttolerant=` + _FaultTolerant.ToString()
                                     + `) worker host name= ` + System.Net.Dns.GetHostName()
                                     + `; path of file being read= ` + input.Name
                                     + `; in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
@@ -1122,10 +1207,154 @@ namespace UserMapper
                 }
                 break;
             }
-
         }
-        
-        ").Replace('`', '"') + code + (@"
+"
+  + (partialreduce ? (RandomAccessEntriesClassCode +
+
+  @"       
+        public class RandomAccessOutput
+        {
+            MapOutput _output;
+            internal void SetOutput(MapOutput output)
+            {
+                _output = output;
+            }
+            public void Add(ByteSlice key, ByteSlice value)
+            {
+                _output.Add(key, value);
+            }
+            public RandomAccessOutput GetOutputByIndex(int index)
+            {
+                throw new Exception(`GetOutputByIndex(int index) not supported in partial reduce`);
+            }
+            public static int _ParseCapacity(string capacity)
+            {
+                throw new Exception(`_ParseCapacity(string capacity) not supported in partial reduce`);
+            }
+            public void Cache(ByteSlice key, ByteSlice value)
+            {
+                throw new Exception(`Cache(ByteSlice key, ByteSlice value) not supported in partial reduce`);
+            }
+            public void Cache(string key, string value)
+            {
+                throw new Exception(`Cache(string key, string value) not supported in partial reduce`);
+            }
+            public void Cache(recordset key, recordset value)
+            {
+                throw new Exception(`Cache(recordset key, recordset value) not supported in partial reduce`);
+            }
+            public void Cache(mstring key, mstring value)
+            {
+                throw new Exception(`Cache(mstring key, mstring value) not supported in partial reduce`);
+            }
+            public void Cache(mstring key, recordset value)
+            {
+                throw new Exception(`Cache(mstring key, recordset value) not supported in partial reduce`);
+            }
+            public void Add(ByteSlice entry, bool addnewline)
+            {
+                throw new Exception(`Add(ByteSlice entry, bool addnewline) not supported in partial reduce`);
+            }
+            public void Add(ByteSlice entry)
+            {
+                throw new Exception(`Add(ByteSlice entry) not supported in partial reduce`);
+            }
+            public void WriteLine(ByteSlice entry)
+            {
+                throw new Exception(`WriteLine(ByteSlice entry) not supported in partial reduce`);
+            }
+            public void Add(mstring ms)
+            {
+                throw new Exception(`Add(mstring ms) not supported in partial reduce`);
+            }
+            public void AddBinary(Blob b)
+            {
+                throw new Exception(`AddBinary(Blob b) not supported in partial reduce`);
+            }
+            public void Add(recordset rs)
+            {
+                throw new Exception(`Add(recordset rs) not supported in partial reduce`);
+            }
+            public void WriteLine(mstring ms)
+            {
+                throw new Exception(`WriteLine(mstring ms) not supported in partial reduce`);
+            }
+            public void WriteRecord(ByteSlice entry)
+            {
+                throw new Exception(`WriteRecord(ByteSlice entry) not supported in partial reduce`);
+            }
+        }
+
+        RandomAccessEntries raentries;
+        RandomAccessOutput raoutput;
+        byte[] flipbuf;
+        public void OnPartialReduce(EntriesInput input, MapOutput output)
+        {
+            ExecutionContextType oldcontexttype = StaticGlobals.ExecutionContext;
+            StaticGlobals.ExecutionContext = ExecutionContextType.PARTIALREDUCE;
+            byte[] firstkeybuf, xkeybuf;
+            int firstkeyoffset, xkeyoffset;
+            int firstkeylen, xkeylen;     
+
+            if(null == raentries)
+            {
+                raentries = new RandomAccessEntries();                
+            }       
+            if(null == raoutput)
+            {
+                raoutput = new RandomAccessOutput();
+            }
+            raentries.SetInput(input);
+            raoutput.SetOutput(output);
+            
+            for (int i = 0; i < input.entries.Count; )
+            {
+                input.entries[i].LocateKey(input, out firstkeybuf, out firstkeyoffset, out firstkeylen);
+                ByteSlice key = ByteSlice.Prepare(firstkeybuf, firstkeyoffset, firstkeylen);
+                int len = 1;
+                for (int j = i + 1; j < input.entries.Count; j++)
+                {
+                    bool nomatch = false;
+                    input.entries[j].LocateKey(input, out xkeybuf, out xkeyoffset, out xkeylen);
+                    if (firstkeylen != xkeylen)
+                    {
+                        break;
+                    }
+                    for (int ki = 0; ki != xkeylen; ki++)
+                    {
+                        if (xkeybuf[xkeyoffset + ki] != firstkeybuf[firstkeyoffset + ki])
+                        {
+                            nomatch = true;
+                            break;
+                        }
+                    }
+                    if (nomatch)
+                    {
+                        break;
+                    }
+                    len++;
+                }
+                raentries.set(i, len);
+                if(!StaticGlobals.DSpace_OutputDirection_ascending)
+                {
+                    if(flipbuf == null)
+                    {
+                        flipbuf = new byte[key.Length];
+                    }
+                    key = key.FlipAllBits(flipbuf);    
+                }
+                Reduce(key, raentries, raoutput);
+                i += len;
+            }
+            StaticGlobals.ExecutionContext = oldcontexttype;
+        }") : @"
+                public void OnPartialReduce(EntriesInput input, MapOutput output)
+                {
+                    throw new Exception(`OnPartialReduce not supported when PartialReduce mode is not on`);
+                }
+")
+          
+          ).Replace('`', '"') + code + (@"
     }
 }");
         }
@@ -1162,26 +1391,11 @@ namespace UserMapper
         
         byte[] keybuf = new byte[(8 + DSpace_KeyLength > 8 + 8) ? 8 + DSpace_KeyLength : 8 + 8];       
         byte[] valuebuf = new byte[0x400 * 0x400 * 1];   
-        const int _CookTimeout = " + CookTimeout.ToString() + @";
-        const int _CookRetries = " + CookRetries.ToString() + @";
+        const int _CookTimeout = " + (FaultTolerant ? FTReadTimeout.ToString() : CookTimeout.ToString()) + @";
+        const int _CookRetries = " + (FaultTolerant ? FTReadRetries.ToString() : CookRetries.ToString()) + @";
+        bool _FaultTolerant = " + (FaultTolerant ? "true" : "false") + @";
         public void OnMap(MapInput input, MapOutput output)
-        {
-                //StaticGlobals.MapIteration = -1;
-                //StaticGlobals.ReduceIteration = -1;
-                //StaticGlobals.DSpace_KeyLength = DSpace_KeyLength;
-                //StaticGlobals.DSpace_SlaveIP = DSpace_SlaveIP;
-                //StaticGlobals.DSpace_SlaveHost = DSpace_SlaveHost;
-                //StaticGlobals.DSpace_BlocksTotalCount = DSpace_BlocksTotalCount;
-                //StaticGlobals.DSpace_BlockID = DSpace_BlockID;
-                //StaticGlobals.ExecutionContext = ExecutionContextType.MAP;
-                //StaticGlobals.DSpace_Hosts = new string[]{" + ExpandListCode(StaticGlobals.DSpace_Hosts) + @"};
-                //StaticGlobals.DSpace_OutputDirection = `" + StaticGlobals.DSpace_OutputDirection + @"`;
-                //StaticGlobals.DSpace_OutputDirection_ascending = " + (StaticGlobals.DSpace_OutputDirection_ascending ? "true" : "false") + @";
-                //InputRecordLength = StaticGlobals.DSpace_InputRecordLength;
-                //StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
-                //StaticGlobals.DSpace_MaxDGlobals = " + StaticGlobals.DSpace_MaxDGlobals.ToString() + @";
-                ").Replace('`', '"') + DGlobalsM.ToCode() + (@"
-            
+        {            
             //----------------------------COOKING--------------------------------
             bool cooking_is_cooked = false;
             int cooking_cooksremain = _CookRetries;
@@ -1227,10 +1441,6 @@ namespace UserMapper
                 }
                 catch(Exception e)
                 {
-                    if(null != e as MySpace.DataMining.DistributedObjects.FailoverFileStreamFatalException)
-                    {
-                        throw;
-                    }
                     //----------------------------COOKING--------------------------------
                     if(!cooking_is_read)
                     {
@@ -1239,18 +1449,30 @@ namespace UserMapper
                     bool firstcook = cooking_cooksremain == _CookRetries;
                     if(cooking_cooksremain-- <= 0)
                     {
-                            string ns = ` (unable to get connection count)`;
-                            try
+                        string ns = ` (unable to get connection count)`;
+                        try
+                        {
+                            ns = ` (` + NetUtils.GetActiveConnections().Length.ToString()
+                                + ` total connections on this machine)`;
+                        }
+                        catch
+                        {
+                        }
+                        if(_FaultTolerant)
+                        {
+                            string[] xnames = input.Name.Split('*');
+                            foreach (string xn in xnames)
                             {
-                                ns = ` (` + NetUtils.GetActiveConnections().Length.ToString()
-                                    + ` total connections on this machine)`;
+                                int xdel = xn.IndexOf(@`\`, 2);
+                                string xhost = xn.Substring(2, xdel - 2);
+                                input.ReportRogueHost(xhost);
                             }
-                            catch
-                            {
-                            }
+                            input.ReportRogueHost(System.Net.Dns.GetHostName());
+                        }
                         throw new System.IO.IOException(`cooked too many times (retries=`
                             + _CookRetries.ToString()
                             + `; timeout=` + _CookTimeout.ToString()
+                            + `; faulttolerant=` + _FaultTolerant.ToString()
                             + `) on ` + System.Net.Dns.GetHostName() + ns, e);
                     }
                     System.Threading.Thread.Sleep(IOUtils.RealRetryTimeout(_CookTimeout));
@@ -1260,6 +1482,7 @@ namespace UserMapper
                         {
                             Qizmt_Log(`cooking started (retries=` + _CookRetries.ToString()
                                 + `; timeout=` + _CookTimeout.ToString()
+                                + `; faulttolerant=` + _FaultTolerant.ToString()
                                 + `) on ` + System.Net.Dns.GetHostName()
                                 + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod());
                         }
@@ -1276,6 +1499,7 @@ namespace UserMapper
                                 Qizmt_Log(`cooking continues with ` + cooking_cooksremain
                                     + ` more retries (retries=` + _CookRetries.ToString()
                                     + `; timeout=` + _CookTimeout.ToString()
+                                    + `; faulttolerant=` + _FaultTolerant.ToString()
                                     + `) on ` + System.Net.Dns.GetHostName()
                                     + ` in ` + (new System.Diagnostics.StackTrace()).GetFrame(0).GetMethod()
                                     + Environment.NewLine + e.ToString());
@@ -1291,6 +1515,11 @@ namespace UserMapper
                 }
                 break;
             }
+        }
+
+        public void OnPartialReduce(EntriesInput input, MapOutput output)
+        {
+            throw new Exception(`OnPartialReduce is not supported for rehash`);
         }
 
         private static int StreamReadLoop(System.IO.Stream stm, byte[] buf, int len)
@@ -1325,7 +1554,7 @@ namespace UserMapper
         public virtual void DoMap(IList<string> inputdfsnodes, string code, string[] usings, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             const string classname = "DfsMapper";
-            DoMapFullSource(inputdfsnodes, GetMapSource(code, usings, classname), classname, inputdfsfilenames, inputnodesoffsets, false);
+            DoMapFullSource(inputdfsnodes, GetMapSource(code, usings, classname, PartialReduce), classname, inputdfsfilenames, inputnodesoffsets, false);
         }
 
         public virtual void DoMapRehash(IList<string> inputdfsnodes, string code)
@@ -1418,7 +1647,7 @@ namespace UserMapper
         public virtual void BeginDoFoilMapSample(IList<string> inputdfsnodes, string code, string[] usings, List<string> inputdfsfilenames, List<int> inputnodesoffsets)
         {
             const string classname = "DfsMapper";
-            string source = GetMapSource(code, usings, classname);
+            string source = GetMapSource(code, usings, classname, false);
             byte[] dlldata = null;
             if (LocalCompile)
             {
@@ -1474,6 +1703,12 @@ namespace UserMapper
             base.Close();
         }
 
+        public void JustClose()
+        {
+            closed = true;
+
+            base.JustCloseNoLock();
+        }
 
         public void CommitZBalls(string cachename, bool keepzblocks)
         {
@@ -1796,6 +2031,112 @@ namespace UserMapper
             return GetEnumerators(dlldata, classname, code);
         }
 
+        static string RandomAccessEntriesClassCode = 
+        @"public class RandomAccessEntries: IEnumerator<ByteSlice>,IEnumerable<ByteSlice>
+        {
+            public RandomAccessEntries()
+            {
+            }            
+            
+            internal void SetInput(EntriesInput input)
+            {
+                this.input = input;
+                this.items.parent = this;
+            }
+
+            internal void set(int offset, int length)
+            {
+                this.offset = offset;
+                this.length = length;
+                this.curPos = -1;
+            }
+
+            public int Length
+            {
+                get
+                {
+                    return length;
+                }
+            }
+
+            public ByteSlice Current
+            {
+                get
+                {
+                     return this[curPos].Value;
+                }           
+            }
+
+            object System.Collections.IEnumerator.Current
+            {
+                get
+                {
+                     return this[curPos].Value;
+                }  
+            }            
+
+            public void Reset()
+            {
+                curPos = -1;
+            }
+
+            public bool MoveNext()
+            {
+                return (++curPos < length);
+            }
+
+            public RandomAccessEntriesItems Items
+            {
+                get
+                {
+                    return items;
+                }
+            }
+
+            public ReduceEntry this[int index]
+            {
+                get
+                {
+                    if (index < 0 || index > length)
+                    {
+                        throw new ArgumentOutOfRangeException();
+                    }
+                    return ReduceEntry.Create(input, input.entries[offset + index]);
+                }
+            }
+
+            public void Dispose()
+            {                
+            }
+
+            public IEnumerator<ByteSlice> GetEnumerator()
+            {
+                return this;
+            }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            {
+                return this;
+            }
+
+            int offset, length;
+            EntriesInput input;
+            RandomAccessEntriesItems items;
+            int curPos;
+        }
+
+        public struct RandomAccessEntriesItems
+        {
+            internal RandomAccessEntries parent;
+
+            public ByteSlice this[int index]
+            {
+                get
+                {
+                   return parent[index].Value;
+                }
+            }
+        }";
 
         ArrayComboListEnumerator[] GetEnumeratorsReducerOutput(string code, string reduceroutputclasscode, string[] usings)
         {
@@ -1968,116 +2309,11 @@ namespace MySpace.DataMining.EasyReducer
             }
             i = 0;
             return false; // At end; stop.
-        }
+        }" 
+       
+       + RandomAccessEntriesClassCode + 
 
-
-        public class RandomAccessEntries: IEnumerator<ByteSlice>,IEnumerable<ByteSlice>
-        {
-            public RandomAccessEntries()
-            {
-            }            
-            
-            internal void SetInput(EntriesInput input)
-            {
-                this.input = input;
-                this.items.parent = this;
-            }
-
-            internal void set(int offset, int length)
-            {
-                this.offset = offset;
-                this.length = length;
-                this.curPos = -1;
-            }
-
-            public int Length
-            {
-                get
-                {
-                    return length;
-                }
-            }
-
-            public ByteSlice Current
-            {
-                get
-                {
-                     return this[curPos].Value;
-                }           
-            }
-
-            object System.Collections.IEnumerator.Current
-            {
-                get
-                {
-                     return this[curPos].Value;
-                }  
-            }            
-
-            public void Reset()
-            {
-                curPos = -1;
-            }
-
-            public bool MoveNext()
-            {
-                return (++curPos < length);
-            }
-
-            public RandomAccessEntriesItems Items
-            {
-                get
-                {
-                    return items;
-                }
-            }
-
-            public ReduceEntry this[int index]
-            {
-                get
-                {
-                    if (index < 0 || index > length)
-                    {
-                        throw new ArgumentOutOfRangeException();
-                    }
-                    return ReduceEntry.Create(input, input.entries[offset + index]);
-                }
-            }
-
-            public void Dispose()
-            {                
-            }
-
-            public IEnumerator<ByteSlice> GetEnumerator()
-            {
-                return this;
-            }
-
-            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-            {
-                return this;
-            }
-
-            int offset, length;
-            EntriesInput input;
-            RandomAccessEntriesItems items;
-            int curPos;
-        }
-
-        public struct RandomAccessEntriesItems
-        {
-            internal RandomAccessEntries parent;
-
-            public ByteSlice this[int index]
-            {
-                get
-                {
-                   return parent[index].Value;
-                }
-            }
-        }
-
-
+       @"
         public class ExplicitCacheAttribute: Attribute
         {
         }
@@ -2112,6 +2348,7 @@ namespace MySpace.DataMining.EasyReducer
                 if(null != initmethod)
                 {" + 
                     @"StaticGlobals.DSpace_MaxDGlobals = " + StaticGlobals.DSpace_MaxDGlobals.ToString() + @";" +
+                    @"StaticGlobals.DSpace_OutputRecordLength = " + StaticGlobals.DSpace_OutputRecordLength.ToString() + @";" +
                     DGlobalsM.ToCode() + @";
                     if(StaticGlobals.DSpace_Hosts == null)
                     {
@@ -2199,6 +2436,7 @@ namespace MySpace.DataMining.EasyReducer
         static byte[] flipbuf = null;
         static bool flip = " + (string.Compare(StaticGlobals.DSpace_OutputDirection, "descending", true) == 0 ? "true" : "false") + @";
         const long DfsSampleDistance = " + DfsSampleDistance.ToString() + @";
+        const bool nospill = " + (NoSpill ? "true" : "false") + @";
 
         RandomAccessOutput[] raouts = null;
         int[] outputrecordlengths = null;
@@ -2224,6 +2462,7 @@ namespace MySpace.DataMining.EasyReducer
                     raouts[i] = new RandomAccessOutput(output, filepaths[i], outputrecordlengths[i]);
                     raouts[i].rar = rar;
                     raouts[i].parentlist = raouts;
+                    raouts[i].NoSpill = nospill;
                 }
                 
                 {
@@ -2264,6 +2503,13 @@ namespace MySpace.DataMining.EasyReducer
                     Stack.ResetStack();
                     recordset.ResetBuffers();
                     ++StaticGlobals.ReduceIteration;
+                    if(nospill)
+                    {
+                        for(int i = 0; i < NRAOUTS; i++)
+                        {
+                            raouts[i].KeyFirstOutput = true;
+                        }
+                    }                    
                     Reduce(key, rar.Values, raouts[0]);                     
             }
         }
@@ -2315,11 +2561,14 @@ namespace MySpace.DataMining.EasyReducer
             int OutputRecordLength = -1;
             bool _WriteSamples = true;
 
+            internal bool NoSpill = false;
+            internal bool KeyFirstOutput = false;
+
             public RandomAccessOutput(EntriesOutput eoutput, string basefilename, int outputrecordlength)
             {
                 this._basefilename = basefilename;
                 this.OutputRecordLength = outputrecordlength;
-                this._WriteSamples = outputrecordlength < 1;
+                this._WriteSamples = (outputrecordlength < 1 && outputrecordlength != -2);
 
                 StaticGlobals.DSpace_OutputRecordLength = " + OutputRecordLength.ToString() + @";
             }
@@ -2646,19 +2895,33 @@ namespace MySpace.DataMining.EasyReducer
                 _cursize = 0;
             }
 
+            public void Add(ByteSlice key, ByteSlice value)
+            {
+                throw new Exception(`Add(ByteSlice key, ByteSlice value) not supported in reduce`);
+            }
+
             public void Add(ByteSlice entry, bool addnewline)
             {
-                if(-1 == _filenum || _cursize >= _basefilesize)
+                if(-1 == _filenum || (_cursize >= _basefilesize && (!NoSpill || KeyFirstOutput)))
                 {
                     _nextfile();
                 }
+
+                if(NoSpill && KeyFirstOutput)
+                {
+                    KeyFirstOutput = false;
+                }
                 
                 {
+                    int len = entry.Length;
+                    if(OutputRecordLength == -2)
+                    {
+                        len += Entry.RecordLengthToBytes(entry.Length, _outstm);
+                    }
                     for(int i = 0; i < entry.Length; i++)
                     {
                         _outstm.WriteByte(entry[i]);
-                    }
-                    int len = entry.Length;
+                    }                    
                     if(addnewline)
                     {
                         string nl = Environment.NewLine;
@@ -2678,11 +2941,15 @@ namespace MySpace.DataMining.EasyReducer
                     if(_cursize >= _nextsamplepos)
                     {
                         {
+                            int len = entry.Length;
+                            if(OutputRecordLength == -2)
+                            {
+                                len += Entry.RecordLengthToBytes(entry.Length, _outsamps);
+                            }
                             for(int i = 0; i < entry.Length; i++)
                             {
                                 _outsamps.WriteByte(entry[i]);
-                            }
-                            int len = entry.Length;
+                            }                            
                             if(addnewline)
                             {
                                 string nl = Environment.NewLine;
@@ -2701,11 +2968,11 @@ namespace MySpace.DataMining.EasyReducer
             
             void AddCheck(ByteSlice entry, bool addnewline)
             {
-                if(OutputRecordLength > 0)
+                if(OutputRecordLength > 0 || OutputRecordLength == -2)
                 {
                     if(addnewline)
                     {
-                        throw new Exception(`Cannot write-line in fixed-length record rectangular binary mode`);
+                        throw new Exception(`Cannot write line in record binary mode`);
                     }
                 }
                 else
@@ -2725,7 +2992,7 @@ namespace MySpace.DataMining.EasyReducer
 
             public void Add(ByteSlice entry)
             {
-                bool addnewline = OutputRecordLength < 1;
+                bool addnewline = (OutputRecordLength < 1 && OutputRecordLength != -2);
                 Add(entry, addnewline);
             }
 
@@ -2745,33 +3012,42 @@ namespace MySpace.DataMining.EasyReducer
                 ByteSlice bs = ByteSlice.Prepare(s);
                 Add(bs);
             }
+            public void Add(string str)
+             { 
+               mstring ms = mstring.Prepare(str);
+               Add(ByteSlice.Prepare(ms));
+               
+              }
 
             public void Add(recordset rs)
             {
                 int rsLength = rs.Length;
-                if(rsLength > OutputRecordLength)
+                if(OutputRecordLength != -2)
                 {
-                    throw new Exception(`recordset is larger than record length; got length of ` + rsLength.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
-                }
-                else if(rsLength < OutputRecordLength)
-                {
-                    for(; rsLength < OutputRecordLength; rsLength++)
+                    if(rsLength > OutputRecordLength)
                     {
-                        rs.PutByte(0);
+                        throw new Exception(`recordset is larger than record length; got length of ` + rsLength.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
+                    }
+                    else if(rsLength < OutputRecordLength)
+                    {
+                        for(; rsLength < OutputRecordLength; rsLength++)
+                        {
+                            rs.PutByte(0);
+                        }
+                        #if DEBUG
+                        if(rs.Length != rsLength)
+                        {
+                            throw new Exception(`DEBUG: (rs.Length != rsLength)`);
+                        }
+                        #endif
                     }
                     #if DEBUG
-                    if(rs.Length != rsLength)
+                    if(rs.Length != OutputRecordLength)
                     {
-                        throw new Exception(`DEBUG: (rs.Length != rsLength)`);
+                        throw new Exception(`DEBUG: (rs.Length != OutputRecordLength)`);
                     }
                     #endif
-                }
-                #if DEBUG
-                if(rs.Length != OutputRecordLength)
-                {
-                    throw new Exception(`DEBUG: (rs.Length != OutputRecordLength)`);
-                }
-                #endif
+                }                
                 AddCheck(rs.ToRow(), false); // WriteRecord(rs.ToRow());
             }
 
@@ -2782,14 +3058,17 @@ namespace MySpace.DataMining.EasyReducer
 
             public void WriteRecord(ByteSlice entry)
             {
-                if(OutputRecordLength < 1)
+                if(OutputRecordLength != -2)
                 {
-                    throw new Exception(`Cannot write records; not in fixed-length record rectangular binary mode`);
-                }
-                if(entry.Length != OutputRecordLength) // && OutputRecordLength > 0)
-                {
-                    throw new Exception(`Record length mismatch; got length of ` + entry.Length.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
-                }
+                    if(OutputRecordLength < 1)
+                    {
+                        throw new Exception(`Cannot write records; not in binary mode`);
+                    }
+                    if(entry.Length != OutputRecordLength) // && OutputRecordLength > 0)
+                    {
+                        throw new Exception(`Record length mismatch; got length of ` + entry.Length.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
+                    }
+                }                
                 AddCheck(entry, false);
             }
             

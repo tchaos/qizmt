@@ -240,7 +240,6 @@ namespace RDBMS_DBCORE
             {
             }
 
-
             public override void Reduce(ByteSlice key, IEnumerator<ByteSlice> values, MapReduceOutput output)
             {
                 if (JoinType.X == type)
@@ -314,7 +313,6 @@ namespace RDBMS_DBCORE
                         }
 
                     }
-
                 }
                 else if (0 == t1Count)
                 {
@@ -325,15 +323,16 @@ namespace RDBMS_DBCORE
                             ByteSlice z = t0[i];
                             List<byte> valuebuf = ftools.AllocBuffer(DSpace_OutputRecordLength);
                             z.AppendTo(valuebuf);
+
                             for (int n = 0; n < DSpace_OutputRecordLength - z.Length; n++)
                             {
                                 valuebuf.Add(1); // IsNull=true.
                             }
+
                             output.Add(ByteSlice.Prepare(valuebuf));
                         }
 
                     }
-
                 }
                 else
                 {
@@ -346,7 +345,9 @@ namespace RDBMS_DBCORE
 #if DEBUG
                             if (DSpace_OutputRecordLength != x.Length + y.Length)
                             {
-                                throw new Exception("DEBUG:  JoinOn.Reduce: (DSpace_OutputRecordLength != x.Length + y.Length)");
+                                throw new Exception("DEBUG:  JoinOn.Reduce: (DSpace_OutputRecordLength != x.Length + y.Length).  x.Length=" 
+                                    + x.Length.ToString() + "; y.Length=" + y.Length.ToString() + ";DSpace_OutputRecordLength="
+                                    + DSpace_OutputRecordLength.ToString());
                             }
 #endif
                             List<byte> valuebuf = ftools.AllocBuffer(DSpace_OutputRecordLength);
@@ -355,7 +356,6 @@ namespace RDBMS_DBCORE
                             output.Add(ByteSlice.Prepare(valuebuf));
                         }
                     }
-
                 }
 
                 ftools.ResetBuffers();

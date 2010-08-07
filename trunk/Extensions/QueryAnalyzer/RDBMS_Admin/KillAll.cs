@@ -10,12 +10,26 @@ namespace RDBMS_Admin
         private static void KillAll(string[] args)
         {
             bool forceflag = false;
+            bool proxy = false;
+            string cmd = "";
 
-            if (args.Length > 1)
+            for (int i = 0; i < args.Length; i++)
             {
-                if (args[1].ToLower() == "-f")
+                string arg = args[i].ToLower();
+                switch (arg)
                 {
-                    forceflag = true;
+                    case "-f":
+                        forceflag = true;
+                        cmd += " " + arg;
+                        break;
+                    
+                    case "-p":
+                        proxy = true;
+                        break;
+
+                    default:
+                        cmd += " " + arg;
+                        break;
                 }
             }
 
@@ -23,6 +37,12 @@ namespace RDBMS_Admin
             {
                 Console.Error.WriteLine("WARNING: about to terminate protocol services.");
                 Console.Error.WriteLine("To continue, use:  RDBMS_admin killall -f");
+                return;
+            }
+
+            if (proxy)
+            {
+                RunViaJob(cmd);
                 return;
             }
 
@@ -99,6 +119,59 @@ namespace RDBMS_Admin
                 Console.WriteLine("Killall completed successfully.");
             }
             Console.WriteLine("---KILLALL RESULTS---");
+        }
+
+        internal static void RunViaJob(string cmd)
+        {
+            string tempdir = CurrentDir + @"\" + Guid.NewGuid().ToString();
+            string jobname = Guid.NewGuid().ToString();
+
+            try
+            {
+                System.IO.Directory.CreateDirectory(tempdir);
+                string job = (@"<SourceCode>
+  <Jobs>
+    <Job Name=`rdbms_admin` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Qizmt_Log(Shell(@`rdbms_admin " + cmd + @"`));   
+            }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>").Replace('`', '"');
+                
+                System.IO.File.WriteAllText(tempdir + @"\" + jobname, job);
+                Exec.Shell("Qizmt importdir \"" + tempdir + "\"");
+                Console.WriteLine(Exec.Shell("Qizmt exec " + jobname));                
+            }
+            finally
+            {
+                try
+                {
+                    Exec.Shell("Qizmt del " + jobname);
+                }
+                catch
+                {
+                }
+
+                try
+                {                    
+                    if (System.IO.Directory.Exists(tempdir))
+                    {
+                        System.IO.Directory.Delete(tempdir, true);
+                    }      
+                }
+                catch
+                {
+                }                         
+            }            
         }
     }
 }

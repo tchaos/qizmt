@@ -1,4 +1,25 @@
-﻿#define FAILOVER_TEST
+﻿/**************************************************************************************
+ *  MySpace’s Mapreduce Framework is a mapreduce framework for distributed computing  *
+ *  and developing distributed computing applications on large clusters of servers.   *
+ *                                                                                    *
+ *  Copyright (C) 2008  MySpace Inc. <http://qizmt.myspace.com/>                      *
+ *                                                                                    *
+ *  This program is free software: you can redistribute it and/or modify              *
+ *  it under the terms of the GNU General Public License as published by              *
+ *  the Free Software Foundation, either version 3 of the License, or                 *
+ *  (at your option) any later version.                                               *
+ *                                                                                    *
+ *  This program is distributed in the hope that it will be useful,                   *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of                    *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                     *
+ *  GNU General Public License for more details.                                      *
+ *                                                                                    *
+ *  You should have received a copy of the GNU General Public License                 *
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
+***************************************************************************************/
+
+//#define TESTFAULTTOLERANT
+//#define FAILOVER_DEBUG
 #define MR_REPLICATION_TIME_PRINT
 
 using System;
@@ -17,7 +38,7 @@ namespace MySpace.DataMining.AELight
             internal Dictionary<string, int> goodHosts = null;
             internal Dictionary<string, int> badHosts = null;
             internal Dictionary<int, int> blockStatus = null;
-            internal List<string> newBadHosts = null;
+            internal Dictionary<string, string> newBadHostToReason = null;
             internal MySpace.DataMining.DistributedObjects.DiskCheck diskcheck = null;
             internal Random rnd = null;
             internal uint awakeCnt = 0;
@@ -33,11 +54,22 @@ namespace MySpace.DataMining.AELight
             Dictionary<string, List<ReplWorker>> hostToReplWorkers = null;
             internal Dictionary<string, List<string>> dfsnamesToReplnames = null;
             internal Dictionary<string, int> badOutputFilenodes = null;
+            Dictionary<string, int> reportedBadHostsFromReplWorkers = null;
 
             internal FailoverInfo(dfs dc)
             {
-                healthpluginpaths = GetHealthPluginPaths(dc);
-                diskcheck = new MySpace.DataMining.DistributedObjects.DiskCheck(healthpluginpaths);
+                try
+                {
+                    healthpluginpaths = GetHealthPluginPaths(dc);
+                }
+                catch
+                {
+                }
+
+                if (healthpluginpaths != null && healthpluginpaths.Length > 0)
+                {
+                    diskcheck = new MySpace.DataMining.DistributedObjects.DiskCheck(healthpluginpaths);
+                }                
                 rnd = new Random(unchecked(DateTime.Now.Millisecond + System.Diagnostics.Process.GetCurrentProcess().Id));
             }
 
@@ -67,7 +99,7 @@ namespace MySpace.DataMining.AELight
                 goodHosts = new Dictionary<string, int>(goodhosts.Length);
                 blockStatus = new Dictionary<int, int>(allblockscount);
                 badHosts = new Dictionary<string, int>(goodhosts.Length + badhosts.Length);
-                newBadHosts = new List<string>(goodhosts.Length);
+                newBadHostToReason = new Dictionary<string, string>(goodhosts.Length);
                 workingBlocks = new List<MapReduceBlockInfo>(blockcount);
                 childFailovers = new Dictionary<int, FailoverInfo>(failovershared.dc.Replication);
                 hostToESRBlocks = new Dictionary<string, List<MapReduceBlockInfo>>(goodhosts.Length);
@@ -192,6 +224,10 @@ namespace MySpace.DataMining.AELight
                     block.acl = new MySpace.DataMining.DistributedObjects5.ArrayComboList(failovershared.cfgj.NarrativeName + "_BlockID" + block.BlockID.ToString(), failovershared.cfgj.IOSettings.KeyLength);
                     block.acl.SetJID(jid);
                     block.acl.HealthPluginPaths = healthpluginpaths;
+                    block.acl.FaultTolerant = true;
+                    block.acl.FTReadTimeout = failovershared.dc.slave.FaultTolerantReadTimeout;
+                    block.acl.FTReadRetries = failovershared.dc.slave.FaultTolerantReadRetries;
+                    block.acl.FTConnectRetries = failovershared.dc.slave.FaultTolerantConnectRetries;
                     int IntermediateDataAddressing = failovershared.cfgj.IntermediateDataAddressing;
                     if (0 == IntermediateDataAddressing)
                     {
@@ -202,6 +238,7 @@ namespace MySpace.DataMining.AELight
                     {
                         throw new InvalidOperationException("Invalid value for IntermediateDataAddressing: " + IntermediateDataAddressing.ToString());
                     }
+                    block.acl.PartialReduce = (failovershared.cfgj.PartialReduce != null);
                     block.acl.InputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_InputRecordLength;
                     block.acl.OutputRecordLength = MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength;
                     block.acl.OutputRecordLengths = failovershared.outputrecordlengths;
@@ -226,6 +263,14 @@ namespace MySpace.DataMining.AELight
                     if (failovershared.cfgj.OpenCVExtension != null)
                     {
                         block.acl.AddOpenCVExtension();
+                    }
+                    if (failovershared.cfgj.MemCache != null)
+                    {
+                        //block.acl.AddMemCacheExtension();
+                        Console.Error.WriteLine(" MemCache cannot be enabled with fault-tolerant execution"
+                            + "; job '{0}' has <MemCache/> tag", failovershared.cfgj.NarrativeName);
+                        SetFailure();
+                        return;
                     }
                     if (failovershared.cfgj.Unsafe != null)
                     {
@@ -289,14 +334,14 @@ namespace MySpace.DataMining.AELight
                     List<string> _mapinputfilenames = null;
                     List<int> _mapinputoffsets = null;
                     List<int> _mapinputreclengths = null;
-                    if (string.Compare("next", failoverShared.cfgj.Computing.MapInputOrder, StringComparison.OrdinalIgnoreCase) == 0)
+                    if (string.Compare("next", failoverShared.cfgj.FaultTolerantExecution.MapInputOrder, StringComparison.OrdinalIgnoreCase) == 0)
                     {
                         _mapinputfilepaths = mapinputfilepaths;
                         _mapinputfilenames = mapinputfilenames;
                         _mapinputoffsets = mapinputoffsets;
                         _mapinputreclengths = mapinputreclengths;
                     }
-                    else if (string.Compare("shuffle", failoverShared.cfgj.Computing.MapInputOrder, StringComparison.OrdinalIgnoreCase) == 0)
+                    else if (string.Compare("shuffle", failoverShared.cfgj.FaultTolerantExecution.MapInputOrder, StringComparison.OrdinalIgnoreCase) == 0)
                     {
                         if (!rehash)
                         {
@@ -845,71 +890,177 @@ namespace MySpace.DataMining.AELight
                 }
             }
 
-            private bool _checkMachineFailure(bool dochecknow, string host)
+            private bool _checkMachineFailureUsingPlugins(bool dochecknow, string host, out string reason)
             {
-                string reason = null;
                 bool failure = false;
+                reason = null;                
                 if (dochecknow)
                 {
-                    failure = diskcheck.IsDiskFailure(host, HeartBeats.rogueHosts, out reason);
+                    failure = diskcheck.IsDiskFailure(host, null, out reason);
                 }
                 else
                 {
-                    failure = diskcheck.IsDiskFailure(awakeCnt, host, HeartBeats.rogueHosts, out reason);
+                    failure = diskcheck.IsDiskFailure(awakeCnt, host, null, out reason);
                 }
 
                 if (failure)
                 {
-                    LogOutputToFile("CheckMachineFailure: " + host + ";reason=" + reason);
+                    LogOutputToFile("_checkMachineFailureUsingPlugins: " + host + ";reason=" + reason);
                 }
                 
 #if FAILOVER_DEBUG
                 if (failure)
                 {
-                    Log("CheckMachineFailure: " + host + ";reason=" + reason);
+                    Log("_checkMachineFailureUsingPlugins: " + host + ";reason=" + reason);
                 }
 #endif
                 return failure;
             }
 
-            internal bool CheckMachineFailure(string host)
-            {
-                return _checkMachineFailure(true, host);
-            }
-
             internal int CheckMachineFailures(bool dochecknow)
             {
-                int nthreads = goodHosts.Count;
-                if (nthreads > 15)
+                newBadHostToReason.Clear(); //!
+
+                if (diskcheck != null)
                 {
-                    nthreads = 15;
+                    int nthreads = goodHosts.Count;
+                    if (nthreads > 15)
+                    {
+                        nthreads = 15;
+                    }
+                    MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                    new Action<string>(
+                    delegate(string host)
+                    {
+                        string reason = null;
+                        if (_checkMachineFailureUsingPlugins(dochecknow, host, out reason))
+                        {
+                            lock (newBadHostToReason)
+                            {
+                                newBadHostToReason[host] = reason;
+                            }
+                        }
+                    }), new List<string>(goodHosts.Keys), nthreads);
+                }
+                                
+                foreach (string h in goodHosts.Keys)
+                {
+                    string reason = null;
+                    if (VitalsMonitor.IsRogueHost(h, out reason))
+                    {
+                        newBadHostToReason[h] = reason;
+                    }
+                }                           
+
+                foreach (string bh in newBadHostToReason.Keys)
+                {
+                    goodHosts.Remove(bh);
+                    badHosts.Add(bh, 0);
                 }
 
-                newBadHosts.Clear();
+                return newBadHostToReason.Count;
+            }                     
+                       
+            internal bool CheckHealthMap(bool dochecknow)
+            {
+                int fmcount = CheckMachineFailures(dochecknow);
+                fmcount += CheckBlocksExceptionsAppend(hostToBlocks);
 
-                MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
-                new Action<string>(
-                delegate(string host)
+                return fmcount > 0;
+            }
+
+            internal bool CheckHealthESR(bool dochecknow)
+            {
+                int fmcount = CheckMachineFailures(dochecknow);
+                fmcount += CheckBlocksExceptionsAppend(hostToESRBlocks);
+                bool esronfail = ESRBlockOnFailedMachine();
+
+                return (fmcount > 0 || esronfail);
+            }
+
+            internal bool CheckHealthReplication(bool dochecknow)
+            {
+                CheckMachineFailures(dochecknow);
+
+                //check reported rogue hosts from each replworker.    
+                lock (reportedBadHostsFromReplWorkers)
                 {
-                    if (_checkMachineFailure(dochecknow, host))
+                    foreach (string bh in reportedBadHostsFromReplWorkers.Keys)
                     {
-                        lock (newBadHosts)
+                        if (!badHosts.ContainsKey(bh))  //a new bad host
                         {
-                            newBadHosts.Add(host);
+#if FAILOVER_DEBUG
+                            Log("Reported bad host from repl worker:" + bh);
+#endif
+                            goodHosts.Remove(bh);                            
+                            badHosts.Add(bh, 0);
+                            newBadHostToReason.Add(bh, "Rogue host reported from replication worker");
                         }
                     }
-                }), new List<string>(goodHosts.Keys), nthreads);
+                }
 
-                if (newBadHosts.Count > 0)
+                //check replworker exception                
+                foreach (KeyValuePair<string, List<ReplWorker>> pair in hostToReplWorkers)
                 {
-                    foreach (string bh in newBadHosts)
+                    string host = pair.Key;
+                    List<ReplWorker> workers = pair.Value;
+                    foreach (ReplWorker w in workers)
                     {
-                        goodHosts.Remove(bh);
-                        badHosts.Add(bh, 0);
+                        if (w.LastException != null)
+                        {
+                            if (!badHosts.ContainsKey(host)) //a new bad host
+                            {
+#if FAILOVER_DEBUG
+                                Log("Repl worker has exception, add to bad host:" + host);
+#endif
+                                goodHosts.Remove(host);
+                                badHosts.Add(host, 0);
+                                newBadHostToReason.Add(host, "Replication worker exception");
+                            }
+                            break;
+                        }
                     }
                 }
 
-                return newBadHosts.Count;
+                bool esronfail = ESRBlockOnFailedMachine();
+
+                return (newBadHostToReason.Count > 0 || esronfail);
+            }
+
+            internal int CheckBlocksExceptionsAppend(Dictionary<string, List<MapReduceBlockInfo>> blockstocheck)
+            {
+                int foundcount = 0;
+
+                lock (blockstocheck) //don't want dirty read
+                {
+                    foreach (KeyValuePair<string, List<MapReduceBlockInfo>> pair in blockstocheck)
+                    {
+                        string host = pair.Key;
+                        List<MapReduceBlockInfo> blocks = pair.Value;
+                        foreach (MapReduceBlockInfo bl in blocks)
+                        {
+                            if (bl.blockfail)
+                            {
+#if FAILOVER_DEBUG
+                                Log("BEFORE ADDED: bad host found because of block exceptions:" + host);
+#endif
+                                if (!badHosts.ContainsKey(host))  // a new bad host
+                                {
+#if FAILOVER_DEBUG
+                                    Log("ADDING: bad host found because of block exceptions:" + host);
+#endif
+                                    newBadHostToReason.Add(host, "Block exception");
+                                    goodHosts.Remove(host);
+                                    badHosts.Add(host, 0);
+                                    foundcount++;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }                
+
+                return foundcount;
             }
 
             internal bool ESRBlockOnFailedMachine()
@@ -946,16 +1097,20 @@ namespace MySpace.DataMining.AELight
             {
                 for (int i = 0; i < allBlocks.Length; i++)
                 {
-                    if (!allBlocks[i].diskfailuredetected)
+                    try
                     {
-                        try
+                        if (!allBlocks[i].diskfailuredetected)
                         {
                             allBlocks[i].acl.StopZMapBlockServer();
-                            allBlocks[i].acl.Close();                            
+                            allBlocks[i].acl.Close();
                         }
-                        catch
+                        else
                         {
-                        }      
+                            allBlocks[i].acl.JustClose();
+                        }
+                    }
+                    catch
+                    {
                     }                    
                 }
                 foreach (FailoverInfo failover in childFailovers.Values)
@@ -1130,7 +1285,7 @@ namespace MySpace.DataMining.AELight
                     uint sleepCnt = 0;
                     {
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                         {
                             Console.WriteLine(@"FAILOVER_TEST: before map threads start");                            
                             while (System.IO.File.Exists(@"c:\temp\failovertest1.txt"))
@@ -1187,21 +1342,21 @@ namespace MySpace.DataMining.AELight
                                 Log("Health check at map loop;awakeCnt=" + awakeCnt.ToString());
 #endif
 
-                                if (CheckMachineFailures(false) > 0)
+                                if (CheckHealthMap(false))
                                 {
 #if FAILOVER_DEBUG                                    
                                     {
                                         Log("Disk failure detected at map loop...");
                                         string debugtxt = "======Bad hosts found=======" + Environment.NewLine +
-                                            string.Join(";", newBadHosts.ToArray());
+                                            string.Join(";", new List<string>(newBadHostToReason.Keys).ToArray());
                                         Log(debugtxt);
                                     }
 #endif                               
                                     DisplayNewBadHosts();    
 
-                                    for (int hi = 0; hi < newBadHosts.Count; hi++)
-                                    {                                     
-                                        AbortBlocksFromFailedHost(newBadHosts[hi]);
+                                    foreach(string bh in newBadHostToReason.Keys)
+                                    {
+                                        AbortBlocksFromFailedHost(bh);
                                     }
                                     
 
@@ -1237,7 +1392,7 @@ namespace MySpace.DataMining.AELight
                             }
                         }
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                         {
                             Console.WriteLine(@"FAILOVER_TEST: after map threads joined");
                             while (System.IO.File.Exists(@"c:\temp\failovertest2.txt"))
@@ -1248,12 +1403,12 @@ namespace MySpace.DataMining.AELight
                         }
 #endif
 
-                        if (CheckMachineFailures(true) > 0)
+                        if(CheckHealthMap(true))
                         {
-                            DisplayNewBadHosts();                           
-                            for (int hi = 0; hi < newBadHosts.Count; hi++)
+                            DisplayNewBadHosts(); 
+                            foreach(string bh in newBadHostToReason.Keys)
                             {
-                                AbortBlocksFromFailedHost(newBadHosts[hi]);
+                                AbortBlocksFromFailedHost(bh);
                             }
                         }                        
 
@@ -1270,7 +1425,7 @@ namespace MySpace.DataMining.AELight
 #endif
                         if (badHosts.Count >= failoverShared.dc.Replication)
                         {
-                            throw new Exception("Error: Cannot continue to exchange/sort/reduce phase.  The number of machines with hardware failure (" + (badHosts.Count).ToString() + ") is greater than or equal to replication factor (" + failoverShared.dc.Replication.ToString() + ").");
+                            throw new Exception("Error: Cannot continue to exchange/sort/reduce phase.  The number of machines removed (" + (badHosts.Count).ToString() + ") is greater than or equal to replication factor (" + failoverShared.dc.Replication.ToString() + ").");
                         }
 
                         for (int bi = 0; bi < workingBlocks.Count; bi++)
@@ -1402,7 +1557,7 @@ namespace MySpace.DataMining.AELight
                         hostToESRBlocks[host].Add(bl);
                     }
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                     {
                         Console.WriteLine(@"FAILOVER_TEST: before esr threads start");
                         while (System.IO.File.Exists(@"c:\temp\failovertest3.txt"))
@@ -1449,7 +1604,7 @@ namespace MySpace.DataMining.AELight
                             Log("All esr blocks completed.");
 #endif
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                             {
                                 Console.WriteLine(@"FAILOVER_TEST: all esr blocks completed, before breaking out of loop");                               
                                 while (System.IO.File.Exists(@"c:\temp\failovertest4.txt"))
@@ -1461,7 +1616,7 @@ namespace MySpace.DataMining.AELight
 #endif
 
                             //do one more check before breaking out of loop.
-                            if (CheckMachineFailures(true) > 0 || ESRBlockOnFailedMachine())
+                            if(CheckHealthESR(true))
                             {
 
 #if FAILOVER_DEBUG
@@ -1488,7 +1643,7 @@ namespace MySpace.DataMining.AELight
                             Log("Health check at esr loop;awakeCnt=" + awakeCnt.ToString());
 #endif
 
-                            if (CheckMachineFailures(false) > 0 || ESRBlockOnFailedMachine())
+                            if (CheckHealthESR(false))
                             {
                                 DisplayNewBadHosts();
                                 RehashESRBlocksFromFailedHosts();
@@ -1597,16 +1752,19 @@ namespace MySpace.DataMining.AELight
 
             internal void DisplayNewBadHosts()
             {
-                if (newBadHosts.Count > 0)
+                if (newBadHostToReason.Count > 0)
                 {
-                    int hoffset = (badHosts.Count - newBadHosts.Count);
-                    string recovered = badHosts.Count >= failoverShared.dc.Replication ? "NoRecovery" : "Recovered";
-                    for (int hi = 0; hi < newBadHosts.Count; hi++)
+                    int hoffset = (badHosts.Count - newBadHostToReason.Count);
+                    string recovered = badHosts.Count >= failoverShared.dc.Replication ? "No Recovery" : "Recovered";
+                    int hi = 0;
+                    foreach (KeyValuePair<string, string> pair in newBadHostToReason)
                     {
-                        string badhost = newBadHosts[hi];
-                        Console.WriteLine(Environment.NewLine + "HWFailure:{0}:{1}:{2}/{3}",
-                            recovered, badhost, hi + 1 + hoffset, failoverShared.dc.Replication);
-                    }
+                        string badhost = pair.Key;
+                        string reason = pair.Value;
+                        Console.WriteLine(Environment.NewLine + "Machine removed:{0}:{1}:{2}/{3}:{4}",
+                            recovered, badhost, hi + 1 + hoffset, failoverShared.dc.Replication, reason);
+                        hi++;
+                    }                    
                     ConsoleFlush();
                 }               
             }
@@ -1619,7 +1777,7 @@ namespace MySpace.DataMining.AELight
 
                 if (badHosts.Count >= failoverShared.dc.Replication)
                 {
-                    throw new Exception("The number of hardware failures >= Replication factor");
+                    throw new Exception("The number of machines removed >= Replication factor");
                 }
 
                 //if there is anything to rehash.
@@ -1644,7 +1802,7 @@ namespace MySpace.DataMining.AELight
                     Log("rehashing...newblockcount:" + newblockcount.ToString() + ";cid:" + cID.ToString());
 #endif
                     failover.CreateBlocks(newblockcount, exchangeworkload, null, null, null, failoverShared, new List<string>(goodHosts.Keys).ToArray(), new List<string>(badHosts.Keys).ToArray(), true); //rehash=true
-                    int childcid = cID;
+                    int childcid = cID; //!
                     System.Threading.Thread th = new System.Threading.Thread(new System.Threading.ThreadStart(delegate()
                     {
                         failover.ExecOneMapReduceFailover(this, childcid);
@@ -1679,7 +1837,7 @@ namespace MySpace.DataMining.AELight
             {
                 blockStatus.Clear(); //!
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                 {
                     Console.WriteLine(@"FAILOVER_TEST: before replication main threads start");
                     while (System.IO.File.Exists(@"c:\temp\failovertest5.txt"))
@@ -1693,10 +1851,11 @@ namespace MySpace.DataMining.AELight
                 hostToReplWorkers = new Dictionary<string, List<ReplWorker>>(goodHosts.Count);
                 dfsnamesToReplnames = new Dictionary<string, List<string>>(failoverShared.outputfiles.Count);
                 badOutputFilenodes = new Dictionary<string, int>();
+                reportedBadHostsFromReplWorkers = new Dictionary<string, int>(goodHosts.Count);
                 DateTime replstart = ESRBlocksToReplicationPhase();
 
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                 {
                     Console.WriteLine(@"FAILOVER_TEST: all replication main threads started; before join loop");
                     while (System.IO.File.Exists(@"c:\temp\failovertest6.txt"))
@@ -1730,7 +1889,7 @@ namespace MySpace.DataMining.AELight
                         Log("replication blocks completed.");
 #endif
 
-#if FAILOVER_TEST
+#if TESTFAULTTOLERANT
                         {
                             Console.WriteLine(@"FAILOVER_TEST: before breaking out of replication join loop");
                             while (System.IO.File.Exists(@"c:\temp\failovertest7.txt"))
@@ -1741,7 +1900,7 @@ namespace MySpace.DataMining.AELight
                         }
 #endif
 
-                        if (CheckMachineFailures(true) > 0 || ESRBlockOnFailedMachine())
+                        if (CheckHealthReplication(true))
                         {
 #if FAILOVER_DEBUG
                             Log("df found after rep blocks all completed.");
@@ -1798,7 +1957,7 @@ namespace MySpace.DataMining.AELight
 #if FAILOVER_DEBUG
                         Log("Health check at rep loop;awakeCnt=" + awakeCnt.ToString());
 #endif
-                        if (CheckMachineFailures(false) > 0 || ESRBlockOnFailedMachine())
+                        if (CheckHealthReplication(false))
                         {
 #if FAILOVER_DEBUG
                             Log("df found at replication loop");
@@ -1810,19 +1969,6 @@ namespace MySpace.DataMining.AELight
                         awakeCnt++;
                     }
                 }
-
-                //replication joined                
-                foreach (KeyValuePair<string, List<ReplWorker>> pair in hostToReplWorkers)
-                {
-                    foreach (ReplWorker worker in pair.Value)
-                    {
-                        if (worker.LastException != null)
-                        {
-                            throw new Exception("Replication worker on host: " + worker.info.host + " reported an exception: " + worker.LastException.ToString());
-                        }
-                    }
-                }
-
 
 #if MR_REPLICATION_TIME_PRINT
                 {
@@ -1991,37 +2137,10 @@ namespace MySpace.DataMining.AELight
                     ConsoleColor oldcolor = Console.ForegroundColor;
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine(Environment.NewLine +
-                        "{0}{1} machine(s) with hardware failure: {2}{3}", isdspace ? "\u00014" : "", badHosts.Count, sbadhosts, isdspace ? "\u00010" : "");
+                        "{0}{1} machine(s) removed: {2}{3}", isdspace ? "\u00014" : "", badHosts.Count, sbadhosts, isdspace ? "\u00010" : "");
                     ConsoleFlush();
                     Console.ForegroundColor = oldcolor;
-                }
-
-                //After dfs.xml updated,
-                //check if there is any false negative plugin failure reported from replworker
-                //that is, replworker sees a df but surrogate doesn't
-                //recommend actions for clients.
-                foreach (KeyValuePair<string, List<ReplWorker>> pair in hostToReplWorkers)
-                {
-                    foreach (ReplWorker worker in pair.Value)
-                    {
-                        if (!string.IsNullOrEmpty(worker.sFailedHosts))
-                        {
-
-#if FAILOVER_DEBUG
-                            Log("worker.sFailedHosts=" + worker.sFailedHosts);
-#endif
-                            string[] fhs = worker.sFailedHosts.Split(';');
-                            foreach (string fh in fhs)
-                            {
-                                if (!badHosts.ContainsKey(fh.ToLower()))
-                                {
-                                    //throw?
-                                    Console.Error.WriteLine("Health plugin reported a false negative on host: " + fh + ".  Recommended actions:  ReplicationPhase and Health -a to discover missing file chunks and replicates.");
-                                }
-                            }
-                        }
-                    }
-                }
+                }                
             }
 
             internal void AddBadOutputFilenodesAndRehash()
@@ -2087,7 +2206,7 @@ namespace MySpace.DataMining.AELight
                 //so that they can help to download those file nodes.                
                 Dictionary<string, dfs.DfsFile> ownerfiles = new Dictionary<string, dfs.DfsFile>();
                 Dictionary<string, Dictionary<string, dfs.DfsFile.FileNode>> ownerfiletonodes = new Dictionary<string, Dictionary<string, dfs.DfsFile.FileNode>>();
-                foreach (string badhost in newBadHosts)
+                foreach (string badhost in newBadHostToReason.Keys)
                 {
                     if (hostToReplWorkers.ContainsKey(badhost))
                     {
@@ -2400,6 +2519,7 @@ namespace MySpace.DataMining.AELight
                         worker.infos = infos;
                         worker.machineCompletedString = MachineCompletedString;
                         worker.verbose = true;
+                        worker.reportedBadHosts = reportedBadHostsFromReplWorkers;
                         worker.thread = new System.Threading.Thread(new System.Threading.ThreadStart(worker.ThreadProc));
                         worker.thread.IsBackground = true; //!
                         string whost = worker.info.host.ToLower();
@@ -2482,6 +2602,10 @@ namespace MySpace.DataMining.AELight
                                 if (failoverShared.outputrecordlengths[nfile] > 0)
                                 {
                                     df.XFileType = DfsFileTypes.BINARY_RECT + "@" + failoverShared.outputrecordlengths[nfile].ToString();
+                                }
+                                else if (failoverShared.outputrecordlengths[nfile] == -2)
+                                {
+                                    df.XFileType = DfsFileTypes.BINARY_RECT + "@?";
                                 }
                                 df.Nodes = new List<dfs.DfsFile.FileNode>();
                                 df.Size = -1; // Preset
@@ -2616,10 +2740,10 @@ namespace MySpace.DataMining.AELight
                 internal string machineCompletedString = null;
                 internal Exception LastException = null;
                 internal RAQueue<ReplInfo> infos = null;   //!!!!!!!!!!!!!!!USE SOMETHING ELSE FOR LOCK
-                internal string sFailedHosts = null;
+                internal Dictionary<string, int> reportedBadHosts = null;
 
                 internal void ThreadProc()
-                {
+                {                    
                     if (info.pullfiles.Count > 0)
                     {
                         System.Net.Sockets.NetworkStream nstm = null;
@@ -2655,46 +2779,42 @@ namespace MySpace.DataMining.AELight
                                 }
                             }
 
-                            byte[] opts = new byte[1 + 4 + 4 + 16];
-                            opts[0] = 0; // Disabled: per-file download feedback.
-                            MySpace.DataMining.DistributedObjects.Entry.ToBytes(failover.failoverShared.dc.slave.CookTimeout, opts, 1);
-                            MySpace.DataMining.DistributedObjects.Entry.ToBytes(failover.failoverShared.dc.slave.CookRetries, opts, 1 + 4);
-
-                            nstm.WriteByte((byte)'Y'); // Batch send.
+                            byte[] opts = new byte[4 + 8];
+                            MySpace.DataMining.DistributedObjects.Entry.ToBytes(failover.failoverShared.dc.slave.FaultTolerantReadRetries, opts, 0);
+                            MySpace.DataMining.DistributedObjects.Entry.LongToBytes(jid, opts, 4);
+                            
+                            nstm.WriteByte((byte)'n'); // Batch download with fault tolerance.
                             XContent.SendXContent(nstm, opts);
                             XContent.SendXContent(nstm, spullpaths);
-                            XContent.SendXContent(nstm, string.Join(";", failover.healthpluginpaths));
 
                             if ('+' != nstm.ReadByte())
                             {
                                 throw new ReplicationException("Host " + info.host + " did not report a success for bulk file transfer");
                             }
 
-                            //Any reported df?
-                            sFailedHosts = XContent.ReceiveXString(nstm, opts);
+                            //Any reported bad hosts?
+                            string sbadhosts = XContent.ReceiveXString(nstm, opts);
+                            if (sbadhosts.Length > 0)
+                            {
+                                string[] bhs = sbadhosts.Split(';');
+                                lock (reportedBadHosts)
+                                {
+                                    foreach (string bh in bhs)
+                                    {
+                                        string _bh = bh.ToLower();
+                                        if (!reportedBadHosts.ContainsKey(_bh))
+                                        {
+                                            reportedBadHosts.Add(_bh, 0);
+                                        }
+                                    }
+                                }
+                            }
                         }
                         catch (Exception e)
                         {
-                            LastException = e;
-
-                            bool donelogging = false;
-                            if (failover.CheckMachineFailure(info.host))
-                            {
-                                Console.Error.WriteLine("Thread exception: (replication thread): Hardware failure at " + info.host);
-                                LogOutputToFile("Thread exception: (replication thread): Hardware failure at " + info.host + ": " + e.ToString());
-                                donelogging = true;
-                            }
-
-                            if (!donelogging)
-                            {
-                                LogOutputToFile("Thread exception: (replication thread) error: " + e.ToString());
-                                if (verbose)
-                                {
-                                    ConsoleFlush();
-                                    Console.Error.WriteLine("Thread exception: (replication thread): {0}", e.Message);
-                                    Console.Error.Flush();                                    
-                                }
-                            }
+                            LastException = e;                            
+                            Console.Error.WriteLine("Thread exception: (replication thread): on " + info.host);
+                            LogOutputToFile("Thread exception: (replication thread): on " + info.host + ".  Error: " + e.ToString());                                                        
                         }
 
                         if (null != nstm)

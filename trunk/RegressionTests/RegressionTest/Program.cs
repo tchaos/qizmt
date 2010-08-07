@@ -6,7 +6,7 @@ using System.Xml;
 
 namespace RegressionTest
 {
-    class Program
+    public partial class Program
     {
         static void Main(string[] args)
         {
@@ -65,12 +65,9 @@ namespace RegressionTest
                         break;
                     case "killallproxy":
                         KillallProxy.TestKillallProxy(args);
-                        break;
-                    case "speculativecomputingtesthdfailurebeforemapstarts":
-                        SpeculativeComputingMapPhase.TestHDFailureBeforeMapStarts(new string[]{"TestHDFailureBeforeMapStarts"});
-                        break;
-                    case "speculativecomputingtesthdfailureaftermapstarts":
-                        SpeculativeComputingMapPhase.TestHDFailureAfterMapStarts(new string[] { "TestHDFailureAfterMapStarts" });
+                        break;                   
+                    case "faulttolerantexecutiontest":
+                        FaultTolerantExecutionTest(args);
                         break;
                     default:
                         ShowUsage();
@@ -107,9 +104,8 @@ namespace RegressionTest
             Console.WriteLine("           [writeExisting=<bool>]");
             Console.WriteLine("    PerfmonAdminCommandLock <dfsXmlPath>");
             Console.WriteLine("    PacketSniffAdminCommandLock <dfsXmlPath>");
-            Console.WriteLine("    KillallProxy");
-            Console.WriteLine("    SpeculativeComputingTestHDFailureBeforeMapStarts");
-            Console.WriteLine("    SpeculativeComputingTestHDFailureAfterMapStarts");
+            Console.WriteLine("    KillallProxy");           
+            Console.WriteLine("    FaultTolerantExecutionTest [-verbose] [-skipsplitsort]");
         }        
     }
 }

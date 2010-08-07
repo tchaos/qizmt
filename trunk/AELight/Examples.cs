@@ -145,8 +145,131 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
             Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             #endregion
 
-            #region WordCount
-            alljobfiles.Add(@"Qizmt-WordCount.xml");
+            #region WordCountByPartialReduce
+            alljobfiles.Add(@"Qizmt-WordCountByPartialReduce.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+                @"<?xml version=`1.0` encoding=`utf-8`?>
+<SourceCode>
+  <Jobs>
+    <Job Name=`Cleanup` Custodian=`` email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@`Qizmt del WordCountByPartialReduce_*`,true); // Clean previous run.            
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description=`Load sample data` Name=`` Custodian=`` email=``>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://WordCountByPartialReduce_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+             dfsoutput.WriteLine(@`Create a community on MySpace and you can share photos, journals and interests with your growing network of mutual  friends!
+
+See who knows who, or how you are connected. Find out if you really are six people away from Kevin Bacon.
+
+MySpace is for everyone:
+Friends who want to talk Online 
+Single people who want to meet other Singles 
+Matchmakers who want to connect their friends with other friends 
+Families who want to keep in touch--map your Family Tree 
+Business people and co-workers interested in networking 
+Classmates and study partners 
+Anyone looking for long lost friends!
+
+
+MySpace makes it easy to express yourself, connect with friends and make new ones, but please remember that what you  post publicly can be read by anyone viewing your profile, so we suggest you consider the following guidelines when  using MySpace: 
+Don't forget that your profile and MySpace forums are public spaces. Don't post anything you wouldn't want the world  to know (e.g., your phone number, address, IM screens name, or specific whereabouts). Avoid posting anything that  would make it easy for a stranger to find you, such as where you hang out every day after school. 
+People aren't always who they say they are. Be careful about adding people you don't know in the physical world to  your friends list. It's fun to connect with new MySpace friends from all over the world, but avoid meeting people in  person whom you do not already know in the physical world. If you decide to meet someone you've met on MySpace, tell  your parents first, do it in a public place and bring a trusted adult. 
+Harassment, hate speech and inappropriate content should be reported. If you feel someone's behavior is  inappropriate, react. Talk with a trusted adult, or report it to MySpace or the authorities.
+Don't post anything that would embarrass you later. It's easy to think that only people you know are looking at your  MySpace page, but the truth is that everyone can see it. Think twice before posting a photo or information you  wouldn't want others to see, including potential employers or colleges!
+Do not lie about your age.  Your profile may be deleted and your Membership may be terminated without warning if we  believe that you are under 14 years of age or if we believe you are 14 through 17 years of age and you represent  yourself as 18 or older.       
+Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to try to get your personal  information, such as your username and password, by pretending to be a site you trust.`);
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`WordCountByPartialReduce` Custodian=`` email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>16</KeyLength>
+        <DFSInput>dfs://WordCountByPartialReduce_Input.txt</DFSInput>
+        <DFSOutput>dfs://WordCountByPartialReduce_Output.txt</DFSOutput>
+      </IOSettings>
+      <PartialReduce/>        
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              mstring sLine= mstring.Prepare(line);
+              mstringarray parts = sLine.SplitM(' ');
+              
+             for(int i=0; i < parts.Length; i++)
+             {
+                    mstring word = parts[i];
+                    
+                    if(word.Length > 0 && word.Length <= 16) // Word cannot be longer than the KeyLength!
+                    {                        
+                        recordset rs = recordset.Prepare();
+                        rs.PutInt(1);
+                        output.Add(word.ToLowerM(), rs); 
+                    }                                 
+             }
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[         
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              int totalCount = 0;
+              
+              for(int i = 0; i < values.Length; i++)
+              {
+                  recordset rs = recordset.Prepare(values[i].Value);
+                  int count = rs.GetInt();
+                  totalCount += count;
+              }
+              
+              if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+              {
+                  recordset rs = recordset.Prepare();
+                  rs.PutInt(totalCount);
+                  output.Add(key, rs.ToByteSlice());
+              }
+              else
+              {
+                  mstring outline = mstring.Prepare(UnpadKey(key));
+                  outline = outline.AppendM(',').AppendM(totalCount);
+                  output.Add(outline);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region WordCountByOther
+            alljobfiles.Add(@"Qizmt-WordCountByOther.xml");
             AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
             AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
 @"<?xml version=`1.0` encoding=`utf-8`?>
@@ -213,7 +336,9 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
         <DFSInput>dfs://WordCount_Input.txt</DFSInput>
         <DFSOutput>dfs://WordCount_Output.txt</DFSOutput>
       </IOSettings>
-
+      <FaultTolerantExecution>
+        <Mode>enabled</Mode> <!-- enabled or disabled -->
+      </FaultTolerantExecution>
       <!--
           No limit to intermediate data collisions and allows up to 1GB of keys and values per reduce.
       -->
@@ -285,7 +410,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
 </SourceCode>
 ".Replace('`', '"'));
             Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
-            #endregion
+            #endregion            
 
             #region ExecXPath
             alljobfiles.Add(@"Qizmt-ExecXPath.xml");
@@ -2272,273 +2397,7 @@ Don't get hooked by a phishing scam.  Phishing is a method used by fraudsters to
             Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             #endregion
 
-            #region AddUsingReferences
-            alljobfiles.Add(@"Qizmt-AddUsingReferences.xml");
-            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
-            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
-                @"<SourceCode>
-  <Jobs>
-    <Job>
-      <Narrative>
-        <Name>regression_test_put_dll_Preprocessing</Name>
-        <Custodian></Custodian>
-        <email></email>
-      </Narrative>
-      <IOSettings>
-        <JobType>local</JobType>
-      </IOSettings>
-      <Local>
-        <![CDATA[
-        public virtual void Local()
-        {
-            Shell(@`Qizmt del Qizmt-AddUsingReferences_testdll.dll`);
-            Shell(@`Qizmt del Qizmt-AddUsingReferences_Input.txt`);
-            Shell(@`Qizmt del Qizmt-AddUsingReferences_Output1.txt`);
-            Shell(@`Qizmt del Qizmt-AddUsingReferences_Output2.txt`);
-        }
-        ]]>
-      </Local>
-    </Job>
-    <Job>
-      <Narrative>
-        <Name>regression_test_put_dll PUT DLL</Name>
-        <Custodian></Custodian>
-        <email></email>
-      </Narrative>
-      <IOSettings>
-        <JobType>local</JobType>
-      </IOSettings>
-      <Local>
-        <![CDATA[
-        public virtual void Local()
-        {
-            /*
-            This example puts a simple 'Any CPU' DLL into CAC (Cluster Assembly Cache in MR.DFS).
-            Select 'Any CPU' when building a DLL for CAC.
-            DLL's put into the CAC are replicated on every machine of the cluster before the put command returns.
-            Once DLL is in CAC, it may be referenced from mapreducer jobs, local jobs and remote jobs.
-            CAC DLL's may be written in any .net language, e.g. C#, VB.NET, C++ CLI, etc.
-            */
-            string localdir = @`\\` + System.Net.Dns.GetHostName() + @`\c$\temp\Qizmt`;
-            if(!System.IO.Directory.Exists(localdir))
-            {
-                System.IO.Directory.CreateDirectory(localdir);
-            }
-            
-            string fn = `Qizmt-AddUsingReferences_testdll.dll`;
-            string localfn = localdir + @`\` + Guid.NewGuid().ToString() + fn;
-            /*
-            // Code for Qizmt-AddUsingReferences_testdll.dll:
-namespace testdll
-{
-    public class Test
-    {
-        static int x = 0;
-        public static void reset()
-        {
-            x = 0;
-        }
-        public static int next()
-        {
-            return x++;
-        }
-    }
-}
-            */
-            string testdlldataAnyCPU = `TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAA4fug4AtAnNIbgBTM0hVGhpcyBwcm9ncmFtIGNhbm5vdCBiZSBydW4gaW4gRE9TIG1vZGUuDQ0KJAAAAAAAAABQRQAATAEDAJb9r0oAAAAAAAAAAOAAAiELAQgAAAgAAAAGAAAAAAAATicAAAAgAAAAQAAAAABAAAAgAAAAAgAABAAAAAAAAAAEAAAAAAAAAACAAAAAAgAAAAAAAAMAQIUAABAAABAAAAAAEAAAEAAAAAAAABAAAAAAAAAAAAAAAPQmAABXAAAAAEAAAMgDAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAwAAABYJgAAHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAAAAAAAAAAAAAAACCAAAEgAAAAAAAAAAAAAAC50ZXh0AAAAVAcAAAAgAAAACAAAAAIAAAAAAAAAAAAAAAAAACAAAGAucnNyYwAAAMgDAAAAQAAAAAQAAAAKAAAAAAAAAAAAAAAAAABAAABALnJlbG9jAAAMAAAAAGAAAAACAAAADgAAAAAAAAAAAAAAAAAAQAAAQgAAAAAAAAAAAAAAAAAAAAAwJwAAAAAAAEgAAAACAAUAjCAAAMwFAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACIAFoABAAAEKgAAABMwAwATAAAAAQAAEQB+AQAABCUXWIABAAAECisABioeFoABAAAEKh4CKBAAAAoqAEJTSkIBAAEAAAAAAAwAAAB2Mi4wLjUwNzI3AAAAAAUAbAAAAOgBAAAjfgAAVAIAAIACAAAjU3RyaW5ncwAAAADUBAAACAAAACNVUwDcBAAAEAAAACNHVUlEAAAA7AQAAOAAAAAjQmxvYgAAAAAAAAACAAABVxQCAAkAAAAA+gEzABYAAAEAAAARAAAAAgAAAAEAAAAEAAAAEAAAAA0AAAABAAAAAQAAAAEAAAAAAAoAAQAAAAAABgBMAEUABgB4AGYABgCPAGYABgCsAGYABgDLAGYABgDkAGYABgD9AGYABgAYAWYABgAzAWYABgBrAUwBBgB/AUwBBgCNAWYABgCmAWYABgDWAcMBOwDqAQAABgAZAvkBBgA5AvkBAAAAAAEAAAAAAAEAAQABABAALwA0AAUAAQABABEAUwAKAFAgAAAAAJYAVQANAAEAXCAAAAAAlgBbABEAAQCDIAAAAACGGGAAFQABAHsgAAAAAJEYeAINAAEAEQBgABkAGQBgABkAIQBgABkAKQBgABkAMQBgABkAOQBgABkAQQBgABkASQBgABkAUQBgAB4AWQBgABkAYQBgABkAaQBgABkAcQBgACMAgQBgACkAiQBgABUACQBgABUALgALADIALgATAFgALgAbAFgALgAjAFgALgArADIALgAzAF4ALgA7AFgALgBLAFgALgBTAHYALgBjAKAALgBrAK0ALgBzALYALgB7AL8ALgAEgAAAAQAAAAAAAAAAAAAAAABXAgAAAgAAAAAAAAAAAAAAAQA8AAAAAAAAAAAAADxNb2R1bGU+AFFpem10LUFkZFVzaW5nUmVmZXJlbmNlc190ZXN0ZGxsLmRsbABUZXN0AHRlc3RkbGwAbXNjb3JsaWIAU3lzdGVtAE9iamVjdAB4AHJlc2V0AG5leHQALmN0b3IAU3lzdGVtLlJlZmxlY3Rpb24AQXNzZW1ibHlUaXRsZUF0dHJpYnV0ZQBBc3NlbWJseURlc2NyaXB0aW9uQXR0cmlidXRlAEFzc2VtYmx5Q29uZmlndXJhdGlvbkF0dHJpYnV0ZQBBc3NlbWJseUNvbXBhbnlBdHRyaWJ1dGUAQXNzZW1ibHlQcm9kdWN0QXR0cmlidXRlAEFzc2VtYmx5Q29weXJpZ2h0QXR0cmlidXRlAEFzc2VtYmx5VHJhZGVtYXJrQXR0cmlidXRlAEFzc2VtYmx5Q3VsdHVyZUF0dHJpYnV0ZQBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXMAQ29tVmlzaWJsZUF0dHJpYnV0ZQBHdWlkQXR0cmlidXRlAEFzc2VtYmx5VmVyc2lvbkF0dHJpYnV0ZQBBc3NlbWJseUZpbGVWZXJzaW9uQXR0cmlidXRlAFN5c3RlbS5EaWFnbm9zdGljcwBEZWJ1Z2dhYmxlQXR0cmlidXRlAERlYnVnZ2luZ01vZGVzAFN5c3RlbS5SdW50aW1lLkNvbXBpbGVyU2VydmljZXMAQ29tcGlsYXRpb25SZWxh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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==`;
-            byte[] testdlldata = System.Convert.FromBase64String(testdlldataAnyCPU);
-            System.IO.File.WriteAllBytes(localfn, testdlldata);
-            try
-            {
-                Shell(@`Qizmt dfs put ` + localfn + ` ` + fn);
-            }
-            finally
-            {
-                System.IO.File.Delete(localfn);
-            }
-        }
-        ]]>
-      </Local>
-    </Job>
-
-    <Job Name=`testdll` Custodian=`` email=``>
-      <Add Reference=`Qizmt-AddUsingReferences_testdll.dll` Type=`dfs` />
-      <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
-      <Using>testdll</Using>
-      <Using>Microsoft.VisualBasic</Using>
-      <IOSettings>
-        <JobType>local</JobType>
-      </IOSettings>
-      <Local>
-        <![CDATA[
-        public virtual void Local()
-        {
-            if(32 != Strings.Asc(' '))
-            {
-                throw new Exception(`Local: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
-            }
-            
-            Test.reset();
-            if(0 != Test.next())
-            {
-                throw new Exception(`Local: (0 != testdll.Test.next())`);
-            }
-            if(1 != Test.next())
-            {
-                throw new Exception(`Local: (1 != testdll.Test.next())`);
-            }
-            if(2 != Test.next())
-            {
-                throw new Exception(`Local: (2 != testdll.Test.next())`);
-            }
-            if(3 != Test.next())
-            {
-                throw new Exception(`Local: (3 != testdll.Test.next())`);
-            }
-            const string want = `4513`;
-            string str = Test.next().ToString() + Test.next().ToString()
-                + (Test.next() + Test.next()).ToString(); // 4.ToString() + 5.ToString() + (6 + 7).ToString()
-            if(want != str)
-            {
-                throw new Exception(`Local: (want != str)`);
-            }
-            string localdir = @`\\` + System.Net.Dns.GetHostName() + @`\c$\temp\Qizmt`;
-            string fn = `Qizmt-AddUsingReferences_Input.txt`;
-            string localfn = localdir + @`\` + Guid.NewGuid().ToString() + fn;
-            System.IO.File.WriteAllText(localfn, want + Environment.NewLine);
-            try
-            {
-                Shell(@`Qizmt dfs put ` + localfn + ` ` + fn);
-            }
-            finally
-            {
-                System.IO.File.Delete(localfn);
-            }
-        }
-        ]]>
-      </Local>
-    </Job>
-
-    <Job description=`Create sample data` Name=`testdll_CreateSampleData` Custodian=`` email=``>
-      <Add Reference=`Qizmt-AddUsingReferences_testdll.dll` Type=`dfs` />
-      <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
-      <Using>testdll</Using>
-      <Using>Microsoft.VisualBasic</Using>
-      <IOSettings>
-        <JobType>remote</JobType>
-        <DFS_IO>
-          <DFSReader>dfs://Qizmt-AddUsingReferences_Input.txt</DFSReader>
-          <DFSWriter>dfs://Qizmt-AddUsingReferences_Output1.txt</DFSWriter>
-        </DFS_IO>
-      </IOSettings>
-      <Remote>
-        <![CDATA[
-          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
-          {
-              if(32 != Strings.Asc(' '))
-              {
-                  throw new Exception(`Remote: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
-              }
-            
-              List<byte> line = new List<byte>();
-              dfsinput.ReadLineAppend(line);
-              
-              Test.reset();
-              const string want2 = `03`;
-              string str2 = Test.next().ToString()
-                    + (Test.next() + Test.next()).ToString(); // 0.ToString() + (1 + 2).ToString()
-              if(want2 != str2)
-              {
-                throw new Exception(`Remote: (want2 != str2)`);
-              }
-              
-              dfsoutput.WriteLine(line);
-           }
-        ]]>
-      </Remote>
-    </Job>
-
-    <Job Name=`testdll` Custodian=`` email=``>
-      <Add Reference=`Qizmt-AddUsingReferences_testdll.dll` Type=`dfs` />
-      <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
-      <Using>testdll</Using>
-      <Using>Microsoft.VisualBasic</Using>
-      <IOSettings>
-        <JobType>mapreduce</JobType>
-        <KeyLength>1</KeyLength>
-        <DFSInput>dfs://Qizmt-AddUsingReferences_Output1.txt</DFSInput>
-        <DFSOutput>dfs://Qizmt-AddUsingReferences_Output2.txt</DFSOutput>
-        <OutputMethod>grouped</OutputMethod>
-      </IOSettings>
-      <MapReduce>
-        <Map>
-          <![CDATA[
-          public virtual void Map(ByteSlice line, MapOutput output)
-          {
-              if(32 != Strings.Asc(' '))
-              {
-                  throw new Exception(`Map: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
-              }
-            
-              const string want = `4513`;
-              if(want == line.ToString())
-              {
-                    Test.reset();
-                    Test.next(); // 0
-                    Test.next(); // 1
-                    Test.next(); // 2
-                    
-                    string want3 = `39`;
-                    string str3 = Test.next().ToString()
-                            + (Test.next() + Test.next()).ToString(); // 3.ToString() + (4+ 5).ToString()
-                    if(want3 != str3)
-                    {
-                        throw new Exception(`Map: (want3 != str3)`);
-                    }
-                    
-                    {
-                        Test.reset();
-                        if(0 != Test.next())
-                        {
-                            throw new Exception(`Map: (0 != testdll.Test.next())`);
-                        }
-                    }
-                    
-                    output.Add(ByteSlice.Prepare(`x`), line);
-              }
-          }
-        ]]>
-        </Map>
-        <Reduce>
-          <![CDATA[
-          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
-          {
-                if(32 != Strings.Asc(' '))
-                {
-                    throw new Exception(`Reduce: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
-                }
-                
-                Test.reset();
-                if(0 != Test.next())
-                {
-                    throw new Exception(`Reduce: (0 != testdll.Test.next())`);
-                }
-                
-                while(values.MoveNext())
-                {
-                    output.Add(values.Current);
-                }
-          }
-        ]]>
-        </Reduce>
-      </MapReduce>
-    </Job>
-  </Jobs>
-</SourceCode>
-".Replace('`', '"'));
-            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
-            #endregion
-
+       
             #region SharedMemory
             alljobfiles.Add(@"Qizmt-SharedMemory.xml");
             AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
@@ -3624,6 +3483,2237 @@ Qizmt exec Qizmt-ClusterLock.xml -c
 ".Replace('`', '"'));
             Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             #endregion
+
+            #region MemCache
+            alljobfiles.Add(@"Qizmt-MemCache.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+                @"<!--
+
+The following jobs operate on a MemCache with these steps:
+Local job MemCache_Create:
+    1. Create a new MemCache,
+    2. Generate input data to populate into the MemCache,
+        this uses the gen command to generate random binary records,
+MapReduce job MemCache_Insert:
+    3. Map over the input data for Reduce to insert into the MemCache,
+        this needs to be done in Reduce so all keys hash to the same worker,
+        the keys are sorted on the last reduce iteration and inserted in order,
+Local job MemCache_Commit:
+    4. Commit the MemCache to DFS,
+        this allows transactions, can either roll back or commit future changes,
+        commit can be postponed and queued every X hours via a schedule,
+Local job MemCache_CreateDelta:
+    5. Generate delta input data to merge into the MemCache,
+        this uses the gen command again,
+MapReduce job MemCache_MergeDelta:
+    6. Map over the delta for Reduce to merge into the MemCache,
+        business logic can be applied, inserting, updating, deleting, etc,
+        the keys are sorted on the last reduce iteration and merged in order,
+Local job MemCache_Rollback:
+    7. Roll back all the changes made since commit,
+        this essentially discards all the delta that was merged,
+    8. Load from DFS the previously committed MemCache,
+        this essentially will return to the state of the last commit
+
+Exec usage:
+    [<MemCacheSize>] [<DeltaSize>]
+
+-->
+
+
+<SourceCode>
+  <Jobs>
+    
+    <Job Name=`MemCache_Create` Custodian=`` Email=`` Description=`Create the MemCache and generate input data for the next job`>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            
+            string schema =
+                `int,int,int,int,int,int,int,int,int,int`
+                + `,int,int,int,int,int,int,int,int,int,int`
+                + `,int,int,int,int,int,int,int,int,int,int`
+                + `,int`; // Default.
+            const string DefaultMemCacheSize = `10MB`;
+            
+            public virtual void Local()
+            {
+                // Delete old data if any:
+                Shell(@`Qizmt del dfs://Qizmt-TestMemCacheInputData*`);
+                Shell(@`Qizmt del dfs://Qizmt-TestMemCacheChanges`);
+                Shell(@`Qizmt memcache delete name=Qizmt-TestMemCache`, true);
+                
+                // Create the empty MemCache:
+                Shell(@`Qizmt memcache create name=Qizmt-TestMemCache schema=` + schema);
+                Qizmt_Log(` Created MemCache named 'Qizmt-TestMemCache' `);
+                
+                // Get argument:
+                string sMemCacheSize = DefaultMemCacheSize;
+                if(Qizmt_ExecArgs.Length > 0)
+                {
+                    sMemCacheSize = Qizmt_ExecArgs[0];
+                }
+                long MemCacheSize = CommandUtils.ParseLongByteSize(sMemCacheSize);
+                
+                // Generate input data for the next job to insert into the MemCache to populate it:
+                Shell(@`Qizmt gen dfs://Qizmt-TestMemCacheInputDataPopulate@124 ` + MemCacheSize + ` rand=frand`);
+                Qizmt_Log(` Generated ` + sMemCacheSize + ` of input data for the next job to insert into the MemCache to populate it `);
+                
+            }
+        ]]>
+      </Local>
+    </Job>
+    
+    <Job Name=`MemCache_Insert` Custodian=`` Email=`` Description=`Insert the input data into the MemCache - populate memcache with some data`>
+      <MemCache />
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int,int</KeyLength>
+        <DFSInput>dfs://Qizmt-TestMemCacheInputDataPopulate@124</DFSInput>
+        <DFSOutput></DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                // Set the output key to the first 8 bytes of the input record,
+                // and the value to the whole input record.
+                output.Add(ByteSlice.Prepare(line, 0, 8), line);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            
+            const string DefaultMemCacheSize = `10MB`;
+            
+            List<int[]> Inputs = new List<int[]>(2000);
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                while(values.MoveNext())
+                {
+                    // Just gather up the input for now so it can be sorted on last reduce iteration.
+                    recordset rs = recordset.Prepare(values.Current);
+                    int[] input = new int[31];
+                    for(int i = 0; i < input.Length; i++)
+                    {
+                        input[i] = rs.GetInt();
+                    }
+                    Inputs.Add(input);
+                    break; // Remove if you want duplicate keys in the MemCache.
+                }
+                
+                if(StaticGlobals.Qizmt_Last)
+                {
+                    // On last reduce iteration, so sort the input and insert into the MemCache.
+                    
+                    // Need to sort the input keys since this is a grouped job.
+                    Inputs.Sort(MyCompareKeys);
+                    
+                    string MemCacheName = `Qizmt-TestMemCache`;
+                    int keyoffset = 0, keylen = 8;
+                    int rowlen = 124;
+                    
+                    // Attach to this worker's view of the MemCache in a using-statement.
+                    using(MemCache mc = MemCache.Attach(MemCacheName, Qizmt_ProcessID))
+                    {
+                        mc.MoveFirst(); // Start forward-only iterator for the following inserts.
+                        
+                        // Loop through all the input data and add to the MemCache in order.
+                        foreach(int[] input in Inputs)
+                        {
+                            MemCache.Tuple t;
+                            t = mc.InsertRow();
+                            for(int i = 0; i < input.Length; i++)
+                            {
+                                t[i].SetInt(input[i]);
+                            }
+                        }
+                        
+                    }
+                    
+                    if(0 == Qizmt_ProcessID)
+                    {
+                        string sMemCacheSize = DefaultMemCacheSize;
+                        if(Qizmt_ExecArgs.Length > 0)
+                        {
+                            sMemCacheSize = Qizmt_ExecArgs[0];
+                        }
+                        Qizmt_Log(` Loaded ` + sMemCacheSize + ` into MemCache `);
+                    }
+                    
+                }
+                
+            }
+            
+            // Only comparing first 2 ints since they are the key.
+            int MyCompareKeys(int[] x, int[] y)
+            {
+                int r = x[0].CompareTo(y[0]);
+                if(0 == r)
+                {
+                    r = x[1].CompareTo(y[1]);
+                }
+                return r;
+            }
+            
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    
+    <Job Name=`MemCache_Commit` Custodian=`` Email=`` Description=`Commit the MemCache changes`>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                // Commit the MemCache changes to DFS.
+                // Alternatively, could execute commit every X hours from the Qizmt scheduler.
+                {
+                    DateTime lt = DateTime.Now;
+                    Shell(@`Qizmt memcache commit name=Qizmt-TestMemCache`, true);
+                    Qizmt_Log(`Committed MemCache; duration: ` + (DateTime.Now - lt));
+                }
+                
+            }
+        ]]>
+      </Local>
+    </Job>
+    
+    <Job Name=`MemCache_CreateDelta` Custodian=`` Email=`` Description=`Generate delta input data for the next job`>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            
+            const string DefaultDeltaMemCacheSize = `10MB`;
+            
+            public virtual void Local()
+            {
+                // Delete old data if any:
+                Shell(@`Qizmt del dfs://Qizmt-TestMemCacheInputData*`);
+                
+                // Get argument:
+                string sDeltaMemCacheSize = DefaultDeltaMemCacheSize;
+                if(Qizmt_ExecArgs.Length > 1)
+                {
+                    sDeltaMemCacheSize = Qizmt_ExecArgs[1];
+                }
+                long DeltaMemCacheSize = CommandUtils.ParseLongByteSize(sDeltaMemCacheSize);
+                
+                // Generate input data for the next job to insert into the MemCache to populate it:
+                Shell(@`Qizmt gen dfs://Qizmt-TestMemCacheInputDataDelta@124 ` + DeltaMemCacheSize + ` rand=frand`);
+                Qizmt_Log(` Generated ` + sDeltaMemCacheSize + ` of delta input data for the next job to merge into the MemCache `);
+                
+            }
+        ]]>
+      </Local>
+    </Job>
+    
+    <Job Name=`MemCache_MergeDelta` Custodian=`` Email=`` Description=`Merge delta data into the MemCache (inserts, updates, deletes, custom business logic, etc.)`>
+      <MemCache />
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int,int</KeyLength>
+        <DFSInput>dfs://Qizmt-TestMemCacheInputDataDelta@124</DFSInput>
+        <DFSOutput>dfs://Qizmt-TestMemCacheChanges@124</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                // Set the output key to the first 8 bytes of the input record,
+                // and the value to the whole input record.
+                output.Add(ByteSlice.Prepare(line, 0, 8), line);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            
+            List<int[]> Inputs = new List<int[]>(400); // Inputs to be merged into the MemCache.
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                while(values.MoveNext())
+                {
+                    // Just gather up the input for now so it can be sorted on last reduce iteration.
+                    recordset rs = recordset.Prepare(values.Current);
+                    int[] input = new int[31];
+                    for(int i = 0; i < input.Length; i++)
+                    {
+                        input[i] = rs.GetInt();
+                    }
+                    Inputs.Add(input);
+                    break; // Remove if you want duplicate keys in the MemCache.
+                }
+                
+                if(StaticGlobals.Qizmt_Last)
+                {
+                    // On last reduce iteration, so sort the input and insert into the MemCache.
+                    
+                    // Need to sort the input keys since this is a grouped job.
+                    Inputs.Sort(MyCompareKeys);
+                    
+                    string MemCacheName = `Qizmt-TestMemCache`;
+                    int keyoffset = 0, keylen = 8;
+                    int rowlen = 124;
+                    
+                    // Attach to this worker's view of the MemCache in a using-statement.
+                    using(MemCache mc = MemCache.Attach(MemCacheName, Qizmt_ProcessID))
+                    {
+                        int CurrentMergeKeyIndex = 0;
+                        for(mc.MoveFirst(); !mc.EOF; mc.MoveNext()) // Iterate through existing values in MemCache.
+                        {
+                            recordset.ResetBuffers(); // Reset recordset buffers in tight loop.
+                            
+                            MemCache.Tuple t;
+                            t = mc.PeekRow(); // Peek at the current row, but don't read past it yet.
+                            int k0 = t[0].GetInt(); // First part of existing row.
+                            int k1 = t[1].GetInt(); // Second part of existing row.
+                            
+                            {
+                                // If the first int of an existing row is evenly divisible by 8, delete it (for demo).
+                                if(0 == (k0 % 8))
+                                {
+                                    mc.DeleteRow(); // Delete the row before it was read.
+                                    continue; // We're done with this one so go to the next one.
+                                }
+                            }
+                            
+                            bool updated = false;
+                            while(CurrentMergeKeyIndex < Inputs.Count)
+                            {
+                                // See if there are new keys to insert or keys to change.
+                                int[] input = Inputs[CurrentMergeKeyIndex];
+                                int kdiff = MyCompareKeys(input, new int[] {k0, k1 });
+                                if(kdiff < 0) // Merge key is less than current one, so insert.
+                                {
+                                    if(updated)
+                                    {
+                                        throw new Exception(`Keys out of order (2662)`);
+                                    }
+                                    // Insert here.
+                                    t = mc.InsertRow();
+                                    for(int i = 0; i < input.Length; i++)
+                                    {
+                                        t[i].SetInt(input[i]);
+                                    }
+                                    {
+                                        // Outputting changes to DFS: (new ones sorted in)
+                                        recordset rs = recordset.Prepare();
+                                        for(int i = 0; i < input.Length; i++)
+                                        {
+                                            rs.PutInt(t[i].GetInt());
+                                        }
+                                        output.Add(rs);
+                                    }
+                                    CurrentMergeKeyIndex++;
+                                    continue;
+                                }
+                                else if(kdiff == 0) // Merge key is the same as the current one, so update.
+                                {
+                                    // They're the same key, so update it.
+                                    t = mc.ReadRow(); // Read it so it's included, and then update it.
+                                    // Leave first 2 ints.
+                                    // Only take the highest value of the rest of the ints.
+                                    for(int i = 2; i < input.Length; i++)
+                                    {
+                                        if(input[i] > t[i].GetInt())
+                                        {
+                                            t[i].SetInt(input[i]);
+                                        }
+                                    }
+                                    CurrentMergeKeyIndex++;
+                                    {
+                                        // Outputting changes to DFS: (updated ones)
+                                        recordset rs = recordset.Prepare();
+                                        for(int i = 0; i < input.Length; i++)
+                                        {
+                                            rs.PutInt(t[i].GetInt());
+                                        }
+                                        output.Add(rs);
+                                    }
+                                    updated = true;
+                                    continue; // Let it keep updating the same one if same keys.
+                                }
+                                break;
+                            }
+                            if(updated)
+                            {
+                                continue;
+                            }
+                        }
+                        // Add extra, higher keys after the last one.
+                        while(CurrentMergeKeyIndex < Inputs.Count)
+                        {
+                            recordset.ResetBuffers(); // Reset recordset buffers in tight loop.
+                            
+                            int[] input = Inputs[CurrentMergeKeyIndex];
+                            MemCache.Tuple t;
+                            t = mc.InsertRow();
+                            for(int i = 0; i < input.Length; i++)
+                            {
+                                t[i].SetInt(input[i]);
+                            }
+                            CurrentMergeKeyIndex++;
+                            {
+                                // Outputting changes to DFS: (new ones at end)
+                                recordset rs = recordset.Prepare();
+                                for(int i = 0; i < input.Length; i++)
+                                {
+                                    rs.PutInt(t[i].GetInt());
+                                }
+                                output.Add(rs);
+                            }
+                            
+                        }
+                    }
+                    
+                    if(0 == Qizmt_ProcessID)
+                    {
+                        Qizmt_Log(` Merged data into the MemCache `);
+                    }
+                    
+                }
+                
+            }
+            
+            // Only comparing first 2 ints since they are the key.
+            int MyCompareKeys(int[] x, int[] y)
+            {
+                int r = x[0].CompareTo(y[0]);
+                if(0 == r)
+                {
+                    r = x[1].CompareTo(y[1]);
+                }
+                return r;
+            }
+            
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    
+    <Job Name=`MemCache_Rollback` Custodian=`` Email=`` Description=`Rollback the MemCache changes and then load the previously committed changes`>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            
+            string schema =
+                `int,int,int,int,int,int,int,int,int,int`
+                + `,int,int,int,int,int,int,int,int,int,int`
+                + `,int,int,int,int,int,int,int,int,int,int`
+                + `,int`; // Default.
+            
+            public virtual void Local()
+            {
+                // Roll back all the changes made after commit (merging in delta)
+                {
+                    DateTime lt = DateTime.Now;
+                    Shell(@`Qizmt memcache rollback name=Qizmt-TestMemCache`, true);
+                    Qizmt_Log(`MemCache rollback; duration: ` + (DateTime.Now - lt));
+                }
+                
+                // Clean up:
+                Shell(@`Qizmt del dfs://Qizmt-TestMemCacheInputData*`);
+                
+                // Load from DFS the previously committed MemCache (return to state of last commit)
+                {
+                    DateTime lt = DateTime.Now;
+                    Shell(@`Qizmt memcache load name=Qizmt-TestMemCache`, true);
+                    Qizmt_Log(`MemCache load; duration: ` + (DateTime.Now - lt));
+                }
+                
+                Qizmt_Log(``); // Blank line.
+                // Output first few records of changes:
+                Qizmt_Log(Shell(@`Qizmt head dfs://Qizmt-TestMemCacheChanges@` + schema));
+                
+            }
+        ]]>
+      </Local>
+    </Job>
+    
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region FTE
+            alljobfiles.Add(@"Qizmt-FTE.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+@"<SourceCode>
+  <Jobs>
+    <Job Name=`CleanUp` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del Qizmt-FTE_Input.txt`);
+                Shell(@`Qizmt del Qizmt-FTE_Output.txt`);
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt-FTE_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`200,John Smith,1`);
+                dfsoutput.WriteLine(`300,Ashley West,3`);
+                dfsoutput.WriteLine(`300,Ashley West,9`);
+                dfsoutput.WriteLine(`200,John Smith,10`);
+                dfsoutput.WriteLine(`200,John Smith,12`);
+                dfsoutput.WriteLine(`201,Mary Smith,4`);
+                dfsoutput.WriteLine(`202,Jane Ash,2`);
+                dfsoutput.WriteLine(`100,Joe Green,1`);
+                dfsoutput.WriteLine(`201,Mary Smith,85`);
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`Qizmt-FTE` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://Qizmt-FTE_Input.txt</DFSInput>
+        <DFSOutput>dfs://Qizmt-FTE_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <FaultTolerantExecution>
+        <Mode>enabled</Mode> <!-- enabled or disabled -->
+        <MapInputOrder>shuffle</MapInputOrder>   <!-- next or shuffle map input files -->
+        <HeartBeatTimeout>30000</HeartBeatTimeout> <!-- how often in milliseconds a worker will report a heartbeat -->
+        <HeartBeatRetries>10</HeartBeatRetries> <!-- how many times a worker tries to write to the local drive -->
+        <HeartBeatExpired>120000</HeartBeatExpired> <!-- how many milliseconds take it take for a heartbeat to expire -->
+        <TattleTimeout>3000</TattleTimeout> <!-- how often in milliseconds a worker inquires about rogue hosts -->
+      </FaultTolerantExecution>
+        <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                mstring sLine = mstring.Prepare(line);
+                int userid = sLine.NextItemToInt(',');
+                mstring name = sLine.NextItemToString(',');
+                int pageid = sLine.NextItemToInt(',');
+                
+                recordset rkey = recordset.Prepare();               
+                rkey.PutInt(userid);
+                
+                recordset rvalue = recordset.Prepare();
+                rvalue.PutInt(pageid);
+                
+                output.Add(rkey, rvalue);
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rkey = recordset.Prepare(key);
+                int userid = rkey.GetInt();
+                 
+                mstring sline = mstring.Prepare(userid);
+                sline = sline.AppendM(':');
+                
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rvalue = recordset.Prepare(values.Items[i]);
+                    int pageid = rvalue.GetInt();
+                    
+                    if(i > 0)
+                    {
+                        sline.AppendM(',');
+                    }
+                    
+                    sline.AppendM(pageid);                    
+                }
+                
+                output.Add(sline);
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region Qizmt-AddUsingReferences
+            alljobfiles.Add(@"Qizmt-AddUsingReferences.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+@"<SourceCode>
+  <Jobs>
+    <Job Name=`ExCustomDLL_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del custom.dll`);                // deleting dll from CAC
+                Shell(@`Qizmt del ExCustomDLL_Input.txt`);     // deleting input file from DFS in order to regenerate new one
+                Shell(@`Qizmt del ExCustomDLL_Output.txt`);    // deleting old output file from DFS in order to produce new one
+            }
+        ]]>
+      </Local>
+    </Job>
+   
+    <Job>
+      <Narrative>
+        <Name>regression_test_put_dll PUT DLL</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            /*
+            This example puts a simple `Any CPU` DLL into CAC (Cluster Assembly Cache in MR.DFS).
+            CAC has the same  idea as The Global Assembly Cache or GAC which is a machine-wide .NET assemblies cache for Microsoft's CLR platform,
+            whith the difference that is made for DFS(Distributed File System) platform.
+            For example , two jobs can reference the same dll that is uploaded to the MR.DFS, at the same time.
+            Select `Any CPU` when building a DLL for CAC.
+            DLL`s put into the CAC are replicated on every machine of the cluster before the put command returns.
+            Once DLL is in CAC, it may be referenced from mapreducer jobs, local jobs and remote jobs.
+            CAC DLL`s may be written in any .net language, e.g. C#, VB.NET, C++ CLI, etc.
+            */
+            string localdir = @`\\` + System.Net.Dns.GetHostName() + @`\c$\temp\Qizmt`;
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = `custom.dll`;
+            string localfn = localdir + @`\` + Guid.NewGuid().ToString() + fn;
+            
+  /*
+            // Code for custom.dll:
+namespace custom
+{
+    public class Custom
+    {
+        public static int x;
+        public static string ReverseString(string x)
+        {
+            int len = x.Length;
+            char[] arr = new char[len];
+
+            for (int i = 0; i < len; i++)
+            {
+                arr[i] = x[len - 1 - i];
+            }
+
+            return new string(arr);
+
+        }
+        public static string StringFoo()
+        {
+            return `Testing custom DLL`;
+        }
+    }
+}
+
+            */
+            
+            /* In the next step,  string testdlldataAnyCPU is assigned binary data converted to base64.
+            
+                How this is done?
+                
+                -We can hardcode string base64 in to the job's xml file, then we can convert string to bynary using  System.Convert.FromBase64String()
+                which returns byte array. Byte array can be writen to the file using  System.IO.File.WriteAllBytes(localfn, testdlldata). File can be put in the CAC usig `put` command and
+                net path.
+                
+                 What is the purpose?
+                 
+                 -This is made in order to recreate custom.dll in 
+                each subsequent run and make example self-contained. */
+            string testdlldataAnyCPU = `TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAA4fug4AtAnNIbgBTM0hVGhpcyBwcm9ncmFtIGNhbm5vdCBiZSBydW4gaW4gRE9TIG1vZGUuDQ0KJAAAAAAAAABQRQAATAEDADD+H0wAAAAAAAAAAOAAAiELAQgAAAgAAAAGAAAAAAAAbicAAAAgAAAAQAAAAABAAAAgAAAAAgAABAAAAAAAAAAEAAAAAAAAAACAAAAAAgAAAAAAAAMAQIUAABAAABAAAAAAEAAAEAAAAAAAABAAAAAAAAAAAAAAABwnAABPAAAAAEAAAPgCAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAwAAACEJgAAHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAAAAAAAAAAAAAAACCAAAEgAAAAAAAAAAAAAAC50ZXh0AAAAdAcAAAAgAAAACAAAAAIAAAAAAAAAAAAAAAAAACAAAGAucnNyYwAAAPgCAAAAQAAAAAQAAAAKAAAAAAAAAAAAAAAAAABAAABALnJlbG9jAAAMAAAAAGAAAAACAAAADgAAAAAAAAAAAAAAAAAAQAAAQgAAAAAAAAAAAAAAAAAAAABQJwAAAAAAAEgAAAACAAUAnCAAAOgFAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMwBQAvAAAAAQAAEQJvEAAACgoGjRMAAAELFgwrEgcIAgYXWQhZbxEAAAqdCBdYDAgGMuoHcxIAAAoqGnIBAABwKh4CKBMAAAoqAABCU0pCAQABAAAAAAAMAAAAdjIuMC41MDcyNwAAAAAFAGwAAAAAAgAAI34AAGwCAABsAgAAI1N0cmluZ3MAAAAA2AQAACgAAAAjVVMAAAUAABAAAAAjR1VJRAAAABAFAADYAAAAI0Jsb2IAAAAAAAAAAgAAAVcVAgAJAAAAAPoBMwAWAAABAAAAEwAAAAIAAAABAAAAAwAAAAEAAAATAAAADQAAAAEAAAABAAAAAQAAAAAACgABAAAAAAAGADMALAAGAGwAWgAGAIMAWgAGAKAAWgAGAL8AWgAGANgAWgAGAPEAWgAGAAwBWgAGACcBWgAGAF8BQAEGAHMBQAEGAIEBWgAGAJoBWgAGAMoBtwE7AN4BAAAGAA0C7QEGAC0C7QEGAEsCLAAGAF0CLAAAAAAAAQAAAAAAAQABAAEAEAAVABwABQABAAEAFgA6AAoAUCAAAAAAlgA8AA0AAQCLIAAAAACWAEoAEgACAJIgAAAAAIYYVAAWAAIAAAABADoAEQBUABoAGQBUABoAIQBUABoAKQBUABoAMQBUABoAOQBUABoAQQBUABoASQBUABoAUQBUAB8AWQBUABoAYQBUABoAaQBUABoAcQBUACQAgQBUACoAiQBUABYAkQBSAi8AkQBiAjMAkQBUADgACQBUABYALgALAEUALgATAFEALgAbAFEALgAjAFEALgArAEUALgAzAFcALgA7AFEALgBLAFEALgBTAG8ALgBjAJkALgBrAKYALgBzAK8ALgB7ALgAPgAEgAAAAQAAAAAAAAAAAAAAAAAcAAAAAgAAAAAAAAAAAAAAAQAjAAAAAAAAAAA8TW9kdWxlPgBjdXN0b20uZGxsAEN1c3RvbQBjdXN0b20AbXNjb3JsaWIAU3lzdGVtAE9iamVjdAB4AFJldmVyc2VTdHJpbmcAU3RyaW5nRm9vAC5jdG9yAFN5c3RlbS5SZWZsZWN0aW9uAEFzc2VtYmx5VGl0bGVBdHRyaWJ1dGUAQXNzZW1ibHlEZXNjcmlwdGlvbkF0dHJpYnV0ZQBBc3NlbWJseUNvbmZpZ3VyYXRpb25BdHRyaWJ1dGUAQXNzZW1ibHlDb21wYW55QXR0cmlidXRlAEFzc2VtYmx5UHJvZHVjdEF0dHJpYnV0ZQBBc3NlbWJseUNvcHlyaWdodEF0dHJpYnV0ZQBBc3NlbWJseVRyYWRlbWFya0F0dHJpYnV0ZQBBc3NlbWJseUN1bHR1cmVBdHRyaWJ1dGUAU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzAENvbVZpc2libGVBdHRyaWJ1dGUAR3VpZEF0dHJpYnV0ZQBBc3NlbWJseVZlcnNpb25BdHRyaWJ1dGUAQXNzZW1ibHlGaWxlVmVyc2lvbkF0dHJpYnV0ZQBTeXN0ZW0uRGlhZ25vc3RpY3MARGVidWdnYWJsZUF0dHJpYnV0ZQBEZWJ1Z2dpbmdNb2RlcwBTeXN0ZW0uUnVudGltZS5Db21w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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==`;
+    /*  CODE THAT CONVERTS  binary data from custom.dll in to base64 string and writes it to the file
+            
+            
+            System.IO.FileStream inFile;
+            byte[] binaryData;
+
+
+            inFile = new System.IO.FileStream(inputFile(some custom dll), System.IO.FileMode.Open, System.IO.FileAccess.Read);
+            binaryData = new Byte[inFile.Length];
+            long bytesRead = inFile.Read(binaryData, 0, (int)inFile.Length);
+            inFile.Close();
+            string base64String = System.Convert.ToBase64String(binaryData, 0, binaryData.Length);
+
+          System.IO.StreamWriter outFile;
+			try
+			{
+				outFile = new System.IO.StreamWriter(outputFile(text file), false, System.Text.Encoding.ASCII);
+				outFile.Write(base64String);
+				outFile.Close();
+			}
+			catch (System.Exception exp)
+			{
+				System.Console.WriteLine(`{0}`, exp.Message);
+			}
+            
+            
+            */
+            byte[] testdlldata = System.Convert.FromBase64String(testdlldataAnyCPU);
+            System.IO.File.WriteAllBytes(localfn, testdlldata);
+            try
+            {
+                Shell(@`Qizmt dfs put ` + localfn + ` ` + fn);
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`ExCustomDLL_Preprocessing` Custodian=`` Email=``>
+    <Add Reference='custom.dll' Type='dfs' />
+    <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
+      <Using>custom</Using>
+      <Using>Microsoft.VisualBasic</Using>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                  if(32 != Strings.Asc(' '))
+            {
+                throw new Exception(`Local: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
+            }
+            
+
+                Qizmt_Log(Custom.StringFoo());
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`ExCustomDLL_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+   <Add Reference='custom.dll' Type='dfs' />
+    <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
+      <Using>custom</Using>
+      <Using>Microsoft.VisualBasic</Using>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://ExCustomDLL_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+
+              if(32 != Strings.Asc(' '))
+                {
+                   throw new Exception(`Local: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
+                }
+            
+                //Create sample data.
+                dfsoutput.WriteLine(Custom.StringFoo());
+                dfsoutput.WriteLine(`This is PolindromFinder example with use of the custom made DLL`);
+                 dfsoutput.WriteLine(`Polindromes are words that can be read the same way in either direction`);
+                 dfsoutput.WriteLine(`Such as aibohphobia alula cammac kayak level radar refer`);
+                dfsoutput.WriteLine(`Use of custom made DLLs together with powerful API of Qizmt makes life easier`);
+                dfsoutput.WriteLine(`What other features we can implement in the future?`);
+                dfsoutput.WriteLine(`What else is needed to improve performance?`);
+                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`ExCustomDLL` Custodian=`` Email=``>
+    <Add Reference='custom.dll' Type='dfs' />
+    <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
+      <Using>custom</Using>
+      <Using>Microsoft.VisualBasic</Using>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>40</KeyLength>
+        <DFSInput>dfs://ExCustomDLL_Input.txt</DFSInput>
+        <DFSOutput>dfs://ExCustomDLL_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+               mstring sLine = mstring.Prepare(line);
+               mstringarray parts = sLine.SplitM(' ');
+               
+               for(int i=0; i<parts.Length;i++)
+               {
+                   string word ;
+                   word = parts[i].ToString();
+                   string rword ;
+                    rword = Custom.ReverseString(word);
+                    
+                    if ( rword == word )
+                    {
+                        recordset count = recordset.Prepare();
+                        count.PutInt(1);
+                        output.Add(parts[i],count);
+                    }
+                   
+                   
+               }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+
+                if(32 != Strings.Asc(' '))
+                  {
+                     throw new Exception(`Local: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
+                  }
+            
+                mstring Polindrome = mstring.Prepare(UnpadKey(key));
+                int count = 0 ;
+                for(int i = 0; i< values.Length; i++)
+                {
+                    
+                    count++;
+                    
+                    
+                }
+                
+                Polindrome.AppendM(` - `);
+                Polindrome.AppendM(count);
+                
+                output.Add(Polindrome);
+                
+               
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name=`ExCustomDLL_DisplayInputData` Custodian=`` Email=`` Description=`Display input data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://ExCustomDLL_Input.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display input.
+                Qizmt_Log(`Input:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`ExCustomDLL_DisplayOutputData` Custodian=`` Email=`` Description=`Display output data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://ExCustomDLL_Output.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display output.
+                Qizmt_Log(`Output:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>
+
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region Qizmt-WordCountMemCache.xml
+            alljobfiles.Add(@"Qizmt-WordCountMemCache.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+@"<SourceCode>
+  <Jobs>
+    <Job Name=`Qizmt-WordCountMemCache_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del Qizmt-WordCountMemCache1_Input.txt`);
+                Shell(@`Qizmt del Qizmt-WordCountMemCache2_Input.txt`);
+                Shell(@`Qizmt del Qizmt-WordCountMemCache3_Input.txt`);
+                Shell(@`Qizmt del Qizmt-WordCountMemCache_Output.txt`);
+              
+               
+           
+            }
+        ]]>
+      </Local>
+    </Job>
+   
+     <Job Name=`Qizmt-WordCountMemCache_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt-WordCountMemCache1_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`In computer science a cache pronounced kækash is a component that improves performance by transparently storing data such that future requests for that data can be served faster`);
+                dfsoutput.WriteLine(`The data that is stored within a cache might be values that have been computed earlier or duplicates of original values that are stored elsewhere`);
+                dfsoutput.WriteLine(`regression test`);
+              
+            }
+        ]]>
+      </Remote>
+    </Job>
+     <Job Name=`Qizmt-WordCountMemCache_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt-WordCountMemCache2_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`As opposed to a buffer which is managed explicitly by a client a cache stores data transparently`);
+                dfsoutput.WriteLine(` Nevertheless caches have proven extremely effective in many areas of computing because `);
+                              
+            }
+        ]]>
+      </Remote>
+    </Job>
+     <Job Name=`Qizmt-WordCountMemCache_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt-WordCountMemCache3_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`Nevertheless caches have proven extremely effective in many areas of computing because`);
+                dfsoutput.WriteLine(` if data is requested that is physically stored close to data that has been requested already`);
+              
+            }
+    
+      ]]>
+      </Remote>
+    </Job>
+    
+    <Job Name=`Qizmt-WordCountMemCache` Custodian=`` Email=``>
+     <MemCache />
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>16</KeyLength>
+        <DFSInput>dfs://Qizmt-WordCountMemCache1_Input.txt</DFSInput>
+        <DFSOutput>dfs://Qizmt-WordCountMemCache_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                
+                 mstring sLine= mstring.Prepare(line);
+                 mstringarray parts = sLine.SplitM(' ');
+              
+                 for(int i=0; i < parts.Length; i++)
+                     {
+                        mstring word = parts[i];
+                    
+                        if(word.Length > 0 && word.Length <= 16) // Word cannot be longer than the KeyLength!
+                          {                        
+                            output.Add(word.ToLowerM(), mstring.Prepare(1)); 
+                           }   
+                     }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          struct SKeyVal
+            {
+             public   string ikey;
+             public   int ival;
+            }
+          
+            List<SKeyVal> Inputs = new List<SKeyVal>(); 
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+               
+                            
+                    mstring rs = mstring.Prepare(key);
+                    SKeyVal s = new SKeyVal();
+                    s.ikey = rs.ToString();
+                    
+                    for (int i=0; i < values.Length; i ++)
+                    {
+                        s.ival++;
+                        
+                    }
+                   
+                      
+                   
+                    Inputs.Add(s);
+                                
+                
+                if(StaticGlobals.Qizmt_Last)
+                {
+                    // On last reduce iteration, so sort the input and insert into the MemCache.
+                    
+                                 Inputs.Sort(MyCompareKeys1);  
+                    
+                    string MemCacheName = `Qizmt-WordCountMemCache`;
+                    int keyoffset = 0, keylen = 16;
+                    int rowlen = 36;
+                    
+                    // Attach to this worker's view of the MemCache in a using-statement.
+                    using(MemCache mc = MemCache.Attach(MemCacheName, Qizmt_ProcessID))
+                    {
+                        int CurrentMergeKeyIndex = 0;
+                        for(mc.MoveFirst(); !mc.EOF; mc.MoveNext()) // Iterate through existing values in MemCache.
+                        {
+                            MemCache.Tuple t;
+                            t = mc.PeekRow(); // Peek at the current row, but don't read past it yet.
+                            string k0 = t[0].GetString(); // First part of existing row.
+                                                       
+                            
+                                
+                            bool updated = false;
+                            while(CurrentMergeKeyIndex < Inputs.Count)
+                            {
+                                // See if there are new keys to insert or keys to change.
+                                int kdiff = MyCompareKeys((Inputs[CurrentMergeKeyIndex].ikey).ToString(),
+                                    k0.ToString() );
+                                if(kdiff < 0) // Merge key is less than current one, so insert.
+                                {
+                                    if(updated)
+                                    {
+                                        throw new Exception(`Keys out of order (2662)`);
+                                    }
+                                    // Insert here.
+                                    t = mc.InsertRow();
+                                    t[0].SetString(Inputs[CurrentMergeKeyIndex].ikey); // First part of input.
+                                    t[1].SetInt(Inputs[CurrentMergeKeyIndex].ival);//Second part of input.
+                                    mstring sLine = mstring.Prepare(Inputs[CurrentMergeKeyIndex].ikey);
+                                    sLine.AppendM(`->`);
+                                    sLine.AppendM(Inputs[CurrentMergeKeyIndex].ival);
+                                    output.Add(sLine);
+                                    
+                                    
+                                    CurrentMergeKeyIndex++;
+                                    continue;
+                                }
+                                else if(kdiff == 0) // Merge key is the same as the current one, so update.
+                                {
+                                    // They're the same, so update it.
+                                    t = mc.ReadRow(); // Read it so it's included, and then update it.
+                                    
+                                    t[0].SetString(Inputs[CurrentMergeKeyIndex].ikey);
+                                    
+                                    int k1 = t[1].GetInt();
+                                    
+                                    t[1].SetInt(Inputs[CurrentMergeKeyIndex].ival+k1);
+                                    
+                                    // Creating output:
+                                    mstring sLine = mstring.Prepare(Inputs[CurrentMergeKeyIndex].ikey);
+                                    sLine.AppendM(`->`);
+                                    sLine.AppendM(Inputs[CurrentMergeKeyIndex].ival+k1);
+                                    output.Add(sLine);
+                                    CurrentMergeKeyIndex++;
+                                    updated = true;
+                                    continue; // Let it keep updating the same one if same keys.
+                                }
+                                break;
+                            }
+                            if(updated)
+                            {
+                                continue;
+                            }
+                        }
+                        // Add extra, higher keys after the last one.
+                        while(CurrentMergeKeyIndex < Inputs.Count)
+                        {
+                            MemCache.Tuple t;
+                            t = mc.InsertRow();
+                            t[0].SetString(Inputs[CurrentMergeKeyIndex].ikey);
+                            t[1].SetInt(Inputs[CurrentMergeKeyIndex].ival);
+                            // Creating output:
+                            mstring sLine = mstring.Prepare(Inputs[CurrentMergeKeyIndex].ikey);
+                                    sLine.AppendM(`->`);
+                                    sLine.AppendM(Inputs[CurrentMergeKeyIndex].ival);
+                                    output.Add(sLine);
+                            
+                            CurrentMergeKeyIndex++;
+                        }
+                    }
+                    
+                    if(0 == Qizmt_ProcessID)
+                    {
+                        Qizmt_Log(` Merged data into the MemCache `);
+                    }
+                    
+                }
+                
+   
+                
+                
+            }
+            
+            int MyCompareKeys1(SKeyVal x,SKeyVal y)
+            {
+                int r = (x.ikey).CompareTo(y.ikey);
+                
+                return r;
+                
+            }
+            
+              int MyCompareKeys(string x,string  y)
+            {
+                int r = x.CompareTo(y);
+              
+                return r;
+            }
+                       
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    
+      <Job Name=`MemCache_Commit` Custodian=`` Email=`` Description=`Commit the MemCache changes`>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                // Commit the MemCache changes to DFS.
+                // Alternatively, could execute commit every X hours from the Qizmt scheduler.
+                {
+                    DateTime lt = DateTime.Now;
+                    Shell(@`Qizmt memcache commit name=Qizmt-TestMemCache`, true);
+                    Qizmt_Log(`Committed MemCache; duration: ` + (DateTime.Now - lt));
+                }
+                
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`Qizmt-WordCountMemCache_DisplayInputData` Custodian=`` Email=`` Description=`Display input data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://Qizmt-WordCountMemCache1_Input.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display input.
+                Qizmt_Log(`Input:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`Qizmt-WordCountMemCache_DisplayOutputData` Custodian=`` Email=`` Description=`Display output data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://Qizmt-WordCountMemCache_Output.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display output.
+                Qizmt_Log(`Output:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>
+
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region Qizmt-Wrapper-WordCountMemCache.xml
+            alljobfiles.Add(@"Qizmt-Wrapper-WordCountMemCache.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+@"<SourceCode>
+  <Jobs>
+    <Job Name=`ExecXPath_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            if(Qizmt_ExecArgs.Length > 0)
+            {
+               
+                
+                if (Qizmt_ExecArgs[0] == `1`)
+                {
+  string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache1_Input.txt`` ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+                 Qizmt_Log(output);
+                }
+            
+             if (Qizmt_ExecArgs[0] == `2`)
+                {
+   string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache2_Input.txt``   ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+                Qizmt_Log(output);
+                }
+             if (Qizmt_ExecArgs[0] == `3`)
+             {
+      string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache3_Input.txt`` ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+             Qizmt_Log(output);
+             }
+            
+            }
+            else
+            {
+              
+                 string schema =
+                `string(16),int`; // Default.
+            const string DefaultMemCacheSize = `10KB`;
+            
+                  // Delete old data if any:
+            //  Shell(@`Qizmt del dfs://Qizmt-WordCountMemCache*`);
+              Shell(@`Qizmt memcache delete name=Qizmt-WordCountMemCache`, true);
+                
+                // Create the empty MemCache:
+              Shell(@`Qizmt memcache create name=Qizmt-WordCountMemCache schema=` + schema);
+              Qizmt_Log(` Created MemCache named 'Qizmt-WordCountMemCache' `);
+              
+       string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache1_Input.txt`` ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+            Qizmt_Log(output);
+
+                
+          }
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
+
+
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+
+            #region Qizmt-AddUsingReferences
+            alljobfiles.Add(@"Qizmt-AddUsingReferences.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+@"<SourceCode>
+  <Jobs>
+    <Job Name=`ExCustomDLL_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del custom.dll`);                // deleting dll from CAC
+                Shell(@`Qizmt del ExCustomDLL_Input.txt`);     // deleting input file from DFS in order to regenerate new one
+                Shell(@`Qizmt del ExCustomDLL_Output.txt`);    // deleting old output file from DFS in order to produce new one
+            }
+        ]]>
+      </Local>
+    </Job>
+   
+    <Job>
+      <Narrative>
+        <Name>regression_test_put_dll PUT DLL</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {            /*
+            This example puts a simple `Any CPU` DLL into CAC (Cluster Assembly Cache in MR.DFS).
+            CAC has the same  idea as The Global Assembly Cache or GAC which is a machine-wide .NET assemblies cache for Microsoft's CLR platform,
+            whith the difference that is made for DFS(Distributed File System) platform.
+            For example , two jobs can reference the same dll that is uploaded to the MR.DFS, at the same time.
+            Select `Any CPU` when building a DLL for CAC.
+            DLL`s put into the CAC are replicated on every machine of the cluster before the put command returns.
+            Once DLL is in CAC, it may be referenced from mapreducer jobs, local jobs and remote jobs.
+            CAC DLL`s may be written in any .net language, e.g. C#, VB.NET, C++ CLI, etc.
+            */
+            string localdir = @`\\` + System.Net.Dns.GetHostName() + @`\c$\temp\Qizmt`;
+            if(!System.IO.Directory.Exists(localdir))
+            {
+                System.IO.Directory.CreateDirectory(localdir);
+            }
+            
+            string fn = `custom.dll`;
+            string localfn = localdir + @`\` + Guid.NewGuid().ToString() + fn;
+            
+  /*
+            // Code for custom.dll:
+namespace custom
+{
+    public class Custom
+    {
+        public static int x;
+        public static string ReverseString(string x)
+        {
+            int len = x.Length;
+            char[] arr = new char[len];
+
+            for (int i = 0; i < len; i++)
+            {
+                arr[i] = x[len - 1 - i];
+            }
+
+            return new string(arr);
+
+        }
+        public static string StringFoo()
+        {
+            return `Testing custom DLL`;
+        }
+    }
+}
+
+            */
+            
+            /* In the next step,  string testdlldataAnyCPU is assigned binary data converted to base64.
+            
+                How this is done?
+                
+                -We can hardcode string base64 in to the job's xml file, then we can convert string to bynary using  System.Convert.FromBase64String()
+                which returns byte array. Byte array can be writen to the file using  System.IO.File.WriteAllBytes(localfn, testdlldata). File can be put in the CAC usig `put` command and
+                net path.
+                
+                 What is the purpose?
+                 
+                 -This is made in order to recreate custom.dll in 
+                each subsequent run and make example self-contained. */
+            string testdlldataAnyCPU = `TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAA4fug4AtAnNIbgBTM0hVGhpcyBwcm9ncmFtIGNhbm5vdCBiZSBydW4gaW4gRE9TIG1vZGUuDQ0KJAAAAAAAAABQRQAATAEDADD+H0wAAAAAAAAAAOAAAiELAQgAAAgAAAAGAAAAAAAAbicAAAAgAAAAQAAAAABAAAAgAAAAAgAABAAAAAAAAAAEAAAAAAAAAACAAAAAAgAAAAAAAAMAQIUAABAAABAAAAAAEAAAEAAAAAAAABAAAAAAAAAAAAAAABwnAABPAAAAAEAAAPgCAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAwAAACEJgAAHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAAAAAAAAAAAAAAACCAAAEgAAAAAAAAAAAAAAC50ZXh0AAAAdAcAAAAgAAAACAAAAAIAAAAAAAAAAAAAAAAAACAAAGAucnNyYwAAAPgCAAAAQAAAAAQAAAAKAAAAAAAAAAAAAAAAAABAAABALnJlbG9jAAAMAAAAAGAAAAACAAAADgAAAAAAAAAAAAAAAAAAQAAAQgAAAAAAAAAAAAAAAAAAAABQJwAAAAAAAEgAAAACAAUAnCAAAOgFAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMwBQAvAAAAAQAAEQJvEAAACgoGjRMAAAELFgwrEgcIAgYXWQhZbxEAAAqdCBdYDAgGMuoHcxIAAAoqGnIBAABwKh4CKBMAAAoqAABCU0pCAQABAAAAAAAMAAAAdjIuMC41MDcyNwAAAAAFAGwAAAAAAgAAI34AAGwCAABsAgAAI1N0cmluZ3MAAAAA2AQAACgAAAAjVVMAAAUAABAAAAAjR1VJRAAAABAFAADYAAAAI0Jsb2IAAAAAAAAAAgAAAVcVAgAJAAAAAPoBMwAWAAABAAAAEwAAAAIAAAABAAAAAwAAAAEAAAATAAAADQAAAAEAAAABAAAAAQAAAAAACgABAAAAAAAGADMALAAGAGwAWgAGAIMAWgAGAKAAWgAGAL8AWgAGANgAWgAGAPEAWgAGAAwBWgAGACcBWgAGAF8BQAEGAHMBQAEGAIEBWgAGAJoBWgAGAMoBtwE7AN4BAAAGAA0C7QEGAC0C7QEGAEsCLAAGAF0CLAAAAAAAAQAAAAAAAQABAAEAEAAVABwABQABAAEAFgA6AAoAUCAAAAAAlgA8AA0AAQCLIAAAAACWAEoAEgACAJIgAAAAAIYYVAAWAAIAAAABADoAEQBUABoAGQBUABoAIQBUABoAKQBUABoAMQBUABoAOQBUABoAQQBUABoASQBUABoAUQBUAB8AWQBUABoAYQBUABoAaQBUABoAcQBUACQAgQBUACoAiQBUABYAkQBSAi8AkQBiAjMAkQBUADgACQBUABYALgALAEUALgATAFEALgAbAFEALgAjAFEALgArAEUALgAzAFcALgA7AFEALgBLAFEALgBTAG8ALgBjAJkALgBrAKYALgBzAK8ALgB7ALgAPgAEgAAAAQAAAAAAAAAAAAAAAAAcAAAAAgAAAAAAAAAAAAAAAQAjAAAAAAAAAAA8TW9kdWxlPgBjdXN0b20uZGxsAEN1c3RvbQBjdXN0b20AbXNjb3JsaWIAU3lzdGVtAE9iamVjdAB4AFJldmVyc2VTdHJpbmcAU3RyaW5nRm9vAC5jdG9yAFN5c3RlbS5SZWZsZWN0aW9uAEFzc2VtYmx5VGl0bGVBdHRyaWJ1dGUAQXNzZW1ibHlEZXNjcmlwdGlvbkF0dHJpYnV0ZQBBc3NlbWJseUNvbmZpZ3VyYXRpb25BdHRyaWJ1dGUAQXNzZW1ibHlDb21wYW55QXR0cmlidXRlAEFzc2VtYmx5UHJvZHVjdEF0dHJpYnV0ZQBBc3NlbWJseUNvcHlyaWdodEF0dHJpYnV0ZQBBc3NlbWJseVRyYWRlbWFya0F0dHJpYnV0ZQBBc3NlbWJseUN1bHR1cmVBdHRyaWJ1dGUAU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzAENvbVZpc2libGVBdHRyaWJ1dGUAR3VpZEF0dHJpYnV0ZQBBc3NlbWJseVZlcnNpb25BdHRyaWJ1dGUAQXNzZW1ibHlGaWxlVmVyc2lvbkF0dHJpYnV0ZQBTeXN0ZW0uRGlhZ25vc3RpY3MARGVidWdnYWJsZUF0dHJpYnV0ZQBEZWJ1Z2dpbmdNb2RlcwBTeXN0ZW0uUnVudGltZS5Db21w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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==`;
+    /*  CODE THAT CONVERTS  binary data from custom.dll in to base64 string and writes it to the file
+            
+            
+            System.IO.FileStream inFile;
+            byte[] binaryData;
+
+
+            inFile = new System.IO.FileStream(inputFile(some custom dll), System.IO.FileMode.Open, System.IO.FileAccess.Read);
+            binaryData = new Byte[inFile.Length];
+            long bytesRead = inFile.Read(binaryData, 0, (int)inFile.Length);
+            inFile.Close();
+            string base64String = System.Convert.ToBase64String(binaryData, 0, binaryData.Length);
+
+          System.IO.StreamWriter outFile;
+			try
+			{
+				outFile = new System.IO.StreamWriter(outputFile(text file), false, System.Text.Encoding.ASCII);
+				outFile.Write(base64String);
+				outFile.Close();
+			}
+			catch (System.Exception exp)
+			{
+				System.Console.WriteLine(`{0}`, exp.Message);
+			}
+            
+            
+            */
+            byte[] testdlldata = System.Convert.FromBase64String(testdlldataAnyCPU);
+            System.IO.File.WriteAllBytes(localfn, testdlldata);
+            try
+            {
+                Shell(@`Qizmt dfs put ` + localfn + ` ` + fn);
+            }
+            finally
+            {
+                System.IO.File.Delete(localfn);
+            }
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`ExCustomDLL_Preprocessing` Custodian=`` Email=``>
+    <Add Reference='custom.dll' Type='dfs' />
+    <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
+      <Using>custom</Using>
+      <Using>Microsoft.VisualBasic</Using>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                  if(32 != Strings.Asc(' '))
+            {
+                throw new Exception(`Local: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
+            }
+            
+
+                Qizmt_Log(Custom.StringFoo());
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`ExCustomDLL_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+   <Add Reference='custom.dll' Type='dfs' />
+    <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
+      <Using>custom</Using>
+      <Using>Microsoft.VisualBasic</Using>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://ExCustomDLL_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+
+              if(32 != Strings.Asc(' '))
+                {
+                   throw new Exception(`Local: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
+                }
+            
+                //Create sample data.
+                dfsoutput.WriteLine(Custom.StringFoo());
+                dfsoutput.WriteLine(`This is PolindromFinder example with use of the custom made DLL`);
+                 dfsoutput.WriteLine(`Polindromes are words that can be read the same way in either direction`);
+                 dfsoutput.WriteLine(`Such as aibohphobia alula cammac kayak level radar refer`);
+                dfsoutput.WriteLine(`Use of custom made DLLs together with powerful API of Qizmt makes life easier`);
+                dfsoutput.WriteLine(`What other features we can implement in the future?`);
+                dfsoutput.WriteLine(`What else is needed to improve performance?`);
+                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`ExCustomDLL` Custodian=`` Email=``>
+    <Add Reference='custom.dll' Type='dfs' />
+    <Add Reference=`Microsoft.VisualBasic.dll` Type=`system` />
+      <Using>custom</Using>
+      <Using>Microsoft.VisualBasic</Using>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>40</KeyLength>
+        <DFSInput>dfs://ExCustomDLL_Input.txt</DFSInput>
+        <DFSOutput>dfs://ExCustomDLL_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+               mstring sLine = mstring.Prepare(line);
+               mstringarray parts = sLine.SplitM(' ');
+               
+               for(int i=0; i<parts.Length;i++)
+               {
+                   string word ;
+                   word = parts[i].ToString();
+                   string rword ;
+                    rword = Custom.ReverseString(word);
+                    
+                    if ( rword == word )
+                    {
+                        recordset count = recordset.Prepare();
+                        count.PutInt(1);
+                        output.Add(parts[i],count);
+                    }
+                   
+                   
+               }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+
+                if(32 != Strings.Asc(' '))
+                  {
+                     throw new Exception(`Local: (32 != Microsoft.VisualBasic.Strings.Asc(' '))`);
+                  }
+            
+                mstring Polindrome = mstring.Prepare(UnpadKey(key));
+                int count = 0 ;
+                for(int i = 0; i< values.Length; i++)
+                {
+                    
+                    count++;
+                    
+                    
+                }
+                
+                Polindrome.AppendM(` - `);
+                Polindrome.AppendM(count);
+                
+                output.Add(Polindrome);
+                
+               
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name=`ExCustomDLL_DisplayInputData` Custodian=`` Email=`` Description=`Display input data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://ExCustomDLL_Input.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display input.
+                Qizmt_Log(`Input:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`ExCustomDLL_DisplayOutputData` Custodian=`` Email=`` Description=`Display output data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://ExCustomDLL_Output.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display output.
+                Qizmt_Log(`Output:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>
+
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region Qizmt-WordCountMemCache.xml
+            alljobfiles.Add(@"Qizmt-WordCountMemCache.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+@"<SourceCode>
+  <Jobs>
+    <Job Name=`Qizmt-WordCountMemCache_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del Qizmt-WordCountMemCache1_Input.txt`);
+                Shell(@`Qizmt del Qizmt-WordCountMemCache2_Input.txt`);
+                Shell(@`Qizmt del Qizmt-WordCountMemCache3_Input.txt`);
+                Shell(@`Qizmt del Qizmt-WordCountMemCache_Output.txt`);
+              
+               
+           
+            }
+        ]]>
+      </Local>
+    </Job>
+   
+     <Job Name=`Qizmt-WordCountMemCache_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt-WordCountMemCache1_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`In computer science a cache pronounced kækash is a component that improves performance by transparently storing data such that future requests for that data can be served faster`);
+                dfsoutput.WriteLine(`The data that is stored within a cache might be values that have been computed earlier or duplicates of original values that are stored elsewhere`);
+                dfsoutput.WriteLine(`regression test`);
+              
+            }
+        ]]>
+      </Remote>
+    </Job>
+     <Job Name=`Qizmt-WordCountMemCache_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt-WordCountMemCache2_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`As opposed to a buffer which is managed explicitly by a client a cache stores data transparently`);
+                dfsoutput.WriteLine(` Nevertheless caches have proven extremely effective in many areas of computing because `);
+                              
+            }
+        ]]>
+      </Remote>
+    </Job>
+     <Job Name=`Qizmt-WordCountMemCache_CreateSampleData` Custodian=`` Email=`` Description=`Create sample data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://Qizmt-WordCountMemCache3_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data.
+                dfsoutput.WriteLine(`Nevertheless caches have proven extremely effective in many areas of computing because`);
+                dfsoutput.WriteLine(` if data is requested that is physically stored close to data that has been requested already`);
+              
+            }
+    
+      ]]>
+      </Remote>
+    </Job>
+    
+    <Job Name=`Qizmt-WordCountMemCache` Custodian=`` Email=``>
+     <MemCache />
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>16</KeyLength>
+        <DFSInput>dfs://Qizmt-WordCountMemCache1_Input.txt</DFSInput>
+        <DFSOutput>dfs://Qizmt-WordCountMemCache_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                
+                 mstring sLine= mstring.Prepare(line);
+                 mstringarray parts = sLine.SplitM(' ');
+              
+                 for(int i=0; i < parts.Length; i++)
+                     {
+                        mstring word = parts[i];
+                    
+                        if(word.Length > 0 && word.Length <= 16) // Word cannot be longer than the KeyLength!
+                          {                        
+                            output.Add(word.ToLowerM(), mstring.Prepare(1)); 
+                           }   
+                     }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          struct SKeyVal
+            {
+             public   string ikey;
+             public   int ival;
+            }
+          
+            List<SKeyVal> Inputs = new List<SKeyVal>(); 
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+               
+                            
+                    mstring rs = mstring.Prepare(key);
+                    SKeyVal s = new SKeyVal();
+                    s.ikey = rs.ToString();
+                    
+                    for (int i=0; i < values.Length; i ++)
+                    {
+                        s.ival++;
+                        
+                    }
+                   
+                      
+                   
+                    Inputs.Add(s);
+                                
+                
+                if(StaticGlobals.Qizmt_Last)
+                {
+                    // On last reduce iteration, so sort the input and insert into the MemCache.
+                    
+                                 Inputs.Sort(MyCompareKeys1);  
+                    
+                    string MemCacheName = `Qizmt-WordCountMemCache`;
+                    int keyoffset = 0, keylen = 16;
+                    int rowlen = 36;
+                    
+                    // Attach to this worker's view of the MemCache in a using-statement.
+                    using(MemCache mc = MemCache.Attach(MemCacheName, Qizmt_ProcessID))
+                    {
+                        int CurrentMergeKeyIndex = 0;
+                        for(mc.MoveFirst(); !mc.EOF; mc.MoveNext()) // Iterate through existing values in MemCache.
+                        {
+                            MemCache.Tuple t;
+                            t = mc.PeekRow(); // Peek at the current row, but don't read past it yet.
+                            string k0 = t[0].GetString(); // First part of existing row.
+                                                       
+                            
+                                
+                            bool updated = false;
+                            while(CurrentMergeKeyIndex < Inputs.Count)
+                            {
+                                // See if there are new keys to insert or keys to change.
+                                int kdiff = MyCompareKeys((Inputs[CurrentMergeKeyIndex].ikey).ToString(),
+                                    k0.ToString() );
+                                if(kdiff < 0) // Merge key is less than current one, so insert.
+                                {
+                                    if(updated)
+                                    {
+                                        throw new Exception(`Keys out of order (2662)`);
+                                    }
+                                    // Insert here.
+                                    t = mc.InsertRow();
+                                    t[0].SetString(Inputs[CurrentMergeKeyIndex].ikey); // First part of input.
+                                    t[1].SetInt(Inputs[CurrentMergeKeyIndex].ival);//Second part of input.
+                                    mstring sLine = mstring.Prepare(Inputs[CurrentMergeKeyIndex].ikey);
+                                    sLine.AppendM(`->`);
+                                    sLine.AppendM(Inputs[CurrentMergeKeyIndex].ival);
+                                    output.Add(sLine);
+                                    
+                                    
+                                    CurrentMergeKeyIndex++;
+                                    continue;
+                                }
+                                else if(kdiff == 0) // Merge key is the same as the current one, so update.
+                                {
+                                    // They're the same, so update it.
+                                    t = mc.ReadRow(); // Read it so it's included, and then update it.
+                                    
+                                    t[0].SetString(Inputs[CurrentMergeKeyIndex].ikey);
+                                    
+                                    int k1 = t[1].GetInt();
+                                    
+                                    t[1].SetInt(Inputs[CurrentMergeKeyIndex].ival+k1);
+                                    
+                                    // Creating output:
+                                    mstring sLine = mstring.Prepare(Inputs[CurrentMergeKeyIndex].ikey);
+                                    sLine.AppendM(`->`);
+                                    sLine.AppendM(Inputs[CurrentMergeKeyIndex].ival+k1);
+                                    output.Add(sLine);
+                                    CurrentMergeKeyIndex++;
+                                    updated = true;
+                                    continue; // Let it keep updating the same one if same keys.
+                                }
+                                break;
+                            }
+                            if(updated)
+                            {
+                                continue;
+                            }
+                        }
+                        // Add extra, higher keys after the last one.
+                        while(CurrentMergeKeyIndex < Inputs.Count)
+                        {
+                            MemCache.Tuple t;
+                            t = mc.InsertRow();
+                            t[0].SetString(Inputs[CurrentMergeKeyIndex].ikey);
+                            t[1].SetInt(Inputs[CurrentMergeKeyIndex].ival);
+                            // Creating output:
+                            mstring sLine = mstring.Prepare(Inputs[CurrentMergeKeyIndex].ikey);
+                                    sLine.AppendM(`->`);
+                                    sLine.AppendM(Inputs[CurrentMergeKeyIndex].ival);
+                                    output.Add(sLine);
+                            
+                            CurrentMergeKeyIndex++;
+                        }
+                    }
+                    
+                    if(0 == Qizmt_ProcessID)
+                    {
+                        Qizmt_Log(` Merged data into the MemCache `);
+                    }
+                    
+                }
+                
+   
+                
+                
+            }
+            
+            int MyCompareKeys1(SKeyVal x,SKeyVal y)
+            {
+                int r = (x.ikey).CompareTo(y.ikey);
+                
+                return r;
+                
+            }
+            
+              int MyCompareKeys(string x,string  y)
+            {
+                int r = x.CompareTo(y);
+              
+                return r;
+            }
+                       
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    
+      <Job Name=`MemCache_Commit` Custodian=`` Email=`` Description=`Commit the MemCache changes`>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                // Commit the MemCache changes to DFS.
+                // Alternatively, could execute commit every X hours from the Qizmt scheduler.
+                {
+                    DateTime lt = DateTime.Now;
+                    Shell(@`Qizmt memcache commit name=Qizmt-TestMemCache`, true);
+                    Qizmt_Log(`Committed MemCache; duration: ` + (DateTime.Now - lt));
+                }
+                
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`Qizmt-WordCountMemCache_DisplayInputData` Custodian=`` Email=`` Description=`Display input data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://Qizmt-WordCountMemCache1_Input.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display input.
+                Qizmt_Log(`Input:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=`Qizmt-WordCountMemCache_DisplayOutputData` Custodian=`` Email=`` Description=`Display output data`>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://Qizmt-WordCountMemCache_Output.txt</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {    
+                //Display output.
+                Qizmt_Log(`Output:`);
+                System.IO.StreamReader sr = new System.IO.StreamReader(dfsinput);
+                Qizmt_Log(sr.ReadToEnd());
+            }
+        ]]>
+      </Remote>
+    </Job>
+  </Jobs>
+</SourceCode>
+
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region Qizmt-Wrapper-WordCountMemCache.xml
+            alljobfiles.Add(@"Qizmt-Wrapper-WordCountMemCache.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+@"<SourceCode>
+  <Jobs>
+    <Job Name=`ExecXPath_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            if(Qizmt_ExecArgs.Length > 0)
+            {
+               
+                
+                if (Qizmt_ExecArgs[0] == `1`)
+                {
+  string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache1_Input.txt`` ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+                 Qizmt_Log(output);
+                }
+            
+             if (Qizmt_ExecArgs[0] == `2`)
+                {
+   string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache2_Input.txt``   ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+                Qizmt_Log(output);
+                }
+             if (Qizmt_ExecArgs[0] == `3`)
+             {
+      string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache3_Input.txt`` ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+             Qizmt_Log(output);
+             }
+            
+            }
+            else
+            {
+              
+                 string schema =
+                `string(16),int`; // Default.
+            const string DefaultMemCacheSize = `10KB`;
+            
+                  // Delete old data if any:
+            //  Shell(@`Qizmt del dfs://Qizmt-WordCountMemCache*`);
+              Shell(@`Qizmt memcache delete name=Qizmt-WordCountMemCache`, true);
+                
+                // Create the empty MemCache:
+              Shell(@`Qizmt memcache create name=Qizmt-WordCountMemCache schema=` + schema);
+              Qizmt_Log(` Created MemCache named 'Qizmt-WordCountMemCache' `);
+              
+       string output = Shell(@`Qizmt exec  ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSInput=Qizmt-WordCountMemCache1_Input.txt`` ``//Job[@Name='Qizmt-WordCountMemCache']/IOSettings/DFSOutput=Qizmt-WordCountMemCache_Output.txt``  Qizmt-WordCountMemCache.xml`);
+            Qizmt_Log(output);
+
+                
+          }
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>
+
+
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
+            #region JaggedBinary
+            alljobfiles.Add(@"Qizmt-JaggedBinary.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+                @"<SourceCode>
+  <Jobs>
+    <Job Name=`Cleanup` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@`Qizmt del JaggedBinary_Input.txt`);
+                Shell(@`Qizmt del JaggedBinary_Input.bin`);
+                Shell(@`Qizmt del JaggedBinary_Output.txt`);
+                Shell(@`Qizmt del JaggedBinary_Output.bin`);
+            }
+        ]]>
+      </Local>
+    </Job>
+    
+    <Job Name=`CreateSampleData` Custodian=`` Email=`` Description=``>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>JaggedBinary_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                //Create sample data
+                //Book title; Edition years; Authors
+                dfsoutput.WriteLine(`Sunshine State;1999,2001,2003;John Smith,Joe Nathan,Mary Smith`);
+                dfsoutput.WriteLine(`Dinner in 30 Minutes;2008,2009;Ray Simon`);
+                dfsoutput.WriteLine(`Travel by Train;1999;Jane Zoe,Cathy Zoe`);
+                dfsoutput.WriteLine(`Curtain Calls;1970,2000,2003,2008;Peter Uay`);
+            }
+        ]]>
+      </Remote>
+    </Job>
+    
+    <Job Name=`ConvertTextToJaggedBinary` Custodian=`` Email=`` Description=``>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>JaggedBinary_Input.txt</DFSReader>
+          <DFSWriter>JaggedBinary_Input.bin@?</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                StringBuilder sb = new StringBuilder();
+                while(dfsinput.ReadLineAppend(sb))
+                {
+                    string line = sb.ToString();
+                    string[] parts = line.Split(';');
+                    
+                    string title = parts[0];
+                    string[] years = parts[1].Split(',');
+                    string[] authors = parts[2].Split(',');                    
+                    
+                    recordset rs = recordset.Prepare();
+                    rs.PutString(title);
+                    
+                    rs.PutInt(years.Length);
+                    for(int i = 0; i < years.Length; i++)
+                    {
+                        rs.PutInt(Int32.Parse(years[i]));
+                    }
+                    
+                    rs.PutInt(authors.Length);
+                    for(int i = 0; i < authors.Length; i++)
+                    {
+                        rs.PutString(authors[i]);
+                    }                    
+                    
+                    dfsoutput.WriteRecord(rs.ToByteSlice().ToBytes()); //output jagged row
+                    sb.Length = 0;
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    
+    <Job Name=`mr` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>JaggedBinary_Input.bin@?</DFSInput>
+        <DFSOutput>dfs://JaggedBinary_Output.bin@?</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+               recordset rline = recordset.Prepare(line);   //read a jagged row
+               
+               mstring title = rline.GetString();
+               
+               int firstyear = 0;
+               {
+                   int yearcount = rline.GetInt();
+                   for(int i = 0; i < yearcount; i++)
+                   {
+                       int year = rline.GetInt();
+                       if(i == 0)
+                       {
+                           firstyear = year;
+                       }
+                   }
+               }              
+               
+               mstring firstauthor = mstring.Prepare();
+               {
+                   int authorcount = rline.GetInt();            
+                   for(int i = 0; i < authorcount; i++)
+                   {
+                       mstring author = rline.GetString();
+                       if(i == 0)
+                       {
+                           firstauthor = author;
+                       }
+                   }               
+               }
+               
+               recordset rkey = recordset.Prepare();
+               rkey.PutInt(firstyear);
+               
+               recordset rvalue = recordset.Prepare();
+               rvalue.PutString(title);
+               rvalue.PutString(firstauthor);
+               
+               output.Add(rkey, rvalue);  
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rkey = recordset.Prepare(key);
+                int firstyear = rkey.GetInt();
+                
+                for(int i = 0; i < values.Length; i++)
+                {
+                    recordset rvalue = recordset.Prepare(values[i].Value);
+                    mstring title = rvalue.GetString();
+                    mstring firstauthor = rvalue.GetString();
+                    
+                    recordset rout = recordset.Prepare();
+                    rout.PutInt(firstyear);
+                    rout.PutString(title);
+                    rout.PutString(firstauthor);
+                    output.Add(rout);   //output jagged row
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    
+    <Job Name=`ReadJaggedBinary` Custodian=`` Email=`` Description=``>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>JaggedBinary_Output.bin@?</DFSReader>
+          <DFSWriter></DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                List<byte> buf = new List<byte>();
+                while(dfsinput.ReadRecordAppend(buf))
+                {
+                    recordset rs = recordset.Prepare(ByteSlice.Prepare(buf));
+                    
+                    int firstyear = rs.GetInt();
+                    mstring title = rs.GetString();
+                    mstring firstauthor = rs.GetString();
+                    
+                    DSpace_Log(title.ToString() + `:` + firstyear.ToString() + `:` + firstauthor.ToString());
+                    
+                    buf.Clear();
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
 
             #region Test
             StringBuilder csjobs = new StringBuilder();

@@ -10,7 +10,11 @@ namespace QueryAnalyzer_ADONET_RegressionTests
         public static void Main(string[] args)
         {
             List<KeyValuePair<string, bool>> AllTests = new List<KeyValuePair<string, bool>>();
-           
+
+            if (args.Length > 0 && "-fte" == args[0])
+            {
+                goto fte;
+            }
             if (args.Length > 0 && "-rindexmutable" == args[0])
             {
                 goto rindexmutable;
@@ -1344,7 +1348,29 @@ namespace QueryAnalyzer_ADONET_RegressionTests
                 }
                 Console.WriteLine();
             }
-            
+
+            fte:
+            if (args.Length > 0 && "-fte" == args[0])
+            {
+                {
+                    string testname = "FaultTolerantExecution";
+                    Console.WriteLine("*** Running test {0}...", testname);
+                    try
+                    {
+                        FaultTolerantExecution();
+                        Console.WriteLine("[PASSED] - {0}", testname);
+                        AllTests.Add(new KeyValuePair<string, bool>(testname, true));
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Error.WriteLine(e.ToString());
+                        Console.WriteLine("[FAILED] - {0}", testname);
+                        AllTests.Add(new KeyValuePair<string, bool>(testname, false));
+                    }
+                    Console.WriteLine();
+                }
+            }
+
             // - Display final output -
             Console.WriteLine("--STARTRESULTS--");
             foreach (KeyValuePair<string, bool> test in AllTests)

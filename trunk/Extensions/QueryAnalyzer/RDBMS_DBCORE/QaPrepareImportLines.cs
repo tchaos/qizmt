@@ -65,7 +65,13 @@ namespace RDBMS_DBCORE
                     TypeInfo = sbTypeInfo.ToString(); // Type
                 }
 
-                DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_ImportLines']/IOSettings/DFSInput=" + ImportDfsFile + "\" \"//Job[@Name='RDBMS_ImportLines']/IOSettings/DFSOutput=" + OutputDfsFile + "@" + OutputRowLength.ToString() + "\" RDBMS_ImportLines.DBCORE \"" + TableName + "\" \"" + ImportDfsFile + "\" \"" + OutputDfsFile + "\" \"" + DfsTableFile + "\" \"" + RowInfo + "\" \"" + TypeInfo + "\" \"" + QlArgDelim + "\"").Trim());
+                string overrideFTE = "";
+                if (RDBMS_DBCORE.Qa.FaultTolerantExecution)
+                {
+                    overrideFTE = " \"//Job[@Name='RDBMS_ImportLines']/FaultTolerantExecution/Mode=enabled\" ";
+                }
+
+                DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_ImportLines']/IOSettings/DFSInput=" + ImportDfsFile + "\" \"//Job[@Name='RDBMS_ImportLines']/IOSettings/DFSOutput=" + OutputDfsFile + "@" + OutputRowLength.ToString() + "\" " + overrideFTE + " RDBMS_ImportLines.DBCORE \"" + TableName + "\" \"" + ImportDfsFile + "\" \"" + OutputDfsFile + "\" \"" + DfsTableFile + "\" \"" + RowInfo + "\" \"" + TypeInfo + "\" \"" + QlArgDelim + "\"").Trim());
             }
 
         }

@@ -220,4 +220,46 @@ namespace MySpace.DataMining.DistributedObjects
             }
         }
     }
+
+
+    /// <summary>
+    /// Fast random methods.
+    /// Sacrifices some randomness for speed.
+    /// Not thread safe.
+    /// </summary>
+    public static class FRandom
+    {
+        static int _rh = 1, _rl = 1594606355;
+
+        /// <summary>
+        /// Seed the randomness. Note that this seed is global.
+        /// </summary>
+        public static void Seed(int x) { _rh = 1594606355; _rl = x ^ 1594606355; }
+
+        /// <summary>
+        /// Get next fully random integer, including negatives.
+        /// </summary>
+        public static int NextInt()
+        {
+            unchecked
+            {
+                _rh = (int)(((uint)_rh << 16) + ((uint)_rh >> 16));
+                _rh += _rl;
+                _rl += _rh;
+                return _rh;
+            }
+        }
+
+        /// <summary>
+        /// Get next non-negative integer.
+        /// </summary>
+        public static int Next() { return NextInt() & 0x7FFFFFFF; }
+
+        /// <summary>
+        /// Get next integer within the specified range, inclusive minimum and exclusive maximum.
+        /// </summary>
+        public static int Next(int a, int b) { return Next() % (b - a) + a; }
+
+    }
+
 }

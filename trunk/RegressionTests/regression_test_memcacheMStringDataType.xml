@@ -1,0 +1,262 @@
+<SourceCode>
+  <Jobs>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcacheMStringDataType_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {  Shell(@"Qizmt memcache del name=regression_test_memcacheMStringDataType");
+            Shell(@"Qizmt del regression_test_memcacheMStringDataType_Input*");
+            Shell(@"Qizmt del regression_test_memcacheMStringDataType_Output*");
+            Shell(@"Qizmt memcache create name=regression_test_memcacheMStringDataType schema=string(32)");
+            
+        }]]>
+      </Local>
+    </Job>
+           <Job description="Create sample data">
+      <Narrative>
+        <Name>regression_test_memcacheMStringDataType_CreateSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_memcacheMStringDataType_Input1.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            
+         public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int stringLength = 16;
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //string  
+                    int cnt = 0;
+                    while(cnt < stringLength)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        if(b != (byte)del)
+                        {
+                            onerow.Add(b);   
+                            cnt++;
+                        }
+                    }      
+                    
+                    //string  
+                    cnt = 0;
+                    while(cnt < stringLength)
+                    {
+                        byte b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);   
+                        
+                        if(b != (byte)del)
+                        {
+                            onerow.Add(b);   
+                            cnt++;
+                        }
+                    }            
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+           }
+            
+        ]]>
+      </Remote>
+    </Job>    
+    <Job>
+      <MemCache/>
+      <Narrative>
+        <Name>regression_test_memcacheMStringDataType Set</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>1</KeyLength>
+        <DFSInput>dfs://regression_test_memcacheMStringDataType_Input1.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_memcacheMStringDataType_Output1.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();    
+                string s = sLine.Substring(0, 16);  
+                string s2 = sLine.Substring(16, 16);
+                mstring val = mstring.Prepare();
+                val = val.AppendM(s).AppendM(s2);
+                output.Add(mstring.Prepare(sLine[0]), val);  
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          long sum = 0;
+          MemCache mc = null;
+          byte[] buf;
+     
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              if(mc == null)
+              {
+                  mc = MemCache.Attach("regression_test_memcacheMStringDataType", Qizmt_ProcessID);
+                  mc.MoveFirst(); // Start forward-only iterator.
+               
+              }
+              
+              while(values.MoveNext())
+              {                  
+                     
+                 
+                   mstring n = mstring.Prepare(values.Current);
+                   MemCache.Tuple t = mc.InsertRow();     
+                   t[0].SetMString(n);
+                  output.Add(values.Current);
+                  
+                  break; // No dupes.
+              }
+              if(StaticGlobals.Qizmt_Last)
+              {                  
+                  if(mc != null)
+                  {
+                      mc.Dispose();
+                  }                  
+                  
+              }
+            
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcacheMStringDataType_Commit</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            // Save inserts.
+           Shell(@"Qizmt memcache commit name=regression_test_memcacheMStringDataType");
+            
+            // Reload memory.
+           Shell(@"Qizmt memcache rollback name=regression_test_memcacheMStringDataType");
+           Shell(@"Qizmt memcache load name=regression_test_memcacheMStringDataType");            
+        }
+        ]]>
+      </Local>
+    </Job>    
+    <Job>
+      <MemCache/>
+      <Narrative>
+        <Name>regression_test_memcacheMStringDataType Get</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_memcacheMStringDataType_Input1.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_memcacheMStringDataType_Output2.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+                string sLine = line.ToString();    
+                string s = sLine.Substring(0, 16);  
+                string s2 = sLine.Substring(16, 16);
+                mstring val = mstring.Prepare();
+                val = val.AppendM(s).AppendM(s2);
+                output.Add(mstring.Prepare(sLine[0]), val);  
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[        
+          
+                public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+                {
+                    if(StaticGlobals.Qizmt_Last)
+                    {
+                        
+                    
+                        
+                        using(MemCache mc = MemCache.Attach("regression_test_memcacheMStringDataType", Qizmt_ProcessID))
+                        {
+                            for(mc.MoveFirst(); !mc.EOF; mc.MoveNext())
+                            {
+                                MemCache.Tuple t = mc.PeekRow();
+                                
+                                
+                            mstring n = mstring.Prepare();   
+                            n = t[0].GetMString();
+                              
+                                        
+                                                 
+                       
+                        output.Add(n);              
+                    }
+                }
+                    }
+                }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcacheMStringDataType_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_memcacheMStringDataType_Output1.txt regression_test_memcacheMStringDataType_Output2.txt regression_test_memcacheMStringDataType.xml");
+            
+            Shell(@"Qizmt del regression_test_memcacheMStringDataType_Input*");
+            Shell(@"Qizmt del regression_test_memcacheMStringDataType_Output*");
+            Shell(@"Qizmt memcache del name=regression_test_memcacheMStringDataType");
+         
+        }
+        ]]>
+      </Local>
+    </Job>    
+  </Jobs>
+</SourceCode>

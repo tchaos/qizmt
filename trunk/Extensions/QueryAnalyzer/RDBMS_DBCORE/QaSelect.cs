@@ -325,7 +325,6 @@ namespace RDBMS_DBCORE
             {
                 orderbuf = new List<byte>(DSpace_KeyLength);
                 defkey = DSpace_ProcessID;
-
                 TableName = DSpace_ExecArgs[0];
                 DfsOutputName = DSpace_ExecArgs[1];
                 string QlArgsSelectWhat = DSpace_ExecArgs[2];

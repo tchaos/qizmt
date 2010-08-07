@@ -1,0 +1,240 @@
+<SourceCode>
+  <Jobs>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcache_datatypes_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_memcache_datatypes_Input.bin");
+            Shell(@"Qizmt del regression_test_memcache_datatypes_Output.bin");
+            Shell(@"Qizmt del regression_test_memcache_datatypes_OutputSum*.txt");
+            
+            Shell(@"Qizmt gen regression_test_memcache_datatypes_Input.bin@21 20MB rand=frand writers=7");
+            
+            Shell(@"Qizmt memcache create name=regression_test_memcache_datatypes_Output.bin schema=int,byte,long,double");            
+        }
+        ]]>
+      </Local>
+    </Job>    
+    <Job>
+      <MemCache/>
+      <Narrative>
+        <Name>regression_test_memcache_datatypes Set</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_memcache_datatypes_Input.bin@21</DFSInput>
+        <DFSOutput>dfs://regression_test_memcache_datatypes_OutputSum1.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(ByteSlice.Prepare(line, 0, 4), line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+          long sum = 0;
+          MemCache mc = null;
+          List<byte> buf = null;
+          byte[] buf2 = new byte[9];
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              if(mc == null)
+              {
+                  mc = MemCache.Attach("regression_test_memcache_datatypes_Output.bin", Qizmt_ProcessID);
+                  mc.MoveFirst(); // Start forward-only iterator.
+                  buf = new List<byte>(100);
+              }
+              
+              while(values.MoveNext())
+              {                  
+                  buf.Clear();
+                  values.Current.AppendTo(buf);     
+                  
+                  for(int i = 0; i < values.Current.Length - 8; i++)
+                  {
+                      sum += values.Current[i];
+                  }
+                  
+                  int offset = 0;
+                  int n0 = Entry.BytesToInt(buf, offset);
+                  offset += 4;
+                  byte n1 = buf[offset];
+                  offset += 1;                  
+                  long n2 = Entry.BytesToLong(buf, offset);
+                  offset += 8;
+                  double n3 = BitConverter.Int64BitsToDouble(Entry.BytesToLong(buf, offset));
+                  
+                  {
+                      Entry.DoubleToBytes(n3, buf2, 0);
+                      for(int i = 0; i < 9; i++)
+                      {
+                          sum += buf2[i];
+                      }
+                  }
+                  
+                  MemCache.Tuple t = mc.InsertRow();     
+                  t[0].SetInt(n0);
+                  t[1].SetByte(n1);
+                  t[2].SetLong(n2);
+                  t[3].SetDouble(n3);
+                  
+                  break; // No dupes.
+              }
+              
+              if(StaticGlobals.Qizmt_Last)
+              {                  
+                  if(mc != null)
+                  {
+                      mc.Dispose();
+                  }                  
+                  output.WriteLine(mstring.Prepare(sum)); 
+                  output.WriteLine(mstring.Prepare(sum));     
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>    
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcache_datatypes_Commit</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            // Save inserts.
+            Shell(@"Qizmt memcache commit name=regression_test_memcache_datatypes_Output.bin");
+            
+            // Reload memory.
+            Shell(@"Qizmt memcache rollback name=regression_test_memcache_datatypes_Output.bin");
+            Shell(@"Qizmt memcache load name=regression_test_memcache_datatypes_Output.bin");            
+        }
+        ]]>
+      </Local>
+    </Job>    
+    <Job>
+      <MemCache/>
+      <Narrative>
+        <Name>regression_test_memcache_datatypes Get</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_memcache_datatypes_Input.bin@21</DFSInput>
+        <DFSOutput>dfs://regression_test_memcache_datatypes_OutputSum2.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              output.Add(ByteSlice.Prepare(line, 0, 4), line);
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[                
+                public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+                {
+                    if(StaticGlobals.Qizmt_Last)
+                    {
+                        List<byte> buf = new List<byte>(100);
+                        byte[] buf2 = new byte[9];
+                        long sum1 = 0;
+                        long sum2 = 0;
+                        
+                        using(MemCache mc = MemCache.Attach("regression_test_memcache_datatypes_Output.bin", Qizmt_ProcessID))
+                        {
+                            for(mc.MoveFirst(); !mc.EOF; mc.MoveNext())
+                            {
+                                MemCache.Tuple t = mc.PeekRow();
+                                
+                                for(int ib = 0; ib < t.Bytes.Length; ib++)
+                                {
+                                    sum1 += t.Bytes[ib];
+                                }
+                                
+                                buf.Clear();
+                                int n0 = t[0].GetInt();
+                                Entry.ToBytesAppend(n0, buf);
+                                
+                                byte n1 = t[1].GetByte();
+                                buf.Add(n1);
+                                
+                                long n2 = t[2].GetLong();
+                                Entry.ToBytesAppend64(n2, buf);
+                                
+                                double n3 = t[3].GetDouble();
+                                Entry.DoubleToBytes(n3, buf2, 0);
+                                
+                                for(int i = 0; i < buf.Count; i++)
+                                {
+                                    sum2 += buf[i];
+                                }
+                                
+                                for(int i = 0; i < buf2.Length; i++)
+                                {
+                                    sum2 += buf2[i];
+                                }
+                                
+                            }                            
+                        }
+                        
+                        output.WriteLine(mstring.Prepare(sum1));        
+                        output.WriteLine(mstring.Prepare(sum2));              
+                    }
+                }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcache_datatypes_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_memcache_datatypes_OutputSum1.txt regression_test_memcache_datatypes_OutputSum2.txt regression_test_memcache_datatypes.xml");
+            
+            Shell(@"Qizmt del regression_test_memcache_datatypes_Input.bin");
+            Shell(@"Qizmt del regression_test_memcache_datatypes_Output.bin");
+            Shell(@"Qizmt del regression_test_memcache_datatypes_OutputSum*.txt");            
+        }
+        ]]>
+      </Local>
+    </Job>    
+  </Jobs>
+</SourceCode>

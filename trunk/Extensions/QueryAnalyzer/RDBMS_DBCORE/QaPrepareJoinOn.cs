@@ -380,6 +380,10 @@ namespace RDBMS_DBCORE
                     mrc.OverrideInput = DfsTableFilesInput;
                     mrc.OverrideOutput = DfsOutputName + "@" + DfsOutputRowSize;
                     mrc.OverrideKeyLength = KeyLength;
+                    if (RDBMS_DBCORE.Qa.FaultTolerantExecution)
+                    {
+                        mrc.OverrideFaultTolerantExecutionMode = "enabled";
+                    }
                     mrc.Call("\"" + QlLeftTableName + "\" " + stype + " \"" + QlRightTableName
                         + "\" \"" + QlOn
                         + "\" \"" + on1col.RowOffset + "," + on1col.Type.Size + "=" + QlArgsEscape(on1col.Type.Name)

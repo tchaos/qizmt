@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySpace.DataMining.DistributedObjects", "MySpace.DataMining.DistributedObjects\MySpace.DataMining.DistributedObjects.csproj", "{278EF378-7DBC-47D5-B9F8-978E9B9FA1E5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySpace.DataMining.DistributedObjects.DistributedObjectsSlave", "MySpace.DataMining.DistributedObjects.DistributedObjectsSlave\MySpace.DataMining.DistributedObjects.DistributedObjectsSlave.csproj", "{43F383AD-4CE7-4C4B-A3AD-A3048754B397}"
@@ -49,9 +49,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MDORedir", "MDORedir\MDORed
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scheduler", "Scheduler\Scheduler.csproj", "{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemCache", "MemCache\MemCache.csproj", "{56F560DE-F137-4910-9CBF-45F036309AF8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemCachePin", "MemCachePin_x\MemCachePin.csproj", "{37A7AD7E-2104-4F65-895A-E8BC561649FC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FaultTolerantExecutionTest", "FaultTolerantExecutionTest\FaultTolerantExecutionTest.csproj", "{A4B1C269-14AD-4CF0-A432-98BF52756F30}"
+EndProject
 Global
 	GlobalSection(TeamFoundationVersionControl) = preSolution
-		SccNumberOfProjects = 25
+		SccNumberOfProjects = 28
 		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
 		SccTeamFoundationServer = http://tfs:8080/
 		SccLocalPath0 = .
@@ -127,6 +133,15 @@ Global
 		SccProjectUniqueName24 = Scheduler\\Scheduler.csproj
 		SccProjectName24 = Scheduler
 		SccLocalPath24 = Scheduler
+		SccProjectUniqueName25 = MemCache\\MemCache.csproj
+		SccProjectName25 = MemCache
+		SccLocalPath25 = MemCache
+		SccProjectUniqueName26 = MemCachePin_x\\MemCachePin.csproj
+		SccProjectName26 = MemCachePin_x
+		SccLocalPath26 = MemCachePin_x
+		SccProjectUniqueName27 = FaultTolerantExecutionTest\\FaultTolerantExecutionTest.csproj
+		SccProjectName27 = FaultTolerantExecutionTest
+		SccLocalPath27 = FaultTolerantExecutionTest
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -281,6 +296,24 @@ Global
 		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6E16BE4B-1296-44B8-A3F5-9E0A12147BAD}.Release|x86.ActiveCfg = Release|Any CPU
+		{56F560DE-F137-4910-9CBF-45F036309AF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56F560DE-F137-4910-9CBF-45F036309AF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56F560DE-F137-4910-9CBF-45F036309AF8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{56F560DE-F137-4910-9CBF-45F036309AF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56F560DE-F137-4910-9CBF-45F036309AF8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56F560DE-F137-4910-9CBF-45F036309AF8}.Release|x86.ActiveCfg = Release|Any CPU
+		{37A7AD7E-2104-4F65-895A-E8BC561649FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{37A7AD7E-2104-4F65-895A-E8BC561649FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{37A7AD7E-2104-4F65-895A-E8BC561649FC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{37A7AD7E-2104-4F65-895A-E8BC561649FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{37A7AD7E-2104-4F65-895A-E8BC561649FC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{37A7AD7E-2104-4F65-895A-E8BC561649FC}.Release|x86.ActiveCfg = Release|Any CPU
+		{A4B1C269-14AD-4CF0-A432-98BF52756F30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A4B1C269-14AD-4CF0-A432-98BF52756F30}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A4B1C269-14AD-4CF0-A432-98BF52756F30}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A4B1C269-14AD-4CF0-A432-98BF52756F30}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A4B1C269-14AD-4CF0-A432-98BF52756F30}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A4B1C269-14AD-4CF0-A432-98BF52756F30}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

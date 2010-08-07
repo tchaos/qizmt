@@ -226,6 +226,10 @@ namespace MySpace.DataMining.AELight
             public int CookTimeout = 1000 * 60;
             public int CookRetries = 1024;
 
+            public int FaultTolerantReadTimeout = 5000;
+            public int FaultTolerantReadRetries = 10;
+            public int FaultTolerantConnectRetries = 10;
+
             //public int FoilKeySkipFactor = 5000;
             public int FoilBaseSkipFactor = 1000;
 
@@ -293,6 +297,7 @@ namespace MySpace.DataMining.AELight
             public int ScanChunkSleep = 1000;
             public int RepairSleep = 1000 * 60 * 60 * 24 * 3 + (1000 * 60 * 60 * 2);
             public int MaxRepairs = 10;
+            public bool AutoRepair = false;
         }
         public ConfigFileDaemon FileDaemon;
 
@@ -331,7 +336,15 @@ namespace MySpace.DataMining.AELight
                     int ic = XFileType.IndexOf('@');
                     if (-1 != ic)
                     {
-                        return int.Parse(XFileType.Substring(ic + 1));
+                        string strlen = XFileType.Substring(ic + 1);
+                        if (strlen == "?")
+                        {
+                            return -2;
+                        }
+                        else
+                        {
+                            return int.Parse(strlen);
+                        }                        
                     }
                     return -1;
                 }
@@ -355,6 +368,20 @@ namespace MySpace.DataMining.AELight
                     return 0 == string.Compare(DfsFileTypes.NORMAL, XFileType, StringComparison.OrdinalIgnoreCase);
                 }
             }
+
+
+            public class ConfigMemCache
+            {
+                public string Schema;
+                public string MetaFileName;
+                public string FieldOffsets;
+                public int KeyOffset;
+                public int KeyLength;
+                public int RowLength;
+                public int SegmentSize;
+            }
+            public ConfigMemCache MemCache = null;
+
 
             public class FileNode : IComparable<FileNode>
             {
@@ -898,6 +925,8 @@ namespace MySpace.DataMining.AELight
 
         public static bool IsBadFilename(string filename, out string reason)
         {
+            
+            filename = filename.Trim();
             if (filename.Length == 0)
             {
                 reason = "Empty name";
@@ -905,6 +934,7 @@ namespace MySpace.DataMining.AELight
             }
             for (int i = 0; i < filename.Length; i++)
             {
+                
                 if (!char.IsLetterOrDigit(filename[i])
                     && '_' != filename[i]
                     && '-' != filename[i]                    
@@ -2094,15 +2124,16 @@ namespace MySpace.DataMining.AELight
                 }
             }
 
-            public ComputingConfig Computing;
+            public FaultTolerantExecutionConfig FaultTolerantExecution;
 
-            public class ComputingConfig
+            public class FaultTolerantExecutionConfig
             {
-                public string Mode = "";
-                public string MapInputOrder = "next";
+                public string Mode = "disabled";
+                public string MapInputOrder = "shuffle";
                 public int HeartBeatTimeout = 30000;
                 public int HeartBeatRetries = 10;
                 public int HeartBeatExpired = 120000;
+                public int TattleTimeout = 3000;
             }
 
             public class ConfigIOSettings
@@ -2292,7 +2323,10 @@ namespace MySpace.DataMining.AELight
 
             public string OpenCVExtension;
             public string Unsafe;
+            public string NoSpill;
             public string DynamicFoil;
+            public string MemCache;
+            public string PartialReduce;
 
         }
         public Job[] Jobs;
@@ -2302,67 +2336,223 @@ namespace MySpace.DataMining.AELight
 
     public class Surrogate
     {
+        public struct RecordInfo
+        {
+            public int Size;
+            public bool InKey;
+        }
+
+        public static IEnumerable<RecordInfo> EachRecord(string UserFriendly)
+        {
+            int result = 0;
+            bool inkey = false;
+            foreach (string p in UserFriendly.Split(','))
+            {
+                RecordInfo ri;
+                try
+                {
+                    string x = p.Trim();
+                    if (x.StartsWith("["))
+                    {
+                        if (inkey)
+                        {
+                            throw new Exception("Invalid key section [");
+                        }
+                        inkey = true;
+                        x = x.Substring(1);
+                    }
+                    if (x.StartsWith("]"))
+                    {
+                        if (!inkey)
+                        {
+                            throw new Exception("Invalid key section ]");
+                        }
+                        inkey = false;
+                    }
+                    bool endkey = false;
+                    if (x.EndsWith("]"))
+                    {
+                        if (!inkey)
+                        {
+                            throw new Exception("Invalid key section ]");
+                        }
+                        endkey = true;
+                        x = x.Substring(0, x.Length - 1);
+                    }
+                    bool nextinkey = false;
+                    if (x.EndsWith("["))
+                    {
+                        if (inkey)
+                        {
+                            throw new Exception("Invalid key section [");
+                        }
+                        nextinkey = true;
+                    }
+                    int sz = GetRecordTypeSize(x);
+                    result += sz;
+                    ri.Size = sz;
+                    ri.InKey = inkey;
+                    if (endkey)
+                    {
+                        inkey = false;
+                    }
+                    if (nextinkey)
+                    {
+                        inkey = true;
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw new FormatException("Record size is invalid: " + UserFriendly, e);
+                }
+                yield return ri;
+            }
+        }
+
+        public static int GetRecordInfo(string UserFriendly, out int keyoffset, out int keylen, List<int> offsets)
+        {
+            int result = 0;
+            bool foundkey = false;
+            keyoffset = 0;
+            keylen = 0;
+            foreach (RecordInfo ri in EachRecord(UserFriendly))
+            {
+                if (null != offsets)
+                {
+                    offsets.Add(result);
+                }
+                if (ri.InKey)
+                {
+                    if (!foundkey)
+                    {
+                        foundkey = true;
+                        keyoffset = result;
+                    }
+                    keylen += ri.Size;
+                }
+                result += ri.Size;
+            }
+            if (keylen == 0)
+            {
+                keylen = result;
+            }
+            return result;
+        }
+
+        public static int GetRecordInfo(string UserFriendly, out int keyoffset, out int keylen)
+        {
+            return GetRecordInfo(UserFriendly, out keyoffset, out keylen, null);
+        }
 
         public static int GetRecordSize(string UserFriendly)
         {
             int result = 0;
             foreach (string p in UserFriendly.Split(','))
             {
+                result += GetRecordTypeSize(p);
+            }
+            return result;
+        }
+
+        public static int GetRecordTypeSize(string x)
+        {
+            
+            int result = 0;
+            x = x.Trim();
+
+         
+            if (0 == string.Compare(x, "SHORT", true)
+               || 0 == string.Compare(x, "INT16", true)
+               ||  0 == string.Compare(x, "USHORT", true)
+               || 0 == string.Compare(x, "UINT16", true))
+            {
+                result += 2;
+            }
+            else if(x.StartsWith("string(", true, null))
+            {
+                if (!x.EndsWith(")"))
+                {
+                    throw new FormatException(") expected");
+                }
+                int pos,pos1;
+                pos = x.IndexOf(')'); 
+                pos1 = x.IndexOf('(');
+                int leng = pos-(pos1+1);
+                result += 2*int.Parse(x.Substring(pos1 + 1, leng));
+
+            }
+            else  if (0 == string.Compare(x, "INT32", true)
+                || 0 == string.Compare(x, "INT", true)
+                || 0 == string.Compare(x, "I", true)
+                || 0 == string.Compare(x, "UINT" ,true)
+                || 0 == string.Compare(x,"UINT32",true))
+            {
+                result += 4;
+            }
+            else if (0 == string.Compare(x, "INT64", true)
+                || 0 == string.Compare(x, "LONG", true)
+                || 0 == string.Compare(x, "L", true)
+                || 0 == string.Compare(x, "UINT64",true)
+                || 0 == string.Compare(x,"ULONG",true))
+            {
+                result += 8;
+            }
+            else if (0 == string.Compare(x, "DOUBLE", true)
+                || 0 == string.Compare(x, "D", true))
+            {
+                result += 9;
+            }
+            else if (0 == string.Compare(x, "BYTE", true)
+                || 0 == string.Compare(x, "B", true))
+            {
+                result += 1;
+            }
+            else if (0 == string.Compare(x, "NInt", true))
+            {
+                result += 1 + 4;
+            }
+            else if (0 == string.Compare(x, "NLong", true))
+            {
+                result += 1 + 8;
+            }
+            else if (0 == string.Compare(x, "NDouble", true))
+            {
+                result += 1 + 9;
+            }
+            else if (0 == string.Compare(x, "NDateTime", true))
+            {
+                result += 1 + 8;
+            }
+            else if (x.StartsWith("NChar(", true, null))
+            {
+                if (!x.EndsWith(")"))
+                {
+                    throw new FormatException(") expected");
+                }
+                string scharlen = x.Substring(6, x.Length - 6 - 1);
+                int charlen = int.Parse(scharlen);
+                result += 1 + (charlen * 2);
+            }
+            else if (0 == string.Compare(x, "?", true))
+            {
+                result = -2;
+            }
+            else
+            {
+                int xx;
                 try
                 {
-                    string x = p.Trim();
-                    if (0 == string.Compare(x, "INT32", true)
-                        || 0 == string.Compare(x, "INT", true)
-                        || 0 == string.Compare(x, "I", true))
-                    {
-                        result += 4;
-                    }
-                    else if (0 == string.Compare(x, "INT64", true)
-                        || 0 == string.Compare(x, "LONG", true)
-                        || 0 == string.Compare(x, "L", true))
-                    {
-                        result += 8;
-                    }
-                    else if (0 == string.Compare(x, "DOUBLE", true)
-                        || 0 == string.Compare(x, "D", true))
-                    {
-                        result += 9;
-                    }
-                    else if (0 == string.Compare(x, "NInt", true))
-                    {
-                        result += 1 + 4;
-                    }
-                    else if (0 == string.Compare(x, "NLong", true))
-                    {
-                        result += 1 + 8;
-                    }
-                    else if (0 == string.Compare(x, "NDouble", true))
-                    {
-                        result += 1 + 9;
-                    }
-                    else if (0 == string.Compare(x, "NDateTime", true))
-                    {
-                        result += 1 + 8;
-                    }
-                    else if (x.StartsWith("NChar(", true, null))
-                    {
-                        if (!x.EndsWith(")"))
-                        {
-                            throw new FormatException(") expected");
-                        }
-                        string scharlen = x.Substring(6, x.Length - 6 - 1);
-                        int charlen = int.Parse(scharlen);
-                        result += 1 + (charlen * 2);
-                    }
-                    else
-                    {
-                        result += int.Parse(x);
-                    }
+                    xx = int.Parse(x);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
-                    throw new FormatException("Record size is invalid: " + UserFriendly, e);
+                    throw new FormatException("Invalid record type '" + x + "', " + e.Message, e);
                 }
+                if (xx <= 0)
+                {
+                    throw new FormatException("Numeric record type must be positive, not " + x);
+                }
+                result += xx;
             }
             return result;
         }
@@ -2453,6 +2643,111 @@ namespace MySpace.DataMining.AELight
             {
                 _mhost = newmasterhost;
             }
+        }
+
+
+        public static bool LogonMachines(string logonfile)
+        {
+#if LOGON_MACHINES
+            // File in the format:
+            // <WindowsUser>
+            // <machine>=<password>
+            try
+            {
+                using (System.IO.StreamReader sr = new System.IO.StreamReader(logonfile))
+                {
+                    string user = sr.ReadLine();
+                    if (string.IsNullOrEmpty(user))
+                    {
+                        return false;
+                    }
+                    for (; ; )
+                    {
+                        string s = sr.ReadLine();
+                        if (null == s)
+                        {
+                            break;
+                        }
+                        string machine = null;
+                        string passwd = s;
+                        int ieq = s.IndexOf('=');
+                        if (ieq > 0)
+                        {
+                            machine = s.Substring(0, ieq);
+                            passwd = s.Substring(ieq + 1);
+                        }
+                        else
+                        {
+                            //continue;
+                            throw new InvalidOperationException("LogonMachines error in file (=)");
+                        }
+                        string netpath = NetworkPathForHost(machine);
+                        int idollar = netpath.IndexOf('$');
+                        if (-1 == idollar)
+                        {
+                            //continue;
+                            throw new InvalidOperationException("LogonMachines error in path ($)");
+                        }
+                        string sharepath = netpath.Substring(0, idollar + 1);
+                        try
+                        {
+                            System.IO.DirectoryInfo di = new System.IO.DirectoryInfo(sharepath);
+                            // Note: ensuring di.Attributes call passes or fails.
+                            if ((di.Attributes & System.IO.FileAttributes.Offline)
+                                == System.IO.FileAttributes.Offline)
+                            {
+                                throw new System.IO.IOException("Network share is offline: " + sharepath);
+                            }
+                            // Has access...
+                            continue;
+                        }
+                        catch
+                        {
+                        }
+                        //AccessNetworkShare(sharepath, user, passwd);
+                        {
+                            string cmdname = "net";
+                            string cmdargs = "use * \"" + sharepath + "\" \"/USER:" + user + "\" \"" + passwd + "\"";
+                            System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(cmdname, cmdargs);
+                            psi.UseShellExecute = false;
+                            psi.CreateNoWindow = true;
+                            psi.RedirectStandardError = true;
+                            System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
+                            //proc.WaitForExit();
+                            string erroutput = proc.StandardError.ReadToEnd().Trim();
+                            proc.Dispose();
+                            if (erroutput.Length > 0)
+                            {
+                                string safeargs = cmdargs;
+                                {
+                                    const string findslashuser = "/USER:";
+                                    int islashuser = cmdargs.IndexOf(findslashuser);
+                                    if (-1 != islashuser)
+                                    {
+                                        safeargs = cmdargs.Substring(0, islashuser + findslashuser.Length) + "{masked}";
+                                    }
+                                }
+                                throw new Exception("Process.Start(\"" + cmdname + "\", \"" + safeargs + "\") error: " + erroutput);
+                            }
+                        }
+                    }
+                    return true;
+                }
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                return false;
+            }
+#else
+            return false;
+#endif
+        }
+
+        public static void LogonMachines()
+        {
+            string appdir = System.IO.Path.GetDirectoryName(System.Reflection
+                .Assembly.GetExecutingAssembly().Location);
+            LogonMachines(appdir + @"\logon.dat");
         }
 
 
@@ -3433,7 +3728,12 @@ namespace MySpace.DataMining.AELight
 
         public static string WildcardRegexString(string str)
         {
-            return "^" + System.Text.RegularExpressions.Regex.Escape(str).Replace(@"\*", @".*").Replace(@"\?", @".") + "$";
+            return "^" + WildcardRegexSubstring(str) + "$";
+        }
+
+        public static string WildcardRegexSubstring(string str)
+        {
+            return System.Text.RegularExpressions.Regex.Escape(str).Replace(@"\*", @".*").Replace(@"\?", @".");
         }
 
 
