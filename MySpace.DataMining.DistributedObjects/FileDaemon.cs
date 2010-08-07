@@ -1,4 +1,24 @@
-﻿using System;
+﻿/**************************************************************************************
+ *  MySpace’s Mapreduce Framework is a mapreduce framework for distributed computing  *
+ *  and developing distributed computing applications on large clusters of servers.   *
+ *                                                                                    *
+ *  Copyright (C) 2008  MySpace Inc. <http://qizmt.myspace.com/>                      *
+ *                                                                                    *
+ *  This program is free software: you can redistribute it and/or modify              *
+ *  it under the terms of the GNU General Public License as published by              *
+ *  the Free Software Foundation, either version 3 of the License, or                 *
+ *  (at your option) any later version.                                               *
+ *                                                                                    *
+ *  This program is distributed in the hope that it will be useful,                   *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of                    *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                     *
+ *  GNU General Public License for more details.                                      *
+ *                                                                                    *
+ *  You should have received a copy of the GNU General Public License                 *
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
+***************************************************************************************/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,6 +27,8 @@ namespace MySpace.DataMining.DistributedObjects
 {
     public class FileDaemon
     {
+
+        static bool dfsnotfound = false;
 
         public static void RunScanner()
         {
@@ -18,10 +40,26 @@ namespace MySpace.DataMining.DistributedObjects
             // Random sleep to hit surrogate\dfs.xml at different times.
             System.Threading.Thread.Sleep(rnd.Next(5000, 30000));
 
-            MySpace.DataMining.AELight.dfs dc
-                = MySpace.DataMining.AELight.dfs.ReadDfsConfig_unlocked(
-                    MySpace.DataMining.AELight.Surrogate.NetworkPathForHost(MySpace.DataMining.AELight.Surrogate.MasterHost)
-                        + @"\" + MySpace.DataMining.AELight.dfs.DFSXMLNAME);
+            MySpace.DataMining.AELight.dfs dc;
+            try
+            {
+                dc = MySpace.DataMining.AELight.dfs.ReadDfsConfig_unlocked(
+                        MySpace.DataMining.AELight.Surrogate.NetworkPathForHost(MySpace.DataMining.AELight.Surrogate.MasterHost)
+                            + @"\" + MySpace.DataMining.AELight.dfs.DFSXMLNAME);
+            }
+            catch (System.IO.FileNotFoundException e)
+            {
+                if (!dfsnotfound)
+                {
+                    dfsnotfound = true;
+                    // Just throw it once.
+                    throw new System.IO.FileNotFoundException("FileDaemon scanner thread aborting"
+                        + "; " + MySpace.DataMining.AELight.dfs.DFSXMLNAME + " not found", e);
+                }
+                dc = null;
+                _ThreadDisabled();
+                return;
+            }
 
             if (null == dc.FileDaemon || !dc.FileDaemon.Enabled)
             {
@@ -199,10 +237,10 @@ namespace MySpace.DataMining.DistributedObjects
                                 if (-1 != i)
                                 {
                                     string s = rf.Substring(i + 2);
-                                    i = s.IndexOf(' ');
+                                    i = IndexOfEndOfParam(s);
                                     string rfhost = s.Substring(0, i);
                                     s = s.Substring(i + 1);
-                                    i = s.IndexOf(' ');
+                                    i = IndexOfEndOfParam(s);
                                     string spos = s.Substring(0, i);
                                     s = s.Substring(i + 1);
                                     string chunkname = s.Trim('"');
@@ -266,7 +304,25 @@ namespace MySpace.DataMining.DistributedObjects
                                 string state = "no attempt";
                                 string newhost = "N/A";
                                 string[] ahosts = fn.Host.Split(';');
-                                if (ahosts.Length < 2
+                                if (dc.FileDaemon.AutoRepair)
+                                {
+                                    for (int itries = 0; itries < 5; itries++, System.Threading.Thread.Sleep(1000))
+                                    {
+                                        try
+                                        {
+                                            System.IO.File.AppendAllText("filerepairlog.txt",
+                                                "[" + DateTime.Now + "] NotReplacing \"" + ri.chunkpath
+                                                + "\" with replicate chunk: AutoRepair is false"
+                                                + Environment.NewLine);
+                                            break;
+                                        }
+                                        catch
+                                        {
+                                        }
+                                    }
+                                    break;
+                                }
+                                else if (ahosts.Length < 2
                                     || ahosts.Length < dc.Replication)
                                 {
                                     //state = "no attempt: file replicate count is " + ahosts.Length
@@ -307,8 +363,8 @@ namespace MySpace.DataMining.DistributedObjects
                                     try
                                     {
                                         System.IO.File.AppendAllText("filerepairlog.txt",
-                                            "[" + DateTime.Now + "] Replacing " + ri.chunkpath
-                                            + " with chunk from " + newhost
+                                            "[" + DateTime.Now + "] Replacing \"" + ri.chunkpath
+                                            + "\" with chunk from " + newhost
                                             + ": " + state
                                             + Environment.NewLine);
                                         break;
@@ -329,6 +385,39 @@ namespace MySpace.DataMining.DistributedObjects
 
             }
 
+        }
+
+
+        static int IndexOfEndOfParam(string s, int index)
+        {
+            for (; index < s.Length; index++)
+            {
+                if (s[index] != ' ')
+                {
+                    break;
+                }
+            }
+            bool inquote = false;
+            for (; index < s.Length; index++)
+            {
+                if (s[index] == ' ')
+                {
+                    if (!inquote)
+                    {
+                        return index;
+                    }
+                }
+                else if (s[index] == '"')
+                {
+                    inquote = !inquote;
+                }
+            }
+            return s.Length;
+        }
+
+        static int IndexOfEndOfParam(string s)
+        {
+            return IndexOfEndOfParam(s, 0);
         }
 
 

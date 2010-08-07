@@ -749,6 +749,7 @@ namespace MySpace.DataMining.AELight
                 case "ulong": name = "UInt64"; break;
                 case "object": name = "Object"; break;
                 case "string": name = "String"; break;
+                case "double": name = "Double"; break;
             }
 
             foreach (Type t in gtypes)
@@ -858,6 +859,7 @@ namespace MySpace.DataMining.AELight
                 mygtypes.Add(typeof(UInt64));
                 mygtypes.Add(typeof(Object));
                 mygtypes.Add(typeof(String));
+                mygtypes.Add(typeof(Double));
             }
            
             //mygtypes.AddRange(System.Reflection.Assembly.GetAssembly(typeof(System.Xml.XmlDocument)).GetTypes()); // System.Xml.dll
@@ -1470,6 +1472,31 @@ namespace MySpace.DataMining.AELight
                 }
             }
 
+            {
+                int ife = code.LastIndexOf("using");
+                if (-1 != ife)
+                {
+                    string fe = code.Substring(ife + 5);
+                    if (fe.Length >= 2)
+                    {
+                        if (fe[0] == '('
+                            || (fe[0] == ' ' && fe[1] == '('))
+                        {
+                            fe = fe.Substring(fe.IndexOf('(') + 1);
+                            // The '=' was already trimmed out above.
+                            string decl = fe;
+                            int ix = decl.IndexOf(')');
+                            if (-1 != ix)
+                            {
+                                decl = decl.Substring(0, ix);
+                            }
+                            _csdecl(decl, results);
+                            return; // Handled!
+                        }
+                    }
+                }
+            }
+
             if (code[code.Length - 1] == ')')
             {
                 {
@@ -1587,10 +1614,15 @@ namespace MySpace.DataMining.AELight
 
                 int nbracks = 0;
                 int nangles = 0;
+                int comma = 0;
                 bool foundsep = false;
                 //bool isarray = false;
                 for (int ic = code.Length - 1; ; ic--)
                 {
+                    if (code[ic] == ',')
+                    {
+                        comma++;
+                    }
                     if (code[ic] == ']')
                     {
                         nbracks++;
@@ -1631,7 +1663,7 @@ namespace MySpace.DataMining.AELight
                     else if (code[ic] == ';' && !foundsep)
                     {
                     }
-                    else if (code[ic] != '_' && !char.IsLetterOrDigit(code[ic]) && code[ic] != '.')
+                    else if (code[ic] != '_' && !char.IsLetterOrDigit(code[ic]) && code[ic] != '.' && code[ic] != ',')
                     {
                         if (foundsep)
                         {
@@ -1646,6 +1678,45 @@ namespace MySpace.DataMining.AELight
 
                     if (0 == ic)
                     {
+
+                        if (comma != 0)
+                        {
+                            string[] arr = new string[comma + 1];
+                            int sep = 0;
+                            string code1 = null;
+                            string code2 = null;
+                            sep = code.IndexOf(' ');
+                            code1 = code.Substring(0, sep);
+                            code2 = code.Substring(sep + 1, code.Length - 1 - sep);
+                            for (int ii = 0; ii < comma + 1; ii++)
+                            {
+                                sep = code2.IndexOf(',');
+                                if (sep != -1 )
+                                {
+                                    arr[ii] = code2.Substring(0, sep);
+                                    code2 = code2.Substring(sep + 1, code2.Length - 1 - sep);
+                                }
+                                else
+                                {
+                                    arr[ii] = code2;
+                                }
+
+                            }
+                            string code3 = null;
+                            for (int iii = 0; iii < comma + 1; iii++)
+                            {
+                                code3 = code1 + " " + arr[iii];
+                                code3 = code3.Trim();
+                                if (0 != code3.Length)
+                                {
+                                    _csdecl(code3, results);
+                                }
+                                
+                            }
+                            foundsep = false;
+
+                        }
+
                         if (foundsep)
                         {
                             code = code.Trim();
@@ -1822,7 +1893,7 @@ namespace MySpace.DataMining.AELight
             {
                 return null;
             }
-            istart += 8;
+            istart += 9;
             if (StopAtNear)
             {
                 return xml.Substring(istart, near - istart);
@@ -1955,7 +2026,7 @@ namespace MySpace.DataMining.AELight
             {
                 //string ctx = Doc.GetRange(Doc.Lines.FromPosition(pos).StartPosition, pos).Text.Trim();
                 string ctx;
-                {
+                {   
                     int DocTextLength = Doc.TextLength;
                     if (pos < 0 || pos > DocTextLength)
                     {
@@ -1975,7 +2046,61 @@ namespace MySpace.DataMining.AELight
                     {
                         throw new ScintillaNativeInterfaceException("DocGetRightmostExprType: unexpected line.StartPosition  (linestartpos > pos) pos=" + pos.ToString() + "; line.StartPosition=" + line.StartPosition.ToString());
                     }
-                    ctx = Doc.GetRange(linestartpos, pos).Text.Trim();
+
+                    int pos1 = 0;
+                    
+                     for(int i = pos-1 ; i>0; i--)
+                         if (Doc.Text[i] == ';' || Doc.Text[i] == '}' || Doc.Text[i] == '{' || Doc.Text[i] == '[' || Doc.Text[i]=='('
+                             || Doc.Text[i] == '=' || Doc.Text[i] == ']' || Doc.Text[i] == ')')
+                         {
+                           
+                                pos1 = i;
+                                break;
+                      
+                         }
+                        
+
+                 
+                   
+                   
+                    ctx = Doc.GetRange(pos1+1, pos).Text.Trim();
+                    StringBuilder ctx1 = new StringBuilder();
+                    for (int i = 0; i < ctx.Length; i++)
+                    {
+
+                        char ch = ctx[i];
+                        char chNext = (i + 1 < ctx.Length) ? ctx[i + 1] : '\0';
+
+                        if (ch == '/' && chNext == '*')
+                        {
+                            for (i += 3; i < ctx.Length; i++)
+                            {
+                                if (ctx[i] == '/' && ctx[i - 1] == '*')
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                        else if (ch == '/' && chNext == '/')
+                        {
+                            for (i += 2; i < ctx.Length; i++)
+                            {
+                                if (ctx[i] == '\r' || ctx[i] == '\n')
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                        if (ctx[i] != ' ' && ctx[i] != '\r' &&  ctx[i] != '\n' && ctx[i] != '\t' )
+                        {
+                            ctx1.Append(ctx[i]);
+                        }
+
+
+                    }
+                    ctx = ctx1.ToString();
+                   
+                        
                 }
                 // '(' scan to ')' if not, use paired one as inner type...
                 List<string> parts = SplitExprParts(ctx);
@@ -1985,6 +2110,7 @@ namespace MySpace.DataMining.AELight
                     IsStatic = false;
                     return null;
                 }
+         
                 if (parts[0][0] == '(') // Cast.
                 {
                     /*
@@ -2002,7 +2128,8 @@ namespace MySpace.DataMining.AELight
                     IsStatic = false;
                     return null;
                 }
-                else if (syms.ContainsKey(parts[0]))
+                    
+                else if (syms.ContainsKey(parts[0]) )
                 {
                     string dtype = syms[parts[0]];
                     ltype = FindAcType(dtype);
@@ -2390,6 +2517,7 @@ namespace MySpace.DataMining.AELight
         {
             if (e.KeyCode == Keys.OemPeriod && e.Modifiers == Keys.None)
             {
+                
                 try
                 {
                     int pos = Doc.Selection.Start;
@@ -2416,7 +2544,7 @@ namespace MySpace.DataMining.AELight
                                             continue;
                                         }
                                         string x = m.Name;
-                                        if (x.StartsWith("get_") || x.StartsWith("set_"))
+                                        if (x.StartsWith("get_") || x.StartsWith("set_") || x.StartsWith("DSpace"))
                                         {
                                             continue;
                                         }
@@ -4270,6 +4398,8 @@ namespace MySpace.DataMining.AELight
                                             Outer.DbgCallsList.Items.Add(s.Substring(0, ipos));
                                         }));
 
+                                        _wherefoundjobfile = false;
+
                                         if (ipos + 4 <= s.Length)
                                         {
                                             s = s.Substring(ipos + 4); // "c:\foo\dbg_cmiller~jobs_b3f46409-1c8a-4205-9998-96ec94b11c98.ds:18"
@@ -4285,6 +4415,7 @@ namespace MySpace.DataMining.AELight
                                         {
                                             if (s.Substring(0, ilcolon).EndsWith(".ds", true, null)) // Simple way to step around a jobs file only.
                                             {
+                                                _wherefoundjobfile = true;
                                                 _TSafeLockedUiCall(new Action(delegate()
                                                 {
                                                     if (-1 != Outer.curdebugcline)
@@ -4328,6 +4459,39 @@ namespace MySpace.DataMining.AELight
                                             Outer.DbgCallsList.Items.Add(s.Substring(0, ipos));
                                         }));
                                     }
+#if DEBUG
+                                    if (!_wherefoundjobfile)
+                                    {
+                                        if (ipos + 4 <= s.Length)
+                                        {
+                                            s = s.Substring(ipos + 4); // "c:\foo\dbg_cmiller~jobs_b3f46409-1c8a-4205-9998-96ec94b11c98.ds:18"
+                                        }
+                                        /*if (s.Length > jobfilename.Length
+                                            && s[jobfilename.Length] == ':'
+                                            && s.StartsWith(jobfilename, StringComparison.OrdinalIgnoreCase)
+                                            )*/
+                                        int ilcolon = s.LastIndexOf(':');
+                                        int cln;
+                                        if (-1 != ilcolon
+                                            && int.TryParse(s.Substring(ilcolon + 1), out cln))
+                                        {
+                                            if (s.Substring(0, ilcolon).EndsWith(".ds", true, null)) // Simple way to step around a jobs file only.
+                                            {
+                                                _wherefoundjobfile = true;
+                                                _TSafeLockedUiCall(new Action(delegate()
+                                                {
+                                                    if (-1 != Outer.curdebugcline)
+                                                    {
+                                                        Outer.Doc.Lines[Outer.curdebugcline].DeleteMarker(MARKER_CURDEBUG);
+                                                    }
+                                                    Outer.curdebugcline = cln;
+                                                    Outer.Doc.Lines[Outer.curdebugcline].AddMarker(MARKER_CURDEBUG);
+                                                    Outer.Doc.Lines[cln].Goto();
+                                                }));
+                                            }
+                                        }
+                                    }
+#endif
                                     continue;
                                 }
                                 else
@@ -4617,6 +4781,7 @@ namespace MySpace.DataMining.AELight
                     List<string> prettyfilenames = new List<string>();
                     List<int> outputrecordlengths = new List<int>();
                     List<int> inputrecordlengths = new List<int>();
+                    bool partialreduce = cfgj.PartialReduce != null;
                     if (debugging)
                     {
                         if (cfgj.IOSettings.DFSOutput.Trim().Length > 0)
@@ -4669,6 +4834,11 @@ namespace MySpace.DataMining.AELight
                     MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength = outputrecordlengths.Count > 0 ? outputrecordlengths[0] : -1;
 
                     dfs dc = LoadDfsConfig();
+                    int ZMapBlockFileBufferSize = 0x400 * 400;
+                    if (dc.slave.ZMapBlockFileBufferSize != "auto")
+                    {
+                        ZMapBlockFileBufferSize = int.Parse(dc.slave.ZMapBlockFileBufferSize);
+                    }
                     if (debugging)
                     {
                         MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_Hosts = dc.Slaves.SlaveList.Split(';');
@@ -4730,7 +4900,7 @@ namespace MySpace.DataMining.AELight
                                     }
                                     mapfiles.Add(dp);
                                     dfs.DfsFile df;
-                                    if (inreclen > 0)
+                                    if (inreclen > 0 || inreclen == -2)
                                     {
                                         df = dc.Find(dp, DfsFileTypes.BINARY_RECT);
                                     }
@@ -4744,7 +4914,7 @@ namespace MySpace.DataMining.AELight
                                         //_TSafe_LeaveDebugMode();
                                         //return false;
                                     }
-                                    if (inreclen > 0)
+                                    if (inreclen > 0 || inreclen == -2)
                                     {
                                         if (inreclen != df.RecordLength)
                                         {
@@ -4804,7 +4974,7 @@ namespace MySpace.DataMining.AELight
                                     mapfiles.Add(dp);
 
                                     dfs.DfsFile df;
-                                    if (inreclen > 0)
+                                    if (inreclen > 0 || inreclen == -2)
                                     {
                                         df = dc.Find(dp, DfsFileTypes.BINARY_RECT);
                                     }
@@ -4818,7 +4988,7 @@ namespace MySpace.DataMining.AELight
                                         //_TSafe_LeaveDebugMode();
                                         //return false;
                                     }
-                                    if (inreclen > 0)
+                                    if (inreclen > 0 || inreclen == -2)
                                     {
                                         if (inreclen != df.RecordLength)
                                         {
@@ -5023,8 +5193,60 @@ class MRRMapper
     public class MRRMapOutput: MySpace.DataMining.DistributedObjects.MapOutput
     {
         public List<MRRKV> mrrentries = new List<MRRKV>();
+        public List<MRRKV> proutput = new List<MRRKV>();
+        int cursize = 0;
+        bool partialreduce = " + (partialreduce ? "true" : "false") + @";
+        MRRReducer preducer = null;
+        byte[] flipbuf = null;
+        bool flip = (string.Compare(StaticGlobals.DSpace_OutputDirection, ""descending"", true) == 0);     
+        public void PartialReduce()
+        {
+            if(mrrentries.Count == 0)
+            {
+                return;
+            }
+            if(preducer == null)
+            {
+                preducer = new MRRReducer();
+            }
+            mrrentries.Sort(new System.Comparison<MRRKV>(mrr_kcmp)); // !               
+            MRRReducer.RandomAccessEntries rae = new MRRReducer.RandomAccessEntries();
+            rae.mrrentries = mrrentries;
+            MRRReducer.RandomAccessOutput raout = new MRRReducer.RandomAccessOutput(-1);
+            raout.proutput = proutput; 
+            ExecutionContextType oldcontexttype = StaticGlobals.ExecutionContext;
+            StaticGlobals.ExecutionContext = ExecutionContextType.PARTIALREDUCE;
+            int i = 0;                           
+            for(;;)
+            {
+                int inarow = MRRCountSameKeys(rae.mrrentries, i);
+                if(inarow < 1)
+                {
+                    break;
+                }
+                rae.mrrentriesstart = i;
+                rae.mrrlength = inarow;
+                rae.curPos = -1;
+                i += inarow; // ! 
+                ByteSlice key = rae[0].Key;               
+                if(flip)
+                {
+                    key = ByteSlice.Prepare(FlipAllBits(rae[0].Key.ToBytes(), 0, rae[0].Key.Length));
+                }
+                preducer.Reduce(key, rae, raout);                
+            }
+            StaticGlobals.ExecutionContext = oldcontexttype;
+            mrrentries.Clear();
+            cursize = 0;
+        }
+
         public override void Add(IList<byte> keybuf, int keyoffset, int keylength, IList<byte> valuebuf, int valueoffset, int valuelength)
         {
+            int addlen = keylength + 4 + valuelength;
+            if(partialreduce && (cursize + addlen > " + ZMapBlockFileBufferSize.ToString() + @"))
+            {
+                PartialReduce();
+            }
             MRRKV kv;
             if(string.Compare(StaticGlobals.DSpace_OutputDirection, ""descending"", true) == 0)
             {
@@ -5035,11 +5257,11 @@ class MRRMapper
                 kv.key = ByteSlice.Prepare(CopyBytes(keybuf, keyoffset, keylength));
             }            
             kv.value = ByteSlice.Prepare(CopyBytes(valuebuf, valueoffset, valuelength));
-            mrrentries.Add(kv);
+            mrrentries.Add(kv); 
+            cursize += addlen;
         }
     }
-
-    " + MySpace.DataMining.DistributedObjects.CommonCs.CommonDynamicCsCode + @"
+    ".Replace('`', '"') + MySpace.DataMining.DistributedObjects.CommonCs.CommonDynamicCsCode + @"
 #line " + cdatalines[curcdata + 0].ToString() + " \"" + jobfilename + "\"\r\n"
     + cfgj.MapReduce.Map + (@"
 #line default
@@ -5169,6 +5391,7 @@ internal class MRRReducerBase
     {
         public System.IO.Stream _outstm;
         internal RandomAccessOutput[] parentlist = null;
+        public List<MRRKV> proutput = null;
 
         int OutputRecordLength = -1;
 
@@ -5189,6 +5412,10 @@ internal class MRRReducerBase
 
         public RandomAccessOutput GetOutputByIndex(int index)
         {
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:GetOutputByIndex(int index) not supported in partial reduce`);
+            }
             if(parentlist == null)
             {
                 throw new Exception(`Error: RandomAccessOutput.GetOutputByIndex(int index) parent list is null.`);
@@ -5200,9 +5427,29 @@ internal class MRRReducerBase
             return parentlist[index];
         }
 
+        public void Add(ByteSlice key, ByteSlice value)
+        {
+            if(StaticGlobals.ExecutionContext != ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Add(ByteSlice key, ByteSlice value) not supported in reduce`); 
+            }
+            MRRKV kv;
+            kv.key = ByteSlice.Prepare(CopyBytes(key.ToBytes(), 0, key.Length));
+            kv.value = ByteSlice.Prepare(CopyBytes(value.ToBytes(), 0, value.Length));
+            proutput.Add(kv);
+        }
+
 	    public void Add(ByteSlice entry, bool addnewline)
         {
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:Add(ByteSlice entry, bool addnewline) not supported in partial reduce`);
+            }
             int cnt = entry.Length;
+            if(OutputRecordLength == -2)
+            {
+                Entry.RecordLengthToBytes(cnt, _outstm);
+            }
             for(int i = 0; i < cnt; i++)
             {
                 _outstm.WriteByte(entry[i]);
@@ -5219,11 +5466,11 @@ internal class MRRReducerBase
 
         void AddCheck(ByteSlice entry, bool addnewline)
         {
-            if(OutputRecordLength > 0)
+            if(OutputRecordLength > 0 || OutputRecordLength == -2)
             {
                 if(addnewline)
                 {
-                    throw new Exception(`Cannot write-line in fixed-length record rectangular binary mode`);
+                    throw new Exception(`Cannot write-line in record rectangular binary mode`);
                 }
             }
             else
@@ -5243,22 +5490,48 @@ internal class MRRReducerBase
 
         public void Add(ByteSlice entry)
         {
-            bool addnewline = OutputRecordLength < 1;
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:Add(ByteSlice entry) not supported in partial reduce`);
+            }
+            bool addnewline = (OutputRecordLength < 1 && OutputRecordLength != -2);
             Add(entry, addnewline);
         }
 
         public void WriteLine(ByteSlice entry)
         {
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:WriteLine(ByteSlice entry) not supported in partial reduce`);
+            }
             AddCheck(entry);
         }
+        public void Add(string str)
+        {  
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:Add(string str) not supported in partial reduce`);
+            } 
+            mstring ms;
+            ms = mstring.Prepare(str);
+            Add(ByteSlice.Prepare(ms));
+         }
 
         public void Add(mstring ms)
         {
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:Add(mstring ms) not supported in partial reduce`);
+            }
             Add(ms.ToByteSlice());
         }
 
         public void AddBinary(Blob b)
         {
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:AddBinary(Blob b) not supported in partial reduce`);
+            }
             string s = b.ToDfsLine();
             ByteSlice bs = ByteSlice.Prepare(s);
             Add(bs);
@@ -5266,48 +5539,66 @@ internal class MRRReducerBase
 
         public void Add(recordset rs)
         {
-            int rsLength = rs.Length;
-            if(rsLength > OutputRecordLength)
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
             {
-                throw new Exception(`recordset is larger than record length; got length of ` + rsLength.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
+                throw new Exception(`Error:Add(recordset rs) not supported in partial reduce`);
             }
-            else if(rsLength < OutputRecordLength)
+            int rsLength = rs.Length;
+            if(OutputRecordLength != -2)
             {
-                for(; rsLength < OutputRecordLength; rsLength++)
+                if(rsLength > OutputRecordLength)
                 {
-                    rs.PutByte(0);
+                    throw new Exception(`recordset is larger than record length; got length of ` + rsLength.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
+                }
+                else if(rsLength < OutputRecordLength)
+                {
+                    for(; rsLength < OutputRecordLength; rsLength++)
+                    {
+                        rs.PutByte(0);
+                    }
+                    //#if DEBUG
+                    if(rs.Length != rsLength)
+                    {
+                        throw new Exception(`DEBUG: (rs.Length != rsLength)`);
+                    }
+                    //#endif
                 }
                 //#if DEBUG
-                if(rs.Length != rsLength)
+                if(rs.Length != OutputRecordLength)
                 {
-                    throw new Exception(`DEBUG: (rs.Length != rsLength)`);
+                    throw new Exception(`DEBUG: (rs.Length != OutputRecordLength)`);
                 }
                 //#endif
-            }
-            //#if DEBUG
-            if(rs.Length != OutputRecordLength)
-            {
-                throw new Exception(`DEBUG: (rs.Length != OutputRecordLength)`);
-            }
-            //#endif
+            }            
             AddCheck(rs.ToRow(), false); // WriteRecord(rs.ToRow());
         }
 
         public void WriteLine(mstring ms)
         {
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+            {
+                throw new Exception(`Error:WriteLine(mstring ms) not supported in partial reduce`);
+            }
             AddCheck(ms.ToByteSlice());
         }
 
         public void WriteRecord(ByteSlice entry)
         {
-            if(OutputRecordLength < 1)
+            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
             {
-                throw new Exception(`Cannot write records; not in fixed-length record rectangular binary mode`);
+                throw new Exception(`Error:WriteRecord(ByteSlice entry) not supported in partial reduce`);
             }
-            if(entry.Length != OutputRecordLength) // && OutputRecordLength > 0)
+            if(OutputRecordLength != -2)
             {
-                throw new Exception(`Record length mismatch; got length of ` + entry.Length.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
-            }
+                if(OutputRecordLength < 1)
+                {
+                    throw new Exception(`Cannot write records; not in fixed-length record rectangular binary mode`);
+                }
+                if(entry.Length != OutputRecordLength) // && OutputRecordLength > 0)
+                {
+                    throw new Exception(`Record length mismatch; got length of ` + entry.Length.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
+                }
+            }            
             AddCheck(entry, false);
         }
 
@@ -5385,7 +5676,7 @@ static int MRRCountSameKeys(List<MRRKV> mrrentries, int offset)
 
 const string dbgmapinputscroll = `" + dbgmapinputscroll + @"`;
 const bool mapinputscrolling_enabledatstartup = " + (Outer.MapInputScrollControlEnabled ? "true" : "false") + @";
-
+bool partialreduce = " + (partialreduce ? "true" : "false") + @";
 public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
 {
     //Console.WriteLine(`{FE4877BA-99A2-498b-835C-25860FE90094}{0}`, dfsinput.NumberOfParts);
@@ -5501,7 +5792,7 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             curinputpartpos = dfsinput.CurrentPartPosition;
             curinputrecordlength = StaticGlobals.DSpace_InputRecordLength;
             curinputfn = StaticGlobals.DSpace_InputFileName;
-            if(StaticGlobals.DSpace_InputRecordLength > 0)
+            if(StaticGlobals.DSpace_InputRecordLength > 0 || StaticGlobals.DSpace_InputRecordLength == -2)
             {
                 hascur = dfsinput.ReadRecordAppend(curinput);                
             }
@@ -5543,7 +5834,7 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
             nextinputpartpos = dfsinput.CurrentPartPosition;
             nextinputrecordlength = StaticGlobals.DSpace_InputRecordLength;
             nextinputfn = StaticGlobals.DSpace_InputFileName;
-            if(StaticGlobals.DSpace_InputRecordLength > 0)
+            if(StaticGlobals.DSpace_InputRecordLength > 0 || StaticGlobals.DSpace_InputRecordLength == -2)
             {
                 hasnext = dfsinput.ReadRecordAppend(nextinput);
             }
@@ -5572,6 +5863,14 @@ public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsout
         StaticGlobals.DSpace_InputRecordLength = realinputrecordlength;
         StaticGlobals.DSpace_InputFileName = realinputfilename;       
     }
+    if (partialreduce)
+    {
+        mapout.PartialReduce();
+    }    
+    if(mapout.proutput != null)
+    {
+        mapout.mrrentries.AddRange(mapout.proutput);
+    }       
     mapout.mrrentries.Sort(new System.Comparison<MRRKV>(mrr_kcmp)); // !
     MRRReducer reducer = new MRRReducer();
     {
@@ -5686,6 +5985,10 @@ static void Main(string[] args)
                     {
                         dobj.AddOpenCVExtension(32);
                     }
+                    if (cfgj.MemCache != null)
+                    {
+                        dobj.AddMemCacheExtension();
+                    }
                     /*if (cfgj.Unsafe != null)
                     {
                         dobj.AddUnsafe();
@@ -5781,6 +6084,10 @@ static void Main(string[] args)
                                     if (outputrecordlengths[oi] > 0)
                                     {
                                         filetype = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[oi].ToString();
+                                    }
+                                    else if (outputrecordlengths[oi] == -2)
+                                    {
+                                        filetype = DfsFileTypes.BINARY_RECT + "@?";
                                     }
                                     Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
                                     "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
@@ -5962,7 +6269,7 @@ static void Main(string[] args)
                                     }
                                 }
                                 dfs.DfsFile df;
-                                if (inreclen > 0)
+                                if (inreclen > 0 || inreclen == -2)
                                 {
                                     df = dc.Find(dp, DfsFileTypes.BINARY_RECT);
                                     if (null != df && inreclen != df.RecordLength)
@@ -6005,6 +6312,10 @@ static void Main(string[] args)
                     {
                         dobj.AddOpenCVExtension(32);
                     }
+                    if (cfgj.MemCache != null)
+                    {
+                        dobj.AddMemCacheExtension();
+                    }
                     /*if (cfgj.Unsafe != null)
                     {
                         dobj.AddUnsafe();
@@ -6028,6 +6339,13 @@ static void Main(string[] args)
                         cfgj.AddAssemblyReferences(dobj.CompilerAssemblyReferences, Surrogate.NetworkPathForHost(dc.Slaves.GetFirstSlave()));
                     }
                     dobj.AddBlock(@"127.0.0.1|" + outputfilebase + @".log|slaveid=0");
+                    string meta = "";
+                    if (null != cfgj.IOSettings.DFS_IOs
+                        && cfgj.IOSettings.DFS_IOs.Length > 0
+                        && null != cfgj.IOSettings.DFS_IOs[0].Meta)
+                    {
+                        meta = cfgj.IOSettings.DFS_IOs[0].Meta;
+                    }
                     string codectx = (@"
     public const int DSpace_BlockID = 0;
     public const int DSpace_ProcessID = DSpace_BlockID;
@@ -6057,7 +6375,7 @@ static void Main(string[] args)
     public static int DSpace_OutputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength; } }
     public static int Qizmt_OutputRecordLength { get { return MySpace.DataMining.DistributedObjects.StaticGlobals.DSpace_OutputRecordLength; } }
 
-    public const string Qizmt_Meta = @`" + cfgj.IOSettings.DFS_IOs[0].Meta + @"`;
+    public const string Qizmt_Meta = @`" + meta + @"`;
 
     const bool _ShouldDebugShellExec = " + (Outer.ShouldDebugShellExec ? "true" : "false") + @";
 
@@ -6179,6 +6497,10 @@ static void Main(string[] args)
                                 {
                                    filetype = DfsFileTypes.BINARY_RECT + "@" + outputrecordlengths[oi].ToString();
                                 }
+                                else if (outputrecordlengths[oi] == -2)
+                                {
+                                    filetype = DfsFileTypes.BINARY_RECT + "@?";
+                                }
                                 Console.Write(MySpace.DataMining.DistributedObjects.Exec.Shell(
                                "DSpace -dfsbind \"" + System.Net.Dns.GetHostName() + "\" \"" + zdfn + "\" \"" + prettyfilenames[oi] + "\" " + filetype
                                ));
@@ -6218,6 +6540,10 @@ static void Main(string[] args)
                     if (cfgj.OpenCVExtension != null)
                     {
                         dobj.AddOpenCVExtension(32);
+                    }
+                    if (cfgj.MemCache != null)
+                    {
+                        dobj.AddMemCacheExtension();
                     }
                     /*if (cfgj.Unsafe != null)
                     {
@@ -6390,6 +6716,7 @@ static void Main(string[] args)
             bool _inprintmultiline = false; // String spanning multiple lines...
             bool _inprint = false;
             bool _inwhere = false;
+            bool _wherefoundjobfile = false;
             string _sync = null;
             List<string> _tostrings = new List<string>(15);
             bool _inexception = false;
@@ -7392,6 +7719,7 @@ static void Main(string[] args)
 
             public void Cache(string key, string value)
             {
+               
                 throw new NotImplementedException();
             }
 
@@ -7407,6 +7735,7 @@ static void Main(string[] args)
 
             public void Cache(MySpace.DataMining.DistributedObjects.mstring key, MySpace.DataMining.DistributedObjects.recordset value)
             {
+               
                 throw new NotImplementedException();
             }
 
@@ -7414,7 +7743,11 @@ static void Main(string[] args)
             {
                 throw new NotImplementedException();
             }
-
+            public void Add(string str)
+            {
+               
+                throw new NotImplementedException();
+            }
             public void Add(MySpace.DataMining.DistributedObjects.recordset rs)
             {
                 throw new NotImplementedException();

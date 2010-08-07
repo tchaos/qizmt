@@ -303,12 +303,25 @@ namespace RemoteExec
             {
                 return false;
             }
-            if(InputRecordLength < 1)
+            if(InputRecordLength < 1 && InputRecordLength != -2)
             {
-                throw new Exception(`Cannot read records; not in fixed-length record rectangular binary mode`);
+                throw new Exception(`Cannot read records; not in binary mode`);
             }
             
-            int remain = InputRecordLength;
+            int remain = 0;
+            if(InputRecordLength != -2)
+            {
+                remain = InputRecordLength;
+            }
+            else
+            {
+                remain = Entry.BytesToRecordLength(this);
+                if(remain == 0)
+                {
+                    return false;
+                }
+            }
+
             while(remain > 0)
             {
                 int ib = this.ReadByte();
@@ -318,7 +331,8 @@ namespace RemoteExec
                 }
                 record.Add((byte)ib);
                 remain--;
-            }
+            }                   
+            
             return true;
         }
 
@@ -328,12 +342,24 @@ namespace RemoteExec
             {
                 return false;
             }
-            if(InputRecordLength < 1)
+            if(InputRecordLength < 1 && InputRecordLength != -2)
             {
-                throw new Exception(`Cannot read records; not in fixed-length record rectangular binary mode`);
+                throw new Exception(`Cannot read records; not in record rectangular binary mode`);
             }
 
-            int remain = InputRecordLength;
+            int remain = 0;
+            if(InputRecordLength != -2)
+            {
+                remain = InputRecordLength;
+            }
+            else
+            {
+                remain = Entry.BytesToRecordLength(this);
+                if(remain == 0)
+                {
+                    return false;
+                }
+            }
             while(remain > 0)
             {
                 int ib = this.ReadByte();
@@ -880,23 +906,36 @@ namespace RemoteExec
 
         public void WriteRecord(IList<byte> record)
         {
-            if(OutputRecordLength < 1)
+            if(OutputRecordLength == -1)
             {
-                throw new Exception(`Cannot write records; not in fixed-length record rectangular binary mode`);
+                throw new Exception(`Cannot write records; not in binary mode`);
             }
 
             int recordCount = record.Count;
-            if(recordCount != OutputRecordLength) // && OutputRecordLength > 0)
-            {
-                throw new Exception(`Record length mismatch; got length of ` + recordCount.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
+            if(OutputRecordLength != -2)
+            {                
+                if(recordCount != OutputRecordLength) // && OutputRecordLength > 0)
+                {
+                    throw new Exception(`Record length mismatch; got length of ` + recordCount.ToString() + ` when expecting length of ` + OutputRecordLength.ToString());
+                }
             }
+            
             Begin();
+            if(OutputRecordLength == -2)
+            {
+                WriteRecordLength(recordCount);
+            }
             for(int i = 0; i < recordCount; i++)
             {
                 this.WriteByte(record[i]);
             }
             End();
         }
+
+        void WriteRecordLength(int reclen)
+        {           
+            Entry.RecordLengthToBytes(reclen, this);
+        } 
 
         public void WriteLine(IList<byte> line)
         {
@@ -1341,7 +1380,7 @@ namespace RemoteExec
             throw new NotSupportedException("Remote.GetEnumeratorsWithFullSource");
         }
 
-        public override string GetMapSource(string code, string[] usings, string classname)
+        public override string GetMapSource(string code, string[] usings, string classname, bool partialreduce)
         {
             throw new NotSupportedException("Remote.GetMapSource");
         }

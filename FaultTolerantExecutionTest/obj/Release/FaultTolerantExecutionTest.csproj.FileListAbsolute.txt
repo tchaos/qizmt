@@ -1,0 +1,7 @@
+C:\SimpleSolutions\DataMining\Open\FaultTolerantExecutionTest\bin\Release\FaultTolerantExecutionTest.dll
+C:\SimpleSolutions\DataMining\Open\FaultTolerantExecutionTest\bin\Release\FaultTolerantExecutionTest.pdb
+C:\SimpleSolutions\DataMining\Open\FaultTolerantExecutionTest\bin\Release\Surrogate.dll
+C:\SimpleSolutions\DataMining\Open\FaultTolerantExecutionTest\bin\Release\Surrogate.pdb
+C:\SimpleSolutions\DataMining\Open\FaultTolerantExecutionTest\obj\Release\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\FaultTolerantExecutionTest\obj\Release\FaultTolerantExecutionTest.dll
+C:\SimpleSolutions\DataMining\Open\FaultTolerantExecutionTest\obj\Release\FaultTolerantExecutionTest.pdb

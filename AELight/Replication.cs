@@ -475,7 +475,6 @@ namespace MySpace.DataMining.AELight
                                     nstm.WriteByte((byte)'Y'); // Batch send.
                                     XContent.SendXContent(nstm, opts);
                                     XContent.SendXContent(nstm, spullpaths);
-                                    XContent.SendXContent(nstm, "");  //empty health plugin paths
 
                                     int ib = nstm.ReadByte();
                                     if (ib == '-')
@@ -1533,6 +1532,546 @@ namespace MySpace.DataMining.AELight
             }
 
             Surrogate.SetNewMasterHost(newmaster); // Note: doesn't update default dfsxmlpath.
+        }
+
+
+        public static void ReplaceMachine(string oldhost, string newhost,
+            bool DontTouchOldHost, bool force)
+        {
+#if DEBUG_REPL
+            if (!IsAdminCmd)
+            {
+                throw new Exception("EnterAdminCmd required");
+            }
+#endif
+
+            dfs dc = LoadDfsConfig();
+            ReplaceMachineMetadataMemory(dc, oldhost, newhost, DontTouchOldHost, force, false);
+            UpdateDfsXml(dc); // Only if ReplaceMachineMetadataMemory succeeded!
+
+        }
+
+
+        // Replace machine in metadata memory only (dfs dc), doesn't save to metadata file.
+        public static void ReplaceMachineMetadataMemory(dfs dc, string oldhost, string newhost,
+            bool DontTouchOldHost, bool force, bool ReplacingSurrogate)
+        {
+            //using (LockDfsMutex()) // Already locked by adminlock.
+            {
+                string[] slaves = dc.Slaves.SlaveList.Split(';');
+                {
+                    bool foundoldhost = false;
+                    for (int si = 0; si < slaves.Length; si++)
+                    {
+                        if (0 == string.Compare(IPAddressUtil.GetName(newhost), IPAddressUtil.GetName(slaves[si]),
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            Console.Error.WriteLine("ReplaceMachine error: the host '{0}' is already a machine of this cluster", newhost);
+                            SetFailure();
+                            return;
+                        }
+                        if (0 == string.Compare(IPAddressUtil.GetName(oldhost), IPAddressUtil.GetName(slaves[si]),
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            foundoldhost = true;
+                        }
+                    }
+                    if (!foundoldhost)
+                    {
+                        Console.Error.WriteLine("ReplaceMachine error: the host '{0}' is not part of this cluster", oldhost);
+                        SetFailure();
+                        return;
+                    }
+                }
+
+                int nthreads = dc.AddMachineMinThreads;
+                if (slaves.Length > nthreads)
+                {
+                    nthreads = slaves.Length;
+                }
+
+                string newhostnetpath;
+                try
+                {
+                    newhostnetpath = Surrogate.NetworkPathForHost(newhost);
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine("Unable to communicate with machine '{0}': {1}  [ensure the Windows service is running on the new machine]", newhost, e.Message);
+                    SetFailure();
+                    return;
+                }
+
+                bool writeslavedat = true;
+                {
+                    string netdir = null;
+                    string newhostmaster = null;
+                    try
+                    {
+                        netdir = Surrogate.NetworkPathForHost(newhost);
+                        newhostmaster = Surrogate.LocateMasterHost(netdir);
+                    }
+                    catch
+                    {
+                    }
+                    if (null != newhostmaster)
+                    {
+                        if (0 != string.Compare(IPAddressUtil.GetName(newhostmaster), IPAddressUtil.GetName(Surrogate.MasterHost), StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (dfs.DfsConfigExists(Surrogate.NetworkPathForHost(newhostmaster) + @"\" + dfs.DFSXMLNAME))
+                            {
+                                // Need to remove the machine from its current/old cluster..
+                                Console.Error.WriteLine("ReplaceMachine error: machine {0} is already part of a cluster, must first remove it from its cluster", newhost);
+                                SetFailure();
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            // It's already configured to be part of this cluster, but technically it isn't;
+                            // e.g. it's this cluster's surrogate but not part of the cluster yet, etc.
+                            // Just go forward and add it...
+                            writeslavedat = false;
+                        }
+                    }
+                }
+
+                // Above block takes care of dfs.xml
+                if (writeslavedat)
+                {
+                    WriteSlaveDat(newhost);
+                }
+
+                // whattopull key is hosts to pull from (excluding oldhost), and value is chunk file name.
+                List<KeyValuePair<string, string>> whattopull = new List<KeyValuePair<string, string>>(100);
+                List<dfs.DfsFile> keeps = new List<dfs.DfsFile>(dc.Files.Count);
+                List<dfs.DfsFile> caches = new List<dfs.DfsFile>(2 + dc.Files.Count / 64);
+                bool oldmachinehasjobs = false;
+                bool needforce = false;
+                foreach (dfs.DfsFile df in dc.Files)
+                {
+                    string dfType = df.Type;
+                    if (0 == string.Compare(DfsFileTypes.DELTA, dfType, true))
+                    {
+                        caches.Add(df);
+                    }
+                    else
+                    {
+                        keeps.Add(df);
+                    }
+                    if (0 == string.Compare(DfsFileTypes.NORMAL, dfType, StringComparison.OrdinalIgnoreCase)
+                        || 0 == string.Compare(DfsFileTypes.BINARY_RECT, dfType, StringComparison.OrdinalIgnoreCase))
+                    {
+                        int numbadparts = 0;
+                        long newsize = 0;
+                        List<dfs.DfsFile.FileNode> newnodes = null;
+                        if (force)
+                        {
+                            newnodes = new List<dfs.DfsFile.FileNode>(df.Nodes.Count);
+                        }
+                        foreach (dfs.DfsFile.FileNode fn in df.Nodes)
+                        {
+                            string[] rhosts = fn.Host.Split(';');
+                            string otherhost = null;
+                            int foundoldhost = -1;
+                            for (int irh = 0; irh < rhosts.Length; irh++)
+                            {
+                                if (0 == string.Compare(IPAddressUtil.GetName(oldhost), IPAddressUtil.GetName(rhosts[irh]),
+                                    StringComparison.OrdinalIgnoreCase))
+                                {
+                                    foundoldhost = irh;
+                                }
+                                else
+                                {
+                                    otherhost = rhosts[irh];
+                                    if (foundoldhost != -1)
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+                            if (foundoldhost == -1)
+                            {
+                                if (0 == string.Compare(DfsFileTypes.NORMAL, dfType, true)
+                                    || 0 == string.Compare(DfsFileTypes.BINARY_RECT, dfType, true))
+                                {
+                                    if (force)
+                                    {
+                                        newnodes.Add(fn);
+                                    }
+                                    newsize += fn.Length;
+                                }
+                            }
+                            else
+                            {
+                                if (0 == string.Compare(DfsFileTypes.NORMAL, dfType, true)
+                                    || 0 == string.Compare(DfsFileTypes.BINARY_RECT, dfType, true))
+                                {
+                                    if (rhosts.Length == 1)
+                                    {
+                                        needforce = true;
+                                        numbadparts++;
+                                    }
+                                    else
+                                    {
+                                        StringBuilder sbkey = new StringBuilder(40);
+                                        for (int irh = 0; irh < rhosts.Length; irh++)
+                                        {
+                                            if (irh != foundoldhost)
+                                            {
+                                                if (0 != sbkey.Length)
+                                                {
+                                                    sbkey.Append(';');
+                                                }
+                                                sbkey.Append(rhosts[irh]);
+                                            }
+                                        }
+                                        rhosts[foundoldhost] = newhost;
+                                        fn.Host = string.Join(";", rhosts);
+                                        if (force)
+                                        {
+                                            newnodes.Add(fn);
+                                        }
+                                        newsize += fn.Length;
+
+                                        //whattopull.Add(Surrogate.NetworkPathForHost(otherhost) + @"\" + fn.Name);
+                                        whattopull.Add(new KeyValuePair<string, string>(sbkey.ToString(), fn.Name));
+                                    }
+                                }
+                                else if (0 == string.Compare(DfsFileTypes.DLL, dfType, true))
+                                {
+                                    // Handled below.
+                                }
+                                else if (0 == string.Compare(DfsFileTypes.JOB, dfType, true))
+                                {
+                                    oldmachinehasjobs = true;
+                                }
+                            }
+                        }
+                        if (numbadparts != 0)
+                        {
+                            ConsoleColor oldc = ConsoleColor.Gray;
+                            if (!isdspace || ReplacingSurrogate)
+                            {
+                                oldc = Console.ForegroundColor;
+                                Console.ForegroundColor = ConsoleColor.Red;
+                            }
+                            Console.WriteLine("{4}  DFS file '{0}' will have {1} parts lost, resulting in {2} data loss from {3} {5}",
+                                df.Name,
+                                numbadparts,
+                                GetFriendlyByteSize(df.Size - newsize),
+                                GetFriendlyByteSize(df.Size),
+                                (isdspace && !ReplacingSurrogate) ? "\u00014" : "",
+                                (isdspace && !ReplacingSurrogate) ? "\u00010" : ""
+                                );
+                            if (df.MemCache != null)
+                            {
+                                Console.WriteLine("{0}    MemCache '{2}' {3} damaged and needs to be deleted and re-created {1}",
+                                    (isdspace && !ReplacingSurrogate) ? "\u00014" : "",
+                                    (isdspace && !ReplacingSurrogate) ? "\u00010" : "",
+                                    df.Name,
+                                    force ? "is now" : "will be"
+                                    );
+                            }
+                            if (!isdspace || ReplacingSurrogate)
+                            {
+                                Console.ForegroundColor = oldc;
+                            }
+                            if (force)
+                            {
+                                df.Nodes = newnodes;
+                                df.Size = newsize;
+                            }
+                        }
+                    }
+                }
+                if (needforce && !force)
+                {
+                    Console.Error.WriteLine("Not performing machine replacement due to data loss; use -f to override");
+                    SetFailure();
+                    return;
+                }
+                if (oldmachinehasjobs && !ReplacingSurrogate)
+                {
+                    Console.WriteLine("Warning: machine being removed hosted jobs files, need to use metabackup to restore");
+                }
+
+
+                Console.Write("  Replacing machine {0} with {1}", oldhost, newhost);
+                if (!ReplacingSurrogate)
+                {
+                    ConsoleFlush();
+                }
+
+                DataMining.Threading.ThreadTools<KeyValuePair<string, string>>.Parallel(
+                    new Action<KeyValuePair<string, string>>(
+                    delegate(KeyValuePair<string, string> pull)
+                    {
+                        string[] pullhosts = pull.Key.Split(';');
+                        for (int itry = 0; ; )
+                        {
+                            string pullfp = Surrogate.NetworkPathForHost(pullhosts[itry % pullhosts.Length]) + @"\" + pull.Value;
+                            string destfp = newhostnetpath + @"\" + pull.Value;
+                            try
+                            {
+                                System.IO.File.Copy(pullfp, destfp, true);
+                                try
+                                {
+                                    System.IO.File.Copy(pullfp + ".zsa", destfp + ".zsa", true);
+                                }
+                                catch
+                                {
+                                }
+                                break;
+                            }
+                            catch
+                            {
+                                const int maxtries = 30;
+                                if (++itry >= maxtries)
+                                {
+                                    Console.Error.WriteLine(" Error: Tried {0} times to copy file '{1}' to {2}",
+                                        maxtries, pullfp, newhost);
+                                    break;
+                                }
+                                Random rnd516 = new Random(pullfp.GetHashCode());
+                                System.Threading.Thread.Sleep(1000 * rnd516.Next(20, 50));
+                            }
+                        }
+                        Console.Write('.');
+                        if (!ReplacingSurrogate)
+                        {
+                            ConsoleFlush();
+                        }
+                    }), whattopull, nthreads);
+                System.Threading.Thread.Sleep(1000 * 2);
+
+                Console.WriteLine();
+
+                // Copy cac dlls from another slave.
+                for (int itry = 0; ; )
+                {
+                    try
+                    {
+                        int iotherslave = 0;
+                        // Don't pull dll's from the old machine...
+                        if (0 == string.Compare(IPAddressUtil.GetName(oldhost), slaves[iotherslave],
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            iotherslave++;
+                        }
+                        if (iotherslave < slaves.Length)
+                        {
+                            string slavenetpath = NetworkPathForHost(slaves[iotherslave]);
+                            string slavecacpath = slavenetpath + @"\" + dfs.DLL_DIR_NAME;
+                            if (System.IO.Directory.Exists(slavecacpath))
+                            {
+                                string newnetpath = NetworkPathForHost(newhost);
+                                string newcacpath = newnetpath + @"\" + dfs.DLL_DIR_NAME;
+                                try
+                                {
+                                    System.IO.Directory.CreateDirectory(newcacpath);
+                                }
+                                catch
+                                {
+                                }
+                                MySpace.DataMining.Threading.ThreadTools<System.IO.FileInfo>.Parallel(
+                                    new Action<System.IO.FileInfo>(
+                                    delegate(System.IO.FileInfo dllfi)
+                                    {
+                                        System.IO.File.Copy(dllfi.FullName, newcacpath + @"\" + dllfi.Name, true);
+                                    }), (new System.IO.DirectoryInfo(slavecacpath)).GetFiles("*.dll"), nthreads);
+                            }
+                        }
+                        else
+                        {
+                            throw new Exception("No machines left");
+                        }
+                        break;
+                    }
+                    catch (Exception e)
+                    {
+                        const int maxtries = 10;
+                        if (++itry >= maxtries)
+                        {
+                            Console.Error.WriteLine("Unable to copy CAC DLLs to new machine because: {0}", e.ToString());
+                            break;
+                        }
+                        System.Threading.Thread.Sleep(1000 * 10);
+                    }
+                }
+
+                //Delete cache files
+                try
+                {
+                    _KillSnowballFileChunks_unlocked_mt(caches, false);
+                }
+                catch
+                {
+                }
+                dc.Files = keeps;
+
+                // Fix slave list.
+                {
+                    StringBuilder sbsl = new StringBuilder(dc.Slaves.SlaveList.Length - oldhost.Length + newhost.Length);
+                    for (int si = 0; si < slaves.Length; si++)
+                    {
+                        string slave = slaves[si];
+                        if (0 != sbsl.Length)
+                        {
+                            sbsl.Append(';');
+                        }
+                        if (0 == string.Compare(IPAddressUtil.GetName(oldhost), IPAddressUtil.GetName(slave),
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            sbsl.Append(newhost);
+                        }
+                        else
+                        {
+                            sbsl.Append(slave);
+                        }
+                    }
+                    dc.Slaves.SlaveList = sbsl.ToString();
+                }
+
+                // Good point.
+
+                if (!DontTouchOldHost)
+                {
+                    System.Threading.Thread sdthread = new System.Threading.Thread(
+                        new System.Threading.ThreadStart(
+                        delegate
+                        {
+                            try
+                            {
+                                string ohnetpath = Surrogate.NetworkPathForHost(oldhost);
+                                System.IO.File.Delete(ohnetpath + @"\slave.dat");
+                            }
+                            catch
+                            {
+                            }
+                            if (ReplacingSurrogate)
+                            {
+                                try
+                                {
+                                    string ohnetpath = Surrogate.NetworkPathForHost(oldhost);
+                                    System.IO.File.Delete(ohnetpath + @"\" + dfs.DFSXMLNAME);
+                                }
+                                catch
+                                {
+                                }
+                            }
+                        }));
+                    sdthread.Start();
+                    if (!sdthread.Join(1000 * 10))
+                    {
+                        Console.WriteLine("Warning: timed out while accessing removed machine");
+                    }
+                }
+
+                {
+                    // Restart MemCachePin service on added machine in case it still has stuff.
+                    // Note: the service might not even exist, which is fine.
+                    string sstartout = Shell(@"sc \\" + newhost + " stop MemCachePin", true); // suppresserrors=true
+                    if (-1 == sstartout.IndexOf("service does not exist"))
+                    {
+                        //Console.WriteLine("Restarting MemCachePin service on new machine {0}", newhost);
+                        System.Threading.Thread.Sleep(1000 * 5);
+                        try
+                        {
+                            Shell(@"sc \\" + newhost + " start MemCachePin", false); // suppresserrors=false
+                        }
+                        catch(Exception e)
+                        {
+                            Console.WriteLine("Problem starting MemCachePin service on new machine {0}: {1}", newhost, e.ToString());
+                        }
+                    }
+                }
+
+                for(int itry = 0;;)
+                {
+                    try
+                    {
+                        // Write new MemCache metadata.
+                        foreach (dfs.DfsFile df in dc.Files)
+                        {
+                            if (df.MemCache != null)
+                            {
+                                List<List<dfs.DfsFile.FileNode>> chunksperslave = new List<List<dfs.DfsFile.FileNode>>();
+                                foreach (dfs.DfsFile.FileNode fn in df.Nodes)
+                                {
+                                    if (0 == string.Compare(IPAddressUtil.GetName(newhost),
+                                        IPAddressUtil.GetName(fn.Host.Split(';')[0]),
+                                        StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        string sstart = "zd.mc~";
+                                        int itend = fn.Name.IndexOf('~', sstart.Length);
+                                        int globalslaveindex;
+                                        if (-1 == itend || !fn.Name.StartsWith(sstart)
+                                            || !int.TryParse(fn.Name.Substring(sstart.Length, itend - sstart.Length), out globalslaveindex)
+                                            || globalslaveindex < 0 || globalslaveindex > ushort.MaxValue)
+                                        {
+                                            throw new Exception("MemCache file named '" + df.Name + "' is not valid; chunk '"
+                                                + fn.Name + "' has unexpected name");
+                                        }
+                                        while (globalslaveindex >= chunksperslave.Count)
+                                        {
+                                            chunksperslave.Add(new List<dfs.DfsFile.FileNode>());
+                                        }
+                                        chunksperslave[globalslaveindex].Add(fn);
+                                    }
+                                }
+
+                                using (System.IO.StreamWriter sw = new System.IO.StreamWriter(
+                                    Surrogate.NetworkPathForHost(newhost) + @"\" + df.MemCache.MetaFileName))
+                                {
+                                    sw.Write(GetMemCacheMetaFileHeader(df));
+
+                                    int curlocalslaveindex = -1;
+                                    for (int curglobalslaveindex = 0; curglobalslaveindex < chunksperslave.Count; curglobalslaveindex++)
+                                    {
+                                        List<dfs.DfsFile.FileNode> chunksinslave = chunksperslave[curglobalslaveindex];
+                                        if (chunksinslave.Count > 0)
+                                        {
+                                            curlocalslaveindex++;
+                                            sw.WriteLine("##{0}:", curglobalslaveindex);
+                                            for (int cis = 0; cis < chunksinslave.Count; cis++)
+                                            {
+                                                if (cis == chunksinslave.Count - 1)
+                                                {
+                                                    // Last chunk for this slave.
+                                                    sw.WriteLine("MemCache_{0}_{1} {2} {3:x8}",
+                                                        df.Name, Guid.NewGuid().ToString(),
+                                                        chunksinslave[cis].Name,
+                                                        chunksinslave[cis].Length);
+                                                }
+                                                else
+                                                {
+                                                    sw.WriteLine("MemCache_{0}_{1} {2}",
+                                                        df.Name, Guid.NewGuid().ToString(),
+                                                        chunksinslave[cis].Name);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    catch (Exception e)
+                    {
+                        const int maxtries = 10;
+                        if (++itry >= maxtries)
+                        {
+                            Console.Error.WriteLine("Unable to write MemCache metadata to new machine because: {0}", e.ToString());
+                            break;
+                        }
+                        System.Threading.Thread.Sleep(1000 * 10);
+                    }
+                }
+
+            }
         }
 
 

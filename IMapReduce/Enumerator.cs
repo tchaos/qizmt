@@ -106,7 +106,6 @@ namespace MySpace.DataMining.DistributedObjects
             }
         }
 
-
         public void LocateValue(EntriesInput input, out byte[] netbuf, out int offset, out int length)
         {
             netbuf = input.net[NetIndex];
@@ -663,9 +662,163 @@ namespace MySpace.DataMining.DistributedObjects
             x++;
             return x;
         }
+        
+        public static int RecordLengthToBytes(int reclen, System.IO.Stream fs)
+        {
+            int bytesoccupy = 0;
+            if (reclen < 128)
+            {
+                fs.WriteByte((byte)reclen);
+                bytesoccupy = 1;
+            }
+            else if (reclen < 16384)
+            {
+                fs.WriteByte((byte)((reclen >> 8) | 128));
+                fs.WriteByte((byte)reclen);
+                bytesoccupy = 2;
+            }
+            else if (reclen < 2097152)
+            {
+                fs.WriteByte((byte)((reclen >> 16) | 192));
+                fs.WriteByte((byte)(reclen >> 8));
+                fs.WriteByte((byte)reclen);
+                bytesoccupy = 3;
+            }
+            else if (reclen < 268435456)
+            {
+                fs.WriteByte((byte)((reclen >> 24) | 224));
+                fs.WriteByte((byte)(reclen >> 16));
+                fs.WriteByte((byte)(reclen >> 8));
+                fs.WriteByte((byte)reclen);
+                bytesoccupy = 4;
+            }
+            else
+            {
+                fs.WriteByte(240);
+                fs.WriteByte((byte)(reclen >> 24));
+                fs.WriteByte((byte)(reclen >> 16));
+                fs.WriteByte((byte)(reclen >> 8));
+                fs.WriteByte((byte)reclen);
+                bytesoccupy = 5;
+            }
+            return bytesoccupy;
+        }
 
+        public static int BytesRecordLengthOccupy(byte ib)
+        {
+            int indicator = ib >> 4;
+            if (indicator < 8)
+            {
+                return 1;
+            }
+            else if (indicator < 12)
+            {
+                return 2;
+            }
+            else if (indicator < 14)
+            {
+                return 3;
+            }
+            else if (indicator == 14)
+            {
+                return 4;
+            }
+            else
+            {
+                return 5;
+            }
+        }
+
+        public static int BytesToRecordLength(IList<byte> buffer)
+        {                       
+            int occupy = BytesRecordLengthOccupy(buffer[0]);
+            int reclen = 0;
+
+            if (occupy == 1)
+            {
+                reclen = buffer[0];
+            }
+            else
+            {
+                int startsh = 0;
+
+                switch (occupy)
+                {
+                    case 2:
+                        reclen = (buffer[0] & 63) << 8;
+                        startsh = 0;
+                        break;
+                    case 3:
+                        reclen = (buffer[0] & 31) << 16;
+                        startsh = 8;
+                        break;
+                    case 4:
+                        reclen = (buffer[0] & 15) << 24;
+                        startsh = 16;
+                        break;
+                    case 5:
+                        startsh = 24;
+                        break;
+                }
+                int bi = 1;
+                for (int sh = startsh; sh >= 0; sh -= 8)
+                {
+                    reclen = reclen | (buffer[bi++] << sh);
+                }
+            }
+            return reclen;
+        }
+
+        public static int BytesToRecordLength(System.IO.Stream fs)
+        {
+            int ib = fs.ReadByte();
+            if (ib == -1)
+            {
+                return 0;
+            }
+
+            int occupy = BytesRecordLengthOccupy((byte)ib);
+            int reclen = 0;
+
+            if (occupy == 1)
+            {
+                reclen = ib;
+            }
+            else
+            {
+                int startsh = 0;
+
+                switch (occupy)
+                {
+                    case 2:
+                        reclen = (ib & 63) << 8;
+                        startsh = 0;
+                        break;
+                    case 3:
+                        reclen = (ib & 31) << 16;
+                        startsh = 8;
+                        break;
+                    case 4:
+                        reclen = (ib & 15) << 24;
+                        startsh = 16;
+                        break;
+                    case 5:
+                        startsh = 24;
+                        break;
+                }
+                for (int sh = startsh; sh >= 0; sh -= 8)
+                {
+                    ib = fs.ReadByte();
+                    if (ib == -1)
+                    {
+                        throw new Exception("RecordLength not valid");
+                    }
+                    reclen = reclen | (ib << sh);
+                }
+            }
+            return reclen;
+        }
     }
-
 
     public abstract class EntriesOutput
     {
@@ -2040,298 +2193,6 @@ namespace MySpace.DataMining.DistributedObjects
     }
 
 
-    public class IOUtils
-    {
-        public static string SafeTextPath(string s)
-        {
-            StringBuilder sb = new StringBuilder();
-            foreach (char ch in s)
-            {
-                if (sb.Length >= 150)
-                {
-                    sb.Append('`');
-                    sb.Append(s.GetHashCode());
-                    break;
-                }
-                if ('.' == ch)
-                {
-                    if (0 == ch)
-                    {
-                        sb.Append("%2E");
-                        continue;
-                    }
-                }
-                if (!char.IsLetterOrDigit(ch)
-                    && '_' != ch
-                    && '-' != ch
-                    && '.' != ch)
-                {
-                    sb.Append('%');
-                    if (ch > 0xFF)
-                    {
-                        sb.Append('u');
-                        sb.Append(((int)ch).ToString().PadLeft(4, '0'));
-                    }
-                    else
-                    {
-                        sb.Append(((int)ch).ToString().PadLeft(2, '0'));
-                    }
-                }
-                else
-                {
-                    sb.Append(ch);
-                }
-            }
-            if (0 == sb.Length)
-            {
-                return "_";
-            }
-            return sb.ToString();
-        }
-
-        private static string tempdir = null;
-        public static string GetTempDirectory()
-        {
-            if (tempdir == null)
-            {
-                tempdir = @"\\" + System.Net.Dns.GetHostName() + @"\" + Environment.CurrentDirectory.Replace(':', '$') + @"\usertemp";
-                if (!System.IO.Directory.Exists(tempdir))
-                {
-                    System.IO.Directory.CreateDirectory(tempdir);
-                }
-            }
-            return tempdir;
-        }
-
-
-        private static Random _rrt = new Random(unchecked(
-            System.Threading.Thread.CurrentThread.ManagedThreadId
-            + DateTime.Now.Millisecond));
-        public static int RealRetryTimeout(int timeout)
-        {
-            if (timeout <= 3)
-            {
-                return timeout;
-            }
-            lock (_rrt)
-            {
-                return _rrt.Next(timeout / 4, timeout + 1);
-            }
-        }
-
-    }
-
-
-    public class NetUtils
-    {
-
-        public class ActiveConnection
-        {
-            public string Protocol;
-            public string LocalAddress;
-            public int LocalPort;
-            public string ForeignAddress;
-            public int ForeignPort;
-            public string State;
-
-            public override string ToString()
-            {
-                string slp = "";
-                if (LocalPort >= 0)
-                {
-                    slp = ":" + LocalPort;
-                }
-                string sfp = "";
-                if (ForeignPort >= 0)
-                {
-                    sfp = ":" + ForeignPort;
-                }
-                return Protocol
-                    + "\t" + LocalAddress + slp
-                    + "\t" + ForeignAddress + sfp
-                    + "\t" + State;
-            }
-
-            public override int GetHashCode()
-            {
-                return unchecked(Protocol.GetHashCode()
-                    + LocalAddress.GetHashCode()
-                    + LocalPort.GetHashCode()
-                    + ForeignAddress.GetHashCode()
-                    + ForeignPort.GetHashCode()
-                    + State.GetHashCode());
-
-            }
-
-            public override bool Equals(object obj)
-            {
-                ActiveConnection ac = obj as ActiveConnection;
-                if (null == ac)
-                {
-                    return false;
-                }
-                return Equals(ac);
-            }
-
-            public bool Equals(ActiveConnection that)
-            {
-                return this.Protocol == that.Protocol
-                    && this.LocalAddress == that.LocalAddress
-                    && this.LocalPort == that.LocalPort
-                    && this.ForeignAddress == that.ForeignAddress
-                    && this.ForeignPort == that.ForeignPort
-                    && this.State == that.State;
-            }
-
-        }
-
-        public static ActiveConnection[] GetActiveConnections()
-        {
-            List<ActiveConnection> results = new List<ActiveConnection>();
-            string[] lines = Exec.Shell("netstat -n").Split(new char[] { '\r', '\n' },
-                StringSplitOptions.RemoveEmptyEntries);
-            char[] sp = new char[] { ' ', '\t' };
-            bool StartedActiveConnections = false;
-            bool StartedProtoHeader = false;
-            foreach (string line in lines)
-            {
-                if (!StartedActiveConnections)
-                {
-                    if (line.StartsWith("Active Connections"))
-                    {
-                        StartedActiveConnections = true;
-                    }
-                }
-                else if(!StartedProtoHeader)
-                {
-                    string tline = line.Trim();
-                    if (tline.StartsWith("Proto"))
-                    {
-                        StartedProtoHeader = true;
-                    }
-                }
-                else
-                {
-                    if (0 == line.Length
-                        || (' ' != line[0] && '\t' != line[0]))
-                    {
-                        break;
-                    }
-                    string[] parts = line.Split(sp, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length < 4)
-                    {
-                        break;
-                    }
-                    ActiveConnection ac = new ActiveConnection();
-                    ac.Protocol = parts[0];
-                    GetAddressParts(parts[1], out ac.LocalAddress, out ac.LocalPort);
-                    GetAddressParts(parts[2], out ac.ForeignAddress, out ac.ForeignPort);
-                    ac.State = parts[3];
-                    results.Add(ac);
-                }
-
-            }
-            return results.ToArray();
-        }
-
-
-        public static void GetAddressParts(string input, out string host, out int port)
-        {
-            int ilc = input.LastIndexOf(':');
-            string sport = "";
-            if (-1 != ilc)
-            {
-                host = input.Substring(0, ilc);
-                sport = input.Substring(ilc + 1);
-            }
-            else
-            {
-                host = input;
-            }
-            if (!int.TryParse(sport, out port))
-            {
-                port = -1;
-            }
-        }
-
-    }
-
-
-    public class MemoryUtils
-    {
-        static int _deffbsz = 0;
-
-        public static int DefaultFileBufferSize
-        {
-            get
-            {
-                return 0x1000;
-            }
-        }
-
-
-        static int _ncpus = 0;
-
-        public static int NumberOfProcessors
-        {
-            get
-            {
-                if (_ncpus < 1)
-                {
-                    try
-                    {
-                        _ncpus = int.Parse(Environment.GetEnvironmentVariable("NUMBER_OF_PROCESSORS"));
-                    }
-                    catch
-                    {
-                        _ncpus = 1;
-                    }
-                }
-                return _ncpus;
-            }
-        }
-    }
-
-
-    public class MapReduceUtils
-    {
-        internal static System.Threading.Mutex logmutex = new System.Threading.Mutex(false, "do5mrlog");
-
-        public static void LogLine(string line)
-        {
-            try
-            {
-                logmutex.WaitOne();
-            }
-            catch (System.Threading.AbandonedMutexException)
-            {
-            }
-            try
-            {
-                System.IO.StreamWriter fstm = System.IO.File.AppendText("do5mapreduce.txt");
-                string build = "";
-                try
-                {
-                    System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
-                    System.Reflection.AssemblyName an = asm.GetName();
-                    int bn = an.Version.Build;
-                    int rv = an.Version.Revision;
-                    build = "(do5." + bn.ToString() + "." + rv.ToString() + ") ";
-                }
-                catch
-                {
-                }
-                fstm.WriteLine("[{0} {1}ms] {2}{3}", System.DateTime.Now.ToString(), System.DateTime.Now.Millisecond, build, line);
-                fstm.Close();
-            }
-            finally
-            {
-                logmutex.ReleaseMutex();
-            }
-        }
-    }
-
-
     public abstract class LoadOutput
     {
         public abstract void Add(IList<byte> keybuf, int keyoffset, int keylength, IList<byte> valuebuf, int valueoffset, int valuelength);
@@ -2425,6 +2286,7 @@ namespace MySpace.DataMining.DistributedObjects
 
         public abstract long Fixup(long position, long length, byte[] buf, int bufoffset);
         public abstract void Reopen(long position);
+        public abstract void ReportRogueHost(string roguehost);
     }
 
 
@@ -2434,6 +2296,7 @@ namespace MySpace.DataMining.DistributedObjects
     public interface IMap
     {
         void OnMap(MapInput input, MapOutput output);
+        void OnPartialReduce(EntriesInput input, MapOutput output);
     }
 
 

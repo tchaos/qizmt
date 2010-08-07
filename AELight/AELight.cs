@@ -49,21 +49,20 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine(@"    exec [""</xpath>=<value>""] <jobs.xml>  run the jobs source code XML file");
             Console.WriteLine("    addmachine <host>       add a machine to the cluster");
             Console.WriteLine("    removemachine <host>    remove a machine from the cluster");
-            //Console.WriteLine("    ps                      distributed process information");
+            Console.WriteLine("    replacemachine <oldhost> <newhost>    Replace a machine with another");
+            Console.WriteLine("                               This allows preserving MemCache alignment");
             Console.WriteLine("    ps                      distributed processes, schedule and queue info");
             Console.WriteLine("    who                     show who is logged on");
             Console.WriteLine("    history [<count>] [-j]  show command history");
             Console.WriteLine("    killall                 kill all jobs, clean any orphaned intermediate data");
             Console.WriteLine("    killall xproxy          killall using install credentials");
-            //Console.WriteLine("    gen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]    generate random data");
-            //Console.WriteLine("    asciigen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]  generate random ASCII");
-            //Console.WriteLine("    wordgen <output-dfsfile> <outputsize> [<rowsize>] [<writerCount>] [<customRandom>]   random sentence words");
-            Console.WriteLine("    gen <output-dfsfile>");
+            Console.WriteLine("    killall MemCacheRollback [xproxy]    killall & force rollback all MemCaches");
+            Console.WriteLine("    gen <output-dfsfile>[@<recordlen>]");
             Console.WriteLine("        <outputsize>");
             Console.WriteLine("        [type=<bin|ascii|word>]");
             Console.WriteLine("        [row=<size>]");
             Console.WriteLine("        [writers=<count>]");
-            Console.WriteLine("        [rand=custom]");
+            Console.WriteLine("        [rand=<DRand|FRand>]");
             Console.WriteLine("        generate random binary, ascii or word data");
             Console.WriteLine("    combine <inputfiles...> [+ <outputfile>]   combine files into one");
             Console.WriteLine("    format machines=localhost       format a new DFS");
@@ -72,6 +71,7 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("         [-mt multi-threaded]");
             Console.WriteLine("         information for DFS or a DFS file");
             Console.WriteLine("    head <dfspath>[:<host>:<part>] [<count>]   show first few lines of file");
+            Console.WriteLine("    head <dfspath>@<record-types> [<count>]    show first few records of file");
             Console.WriteLine("    put <netpath> [<dfspath>[@<recordlen>]]    put a file into DFS");
             Console.WriteLine("    fput files|dirs=<item[,item,item]>|@<filepath to list> [pattern=<pattern>]");
             Console.WriteLine("         [mode=continuous] [dfsfilename=<targetfilename>]");
@@ -127,9 +127,11 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("                    Sniff packets");
             Console.WriteLine("    md5 <dfsfile>           compute MD5 of DFS data file");
             Console.WriteLine("    checksum <dfsfile>      compute sum of DFS data file");
+            Console.WriteLine("    checksummt <dfsfile>    multithreaded way to compute sum of DFS data file");
             Console.WriteLine("    sorted <dfsfile>        check if a DFS data file has sorted lines");
             Console.WriteLine("    nearprime <positiveNum> find the nearest prime number");
             Console.WriteLine("    genhostnames <pattern> <startNum>");
+            Console.WriteLine("    generatefasttests       generate fast tests for the qizmt API");
             Console.WriteLine("                 <endNum> [<delimiter>]");
             Console.WriteLine("                 generate host names");
             Console.WriteLine("    viewlogs     [machine=<machineName>]");
@@ -174,13 +176,29 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    copyto <dfsfile> <target-host>");
             Console.WriteLine("           [<target-dfs-filename>] Copy DFS file to another cluster");
             Console.WriteLine("    viewname [-m]                  Display logical name of cluster");
-            Console.WriteLine("    notifyfinish <JobID> <email>   Receive an e-mail when a JobID finishes");
+            Console.WriteLine("    notifyfinish <JobID> <email> [<message>]");
+            Console.WriteLine("                                   Receive an e-mail when a JobID finishes");
+            Console.WriteLine("                                   A message can be included in the e-mail");
+            Console.WriteLine("    notifyfinish <JobInfo> <email> [<message>]");
+            Console.WriteLine("                                   E-mail after a job with this info finishes");
+            Console.WriteLine("                                   JobInfo can be a user name or job file name");
+            Console.WriteLine("                                   Wildcards * and ? can be used in JobInfo");
             Console.WriteLine("    notifykill <NotifyID>          Remove a notification");
             Console.WriteLine("    clearnotify                    Remove all notifications");
             Console.WriteLine("    viewnotify                     View outstanding notifications");
             Console.WriteLine("    dfscheck [-all]                Confirm all DFS chunks can be fully scanned");
             Console.WriteLine("    dfscheck <dfsfile|chunkname>   Only scan a particular DFS file or chunk");
             Console.WriteLine("                                   No jobs should be running");
+            Console.WriteLine("    memcache create                Create an empty MemCache memory cache");
+            Console.WriteLine("         name=<name>               Name of new MemCache in DFS");
+            Console.WriteLine("         schema=<schema>             Schema of each row, such as int,int,int");
+            Console.WriteLine("         [segment=<size>]            Segmentation size in memory (~64MB)");
+            Console.WriteLine("    memcache delete name=<name>    Delete MemCache from memory and DFS");
+            Console.WriteLine("    memcache commit name=<name>    Commit MemCache changes to DFS");
+            Console.WriteLine("    memcache rollback name=<name>  Roll back changes since last commit");
+            Console.WriteLine("    memcache load name=<name>      Load MemCache from DFS if not in memory");
+            Console.WriteLine("    memcache info name=<name>      Show MemCache-related information");
+            Console.WriteLine("                                   {0} info can also be used for DFS info", appname);
         }
 
 
@@ -308,8 +326,12 @@ namespace MySpace.DataMining.AELight
             dfs.MapNodesToNetworkPaths(nodes, netpaths);
         }
 
-
         public static void CheckUserLogs(IList<string> hosts, string logfilename)
+        {
+            CheckUserLogs(hosts, logfilename, false);
+        }
+
+        public static void CheckUserLogs(IList<string> hosts, string logfilename, bool suppress)
         {
             StringBuilder sb = new StringBuilder(100);
 
@@ -320,22 +342,25 @@ namespace MySpace.DataMining.AELight
                     string np = NetworkPathForHost(hosts[i]) + @"\" + logfilename;
                     if (System.IO.File.Exists(np))
                     {
-                        string trickle = System.IO.File.ReadAllText(np);
-                        if (-1 != trickle.IndexOf("__#ForceStandardError#__"))
+                        if (!suppress)
                         {
-                            //throw new Exception("Exception detected from " + hosts[i] + ": " + trickle);
-                            Console.Error.WriteLine("Exception detected from " + hosts[i] + ": " + trickle);
-                            SetFailure();
-                            return;
+                            string trickle = System.IO.File.ReadAllText(np);
+                            if (-1 != trickle.IndexOf("__#ForceStandardError#__"))
+                            {
+                                //throw new Exception("Exception detected from " + hosts[i] + ": " + trickle);
+                                Console.Error.WriteLine("Exception detected from " + hosts[i] + ": " + trickle);
+                                SetFailure();
+                                return;
+                            }
+                            else if (-1 != trickle.IndexOf("Thread exception:") || -1 != trickle.IndexOf("ArrayComboList Sub Process exception: "))
+                            {
+                                //throw new Exception("Exception detected from " + hosts[i] + ": " + trickle);
+                                Console.Error.WriteLine("Exception detected from " + hosts[i] + ": " + trickle);
+                                SetFailure();
+                                return;
+                            }
+                            sb.Append(trickle);
                         }
-                        else if (-1 != trickle.IndexOf("Thread exception:") || -1 != trickle.IndexOf("ArrayComboList Sub Process exception: "))
-                        {
-                            //throw new Exception("Exception detected from " + hosts[i] + ": " + trickle);
-                            Console.Error.WriteLine("Exception detected from " + hosts[i] + ": " + trickle);
-                            SetFailure();
-                            return;
-                        }
-                        sb.Append(trickle);
                         System.IO.File.Delete(np);
                     }
                 }
@@ -753,6 +778,31 @@ namespace MySpace.DataMining.AELight
             }
         }
 
+        static void MakeInvincible()
+        {
+            string fp = AELight_Dir + @"\invincible.dat";
+#if DEBUG
+            if (System.IO.File.Exists(fp))
+            {
+                Console.Error.WriteLine("DEBUG:  Warning: invincible processes already exist, overwriting");
+            }
+#endif
+            using (System.IO.StreamWriter sw = System.IO.File.CreateText(fp))
+            {
+                sw.WriteLine(System.Diagnostics.Process.GetCurrentProcess().Id);
+                string EvMDODir = Environment.GetEnvironmentVariable("MDODir");
+                if (null != EvMDODir)
+                {
+                    sw.WriteLine(EvMDODir);
+                }
+                string EvMDORedir = Environment.GetEnvironmentVariable("MDORedir");
+                if (null != EvMDORedir)
+                {
+                    sw.WriteLine(EvMDORedir);
+                }
+            }
+        }
+
         static void _CleanJidFile_unlocked()
         {
 #if CLIENT_LOG_ALL
@@ -1017,6 +1067,38 @@ namespace MySpace.DataMining.AELight
         static string[] SubArray(string[] arr, int startindex)
         {
             return SubArray(arr, startindex, arr.Length - startindex);
+        }
+
+
+        static void EachArgument(string[] args, int argstart, int argslength,
+            Action<string, string> KeyValueCallback)
+        {
+            int end = argstart + argslength;
+            for (int i = argstart; i < end; i++)
+            {
+                string arg = args[i];
+                string key = arg;
+                string value = "";
+                int ieq = arg.IndexOf('=');
+                if (-1 != ieq)
+                {
+                    value = arg.Substring(ieq + 1);
+                    key = arg.Substring(0, ieq);
+                }
+                KeyValueCallback(key, value);
+            }
+        }
+
+        static void EachArgument(string[] args, int argstart,
+            Action<string, string> KeyValueCallback)
+        {
+            EachArgument(args, argstart, args.Length - argstart, KeyValueCallback);
+        }
+
+        static void EachArgument(string[] args,
+            Action<string, string> KeyValueCallback)
+        {
+            EachArgument(args, 0, args.Length, KeyValueCallback);
         }
 
 
@@ -1812,6 +1894,8 @@ namespace MySpace.DataMining.AELight
 
         static void Main(string[] args)
         {
+            Surrogate.LogonMachines();
+
 #if AELIGHT_TRACE
             AELight_TraceThreads.Add(System.Threading.Thread.CurrentThread);
 
@@ -2281,6 +2365,10 @@ namespace MySpace.DataMining.AELight
                             }
                             sargs = sb.ToString();
                         }
+                        if (string.Compare(args[0], "memcacheinstall", true) == 0)
+                        {
+                            sargs += " 73045AA6-2F6B-4166-BDE2-806F1E43854B";
+                        }
                         if (-1 != sargs.IndexOf("73045AA6-2F6B-4166-BDE2-806F1E43854B"))
                         {
                             sargs = "\t" + sargs.GetHashCode();
@@ -2418,6 +2506,10 @@ namespace MySpace.DataMining.AELight
             }
             switch (act)
             {
+                case "memcache":
+                    MemCacheCommand(SubArray(args, 1));
+                    break;
+
                 case "enablefilescanner":
                     {
                         dfs dc = LoadDfsConfig();
@@ -2440,10 +2532,18 @@ namespace MySpace.DataMining.AELight
                             {
                                 dc.FileDaemon.ScanChunkSleep = OneMin * 60;
                             }
-                            dc.FileDaemon.Enabled = true;
                         }
+                        dc.FileDaemon.Enabled = true;
                         UpdateDfsXml(dc);
                         Console.WriteLine("File scanner is now enabled");
+                        if (!dc.FileDaemon.AutoRepair)
+                        {
+                            Console.WriteLine("AutoRepair setting is false; problems found will not be repaired");
+                        }
+                        if (dc.Replication < 2)
+                        {
+                            Console.WriteLine("Note: replication is currently not enabled");
+                        }
                         Console.WriteLine("killall must be issued for file scanner changes to take effect");
                     }
                     break;
@@ -2565,17 +2665,24 @@ namespace MySpace.DataMining.AELight
                         bool _dbypass = args[1].StartsWith("+");
 #endif
                         long WaitOnJID;
+                        string JobInfo = null;
                         if (!long.TryParse(args[1], out WaitOnJID) || WaitOnJID < 1)
                         {
-                            Console.WriteLine("Invalid JID: {0}", args[1]);
-                            SetFailure();
-                            return;
+                            WaitOnJID = -1;
+                            JobInfo = args[1];
                         }
                         string email = args[2];
+
+                        string UserMessage = null;
+                        if (args.Length > 3)
+                        {
+                            UserMessage = args[3];
+                        }
 
 #if DEBUG
                         if (!_dbypass)
 #endif
+                        if (-1 != WaitOnJID)
                         {
                             if (!System.IO.File.Exists(WaitOnJID.ToString() + ".jid"))
                             {
@@ -2594,8 +2701,15 @@ namespace MySpace.DataMining.AELight
                             return;
                         }
 
-                        MySpace.DataMining.DistributedObjects.Scheduler.NotifyInfo.NEntry ne
-                            = MySpace.DataMining.DistributedObjects.Scheduler.AddNotify(WaitOnJID, email, douser);
+                        MySpace.DataMining.DistributedObjects.Scheduler.NotifyInfo.NEntry ne;
+                        if (JobInfo != null)
+                        {
+                            ne = MySpace.DataMining.DistributedObjects.Scheduler.AddNotify(JobInfo, email, douser, UserMessage);
+                        }
+                        else
+                        {
+                            ne = MySpace.DataMining.DistributedObjects.Scheduler.AddNotify(WaitOnJID, email, douser, UserMessage);
+                        }
 
                         Console.WriteLine("Notify Identifier: {0}", ne.ID);
                     }
@@ -2660,8 +2774,16 @@ namespace MySpace.DataMining.AELight
                         {
                             foreach (MySpace.DataMining.DistributedObjects.Scheduler.NotifyInfo.NEntry ne in notify)
                             {
-                                Console.WriteLine("  {0} {1} Waiting on JobID {2} to e-mail {3}",
-                                    ne.ID, ne.UserAdded, ne.WaitOnJID, ne.Email);
+                                if (-1 == ne.WaitOnJID)
+                                {
+                                    Console.WriteLine("  {0} {1} Waiting on \"{2}\" to e-mail {3}",
+                                        ne.ID, ne.UserAdded, ne.WaitOnJobInfo, ne.Email);
+                                }
+                                else
+                                {
+                                    Console.WriteLine("  {0} {1} Waiting on JobID {2} to e-mail {3}",
+                                        ne.ID, ne.UserAdded, ne.WaitOnJID, ne.Email);
+                                }
                             }
                         }
                     }
@@ -3939,6 +4061,7 @@ namespace MySpace.DataMining.AELight
                             if (xmlfiles.Length > 1)
                             {
                                 Console.Error.WriteLine("Error: Too many xml files found in metabackup location; remove all but one and try again: {0}", metabackuplocation);
+                                Console.WriteLine("Must be exactly one *.xml file in metabackup location");
                                 SetFailure();
                                 return;
                             }
@@ -4047,11 +4170,19 @@ namespace MySpace.DataMining.AELight
                             return;
                         }
 
-                        _CleanPidFile_unlocked(); // So stopping services doesn't kill this instance.
+                        // So stopping services doesn't kill this instance.
+                        try
+                        {
+                            MakeInvincible();
+                        }
+                        catch
+                        {
+                        }
+                        _CleanPidFile_unlocked();
 
                         if (stop)
                         {
-                            Console.WriteLine("Stopping services...");
+                            Console.WriteLine("  Stopping services...");
                             MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
                                 new Action<string>(
                                 delegate(string host)
@@ -4068,7 +4199,7 @@ namespace MySpace.DataMining.AELight
                         }
 
                         {
-                            Console.WriteLine("Restoring surrogate...");
+                            Console.WriteLine("  Restoring surrogate...");
 
                             Surrogate.SetNewMasterHost(newmaster);
                             Surrogate.SetNewMetaLocation(targetdspacepath);
@@ -4215,7 +4346,7 @@ namespace MySpace.DataMining.AELight
 
                         if (stop)
                         {
-                            Console.WriteLine("Starting services...");
+                            Console.WriteLine("  Starting services...");
                             MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
                                 new Action<string>(
                                 delegate(string host)
@@ -4253,7 +4384,8 @@ namespace MySpace.DataMining.AELight
                         if (args.Length > 1)
                         {
                             EnterAdminCmd();
-                            if (0 == string.Compare("-backup-now", args[1], true))
+                            if (0 == string.Compare("-backup-now", args[1], true)
+                                || 0 == string.Compare("-metabackup-now", args[1], true))
                             {
                                 string metabackupdir = dc.GetMetaBackupLocation();
                                 if (null == metabackupdir)
@@ -5715,7 +5847,7 @@ namespace MySpace.DataMining.AELight
                                         Console.WriteLine("  {0}: {1}", host, reason);
                                     }
                                 }), hosts, nthreads);
-                            Console.WriteLine("      {0}% healthy", Math.Round((double)(hosts.Length - badones) * 100.0 / (double)hosts.Length, 0));
+                            Console.WriteLine("      {0}% healthy", Math.Floor((double)(hosts.Length - badones) * 100.0 / (double)hosts.Length));
                         }
 
                         if (all)
@@ -5729,8 +5861,10 @@ namespace MySpace.DataMining.AELight
                                 new Action<dfs.DfsFile>(
                                 delegate(dfs.DfsFile df)
                                 {
-                                    if (0 == string.Compare(df.Type, DfsFileTypes.NORMAL, StringComparison.OrdinalIgnoreCase)
-                                        || 0 == string.Compare(df.Type, DfsFileTypes.JOB, StringComparison.OrdinalIgnoreCase))
+                                    string dfType = df.Type;
+                                    if (0 == string.Compare(dfType, DfsFileTypes.NORMAL, StringComparison.OrdinalIgnoreCase)
+                                        || 0 == string.Compare(dfType, DfsFileTypes.BINARY_RECT, StringComparison.OrdinalIgnoreCase)
+                                        || 0 == string.Compare(dfType, DfsFileTypes.JOB, StringComparison.OrdinalIgnoreCase))
                                     {
                                         totalchecked++;
                                         string msg = null; // Note: doesn't print Success.
@@ -5749,8 +5883,8 @@ namespace MySpace.DataMining.AELight
                                                 {
                                                     string[] fnHosts = fn.Host.Split(';');
                                                     {
-                                                        if (0 == string.Compare(df.Type, DfsFileTypes.NORMAL, StringComparison.OrdinalIgnoreCase)
-                                                            || 0 == string.Compare(df.Type, DfsFileTypes.BINARY_RECT, StringComparison.OrdinalIgnoreCase))
+                                                        if (0 == string.Compare(dfType, DfsFileTypes.NORMAL, StringComparison.OrdinalIgnoreCase)
+                                                            || 0 == string.Compare(dfType, DfsFileTypes.BINARY_RECT, StringComparison.OrdinalIgnoreCase))
                                                         {
                                                             if (fnHosts.Length < dc.Replication)
                                                             {
@@ -5778,11 +5912,8 @@ namespace MySpace.DataMining.AELight
                                                             onhost = chost;
                                                             using (System.IO.FileStream fs = new System.IO.FileStream(Surrogate.NetworkPathForHost(chost) + @"\" + fn.Name, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 1)) // bufferSize=1
                                                             {
-                                                                //if (fn.Length > 0) // Should always be > 0 or it wouldn't be here...
-                                                                {
-                                                                    // Note: multiple threads writing to 'one' but I don't need it.
-                                                                    fs.Read(one, 0, 1);
-                                                                }
+                                                                // Note: multiple threads writing to 'one' but I don't need it.
+                                                                fs.Read(one, 0, 1);
                                                             }
                                                         }
                                                         onhost = null;
@@ -5814,7 +5945,7 @@ namespace MySpace.DataMining.AELight
                             int percent = 100;
                             if (totalchecked > 0)
                             {
-                                percent = (int)Math.Round((double)(totalchecked - badones) * 100.0 / (double)totalchecked, 0);
+                                percent = (int)Math.Floor((double)(totalchecked - badones) * 100.0 / (double)totalchecked);
                             }
                             Console.WriteLine("      {0}% healthy", percent);
 
@@ -5841,7 +5972,7 @@ namespace MySpace.DataMining.AELight
                                             Console.WriteLine("  {0}: {1}", host, reason);
                                         }
                                     }), hosts, nthreads);
-                                Console.WriteLine("      {0}% healthy", Math.Round((double)(hosts.Length - badones) * 100.0 / (double)hosts.Length, 0));
+                                Console.WriteLine("      {0}% healthy", Math.Floor((double)(hosts.Length - badones) * 100.0 / (double)hosts.Length));
                             }
 
                             Console.WriteLine("[Checking GetFiles()]");
@@ -6250,10 +6381,10 @@ namespace MySpace.DataMining.AELight
                         List<string> xpaths = null;
                         string dfsoutput = null;
                         long sizeoutput = long.MinValue;
-                        long rowsize = 100;
+                        long rowsize = -1;
                         string rowsep = Environment.NewLine;
                         int writersCount = 0;
-                        bool useCustomRandom = false;
+                        GenerateRandom genrand = GenerateRandom.RANDOM;
                         GenerateType gentype = GetGenerateType(act);
                         for (; iarg < args.Length; iarg++)
                         {
@@ -6306,11 +6437,26 @@ namespace MySpace.DataMining.AELight
                                             if (0 == string.Compare(arg, "custom", true)
                                                 || 0 == string.Compare(arg, "customrandom", true))
                                             {
-                                                useCustomRandom = true;
+                                                genrand = GenerateRandom.DRANDOM;
+                                            }
+                                            else if (0 == string.Compare(arg, "Drandom", true)
+                                                || 0 == string.Compare(arg, "Drand", true))
+                                            {
+                                                genrand = GenerateRandom.DRANDOM;
+                                            }
+                                            else if (0 == string.Compare(arg, "Frandom", true)
+                                                || 0 == string.Compare(arg, "Frand", true))
+                                            {
+                                                genrand = GenerateRandom.FRANDOM;
+                                            }
+                                            else if (0 == string.Compare(arg, "random", true)
+                                                || 0 == string.Compare(arg, "rand", true))
+                                            {
+                                                genrand = GenerateRandom.RANDOM;
                                             }
                                             else if (0 == string.Compare(arg, "default", true))
                                             {
-                                                useCustomRandom = false;
+                                                genrand = GenerateRandom.RANDOM;
                                             }
                                             else
                                             {
@@ -6360,17 +6506,6 @@ namespace MySpace.DataMining.AELight
                                     case 1: // output-dfsfile
                                         {
                                             dfsoutput = arg;
-                                            if (dfsoutput.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
-                                            {
-                                                dfsoutput = dfsoutput.Substring(6);
-                                            }
-                                            string reason = "";
-                                            if (dfs.IsBadFilename(dfsoutput, out reason))
-                                            {
-                                                Console.Error.WriteLine("Invalid output-dfsfile: {0}", reason);
-                                                SetFailure();
-                                                return;
-                                            }
                                         }
                                         break;
 
@@ -6383,13 +6518,20 @@ namespace MySpace.DataMining.AELight
                                         break;
 
                                     case 4: // writercount
-                                        writersCount = Int32.Parse(arg);
+                                        try
+                                        {
+                                            writersCount = Int32.Parse(arg);
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            throw new FormatException("Invalid writers count: " + arg, e);
+                                        }
                                         break;
 
                                     case 5: // customrandom
                                         if (0 == string.Compare(arg, "customrandom", true))
                                         {
-                                            useCustomRandom = true;
+                                            genrand = GenerateRandom.DRANDOM;
                                         }
                                         else
                                         {
@@ -6412,12 +6554,12 @@ namespace MySpace.DataMining.AELight
 #if DEBUG
                             System.Diagnostics.Debugger.Launch();
 #endif
-                            Console.Error.WriteLine("Arguments expected: [\"</xpath>=<value>\"] <output-dfsfile> <outputsize> [type=<bin|ascii|word>] [row=<size>] [writers=<count>] [rand=custom]");
+                            Console.Error.WriteLine("Arguments expected: [\"</xpath>=<value>\"] <output-dfsfile> <outputsize> [type=<bin|ascii|word>] [row=<size>] [writers=<count>] [rand=<DRand|FRand>]");
                             SetFailure();
                             return;
                         }
 
-                        Generate(xpaths, dfsoutput, sizeoutput, rowsize, gentype, writersCount, useCustomRandom);
+                        Generate(xpaths, dfsoutput, sizeoutput, rowsize, gentype, writersCount, genrand);
                     }
                     break;
 
@@ -6982,6 +7124,24 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "checksummt":
+
+#if STDOUT_LOG
+                    StdoutLog.Start();
+#endif
+                    if (args.Length > 1)
+                    {
+                        CheckSummt("Sum_mt", args[1]);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("DFS file name expected");
+                        SetFailure();
+                        return;
+                    }
+
+                    break;
+
                 case "sum2":
                 case "checksum2":
 #if STDOUT_LOG
@@ -6997,6 +7157,24 @@ namespace MySpace.DataMining.AELight
                         SetFailure();
                         return;
                     }
+                    break;
+
+                case "sortedmt":
+#if STDOUT_LOG
+                    StdoutLog.Start();
+#endif
+                    if (args.Length > 1)
+                    {
+                        CheckSortedmt(args[1]);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("DFS file name expected");
+                        SetFailure();
+                        return;
+                    }
+
+
                     break;
 
                 case "sorted":
@@ -7179,7 +7357,24 @@ namespace MySpace.DataMining.AELight
                 case "@log":
                     // No action, it's just logged.
                     break;
+                case "generatefasttests" :
 
+                     if (!dfs.DfsConfigExists(DFSXMLPATH))
+                    {
+                        Console.Error.WriteLine("DFS not setup; use:  {0} format", appname);
+                        SetFailure();
+                        return;
+                    }
+                    try
+                    {
+                        FastRegressionTest.GenFastRegressionTests();
+                    }
+                    catch (Exception e)
+                    {
+                        LogOutput(e.ToString());
+                    }
+
+                    break;
                 case "examples":
                 case "example":
                     if (!dfs.DfsConfigExists(DFSXMLPATH))
@@ -7234,6 +7429,568 @@ namespace MySpace.DataMining.AELight
                     catch (Exception e)
                     {
                         LogOutput(e.ToString());
+                    }
+                    break;
+
+                case "replacemachine":
+                    EnterAdminCmd();
+                    if (!dfs.DfsConfigExists(DFSXMLPATH))
+                    {
+                        Console.Error.WriteLine("DFS not setup; use:  {0} format", appname);
+                        SetFailure();
+                        return;
+                    }
+                    {
+
+                        string oldhost = null, newhost = null;
+                        bool DontTouchRMHost = false;
+                        bool RMForce = false;
+                        for (int iarg = 1; iarg < args.Length; iarg++)
+                        {
+                            if (args[iarg][0] == '-')
+                            {
+                                switch (args[iarg])
+                                {
+                                    case "-s":
+                                        DontTouchRMHost = true;
+                                        break;
+
+                                    case "-f":
+                                        RMForce = true;
+                                        break;
+
+                                    default:
+                                        Console.Error.WriteLine("Warning: Unknown switch: {0}", args[iarg]);
+                                        break;
+                                }
+                            }
+                            else
+                            {
+                                if (null == oldhost)
+                                {
+                                    oldhost = args[iarg];
+                                }
+                                else if (null == newhost)
+                                {
+                                    newhost = args[iarg];
+                                }
+                                else
+                                {
+                                    Console.Error.WriteLine("Too many hosts specified: {0}, {1} and {2}", oldhost, newhost, args[iarg]);
+                                    SetFailure();
+                                    return;
+                                }
+                            }
+                        }
+
+                        if (args.Length < 3)
+                        {
+                            Console.Error.WriteLine("replacemachine error: expected <oldmachine> <newmachine>");
+                            SetFailure();
+                            return;
+                        }
+
+                        if (0 == string.Compare(IPAddressUtil.GetName(oldhost),
+                            IPAddressUtil.GetName(Surrogate.MasterHost), StringComparison.OrdinalIgnoreCase))
+                        {
+                            Console.Error.WriteLine("Error: machine '{0}' being replaced is the surrogate"
+                                + "; to replace surrogate, must use command"
+                                + " replacesurrogate [-f] [-nostop] [-s] <oldhost> <metabackup-path> <target-dspace-path> [<new-metabackup-path>] [-metabackup-now]",
+                                oldhost);
+                            SetFailure();
+                            return;
+                        }
+
+                        if (!VerifyHostPermissions(new string[] { newhost }))
+                        {
+                            Shell(@"sc \\" + newhost + " start DistributedObjects");
+                            System.Threading.Thread.Sleep(1000 * 3); // Time to start.
+                            if (!VerifyHostPermissions(new string[] { newhost }))
+                            {
+                                Console.Error.WriteLine("Unable to ReplaceMachine: ensure the Windows service is installed and running on '{0}'", newhost);
+                                SetFailure();
+                                return;
+                            }
+                        }
+
+                        ReplaceMachine(oldhost, newhost, DontTouchRMHost, RMForce);
+                        Console.WriteLine("Done");
+                    }
+                    break;
+
+                case "replacesurrogate":
+                    // [-f] [-nostop] [-s] [-nometabackup] ...
+                    EnterAdminCmd();
+                    {
+
+                        bool stop = true;
+                        string oldhost = null, newhost = null;
+                        string metabackuplocation = null;
+                        string newmetabackuppath = "";
+                        string targetdspacepath = null;
+                        bool DontTouchRMHost = false;
+                        bool callmetabackupnow = true;
+                        bool RMForce = false;
+                        int narg = 0;
+                        for (int iarg = 1; iarg < args.Length; iarg++)
+                        {
+                            if (args[iarg][0] == '-')
+                            {
+                                switch (args[iarg])
+                                {
+                                    case "-s":
+                                        DontTouchRMHost = true;
+                                        break;
+
+                                    case "-f":
+                                        RMForce = true;
+                                        break;
+
+                                    case "-nostop":
+                                        stop = false;
+                                        break;
+
+                                    case "-nometabackup":
+                                        callmetabackupnow = false;
+                                        break;
+
+                                    default:
+                                        Console.Error.WriteLine("Unknown switch: {0}", args[iarg]);
+                                        return;
+                                }
+                            }
+                            else
+                            {
+                                // <oldhost> <metabackup-path> <target-dspace-path> [<new-metabackup-path>]
+                                switch (narg++)
+                                {
+                                    case 0:
+                                        oldhost = args[iarg];
+                                        break;
+                                    case 1:
+                                        metabackuplocation = args[iarg];
+                                        break;
+                                    case 2:
+                                        targetdspacepath = args[iarg];
+                                        break;
+                                    case 3: // Optional.
+                                        newmetabackuppath = args[iarg];
+                                        break;
+                                    default:
+                                        Console.Error.WriteLine("Too many arguments specified: {0}", args[iarg]);
+                                        SetFailure();
+                                        return;
+                                }
+                            }
+                        }
+                        if (narg <= 2)
+                        {
+                            Console.Error.WriteLine("replacesurrogate error: too few arguments");
+                            SetFailure();
+                            return;
+                        }
+
+                        if (0 != string.Compare(IPAddressUtil.GetName(oldhost),
+                            IPAddressUtil.GetName(Surrogate.MasterHost), StringComparison.OrdinalIgnoreCase))
+                        {
+                            Console.Error.WriteLine("Error: machine '{0}' being replaced is not the existing surrogate"
+                                + "; the existing surrogate is '{1}'", oldhost, Surrogate.MasterHost);
+                            SetFailure();
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(newmetabackuppath))
+                        {
+                            if (callmetabackupnow)
+                            {
+                                Console.Error.WriteLine("Must specify metabackup location in order to metabackup now");
+                                SetFailure();
+                                return;
+                            }
+                            Console.WriteLine("Note: new metabackup location not specified");
+                        }
+                        else
+                        {
+                            if (!System.IO.Directory.Exists(newmetabackuppath))
+                            {
+                                System.IO.Directory.CreateDirectory(newmetabackuppath);
+                            }
+                            if (!callmetabackupnow)
+                            {
+                                Console.WriteLine("Note: -nometabackup was specified; {0} metabackup -backup-now"
+                                    + " will need to be manually issued after this command", appname);
+                            }
+                        }
+
+                        string metabackupdfsxmlpath;
+                        if (System.IO.Directory.Exists(metabackuplocation))
+                        {
+                            string dfsbackupxml = metabackuplocation + @"\dfs-backup.xml"; // Favor this one.
+                            if (System.IO.File.Exists(dfsbackupxml))
+                            {
+                                metabackupdfsxmlpath = dfsbackupxml;
+                            }
+                            else
+                            {
+                                string[] xmlfiles = System.IO.Directory.GetFiles(metabackuplocation, "*.xml");
+                                if (xmlfiles.Length > 1)
+                                {
+                                    Console.Error.WriteLine("Error: Too many xml files found in metabackup location; remove all but one and try again: {0}", metabackuplocation);
+                                    Console.WriteLine("Must be exactly one *.xml file in metabackup location");
+                                    SetFailure();
+                                    return;
+                                }
+                                else if (xmlfiles.Length < 1)
+                                {
+                                    Console.Error.WriteLine("Error: {0} not found in metabackup location: {1}", dfs.DFSXMLNAME, metabackuplocation);
+                                    SetFailure();
+                                    return;
+                                }
+                                else //if (xmlfiles.Length == 1)
+                                {
+                                    metabackupdfsxmlpath = xmlfiles[0];
+                                }
+                            }
+                        }
+                        else if (System.IO.File.Exists(metabackuplocation))
+                        {
+                            Console.WriteLine("Error: must speicfy directory of metabackup, not file: {0}", metabackuplocation);
+                            SetFailure();
+                            return;
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: metabackup directory not found: {0}", metabackuplocation);
+                            SetFailure();
+                            return;
+                        }
+
+                        if (targetdspacepath.StartsWith(@"\\"))
+                        {
+                            int ixh = targetdspacepath.IndexOf('\\', 2);
+                            if (-1 == ixh)
+                            {
+                                Console.Error.WriteLine("Error: problem parsing network from path: {0}", targetdspacepath);
+                                SetFailure();
+                                return;
+                            }
+                            newhost = targetdspacepath.Substring(2, ixh - 2);
+                        }
+                        else
+                        {
+                            //newhost = System.Net.Dns.GetHostName();
+                            Console.WriteLine("Error: network path required for target {0} install directory for surrogate: {1}", appname, targetdspacepath);
+                            SetFailure();
+                            return;
+                        }
+
+                        if (!VerifyHostPermissions(new string[] { newhost }))
+                        {
+                            Shell(@"sc \\" + newhost + " start DistributedObjects");
+                            System.Threading.Thread.Sleep(1000 * 3); // Time to start.
+                            if (!VerifyHostPermissions(new string[] { newhost }))
+                            {
+                                Console.Error.WriteLine("Unable to ReplaceMachine: ensure the Windows service is installed and running on '{0}'", newhost);
+                                SetFailure();
+                                return;
+                            }
+                        }
+
+                        Console.WriteLine("Loading metabackup metadata...", metabackupdfsxmlpath);
+                        dfs mbdc;
+                        try
+                        {
+                            mbdc = dfs.ReadDfsConfig_unlocked(metabackupdfsxmlpath);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Unable to read metadata from '{0}': {1}", metabackupdfsxmlpath, e.Message);
+                            SetFailure();
+                            return;
+                        }
+
+                        string[] slaves = mbdc.Slaves.SlaveList.Split(';');
+                        int threadcount = slaves.Length;
+                        if (threadcount > 15)
+                        {
+                            threadcount = 15;
+                        }
+
+                        Console.WriteLine("Accessing target " + appname + " path {0} ...", targetdspacepath);
+                        if (!System.IO.File.Exists(targetdspacepath + @"\aelight.exe"))
+                        {
+                            Console.Error.WriteLine("Problem accessing target " + appname + " path '{0}': {1}",
+                                targetdspacepath, appname + " is not installed at this location");
+                            SetFailure();
+                            return;
+                        }
+
+                        try
+                        {
+                            // Run a little test to verify...
+                            string fp = targetdspacepath + "\\replacesurrogate." + Surrogate.SafeTextPath(System.Net.Dns.GetHostName()) + "." + Guid.NewGuid();
+                            System.IO.File.WriteAllText(fp, "[" + DateTime.Now.ToString() + "] replacesurrogate command issued from " + System.Net.Dns.GetHostName() + " {7BCD3A7C-3FA6-466f-84CB-51D70BB2B686}" + Environment.NewLine);
+                            if (-1 == System.IO.File.ReadAllText(fp).IndexOf("{7BCD3A7C-3FA6-466f-84CB-51D70BB2B686}"))
+                            {
+                                System.IO.File.Delete(fp);
+                                throw new System.IO.IOException("Read verification error {7BCD3A7C-3FA6-466f-84CB-51D70BB2B686}");
+                            }
+                            System.IO.File.Delete(fp);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine("Problem accessing target " + appname + " path '{0}': {1}", targetdspacepath, e.Message);
+                            SetFailure();
+                            return;
+                        }
+
+                        // So stopping services doesn't kill this instance.
+                        try
+                        {
+                            MakeInvincible();
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("Warning: {0}", e.Message);
+                            LogOutputToFile("MakeInvincible warning during ReplaceSurrogate: " + e.ToString());
+                        }
+                        _CleanPidFile_unlocked();
+
+                        if (stop)
+                        {
+                            Console.WriteLine("  Stopping services...");
+                            System.Threading.Thread.Sleep(1000 * 1); // Give a sec.
+                            MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                new Action<string>(
+                                delegate(string host)
+                                {
+                                    try
+                                    {
+                                        if (0 == string.Compare(IPAddressUtil.GetName(oldhost),
+                                            IPAddressUtil.GetName(host), StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            return;
+                                        }
+                                        Shell("sc \\\\" + host + " stop DistributedObjects");
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }), slaves, threadcount);
+                            Shell("sc \\\\" + newhost + " stop DistributedObjects");
+                            System.Threading.Thread.Sleep(1000 * 3); // Give a bit of extra time to shutdown.
+                        }
+
+                        try
+                        {
+                            ReplaceMachineMetadataMemory(mbdc, oldhost, newhost, DontTouchRMHost, RMForce, true);
+
+                            {
+                                Console.WriteLine("Restoring surrogate...");
+
+                                Surrogate.SetNewMasterHost(newhost);
+                                Surrogate.SetNewMetaLocation(targetdspacepath);
+
+                                Console.WriteLine("    Restoring jobs files...");
+                                foreach (System.IO.FileInfo zdfi in (new System.IO.DirectoryInfo(metabackuplocation)).GetFiles("*.zd"))
+                                {
+                                    System.IO.File.Copy(zdfi.FullName, targetdspacepath + @"\" + zdfi.Name, true);
+                                }
+
+                                try
+                                {
+                                    string schedulerbackuplocation = newmetabackuppath;
+                                    if (string.IsNullOrEmpty(schedulerbackuplocation))
+                                    {
+                                        schedulerbackuplocation = null;
+                                    }
+                                    if (MySpace.DataMining.DistributedObjects.Scheduler.BackupRestore(
+                                        metabackuplocation, targetdspacepath, schedulerbackuplocation))
+                                    {
+                                        //Console.WriteLine("Restored scheduled and queued tasks");
+                                    }
+                                    else
+                                    {
+                                        //Console.WriteLine("No scheduled or queued tasks to restore");
+                                    }
+                                }
+                                catch (System.IO.FileNotFoundException e)
+                                {
+                                    Console.WriteLine("Warning: unable to restore scheduled and queued tasks, perhaps it was never backed up from before this feature.");
+                                    Console.WriteLine("Message: {0}", e.Message);
+                                }
+
+                                mbdc.MetaBackup = newmetabackuppath;
+                                if (!string.IsNullOrEmpty(newmetabackuppath))
+                                {
+                                    EnsureMetaBackupLocation(mbdc);
+                                    // Important! Only do this AFTER restoring everything from metabackup location!
+                                    // Because the user might want to re-use the same directory.
+                                    foreach (string fn in System.IO.Directory.GetFiles(mbdc.GetMetaBackupLocation()))
+                                    {
+                                        System.IO.File.Delete(fn);
+                                    }
+                                }
+
+                                // Save mbdc to targetdspacepath
+                                Console.WriteLine("    Restoring metadata...");
+                                try
+                                {
+                                    System.IO.File.Delete(targetdspacepath + @"\dfs.xml");
+                                }
+                                catch
+                                {
+                                }
+                                try
+                                {
+                                    System.IO.File.Delete(targetdspacepath + @"\slave.dat");
+                                }
+                                catch
+                                {
+                                }
+                                {
+                                    // Updating slave.dat if found...
+                                    // If no slave.dat, it's probably a participating surrogate.
+                                    MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                        new Action<string>(
+                                        delegate(string slave)
+                                        {
+                                            if (0 == string.Compare(IPAddressUtil.GetName(oldhost),
+                                                IPAddressUtil.GetName(slave), StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                return;
+                                            }
+                                            try
+                                            {
+                                                System.IO.File.Delete(Surrogate.NetworkPathForHost(slave) + @"\dfs.xml");
+                                            }
+                                            catch
+                                            {
+                                            }
+                                            try
+                                            {
+                                                string sdfp = Surrogate.NetworkPathForHost(slave) + @"\slave.dat";
+                                                if (System.IO.File.Exists(sdfp))
+                                                {
+                                                    string[] sd = System.IO.File.ReadAllLines(sdfp);
+                                                    string sdfpnew = sdfp + ".new";
+                                                    using (System.IO.StreamWriter sw = System.IO.File.CreateText(sdfpnew))
+                                                    {
+                                                        bool fm = false;
+                                                        for (int i = 0; i < sd.Length; i++)
+                                                        {
+                                                            string line = sd[i];
+                                                            if (line.StartsWith("master=", StringComparison.OrdinalIgnoreCase))
+                                                            {
+                                                                line = "master=" + newhost;
+                                                                fm = true;
+                                                            }
+                                                            sw.WriteLine(line);
+                                                        }
+                                                        if (!fm)
+                                                        {
+                                                            throw new Exception("Invalid slave.dat on " + slave + " - master=host entry not found");
+                                                        }
+                                                    }
+                                                    System.IO.File.Delete(sdfp);
+                                                    System.IO.File.Move(sdfpnew, sdfp);
+                                                }
+                                                else
+                                                {
+                                                    // If it doesn't exist, write out a new one, but not if it is surrogate.
+                                                    if (0 != string.Compare(IPAddressUtil.GetName(newhost),
+                                                        IPAddressUtil.GetName(slave), StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        System.IO.File.WriteAllText(sdfp, "master=" + newhost
+                                                            + Environment.NewLine);
+                                                    }
+                                                }
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                lock (slaves)
+                                                {
+                                                    Console.Error.WriteLine("WARNING: Error on machine {0}: {1}", slave, e.Message);
+                                                }
+                                            }
+                                        }), slaves, threadcount);
+                                }
+                                {
+                                    // Fix old surrogate jobs-files references.
+                                    foreach (dfs.DfsFile df in mbdc.Files)
+                                    {
+                                        if (0 == string.Compare(df.Type, DfsFileTypes.JOB, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            foreach (dfs.DfsFile.FileNode fn in df.Nodes)
+                                            {
+                                                fn.Host = newhost;
+                                            }
+
+                                        }
+
+                                    }
+                                }
+
+                            }
+
+                            // Write new dfs.xml... only if ReplaceMachineMetadataMemory succeeded.
+                            UpdateDfsXml(mbdc, targetdspacepath + @"\" + dfs.DFSXMLNAME, mbdc.GetMetaBackupLocation());
+
+                        }
+                        finally
+                        {
+                            // Restart the services even if an exception happened, so you can run a command again.
+                            if (stop)
+                            {
+                                Console.WriteLine("  Starting services...");
+                                System.Threading.Thread.Sleep(1000 * 1); // Give a sec.
+                                MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                    new Action<string>(
+                                    delegate(string host)
+                                    {
+                                        try
+                                        {
+                                            if (0 == string.Compare(IPAddressUtil.GetName(oldhost),
+                                                IPAddressUtil.GetName(host), StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                return;
+                                            }
+                                            Shell("sc \\\\" + host + " start DistributedObjects");
+                                        }
+                                        catch
+                                        {
+                                        }
+                                    }), slaves, threadcount);
+                                Shell("sc \\\\" + newhost + " start DistributedObjects");
+                                System.Threading.Thread.Sleep(1000 * 1); // Give a sec to startup.
+                            }
+
+                        }
+
+                        Console.WriteLine("Done");
+                        LeaveAdminLock();
+
+                        if (callmetabackupnow)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("Calling '{0} metabackup -backup-now' on new surrogate...", appname);
+                            System.Threading.Thread.Sleep(1000 * 20); // Give another sec to startup.
+                            Console.WriteLine(Shell(appname + " @=" + newhost + " metabackup -backup-now").Trim());
+                        }
+
+                        if (!callmetabackupnow)
+                        {
+                            if (!string.IsNullOrEmpty(newmetabackuppath))
+                            {
+                                Console.WriteLine("Type the following to backup the current meta-data:");
+                                Console.WriteLine("    {0} metabackup -backup-now", appname);
+                            }
+                            else
+                            {
+                                Console.WriteLine("Use the metabackup command to re-enable metabackups");
+                            }
+                        }
+
                     }
                     break;
 
@@ -7469,6 +8226,118 @@ namespace MySpace.DataMining.AELight
                     }
                     break;
 
+                case "memcacheinstall":
+                    {
+                        if (args.Length < 4)
+                        {
+                            Console.Error.WriteLine("Usage:  {0} memcacheinstall <@hosts|host[,host...]> <username> <password>", appname);
+                            SetFailure();
+                            return;
+                        }
+
+                        string[] hosts = null;
+                        if (args[1][0] == '@')
+                        {
+                            hosts = Surrogate.GetHostsFromFile(args[1].Substring(1));
+                        }
+                        else
+                        {
+                            hosts = args[1].Split(';', ',');
+                        }                        
+                        if (hosts.Length == 0)
+                        {
+                            Console.Error.WriteLine("No host provided.");
+                            SetFailure();
+                            return;
+                        }
+
+                        string username = args[2];
+                        string password = args[3];
+                        string localhost = System.Net.Dns.GetHostName();
+                        string srcfp = NetworkPathForHost(System.Net.Dns.GetHostName()) + @"\MemCachePin.exe";
+
+                        int nthreads = hosts.Length;
+                        if (nthreads > 10)
+                        {
+                            nthreads = 10;
+                        }
+
+                        MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                            new Action<string>(
+                            delegate(string host)
+                            {
+                                string sout = Shell(@"sc \\" + host + " query MemCachePin", true);
+                                if (sout.IndexOf("SERVICE_NAME: MemCachePin") > -1)
+                                {
+                                    lock (hosts)
+                                    {
+                                        Console.WriteLine("Service found on {0}", host);
+                                    }
+
+                                    sout = Shell(@"sc \\" + host + " stop MemCachePin", true);
+                                    lock (hosts)
+                                    {
+                                        Console.WriteLine("Stopping service on {0}", host);
+                                        Console.WriteLine(sout);
+                                    }
+
+                                    sout = Shell(@"sc \\" + host + " delete MemCachePin", true);
+                                    lock (hosts)
+                                    {
+                                        Console.WriteLine("Deleting service on {0}", host);
+                                        Console.WriteLine(sout);
+                                    }
+                                }
+
+                                if (string.Compare(host, localhost, true) != 0)
+                                {
+                                    Console.WriteLine("Copying file to host {0}", host);
+                                    string destfp = NetworkPathForHost(host) + @"\MemCachePin.exe";
+                                    
+                                    try
+                                    {
+                                        // Remove read-only.
+                                        System.IO.FileAttributes destattribs = System.IO.File.GetAttributes(destfp);
+                                        if ((destattribs & System.IO.FileAttributes.ReadOnly) == System.IO.FileAttributes.ReadOnly)
+                                        {
+                                            System.IO.File.SetAttributes(destfp, destattribs & ~System.IO.FileAttributes.ReadOnly);
+                                        }
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    try
+                                    {
+                                        System.IO.File.Copy(srcfp, destfp, true);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        lock (hosts)
+                                        {
+                                            Console.WriteLine("Error copying file to host " + host + ".  Source: " + srcfp + "; destination: " + destfp + ".  Error: " + e.ToString());
+                                            return;
+                                        }
+                                    }
+                                }                             
+
+                                sout = Shell(@"sc \\" + host + " create MemCachePin binPath= \"" + AELight_Dir + @"\" + "MemCachePin.exe\" start= auto obj= \"" + username + "\" DisplayName= MemCachePin password= \"" + password + "\"");
+
+                                lock (hosts)
+                                {
+                                    Console.WriteLine("Deploying to {0}", host);
+                                    Console.WriteLine(sout);
+                                }
+
+                                sout = Shell(@"sc \\" + host + " start MemCachePin", false);
+                                lock (hosts)
+                                {
+                                    Console.WriteLine("Starting service on {0}", host);
+                                    Console.WriteLine(sout);
+                                }
+                            }), hosts, nthreads);
+                    }
+                    break;
+
                 case "deploy":
                 case "deploymt":
                 case "deployst":
@@ -7491,18 +8360,35 @@ namespace MySpace.DataMining.AELight
                             return;
                         }
 
-                        string[] hosts;
-                        bool thishostcheck = false;
-                        if (args.Length > 1 && "-f" != args[1])
+                        bool withMemCachePin = false;
+                        string arghosts = null;
+                        for (int iarg = 1; iarg < args.Length; iarg++)
                         {
-                            string shosts = args[1];
-                            if (shosts.StartsWith("@"))
+                            if ("-f" == args[iarg])
                             {
-                                hosts = Surrogate.GetHostsFromFile(shosts.Substring(1));
+                                // Ignore.
+                            }
+                            else if (0 == string.Compare("-MemCachePin", args[iarg], true) || 0 == string.Compare("-MemCache", args[iarg], true))
+                            {
+                                withMemCachePin = true;
                             }
                             else
                             {
-                                hosts = shosts.Split(';', ',');
+                                arghosts = args[iarg];
+                            }
+                        }
+
+                        string[] hosts;
+                        bool thishostcheck = false;
+                        if (null != arghosts)
+                        {
+                            if (arghosts.StartsWith("@"))
+                            {
+                                hosts = Surrogate.GetHostsFromFile(arghosts.Substring(1));
+                            }
+                            else
+                            {
+                                hosts = arghosts.Split(';', ',');
                             }
                             thishostcheck = true;
                         }
@@ -7510,6 +8396,11 @@ namespace MySpace.DataMining.AELight
                         {
                             dfs dc = LoadDfsConfig();
                             hosts = dc.Slaves.SlaveList.Split(';');
+                        }
+
+                        if (withMemCachePin)
+                        {
+                            Console.WriteLine("Including MemCachePin service");
                         }
 
                         {
@@ -7536,10 +8427,16 @@ namespace MySpace.DataMining.AELight
                                     foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(".")).GetFiles("*.exe"))
                                     {
                                         string fn = fi.Name;
-                                        if (!r2.IsMatch(fn))
+                                        if (r2.IsMatch(fn))
                                         {
-                                            copyfiles.Add(fn);
+                                            continue;
                                         }
+                                        if(!withMemCachePin
+                                            && 0 == string.Compare(fn, "MemCachePin.exe", true))
+                                        {
+                                            continue;
+                                        }
+                                        copyfiles.Add(fn);
                                     }
                                     foreach (System.IO.FileInfo fi in (new System.IO.DirectoryInfo(".")).GetFiles("*.dll"))
                                     {
@@ -7615,6 +8512,11 @@ namespace MySpace.DataMining.AELight
                                             {
                                                 System.Threading.Thread.Sleep(1000 * 8);
                                             }
+                                            if (withMemCachePin)
+                                            {
+                                                System.Threading.Thread.Sleep(1000);
+                                                Shell(@"sc \\" + host + " stop MemCachePin", true);
+                                            }
                                             System.Threading.Thread.Sleep(1000 * 2);
                                             for (int copyretry = 0; ; copyretry++)
                                             {
@@ -7675,6 +8577,11 @@ namespace MySpace.DataMining.AELight
                                                 Console.WriteLine("Starting {0}:", host);
                                                 Console.WriteLine(uout); // Throws on error.
                                                 nrealdeploy++;
+                                            }
+                                            if (withMemCachePin)
+                                            {
+                                                System.Threading.Thread.Sleep(1000);
+                                                Shell(@"sc \\" + host + " start MemCachePin", true);
                                             }
                                         }
                                     }

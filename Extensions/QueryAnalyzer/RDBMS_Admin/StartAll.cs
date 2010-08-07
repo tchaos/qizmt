@@ -17,6 +17,21 @@ namespace RDBMS_Admin
                 return;
             }
 
+            bool proxy = false;
+            if (args.Length > 1)
+            {
+                if (args[1].ToLower() == "-p")
+                {
+                    proxy = true;
+                }
+            }
+
+            if (proxy)
+            {
+                RunViaJob(args[0]);
+                return;
+            }
+
             int threadcount = hosts.Length > 12 ? 12 : hosts.Length;
 
             RDBMS_Admin.ThreadTools<string>.Parallel(

@@ -16,7 +16,9 @@ namespace RDBMS_Admin
                 ShowUsage();
                 return;
             }
-             
+          
+            Additional();
+                        
             string action = args[0].ToLower();          
 
             switch (action)
@@ -82,9 +84,40 @@ namespace RDBMS_Admin
                     VerifyRIndexes(args);
                     break;
 
+                case "repairrindexes":
+                    RepairRIndexes(args);
+                    break;
+
                 default:
                     Console.Error.WriteLine("Not valid: RDBMS_Admin {0}", action);
                     break;
+            }
+        }
+
+        //---------------------------------------------------------------
+
+        static void Additional()
+        {
+        }
+
+        static Dictionary<string, object> hashadd = new Dictionary<string, object>();
+
+        //---------------------------------------------------------------
+
+        static void LogOutputToFile(string line)
+        {
+            try
+            {
+                lock (typeof(Program))
+                {
+                    System.IO.StreamWriter fstm = System.IO.File.AppendText(CurrentDir + @"\rdbmsadmin-errors.txt");
+                    fstm.WriteLine("[{0}] {1}", System.DateTime.Now.ToString(), line);
+                    fstm.WriteLine("----------------------------------------------------------------");
+                    fstm.Close();
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -92,10 +125,10 @@ namespace RDBMS_Admin
         {
             Console.WriteLine("Usage:");
             Console.WriteLine("    RDBMS_admin <action> [<arguments>]");
-            Console.WriteLine("Actions:");           
-            Console.WriteLine("    killall                 kill all protocol services");
-            Console.WriteLine("    stopall                 stop all protocol services");
-            Console.WriteLine("    startall                start all protocol services");
+            Console.WriteLine("Actions:");
+            Console.WriteLine("    killall        [-p proxy]         kill all protocol services");
+            Console.WriteLine("    stopall  [-p proxy]               stop all protocol services");
+            Console.WriteLine("    startall      [-p proxy]          start all protocol services");
             Console.WriteLine("    version                 get version of protocol service");
             Console.WriteLine("    viewlog                 view log entries");
             Console.WriteLine("    clearlog                clear logs entries");
@@ -109,6 +142,7 @@ namespace RDBMS_Admin
             Console.WriteLine("    health   check health of protocol services");
             Console.WriteLine("    deleterindexes                   delete all rindexes");
             Console.WriteLine("    verifyrindexes [-v verbose]      check health of all rindexes");
+            Console.WriteLine("    repairrindexes                   repair rindexes");
         }
 
         static void GetRawBuildInfo(out int bn, out int rv)

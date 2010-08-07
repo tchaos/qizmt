@@ -173,7 +173,8 @@ namespace MySpace.DataMining.AELight
                 string backupfile = null, oldbackupfile = null, newbackupfile = null;
                 if (null != backupdir)
                 {
-                    backupfile = backupdir + @"\dfs-" + Surrogate.SafeTextPath(System.Net.Dns.GetHostName()) + @".xml";
+                    //backupfile = backupdir + @"\dfs-" + Surrogate.SafeTextPath(System.Net.Dns.GetHostName()) + @".xml";
+                    backupfile = backupdir + @"\dfs-backup.xml";
                     oldbackupfile = backupfile + ".old";
                     newbackupfile = backupfile + ".new";
                 }
@@ -2900,8 +2901,9 @@ switch(workerindex)
                     SetFailure();
                     return;
                 }
-
-                string localpath = args[1];
+                
+               string localpath = args[1];
+               
 
                 EnsureNetworkPath(localpath);
 
@@ -2912,6 +2914,24 @@ switch(workerindex)
                     _DfsGetPartsNoWildcard(args, startparts, lastparts);
                     return;
                 }
+
+                if (!System.IO.File.Exists(localpath))
+                {
+                    
+                    string folderPath = localpath;
+                    System.IO.DirectoryInfo di = new System.IO.DirectoryInfo(folderPath);
+                     
+
+                    if (di.Exists)
+                        localpath += "\\" + args[0];
+                    else if(!di.Parent.Exists)
+                    {
+                        Console.Error.WriteLine("Specified path does not exist, double check existance of the folders in the path");
+                        return;
+                    }
+
+                }                     
+                
 
                 if (System.IO.File.Exists(localpath))
                 {
@@ -2969,7 +2989,9 @@ switch(workerindex)
                 }
                 bool warned = false;
                 long curfilepos = 0;
-                using (System.IO.FileStream _fs = new System.IO.FileStream(localpath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
+               
+               
+                using (System.IO.FileStream _fs = new System.IO.FileStream(localpath, System.IO.FileMode.CreateNew, System.IO.FileAccess.Write, System.IO.FileShare.Read, FILE_BUFFER_SIZE))
                 {
                     System.IO.Stream fs = _fs;
                     /*if (localpath.EndsWith(".gz"))
@@ -3672,6 +3694,12 @@ switch(workerindex)
                 }
 
             }
+            else if (dfsf.MemCache != null)
+            {
+                List<dfs.DfsFile> delfilesMC = new List<dfs.DfsFile>(1);
+                delfilesMC.Add(dfsf);
+                _KillMemCache_mt(delfilesMC, verbose);
+            }
             else
             {
                 for (int dn = 0; dn < dfsf.Nodes.Count; dn++)
@@ -3891,6 +3919,7 @@ switch(workerindex)
             List<dfs.DfsFile> delfilesSB = new List<dfs.DfsFile>();
             List<dfs.DfsFile> delfilesDLL = new List<dfs.DfsFile>();
             List<dfs.DfsFile> delfilesJOB = new List<dfs.DfsFile>();
+            List<dfs.DfsFile> delfilesMC = new List<dfs.DfsFile>(); // MemCache
             string metabackupdir = null;
             using (LockDfsMutex())
             {
@@ -3920,6 +3949,10 @@ switch(workerindex)
                         {
                             delfilesJOB.Add(df);
                         }
+                        else if (df.MemCache != null)
+                        {
+                            delfilesMC.Add(df);
+                        }
                         else
                         {
                             delfiles.Add(df);
@@ -3938,6 +3971,8 @@ switch(workerindex)
             _KillDllFileChunks_unlocked_mt(delfilesDLL, verbose);
             _KillDataFileChunks_unlocked_mt(delfiles, verbose);
             _KillJobFileChunks_unlocked_mt(delfilesJOB, metabackupdir, verbose);
+            _KillMemCache_mt(delfilesMC, verbose);
+            
         }
 
         private static void _DfsDelete_mt(List<dfs.DfsFile> files, bool verbose)
@@ -3946,6 +3981,7 @@ switch(workerindex)
             List<dfs.DfsFile> delfilesSB = new List<dfs.DfsFile>();
             List<dfs.DfsFile> delfilesDLL = new List<dfs.DfsFile>();
             List<dfs.DfsFile> delfilesJOB = new List<dfs.DfsFile>();
+            List<dfs.DfsFile> delfilesMC = new List<dfs.DfsFile>(); // MemCache
             string metabackupdir = null;
 
             using (LockDfsMutex())
@@ -3979,6 +4015,10 @@ switch(workerindex)
                             {
                                 delfilesJOB.Add(df);
                             }
+                            else if (df.MemCache != null)
+                            {
+                                delfilesMC.Add(df);
+                            }
                             else
                             {
                                 delfiles.Add(df);
@@ -3998,6 +4038,8 @@ switch(workerindex)
             _KillDllFileChunks_unlocked_mt(delfilesDLL, verbose);
             _KillDataFileChunks_unlocked_mt(delfiles, verbose);
             _KillJobFileChunks_unlocked_mt(delfilesJOB, metabackupdir, verbose);
+            _KillMemCache_mt(delfilesMC, verbose);
+
         }
 
         static bool atype = true;
@@ -4013,6 +4055,13 @@ switch(workerindex)
                 if (null == df)
                 {
                     Console.Error.WriteLine("Error:  File to rename not found: {0}", args[0]);
+                    SetFailure();
+                    return;
+                }
+
+                if (df.MemCache != null)
+                {
+                    Console.Error.WriteLine("Error: cannot rename a MemCache: {0}", df.Name);
                     SetFailure();
                     return;
                 }
@@ -4060,11 +4109,24 @@ switch(workerindex)
                     SetFailure();
                     return;
                 }
+                if (df1.MemCache != null)
+                {
+                    Console.Error.WriteLine("Error: cannot rename a MemCache: {0}", df1.Name);
+                    SetFailure();
+                    return;
+                }
 
                 dfs.DfsFile df2 = DfsFindAny(dc, dfsname2);
                 if (null == df2)
                 {
                     Console.Error.WriteLine("Error:  File to swap not found: {0}", dfsname2);
+                    SetFailure();
+                    return;
+                }
+
+                if (df2.MemCache != null)
+                {
+                    Console.Error.WriteLine("Error: cannot rename a MemCache: {0}", df2.Name);
                     SetFailure();
                     return;
                 }
@@ -4183,22 +4245,49 @@ switch(workerindex)
                             {
                                 specs = args[0].Split(':');
                             }
+                            string RecordInfo = null;
+                            int RecordLength = -1;
+                            {
+                                int iat = specs[0].IndexOf('@');
+                                if (-1 != iat)
+                                {
+                                    RecordInfo = specs[0].Substring(iat + 1);
+                                    specs[0] = specs[0].Substring(0, iat);
+                                }
+                            }
                             dfs dc = LoadDfsConfig();
-
-                            dfs.DfsFile df = null;
-                            try
-                            {
-                                df = DfsFind(dc, specs[0]);
-                            }
-                            catch (System.IO.IOException e)
-                            {
-                                SetFailure();
-                                return;
-                            }
-
+                            dfs.DfsFile df = DfsFindAny(dc, specs[0]);
                             if (null == df)
                             {
                                 Console.Error.WriteLine("File not found in DFS: {0}", specs[0]);
+                                SetFailure();
+                                return;
+                            }
+                            if (0 == string.Compare(DfsFileTypes.NORMAL, df.Type, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (null != RecordInfo)
+                                {
+                                    Console.Error.WriteLine("Cannot specify record information '{0}'"
+                                        + " for non- rectangular binary DFS file '{1}'",
+                                        RecordInfo, df.Name);
+                                    SetFailure();
+                                    return;
+                                }
+                            }
+                            else if (0 == string.Compare(DfsFileTypes.BINARY_RECT, df.Type, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (string.IsNullOrEmpty(RecordInfo))
+                                {
+                                    Console.Error.WriteLine("DFS file '{0}' is not of expected type", specs[0]);
+                                    Console.WriteLine("Must specify <dfsfile>@<record-types> for a rectangular binary DFS file");
+                                    SetFailure();
+                                    return;
+                                }
+                                RecordLength = df.RecordLength;
+                            }
+                            else
+                            {
+                                Console.Error.WriteLine("DFS file '{0}' is not of expected type", specs[0]);
                                 SetFailure();
                                 return;
                             }
@@ -4275,16 +4364,255 @@ switch(workerindex)
                                             }
                                         }
 
-                                        using (System.IO.StreamReader sr = new System.IO.StreamReader(fc))
+                                        if (null == RecordInfo)
                                         {
-                                            for (; lc > 0; lc--)
+                                            using (System.IO.StreamReader sr = new System.IO.StreamReader(fc))
                                             {
-                                                string s = sr.ReadLine();
-                                                if (null == s)
+                                                for (; lc > 0; lc--)
                                                 {
-                                                    break;
+                                                    string s = sr.ReadLine();
+                                                    if (null == s)
+                                                    {
+                                                        break;
+                                                    }
+                                                    Console.WriteLine(s);
                                                 }
-                                                Console.WriteLine(s);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            byte[] recbuf = new byte[RecordLength];
+                                            string[] types = RecordInfo.Split(',');
+                                            List<int> typesizes = new List<int>(types.Length);
+                                            int totalsizerequested = 0;
+                                            {
+                                                foreach (Surrogate.RecordInfo ri in Surrogate.EachRecord(RecordInfo))
+                                                {
+                                                    if (ri.InKey)
+                                                    {
+                                                        throw new Exception("Unexpected [ found in record information");
+                                                    }
+                                                    totalsizerequested += ri.Size;
+                                                    if (totalsizerequested <= RecordLength)
+                                                    {
+                                                        typesizes.Add(ri.Size);
+                                                    }
+                                                }
+                                            }
+                                            {
+                                                for (; lc > 0; lc--)
+                                                {
+                                                    if (RecordLength != StreamReadLoop(fc, recbuf, RecordLength))
+                                                    {
+                                                        break;
+                                                    }
+                                                    int offset = 0;
+                                                    for (int it = 0; it < typesizes.Count;
+                                                        offset += typesizes[it++])
+                                                    {
+                                                        if (0 != it)
+                                                        {
+                                                            Console.Write(' ');
+                                                        }
+                                                        if (char.IsDigit(types[it][0]))
+                                                        {
+                                                            Console.Write("<{0}>", typesizes[it]);
+                                                        }
+                                                        else if (0 == string.Compare("int", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            || 0 == string.Compare("int32", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            || 0 == string.Compare("nInt", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            )
+                                                        {
+                                                            bool isnullable = (char.ToLowerInvariant(types[it][0]) == 'n');
+                                                            MySpace.DataMining.DistributedObjects.recordset rs;
+                                                            if (isnullable)
+                                                            {
+                                                                if (0 != recbuf[0])
+                                                                {
+                                                                    Console.Write("NULL");
+                                                                    continue;
+                                                                }
+                                                                else
+                                                                {
+                                                                    rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                        MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                            recbuf, offset + 1, typesizes[it] - 1));
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                    MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                        recbuf, offset, typesizes[it]));
+                                                            }
+                                                            int val = rs.GetInt();
+                                                            if (isnullable)
+                                                            {
+                                                                val = (int)MySpace.DataMining.DistributedObjects.Entry.ToUInt32(val);
+                                                            }
+                                                            Console.Write(val);
+                                                        }
+                                                        else if (0 == string.Compare("long", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            || 0 == string.Compare("int64", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            || 0 == string.Compare("nLong", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            )
+                                                        {
+                                                            bool isnullable = (char.ToLowerInvariant(types[it][0]) == 'n');
+                                                            MySpace.DataMining.DistributedObjects.recordset rs;
+
+                                                            if (isnullable)
+                                                            {
+                                                                if (0 != recbuf[0])
+                                                                {
+                                                                    Console.Write("NULL");
+                                                                    continue;
+                                                                }
+                                                                else
+                                                                {
+                                                                    rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                        MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                            recbuf, offset + 1, typesizes[it] - 1));
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                    MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                        recbuf, offset, typesizes[it]));
+                                                            }
+                                                            long val = rs.GetLong();
+                                                            if (isnullable)
+                                                            {
+                                                                val = (long)MySpace.DataMining.DistributedObjects.Entry.ToUInt64(val);
+                                                            }
+                                                            Console.Write(val);
+                                                        }
+                                                        else if (0 == string.Compare("nDateTime", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            )
+                                                        {
+                                                            bool isnullable = (char.ToLowerInvariant(types[it][0]) == 'n');
+                                                            MySpace.DataMining.DistributedObjects.recordset rs;
+
+                                                            if (isnullable)
+                                                            {
+                                                                if (0 != recbuf[0])
+                                                                {
+                                                                    Console.Write("NULL");
+                                                                    continue;
+                                                                }
+                                                                else
+                                                                {
+                                                                    rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                        MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                            recbuf, offset + 1, typesizes[it] - 1));
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                    MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                        recbuf, offset, typesizes[it]));
+                                                            }
+                                                            try
+                                                            {
+                                                                DateTime dtval = rs.GetDateTime();
+                                                                string val = "\"" + dtval + "\"";
+                                                                Console.Write(val);
+                                                            }
+                                                            catch
+                                                            {
+                                                                Console.Write("<error>");
+                                                            }
+                                                        }
+                                                        else if (0 == string.Compare("double", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            || 0 == string.Compare("nDouble", types[it], StringComparison.OrdinalIgnoreCase)
+                                                            )
+                                                        {
+                                                            bool isnullable = (char.ToLowerInvariant(types[it][0]) == 'n');
+                                                            MySpace.DataMining.DistributedObjects.recordset rs;
+                                                            if (isnullable)
+                                                            {
+                                                                if (0 != recbuf[0])
+                                                                {
+                                                                    Console.Write("NULL");
+                                                                    continue;
+                                                                }
+                                                                else
+                                                                {
+                                                                    rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                        MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                            recbuf, offset + 1, typesizes[it] - 1));
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                    MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                        recbuf, offset, typesizes[it]));
+                                                            }
+                                                            double val = Math.Round(rs.GetDouble(), 4);
+                                                            Console.Write(val);
+                                                        }
+                                                        else if (types[it].StartsWith("nChar", StringComparison.OrdinalIgnoreCase)
+                                                            )
+                                                        {
+                                                            bool isnullable = (char.ToLowerInvariant(types[it][0]) == 'n');
+                                                            MySpace.DataMining.DistributedObjects.recordset rs;
+                                                            if (isnullable)
+                                                            {
+                                                                if (0 != recbuf[0])
+                                                                {
+                                                                    Console.Write("NULL");
+                                                                    continue;
+                                                                }
+                                                                else
+                                                                {
+                                                                    rs = MySpace.DataMining.DistributedObjects.recordset.Prepare(
+                                                                        MySpace.DataMining.DistributedObjects.ByteSlice.Prepare(
+                                                                            recbuf, offset + 1, typesizes[it] - 1));
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                throw new NotSupportedException();
+                                                            }
+                                                            try
+                                                            {
+                                                                byte[] sbbuf = new byte[rs.Length];
+                                                                rs.GetBytes(sbbuf, 0, sbbuf.Length);
+                                                                string s = Encoding.Unicode.GetString(sbbuf).TrimEnd('\0');
+                                                                string val = "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+                                                                Console.Write(val);
+                                                            }
+                                                            catch
+                                                            {
+                                                                Console.Write("<error>");
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            // Unhandled type:
+                                                            Console.Write("<{0}>", types[it].ToUpper());
+                                                        }
+                                                    }
+                                                    if (typesizes.Count > types.Length)
+                                                    {
+                                                        if (typesizes.Count > 0)
+                                                        {
+                                                            Console.Write(' ');
+                                                        }
+                                                        Console.Write("<clipped>");
+                                                    }
+                                                    /*else if(totalsizerequested < RecordLength)
+                                                    {
+                                                        if (typesizes.Count > 0)
+                                                        {
+                                                            Console.Write(' ');
+                                                        }
+                                                        Console.Write("<{0}>", RecordLength - totalsizerequested);
+                                                    }*/
+                                                    Console.WriteLine();
+                                                }
                                             }
                                         }
                                     }
@@ -4492,7 +4820,7 @@ switch(workerindex)
                                     bool isdllfile = 0 == string.Compare(dc.Files[i].Type, DfsFileTypes.DLL);
                                     bool istbl = false;
                                     int RecordLength = dc.Files[i].RecordLength;
-                                    if (RecordLength > 0)
+                                    if (RecordLength > 0 || RecordLength == -2)
                                     {
                                         isnormalfile = true; // For most purposes here it's the same.
                                     }
@@ -4520,6 +4848,7 @@ switch(workerindex)
                                     }
                                     ConsoleColor oldcolor = ConsoleColor.Gray; // ...
                                     string colorcode = "", endcolorcode = "";
+                                    int morespace = 0;
                                     if (iszballfile)
                                     {
                                         oldcolor = Console.ForegroundColor;
@@ -4548,10 +4877,18 @@ switch(workerindex)
                                             endcolorcode = "\u00012]\u00010";
                                         }
                                         Console.ForegroundColor = oldcolor;
+                                        morespace += 2;
                                     }
-                                    if (RecordLength > 0)
+                                    if (RecordLength > 0 || RecordLength == -2)
                                     {
-                                        endcolorcode += "\u00012@" + RecordLength.ToString() + "\u00010";
+                                        string srl = RecordLength > 0 ? RecordLength.ToString() : "?";
+                                        endcolorcode += "\u00012@" + srl + "\u00010";
+                                        morespace += 1 + srl.Length;
+                                    }
+                                    if (dc.Files[i].MemCache != null)
+                                    {
+                                        endcolorcode += " \u00012mc\u00010";
+                                        morespace += 3;
                                     }
                                     {
                                         int iddx = dc.Files[i].Name.IndexOf(".$");
@@ -4573,13 +4910,13 @@ switch(workerindex)
                                             }
                                         }
                                     }
-                                    if (isdllfile || istbl || RecordLength > 0)
+                                    if (isdllfile || istbl || RecordLength > 0 || RecordLength == -2)
                                     {
                                         Console.Write("  {0}{1}{2}  ", colorcode, dc.Files[i].Name, endcolorcode);
-                                        int spacelen = 40 - 2 - dc.Files[i].Name.Length;
+                                        int spacelen = 40 - dc.Files[i].Name.Length - morespace;
                                         if (spacelen > 0)
                                         {
-                                            Console.Write(new string(' ', 40 - 2 - dc.Files[i].Name.Length));
+                                            Console.Write(new string(' ', spacelen));
                                         }
                                     }
                                     else
@@ -5302,12 +5639,12 @@ switch(workerindex)
                                             if (0 == string.Compare(df.Type, DfsFileTypes.NORMAL, true)
                                                 || 0 == string.Compare(df.Type, DfsFileTypes.BINARY_RECT, true))
                                             {
-                                                bool HasSamples = df.RecordLength < 1;
+                                                bool HasSamples = df.RecordLength < 1 && df.RecordLength != -2;
                                                 Console.WriteLine("   DFS File: {0}", df.Name);
                                                 int RecordLength = df.RecordLength;
-                                                if (RecordLength > 0)
+                                                if (RecordLength > 0 || RecordLength == -2)
                                                 {
-                                                    Console.WriteLine("      Record Length: {0}", RecordLength);
+                                                    Console.WriteLine("      Record Length: {0}", (RecordLength > 0 ? RecordLength.ToString() : "?"));
                                                 }
                                                 Console.WriteLine("      Size: {0} ({1})", GetFriendlyByteSize(df.Size), df.Size);
                                                 if (HasSamples)

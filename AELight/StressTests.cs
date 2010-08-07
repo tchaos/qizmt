@@ -124,7 +124,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
 
             private static void GenerateHashSorted(string size, List<string> alljobfiles, List<string> jobfilesverify)
@@ -201,7 +201,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
 
             private static void GenerateHashFaceHaarSorted(string size, List<string> alljobfiles)
@@ -345,7 +345,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
 
             private static void GenerateSorted(string size, List<string> alljobfiles, List<string> jobfilesverify)
@@ -419,7 +419,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
 
             private static void GenerateSortedGensort(string size, List<string> alljobfiles, List<string> jobfilesverify)
@@ -592,7 +592,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
 
             private static void GenerateSortedPOS(string size, List<string> alljobfiles)
@@ -666,7 +666,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
 
             private static void GenerateSortTestsDriver(List<string> alljobfiles, List<string> jobfilesverify)
@@ -715,7 +715,7 @@ namespace MySpace.DataMining.AELight
                 DSpace_Log(`-`);
                 foreach(string job in sort)
                 {                    
-                    DSpace_Log(`DSpace exec ` + job);
+                    DSpace_Log(`Qizmt exec ` + job);
                     DSpace_Log(Shell(`DSpace exec ` + job));
                     DSpace_Log(`-`);
                 }
@@ -741,11 +741,11 @@ namespace MySpace.DataMining.AELight
                     
                     if(pass)
                     {
-                        DSpace_LogResult(`DSpace exec ` + job, true);
+                        DSpace_LogResult(`Qizmt exec ` + job, true);
                     }
                     else
                     {                        
-                        DSpace_LogResult(`DSpace exec ` + job, false);
+                        DSpace_LogResult(`Qizmt exec ` + job, false);
                     } 
                     
                     Shell(@`DSpace del ` + job + `.FAILED`, true);
@@ -759,9 +759,9 @@ namespace MySpace.DataMining.AELight
   </Jobs>
 </SourceCode>
 ").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0} [s = run tests]", alljobfiles[alljobfiles.Count - 1]);
-                Console.WriteLine("    DSpace exec {0} [sv = run tests and verify results]", alljobfiles[alljobfiles.Count - 1]);
-                Console.WriteLine("    DSpace exec {0} [v = verify results]", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0} [s = run tests]", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0} [sv = run tests and verify results]", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0} [v = verify results]", alljobfiles[alljobfiles.Count - 1]);
             }
 
             private static void GeneratePrereq()
@@ -913,7 +913,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                    Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                    Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
                 }
                 #endregion
 
@@ -1011,7 +1011,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                    Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                    Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
                 }
                 #endregion               
 
@@ -1171,7 +1171,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
             #endregion
 
@@ -1319,7 +1319,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
             #endregion
 
@@ -1413,7 +1413,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
             #endregion
 
@@ -1515,7 +1515,7 @@ namespace MySpace.DataMining.AELight
     </Job>
   </Jobs>
 </SourceCode>").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             }
             #endregion
 
@@ -1555,8 +1555,8 @@ namespace MySpace.DataMining.AELight
             DSpace_Log(`-`);
             foreach(string job in jobs)
             {                    
-                DSpace_Log(`DSpace exec ` + job + ` ` + mode);
-                DSpace_Log(Shell(`DSpace exec ` + job + ` ` + mode));
+                DSpace_Log(`Qizmt exec ` + job + ` ` + mode);
+                DSpace_Log(Shell(`Qizmt exec ` + job + ` ` + mode));
                 DSpace_Log(`-`);
             }
 
@@ -1577,11 +1577,11 @@ namespace MySpace.DataMining.AELight
                     
                     if(pass)
                     {
-                        DSpace_LogResult(`DSpace exec ` + job, true);
+                        DSpace_LogResult(`Qizmt exec ` + job, true);
                     }
                     else
                     {                        
-                        DSpace_LogResult(`DSpace exec ` + job, false);
+                        DSpace_LogResult(`Qizmt exec ` + job, false);
                     } 
                     
                     Shell(@`DSpace del ` + job + `.FAILED`, true);
@@ -1595,7 +1595,7 @@ namespace MySpace.DataMining.AELight
   </Jobs>
 </SourceCode>
 ").Replace('`', '"'));
-                Console.WriteLine("    DSpace exec {0}  [v = verify results]", alljobfiles[alljobfiles.Count - 1]);
+                Console.WriteLine("    Qizmt exec {0}  [v = verify results]", alljobfiles[alljobfiles.Count - 1]);
             }
             #endregion
 
@@ -1852,7 +1852,7 @@ namespace MySpace.DataMining.AELight
   </Jobs>
 </SourceCode>").Replace('`', '"'));
 
-                Console.WriteLine("DSpace exec " + jobfname);
+                Console.WriteLine("Qizmt exec " + jobfname);
             }
         }
         #endregion

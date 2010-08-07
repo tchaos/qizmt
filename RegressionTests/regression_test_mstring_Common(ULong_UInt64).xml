@@ -1,0 +1,123 @@
+<SourceCode>
+  <Jobs>
+    <Job Name=" regression_test_mstring_Common(ULong_UInt64)_Preprocessing" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+        <!--<LocalHost>localhost</LocalHost>-->
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del  regression_test_mstring_Common(ULong_UInt64)_Input.txt");
+                Shell(@"Qizmt del  regression_test_mstring_Common(ULong_UInt64)_Output.txt");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=" regression_test_mstring_Common(ULong_UInt64)_CreateSampleData" Custodian="" Email="" Description="Create sample data">
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs:// regression_test_mstring_Common(ULong_UInt64)_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                  //Create sample data.
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    //long 
+                    ulong l = (ulong)(DateTime.Now.Ticks + (long)rnd.Next());
+                   
+                    string s = l.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    onerow.Add((byte)del);
+                    
+                    //long  
+                    l = (ulong)(DateTime.Now.Ticks + (long)rnd.Next());
+                    
+                    s = l.ToString();
+                    buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }
+                    
+                    dfsoutput.WriteLine(onerow);        
+                }     
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name=" regression_test_mstring_Common(ULong_UInt64)" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int,double</KeyLength>
+        <DFSInput>dfs:// regression_test_mstring_Common(ULong_UInt64)_Input.txt</DFSInput>
+        <DFSOutput>dfs:// regression_test_mstring_Common(ULong_UInt64)_Output.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                
+               
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+               
+                
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_mstring_Common(string_msring)_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_mstring_Common(ULong_UInt64)_Input.txt regression_test_mstring_Common(ULong_UInt64)_Output.txt regression_test_mstring_Common(ULong_UInt64).xml");     
+            
+            Shell(@"Qizmt del regression_test_mstring_Common(ULong_UInt64)_Input.txt", true);
+            Shell(@"Qizmt del regression_test_mstring_Common(ULong_UInt64)_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

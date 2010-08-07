@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("QueryAnalyzer_DataProvider")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("MySpace Inc.")]
 [assembly: AssemblyProduct("QueryAnalyzer_DataProvider")]
 [assembly: AssemblyCopyright("Copyright ©  2009")]
 [assembly: AssemblyTrademark("")]

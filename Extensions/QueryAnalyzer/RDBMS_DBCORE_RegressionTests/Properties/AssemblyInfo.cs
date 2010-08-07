@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("RDBMS_DBCORE_RegressionTests")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("MySpace Inc.")]
 [assembly: AssemblyProduct("RDBMS_DBCORE_RegressionTests")]
 [assembly: AssemblyCopyright("Copyright ©  2009")]
 [assembly: AssemblyTrademark("")]

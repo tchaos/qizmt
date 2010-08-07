@@ -20,6 +20,8 @@
 
 //#if DEBUG
 #define DOSERVICE_TRACE
+//#define FAILOVER_DEBUG
+//#define TESTFAULTTOLERANT
 //#endif
 
 using System;
@@ -75,8 +77,21 @@ namespace MySpace.DataMining.DistributedObjects5
                         block.abort();
                     }
                 }
-                catch(Exception e2)
+                catch (Exception e2)
                 {
+                }
+            }
+            finally
+            {
+                if (block != null)
+                {
+                    try
+                    {
+                        block.cleanup();
+                    }
+                    catch
+                    {
+                    }
                 }
             }
             DistributedObjectsService.DOService_RemoveTraceThread(null);
@@ -427,6 +442,8 @@ namespace MySpace.DataMining.DistributedObjects5
         {
             try
             {
+                MySpace.DataMining.AELight.Surrogate.LogonMachines();
+
                 DOService_AddTraceThread(null);
 
                 string service_base_dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
@@ -1165,7 +1182,7 @@ namespace MySpace.DataMining.DistributedObjects5
         string name = "(no-block-name)";
         bool added = false;
         byte[] buf;
-
+        VitalsReporter vitals = null;
 
         internal void abort()
         {
@@ -1175,9 +1192,17 @@ namespace MySpace.DataMining.DistributedObjects5
                 dllclientStm.Close(1000);
                 dllclientStm = null;
             }
-            buf = null; // ...
+            buf = null; // ...            
         }
 
+        internal void cleanup()
+        {
+            if (vitals != null)
+            {
+                vitals.Stop();
+                vitals = null;
+            }
+        }
 
         public Block(Socket dllclientSock)
         {
@@ -1482,7 +1507,7 @@ namespace MySpace.DataMining.DistributedObjects5
             string s;
             int x;
             //int len;
-            System.Threading.Thread heartbeatthd = null;
+
             //try
             {
                 for (bool stop = false; !stop; )
@@ -1636,6 +1661,142 @@ namespace MySpace.DataMining.DistributedObjects5
                                 }
                                 break;
 
+                            case 'n': // Batch download files with fault tolerance
+                                {
+#if FAILOVER_DEBUG
+                                    string debugfile = "";
+#endif
+                                    try
+                                    {                                        
+                                        int len;
+                                        buf = XContent.ReceiveXBytes(dllclientStm, out len, buf);
+                                        int ftretries = MyBytesToInt(buf, 0);
+                                        long jid = MySpace.DataMining.DistributedObjects.Entry.BytesToLong(buf, 4);
+
+                                        string[] files = XContent.ReceiveXString(dllclientStm, buf).Split('\u0001');
+                                        Dictionary<string, int> tattledhosts = new Dictionary<string, int>(files.Length);
+
+
+#if FAILOVER_DEBUG
+                                        debugfile = @"c:\temp\slavebatchopts_" + jid.ToString() + "_" +
+                                        ftretries.ToString() + "_" +
+                                        Guid.NewGuid().ToString() + ".txt";
+                                        System.IO.File.WriteAllText(debugfile, string.Join(";", files));
+#endif
+
+#if TESTFAULTTOLERANT
+                                        {
+                                            while (System.IO.File.Exists(@"c:\temp\failoverslavetestrep.txt"))
+                                            {
+                                                System.Threading.Thread.Sleep(10000);
+                                            }                                            
+                                        }
+#endif
+
+                                        
+
+                                        if (files.Length < 2) // Will only be 1 thread here.
+                                        {
+                                            FTReplication worker = new FTReplication();
+                                            worker.allpullfiles = files;
+                                            worker.jid = jid;
+                                            worker.ftretries = ftretries;
+                                            worker.start = 0;
+                                            worker.stop = files.Length;
+                                            worker.tattledhosts = tattledhosts;
+#if TESTFAULTTOLERANT
+                                            worker.fttest = new MySpace.DataMining.AELight.FTTest(jid);
+#endif
+                                            worker.ThreadProc();
+
+#if TESTFAULTTOLERANT
+                                            worker.fttest.Close();
+#endif
+                                        }
+                                        else // More than one thread!
+                                        {
+                                            int nthreads = MyThreadTools.NumberOfProcessors;
+                                            int ntasks = files.Length;
+                                            int tpt = ntasks / nthreads; // Tasks per thread.
+                                            if (0 != (ntasks % nthreads))
+                                            {
+                                                tpt++;
+                                            }
+                                            List<FTReplication> ptos = new List<FTReplication>(nthreads);
+                                            int offset = 0;
+                                            for (int it = 0; offset < ntasks; it++)
+                                            {
+                                                FTReplication pto = new FTReplication();
+                                                pto.allpullfiles = files;
+                                                pto.jid = jid;
+                                                pto.ftretries = ftretries;
+                                                pto.start = offset;
+                                                offset += tpt;
+                                                if (offset > ntasks)
+                                                {
+                                                    offset = ntasks;
+                                                }
+                                                pto.stop = offset;
+                                                pto.tattledhosts = tattledhosts;
+#if TESTFAULTTOLERANT
+                                                pto.fttest = new MySpace.DataMining.AELight.FTTest(jid);
+#endif
+                                                ptos.Add(pto);
+                                                pto.thread = new System.Threading.Thread(new System.Threading.ThreadStart(pto.ThreadProc));
+                                                pto.thread.IsBackground = true;
+                                                pto.thread.Start();
+                                            }
+#if FAILOVER_DEBUG
+                                            System.IO.File.AppendAllText(debugfile, Environment.NewLine + "repl threads started:" + ptos.Count.ToString());
+
+#endif                                          
+
+                                            for (int i = 0; i < ptos.Count; i++)
+                                            {
+                                                ptos[i].thread.Join();
+#if TESTFAULTTOLERANT
+                                                ptos[i].fttest.Close();
+#endif
+                                                if (ptos[i].exception != null)
+                                                {
+#if FAILOVER_DEBUG
+                                                    System.IO.File.AppendAllText(debugfile, Environment.NewLine + "thread.exception is not null");
+#endif
+                                                    throw ptos[i].exception;
+                                                }
+                                            }
+                                        }
+
+#if FAILOVER_DEBUG
+                                        System.IO.File.AppendAllText(debugfile, Environment.NewLine + "repl threads joined");
+#endif
+                                        dllclientStm.WriteByte((byte)'+');
+                                        string stattledhosts = "";
+                                        foreach (KeyValuePair<string, int> pair in tattledhosts)
+                                        {
+                                            if (stattledhosts.Length > 0)
+                                            {
+                                                stattledhosts += ";";
+                                            }
+                                            stattledhosts += pair.Key;
+                                        }
+                                        XContent.SendXContent(dllclientStm, stattledhosts);
+
+#if FAILOVER_DEBUG
+                                        System.IO.File.AppendAllText(debugfile, Environment.NewLine + "tattled:" + stattledhosts);
+#endif
+                                    }
+                                    catch (Exception ex)
+                                    {
+#if FAILOVER_DEBUG
+                                        System.IO.File.AppendAllText(debugfile, Environment.NewLine + "exception caught:" + ex.ToString());
+#endif
+                                        dllclientStm.WriteByte((byte)'-');
+                                        throw;
+                                    }
+                                }                                
+                                break;
+
                             case 'Y': // Batch download files.
                                 try
                                 {
@@ -1656,26 +1817,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                     string[] files = XContent.ReceiveXString(dllclientStm, buf).Split('\u0001');
                                     List<string> errors = new List<string>(files.Length);
                                     const int MAX_SIZE_PER_RECEIVE = 0x400 * 64;
-
-                                    MySpace.DataMining.DistributedObjects.DiskCheck diskcheck = null;
-                                    Dictionary<string, int> failedhosts = null;
-                                    {
-                                        string pluginpaths = XContent.ReceiveXString(dllclientStm, buf);
-                                        if (pluginpaths.Length > 0)
-                                        {
-                                            diskcheck = new MySpace.DataMining.DistributedObjects.DiskCheck(pluginpaths.Split(';'));
-                                            failedhosts = new Dictionary<string, int>(files.Length);
-                                        }
-                                    }
-
-#if FAILOVER_TEST
-                        {
-                            while (System.IO.File.Exists(@"c:\temp\failoverslavetestrep.txt"))
-                            {
-                                System.Threading.Thread.Sleep(10000);
-                            }                            
-                        }
-#endif
 
                                     //for (int fi = 0; fi < files.Length; fi++)
                                     MyThreadTools<string>.ParallelWithTrace(
@@ -1767,28 +1908,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                                         }
                                                         catch (Exception e)
                                                         {
-                                                            if (diskcheck != null)
-                                                            {
-                                                                int del = fn.IndexOf(@"\", 2);
-                                                                string fhost = fn.Substring(2, del - 2).ToLower();
-                                                                string freason = null;
-
-                                                                if (diskcheck.IsDiskFailure(fhost, null, out freason))
-                                                                {
-                                                                    lock (failedhosts)
-                                                                    {
-                                                                        if (!failedhosts.ContainsKey(fhost))
-                                                                        {
-                                                                            failedhosts.Add(fhost, 1);
-                                                                        }
-                                                                    }
-                                                                    XLog.errorlog("Download exception on " + System.Net.Dns.GetHostName()
-                                                                        + ".  Disk failure detected on host " + fhost
-                                                                        + " while copying file " + fn + " . Disk failure reason: " + freason);
-                                                                    break;
-                                                                }
-                                                            }
-
                                                             if (!cooking_is_read)
                                                             {
                                                                 try
@@ -1946,27 +2065,6 @@ namespace MySpace.DataMining.DistributedObjects5
                                     {
                                         dllclientStm.WriteByte((byte)'+');
                                     }
-
-                                    if (diskcheck != null)
-                                    {
-                                        if (failedhosts.Count > 0)
-                                        {
-                                            StringBuilder sbf = new StringBuilder(failedhosts.Count * 50);
-                                            foreach (string fh in failedhosts.Keys)
-                                            {
-                                                if (sbf.Length > 0)
-                                                {
-                                                    sbf.Append(";");
-                                                }
-                                                sbf.Append(fh);
-                                            }
-                                            XContent.SendXContent(dllclientStm, sbf.ToString());
-                                        }
-                                        else
-                                        {
-                                            XContent.SendXContent(dllclientStm, "");
-                                        }
-                                    }
                                 }
                                 catch
                                 {
@@ -1975,72 +2073,103 @@ namespace MySpace.DataMining.DistributedObjects5
                                 }
                                 break;
 
-                            case 'h': // Start heartbeat
+                            case 'a': // Add rogue hosts
                                 {
-                                    if (heartbeatthd != null)
-                                    {
-                                        try
-                                        {
-                                            heartbeatthd.Abort();
-                                            heartbeatthd = null;
-                                        }
-                                        catch
-                                        {
-                                        }                                        
-                                    }
-                                    
                                     int len;
                                     buf = XContent.ReceiveXBytes(dllclientStm, out len, buf);
-                                    int timeout = MyBytesToInt(buf, 0);
-                                    int triesremain = MyBytesToInt(buf, 4);
-                                    string tempfile = Environment.CurrentDirectory + @"\" + Guid.NewGuid().ToString() + ".hbt";
-
-                                    heartbeatthd = new System.Threading.Thread(new System.Threading.ThreadStart(delegate()
+                                    long jobid = MySpace.DataMining.DistributedObjects.Entry.BytesToLong(buf, 0);
+                                    string[] roguehosts = XContent.ReceiveXString(dllclientStm, buf).Split(';');
+                                    foreach (string rh in roguehosts)
                                     {
-                                        for (; ; )
-                                        {
-                                            try
-                                            {
-                                                using (System.IO.FileStream fs = new System.IO.FileStream(tempfile, System.IO.FileMode.CreateNew, System.IO.FileAccess.ReadWrite, System.IO.FileShare.None))
-                                                {
-                                                    fs.WriteByte((byte)'T');
-                                                    fs.Close();
-                                                }
-                                                System.IO.File.Delete(tempfile);
-
-                                                dllclientStm.WriteByte((byte)'.');
-                                                System.Threading.Thread.Sleep(timeout);
-                                            }
-                                            catch
-                                            {
-                                                if (--triesremain <= 0)
-                                                {
-                                                    break;
-                                                }
-                                            }                                            
-                                        }
-                                    }));
-                                    heartbeatthd.IsBackground = true;
-                                    heartbeatthd.Priority = ThreadPriority.Highest;
-                                    heartbeatthd.Start();                                                                       
+                                        RogueHosts.Add(jobid, rh);
+                                    }
                                 }
                                 break;
 
-                            case 's': // Stop heartbeat
+                            case 'h': // Start vitals reporter
                                 {
-                                    if (heartbeatthd != null)
+                                    if (vitals != null)
                                     {
-                                        try
+                                        vitals.Stop();
+                                        vitals = null;
+                                    }
+
+                                    int len;
+                                    buf = XContent.ReceiveXBytes(dllclientStm, out len, buf);
+                                    long jobid = MySpace.DataMining.DistributedObjects.Entry.BytesToLong(buf, 0);
+                                    int heartbeattimeout = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(buf, 8);
+                                    int heartbeatretries = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(buf, 8 + 4);
+                                    int tattletimeout = MySpace.DataMining.DistributedObjects.Entry.BytesToInt(buf, 8 + 4 + 4);
+
+                                    vitals = new VitalsReporter(jobid, dllclientStm);
+                                    vitals.Start(heartbeattimeout, heartbeatretries, tattletimeout);                           
+                                }
+                                break;
+
+                            case 's': // Stop vitals reporter
+                                {
+                                    if (vitals != null)
+                                    {
+                                        vitals.Stop();
+                                        vitals = null;
+                                    }
+                                }
+                                break;
+
+#if TESTFAULTTOLERANT
+                            case '1': // Fault tolerant test
+                                {
+                                    string[] opts = XContent.ReceiveXString(dllclientStm, buf).Split(':');
+                                    long jid = Int64.Parse(opts[0]);
+                                    string host = opts[1].ToLower();
+                                    string phase = opts[2].ToLower();
+                                    int max = Int32.Parse(opts[3]);                                    
+                                    string controlfile = @"c:\temp\fttestcount_23014BB4-9383-406e-BD0E-49CA2E10F244.txt";                                    
+                                    lock ("{435C4771-8AD0-4659-B6D5-F27218F30550}")
+                                    {
+                                        int curcount = 0;
+                                        bool thrownbefore = false;
+                                        if (System.IO.File.Exists(controlfile))
                                         {
-                                            heartbeatthd.Abort();
-                                            heartbeatthd = null;
+                                            string[] lines = System.IO.File.ReadAllLines(controlfile);
+                                            foreach (string line in lines)
+                                            {
+                                                string[] parts = line.Split(':');
+                                                long thisjid = Int64.Parse(parts[0]);
+                                                string thishost = parts[1].ToLower();
+                                                string thisphase = parts[2].ToLower();
+                                                if (thisjid == jid)
+                                                {
+                                                    if (thisphase == phase)
+                                                    {
+                                                        if (host == thishost) //host has already thrown exception before for this phase.
+                                                        {
+                                                            thrownbefore = true;
+                                                            break;
+                                                        }
+                                                        curcount++;
+                                                    }
+                                                }                                                
+                                            }
                                         }
-                                        catch
+                                        
+                                        if (thrownbefore) //continue to throw for this host, don't need to update control file.
                                         {
+                                            dllclientStm.WriteByte((byte)'+');
+                                        }
+                                        else if (curcount < max) //host has not thrown before, let it.
+                                        {
+                                            System.IO.File.AppendAllText(controlfile, jid.ToString() + ":" + host + ":" + phase + Environment.NewLine);
+                                            dllclientStm.WriteByte((byte)'+');
+                                        }
+                                        else
+                                        {
+                                            dllclientStm.WriteByte((byte)'-');
                                         }
                                     }
                                 }
                                 break;
+#endif
 
                             case 'v': // Verify write/read/delete file.
                                 {
@@ -2769,6 +2898,94 @@ namespace MySpace.DataMining.DistributedObjects5
 
                                         default:
                                             throw new Exception("DFS tag (D) error: received unknown sub-tag: " + buf[1].ToString() + " 0x" + buf[1].ToString("X2"));
+                                    }
+                                }
+                                break;
+
+                            case 'C': // MemCache
+                                {
+                                    switch (dllclientStm.ReadByte())
+                                    {
+                                        case 'f': // Flush MemCache.
+                                            try
+                                            {
+                                                string mcname = XContent.ReceiveXString(dllclientStm, buf);
+                                                List<KeyValuePair<string, int>> flushinfo = new List<KeyValuePair<string, int>>();
+                                                MySpace.DataMining.DistributedObjects.MemCache.FlushInternal(mcname, flushinfo);
+                                                dllclientStm.WriteByte((byte)'+');
+                                                {
+                                                    StringBuilder sbfi = new StringBuilder(1024);
+                                                    foreach (KeyValuePair<string, int> kvp in flushinfo)
+                                                    {
+                                                        if (0 != sbfi.Length)
+                                                        {
+                                                            sbfi.Append('\n');
+                                                        }
+                                                        sbfi.Append(kvp.Key);
+                                                        sbfi.Append(' ');
+                                                        sbfi.Append(kvp.Value);
+                                                    }
+                                                    XContent.SendXContent(dllclientStm, sbfi.ToString());
+                                                }
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                try
+                                                {
+                                                    dllclientStm.WriteByte((byte)'-');
+                                                    XContent.SendXContent(dllclientStm, e.ToString());
+                                                }
+                                                catch
+                                                {
+                                                    throw e;
+                                                }
+                                            }
+                                            break;
+
+                                        case 'r': // Release MemCache.
+                                            try
+                                            {
+                                                string mcname = XContent.ReceiveXString(dllclientStm, buf);
+                                                int len;
+                                                buf = XContent.ReceiveXBytes(dllclientStm, out len, buf);
+                                                bool force = len > 0 && buf[0] != 0;
+                                                MySpace.DataMining.DistributedObjects.MemCache.ReleaseInternal(mcname, force);
+                                                dllclientStm.WriteByte((byte)'+');
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                try
+                                                {
+                                                    dllclientStm.WriteByte((byte)'-');
+                                                    XContent.SendXContent(dllclientStm, e.ToString());
+                                                }
+                                                catch
+                                                {
+                                                    throw e;
+                                                }
+                                            }
+                                            break;
+
+                                        case 'l': // Load MemCache.
+                                            try
+                                            {
+                                                string mcname = XContent.ReceiveXString(dllclientStm, buf);
+                                                MySpace.DataMining.DistributedObjects.MemCache.LoadInternal(mcname);
+                                                dllclientStm.WriteByte((byte)'+');
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                try
+                                                {
+                                                    dllclientStm.WriteByte((byte)'-');
+                                                    XContent.SendXContent(dllclientStm, e.ToString());
+                                                }
+                                                catch
+                                                {
+                                                    throw e;
+                                                }
+                                            }
+                                            break;
                                     }
                                 }
                                 break;

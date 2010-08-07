@@ -1,0 +1,148 @@
+<SourceCode>
+  <Jobs>
+    <Job>
+      <Narrative>
+        <Name>regression_test_KeyLength_UInt64_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_KeyLength_UInt64_Input.txt", true);
+            Shell(@"Qizmt del regression_test_KeyLength_UInt64_Output.txt", true);
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job description="Prepare sample data">
+      <Narrative>
+        <Name>regression_test_KeyLength_UInt64_PrepareSampleData</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_KeyLength_UInt64_Input.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+          public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+          {             
+                //Create sample data.
+                int rowCount = 2000;
+                char del = ',';
+                               
+                Random rnd = new Random(System.DateTime.Now.Millisecond / 2 + System.Diagnostics.Process.GetCurrentProcess().Id / 2);
+            
+                List<byte> onerow = new List<byte>();
+                
+                for(long rn = 0; rn < rowCount; rn++)
+                {
+                    onerow.Clear();
+                    
+                    UInt64 x = (UInt64)rnd.Next();
+                    
+                    string s = x.ToString();
+                    byte[] buf = System.Text.Encoding.UTF8.GetBytes(s);
+                    
+                    foreach(byte b in buf)
+                    {
+                        onerow.Add(b);
+                    }                    
+                   
+                    dfsoutput.WriteLine(onerow);        
+                } 
+           }
+        ]]>
+      </Remote>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>Entry.ToUInt32</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>uint64</KeyLength>
+        <DFSInput>dfs://regression_test_KeyLength_UInt64_Input.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_KeyLength_UInt64_Output.txt</DFSOutput>
+        <OutputMethod>sorted</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+               string s = line.ToString();
+               UInt64 x = UInt64.Parse(s);
+               
+               recordset rKey = recordset.Prepare();
+               recordset rValue = recordset.Prepare();
+               
+               rKey.PutUInt64(x);
+               rValue.PutUInt64(x);
+               
+               output.Add(rKey, rValue);
+          }
+        ]]>
+        </Map>
+        <ReduceInitialize>
+          <![CDATA[
+          public void ReduceInitialize() { }
+        ]]>
+        </ReduceInitialize>
+        <Reduce>
+          <![CDATA[
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {               
+                for(int i = 0; i < values.Length; i++)
+                {
+                     recordset rValue = recordset.Prepare(values.Items[i]);
+                     UInt64 val = rValue.GetUInt64();
+                     string sVal = val.ToString();
+                    
+                     output.Add(mstring.Prepare(sVal)); 
+                }                        
+          }
+        ]]>
+        </Reduce>
+        <ReduceFinalize>
+          <![CDATA[
+          public void ReduceFinalize() { }
+        ]]>
+        </ReduceFinalize>
+      </MapReduce>
+    </Job>
+    <Job>
+      <Narrative>
+        <Name>regression_test_KeyLength_UInt64_post-processing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            //Compare input and output file, pass if they are the same.
+            Shell(@"Qizmt exec regression_test_checkTestResult.xml regression_test_KeyLength_UInt64_Input.txt regression_test_KeyLength_UInt64_Output.txt regression_test_KeyLength_UInt64.xml");          
+            
+          Shell(@"Qizmt del regression_test_KeyLength_UInt64_Input.txt", true);
+        Shell(@"Qizmt del regression_test_KeyLength_UInt64_Output.txt", true); 
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

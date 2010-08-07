@@ -588,17 +588,27 @@ namespace MySpace.DataMining.AELight
                        return;
                    }
 
-                   string backupdfs = backupdir + @"\dfs-" + Surrogate.SafeTextPath(host) + @".xml";
-                   if (!dfs.DfsConfigExists(backupdfs))
+                   for (int itry = 0; ; )
                    {
-                       lock (badMetaBackup)
+                       string[] xmlfiles = System.IO.Directory.GetFiles(backupdir, "dfs-*.xml");
+                       if (xmlfiles.Length > 0)
                        {
-                           if (!badMetaBackup.ContainsKey(host))
-                           {
-                               badMetaBackup.Add(host, new List<string>());
-                           }
-                           badMetaBackup[host].Add("Missing: " + backupdfs);
+                           break;
                        }
+                       if (++itry >= 40)
+                       {
+                           lock (badMetaBackup)
+                           {
+                               if (!badMetaBackup.ContainsKey(host))
+                               {
+                                   badMetaBackup.Add(host, new List<string>());
+                               }
+                               string backupdfs = backupdir + @"\dfs-backup.xml";
+                               badMetaBackup[host].Add("Missing: " + backupdfs);
+                           }
+                           break;
+                       }
+                       System.Threading.Thread.Sleep(250);
                    }
 
                    for (int i = 0; i < dc.Files.Count; i++)

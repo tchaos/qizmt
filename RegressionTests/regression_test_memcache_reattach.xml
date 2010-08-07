@@ -1,0 +1,168 @@
+<SourceCode>
+  <Jobs>
+    
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcache_reattach_Preprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt del regression_test_memcache_reattach_Input.bin");
+            Shell(@"Qizmt del regression_test_memcache_reattach_Output.bin");
+            Shell(@"Qizmt del regression_test_memcache_reattach_OutputSum*.txt");
+            
+            Shell(@"Qizmt gen regression_test_memcache_reattach_Input.bin@12 300KB rand=frand writers=7");
+            
+            Shell(@"Qizmt memcache create name=regression_test_memcache_reattach_Output.bin schema=int,int,int,int");
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+    
+    <Job Name="regression_test_memcache_reattach_remote" Custodian="" Email="" Description="">
+      <MemCache/>
+      <IOSettings>
+        <JobType>remote</JobType>
+        <DFS_IO>
+          <DFSReader>dfs://regression_test_memcache_reattach_Input.bin@12</DFSReader>
+          <DFSWriter>regression_test_memcache_reattach_OutputSum.txt</DFSWriter>
+        </DFS_IO>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                long added = 0;
+                try
+                {
+                    long sum = 0;
+                    for(List<byte> record = new List<byte>();
+                        dfsinput.ReadRecordAppend(record);
+                        record.Clear())
+                    {
+                        using(MemCache mc = MemCache.Attach("regression_test_memcache_reattach_Output.bin", 0))
+                        {
+                            mc.ThrowUnpinExceptions = true;
+                            mc.MoveFirst();
+                            for(int i = 0; i < 1; i++)
+                            {
+                                MemCache.Tuple t = mc.InsertRow();
+                                for(int j = 0; j < record.Count; j++)
+                                {
+                                    var bytes = t.Bytes;
+                                    bytes[j] = record[j];
+                                    sum += record[j];
+                                }
+                                added++;
+                            }
+                            
+                            long foo = 0;
+                            while(mc.MoveNext())
+                            {
+                                /*
+                                foo++;
+                                if(foo ; > 1024 && sum % 1024 == 0)
+                                {
+                                    mc.Truncate();
+                                    break;
+                                }
+                                */
+                            }
+                            
+                            for(int i = 0; i < 1; i++)
+                            {
+                                MemCache.Tuple t = mc.InsertRow();
+                                for(int j = 0; j < record.Count; j++)
+                                {
+                                    var bytes = t.Bytes;
+                                    bytes[j] = record[j];
+                                    sum += record[j];
+                                }
+                                added++;
+                            }
+                            
+                        }
+                    }
+                    
+                    if(sum > 0)
+                    {
+                        dfsoutput.WriteLine(sum.ToString());
+                        Qizmt_Log("Sum = " + sum);
+                    }
+                    else
+                    {
+                        Qizmt_Log("Zero sum");
+                    }
+                }
+                catch(Exception e)
+                {
+                    if(-1 != e.ToString().IndexOf("OutOfMemoryException:"))
+                    {
+                        throw new Exception("OutOfMemoryException after " + added + " rows added", e);
+                    }
+                    throw;
+                }
+                Qizmt_Log("" + added + " rows added");
+                
+            }
+        ]]>
+      </Remote>
+    </Job>
+    
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcache_reattach_Other</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            // Save inserts.
+            Shell(@"Qizmt memcache commit name=regression_test_memcache_reattach_Output.bin");
+            
+            // Reload memory.
+            Shell(@"Qizmt memcache rollback name=regression_test_memcache_reattach_Output.bin");
+            Shell(@"Qizmt memcache load name=regression_test_memcache_reattach_Output.bin");
+            
+        }
+        ]]>
+      </Local>
+    </Job>
+    
+    <Job>
+      <Narrative>
+        <Name>regression_test_memcache_reattach_Postprocessing</Name>
+        <Custodian></Custodian>
+        <email></email>
+      </Narrative>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@"Qizmt exec regression_test_iocompare.xml - - regression_test_memcache_reattach.xml");
+            
+            Shell(@"Qizmt del regression_test_memcache_reattach_Input.bin");
+            Shell(@"Qizmt del regression_test_memcache_reattach_Output.bin");
+            Shell(@"Qizmt del regression_test_memcache_reattach_OutputSum*.txt");
+        }
+        ]]>
+      </Local>
+    </Job>
+  </Jobs>
+</SourceCode>

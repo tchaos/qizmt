@@ -34,6 +34,13 @@ namespace MySpace.DataMining.AELight
             WORDS,
         }
 
+        public enum GenerateRandom
+        {
+            RANDOM, // .NET Random class
+            DRANDOM,
+            FRANDOM,
+        }
+
         public static GenerateType GetGenerateType(string x)
         {
             if (-1 != x.IndexOf("ascii", StringComparison.OrdinalIgnoreCase))
@@ -48,60 +55,148 @@ namespace MySpace.DataMining.AELight
         }
 
 
-        public static void Generate(string dfsoutput, long sizeoutput, long rowsize, GenerateType type, int writersCount, bool useCustomRandom)
+        public static void Generate(List<string> xpaths, string outname, long sizeoutput, long rowsize, GenerateType type, int writersCount, GenerateRandom genrand)
         {
-            Generate(null, dfsoutput, sizeoutput, rowsize, type, writersCount, useCustomRandom);
-        }
 
-
-        public static void Generate(List<string> xpaths, string dfsoutput, long sizeoutput, long rowsize, GenerateType type, int writersCount, bool useCustomRandom)
-        {
-            dfs dc = LoadDfsConfig();
-            if (null != DfsFindAny(dc, dfsoutput))
-            {
-                Console.Error.WriteLine("Output file already exists in DFS: {0}", dfsoutput);
-                SetFailure();
-                return;
-            }
-
-            string outname = dfsoutput;
+            int RecordLength = -1;
             if (outname.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
             {
                 outname = outname.Substring(6);
             }
-
-            string tempfnpost = "." + Guid.NewGuid().ToString() + "." +  System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
-            string jobsfn = "gen-jobs.xml" + tempfnpost;
-
-            string rnd = "";
-            if (!useCustomRandom)
             {
-                rnd = "Random rnd = new Random(unchecked(System.DateTime.Now.Millisecond + System.Diagnostics.Process.GetCurrentProcess().Id + DSpace_BlockID));";
+                int iat = outname.IndexOf('@');
+                if (-1 != iat)
+                {
+                    try
+                    {
+                        RecordLength = Surrogate.GetRecordSize(outname.Substring(iat + 1));
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Error.WriteLine(e.Message);
+                        SetFailure();
+                        return;
+                    }
+                    outname = outname.Substring(0, iat);
+                }
             }
-            else if(GenerateType.ASCII == type)
+            string reason = "";
+            if (dfs.IsBadFilename(outname, out reason))
             {
-                rnd = @"DRandom rnd = new DRandom(false, true, (int)' ' + 1, (int)'~' + 1);
-                         DRandom rndLen = null;
-                         DRandom rndLower = null;
-                         DRandom rndUpper = null;";
+                Console.Error.WriteLine("Invalid output-dfsfile: {0}", reason);
+                SetFailure();
+                return;
             }
-            else if (GenerateType.WORDS == type)
+
+            dfs dc = LoadDfsConfig();
+            if (null != DfsFindAny(dc, outname))
             {
-                rnd = @"DRandom rndLen = new DRandom(false, true, 3, 9 + 1);
-                            DRandom rndLower = new DRandom(false, true, (int)'a', (int)'z' + 1);
-                            DRandom rndUpper = new DRandom(false, true, (int)'A', (int)'Z' + 1);
-                            DRandom rnd = null;";
+                Console.Error.WriteLine("Output file already exists in DFS: {0}", outname);
+                SetFailure();
+                return;
+            }
+
+            if (RecordLength > 0)
+            {
+                if (rowsize < 0)
+                {
+                    rowsize = RecordLength;
+                }
+                else
+                {
+                    if (rowsize > RecordLength)
+                    {
+                        Console.Error.WriteLine("Row data cannot be greater than DFS record length");
+                        SetFailure();
+                        return;
+                    }
+                }
+                if (type != GenerateType.BINARY)
+                {
+                    Console.Error.WriteLine("Error: must specify type=bin when generating a rectangular binary DFS file");
+                    SetFailure();
+                    return;
+                }
             }
             else
             {
-                rnd = @"DRandom rnd = new DRandom();
+                if (rowsize < 1)
+                {
+                    rowsize = 100;
+                }
+            }
+
+            string tempfnpost = "." + Guid.NewGuid().ToString() + "." + System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+            string jobsfn = "gen-jobs.xml" + tempfnpost;
+
+            string rnd = "";
+            string nextrandBin = "";
+            string nextrandAscii = "";
+            string nextrandLen = "";
+            string nextrandLower = "";
+            string nextrandUpper = "";
+            if (genrand == GenerateRandom.RANDOM)
+            {
+                rnd = "Random rnd = new Random(unchecked(System.DateTime.Now.Millisecond + System.Diagnostics.Process.GetCurrentProcess().Id + DSpace_BlockID));";
+                nextrandBin = "rnd.Next()";
+                nextrandAscii = "rnd.Next((int)' ' + 1, (int)'~' + 1)";
+                nextrandLen = "rnd.Next(3, 9 + 1)";
+                nextrandLower = "rnd.Next((int)'a', (int)'z' + 1)";
+                nextrandUpper = "rnd.Next((int)'A', (int)'Z' + 1)";
+            }
+            else if (genrand == GenerateRandom.FRANDOM)
+            {
+                rnd = "FRandom.Seed(unchecked(System.DateTime.Now.Millisecond + System.Diagnostics.Process.GetCurrentProcess().Id + DSpace_BlockID));";
+                nextrandBin = "FRandom.Next()";
+                nextrandAscii = "FRandom.Next((int)' ' + 1, (int)'~' + 1)";
+                nextrandLen = "FRandom.Next(3, 9 + 1)";
+                nextrandLower = "FRandom.Next((int)'a', (int)'z' + 1)";
+                nextrandUpper = "FRandom.Next((int)'A', (int)'Z' + 1)";
+            }
+            else if (genrand == GenerateRandom.DRANDOM)
+            {
+                if (GenerateType.ASCII == type)
+                {
+                    rnd = @"DRandom rnd = new DRandom(false, true, (int)' ' + 1, (int)'~' + 1);
                          DRandom rndLen = null;
                          DRandom rndLower = null;
                          DRandom rndUpper = null;";
+                    nextrandBin = "rnd.Next()";
+                }
+                else if (GenerateType.WORDS == type)
+                {
+                    rnd = @"DRandom rndLen = new DRandom(false, true, 3, 9 + 1);
+                            DRandom rndLower = new DRandom(false, true, (int)'a', (int)'z' + 1);
+                            DRandom rndUpper = new DRandom(false, true, (int)'A', (int)'Z' + 1);
+                            DRandom rnd = null;";
+                }
+                else
+                {
+                    rnd = @"DRandom rnd = new DRandom();
+                         DRandom rndLen = null;
+                         DRandom rndLower = null;
+                         DRandom rndUpper = null;";
+                }
+                nextrandBin = "rnd.Next()";
+                nextrandAscii = "rnd.Next()";
+                nextrandLen = "rndLen.Next()";
+                nextrandLower = "rndLower.Next()";
+                nextrandUpper = "rndUpper.Next()";
             }
 
             try
             {
+                string dline = "";
+                string drline = "";
+#if DEBUG
+                dline = "#line 1 \"GEN.ds\"" + Environment.NewLine;
+                drline = "#line default" + Environment.NewLine;
+#endif
+                string outsuffix = "";
+                if (RecordLength > 0)
+                {
+                    outsuffix = "@" + RecordLength;
+                }
                 string[] slaves = dc.Slaves.SlaveList.Split(';');
                 int maxWriters = (writersCount > 0) ? writersCount : Surrogate.NumberOfProcessors * slaves.Length;
                 using (System.IO.StreamWriter sw = System.IO.File.CreateText(jobsfn))
@@ -120,20 +215,25 @@ namespace MySpace.DataMining.AELight
                     {
                         sw.WriteLine(@"        <DFS_IO>
           <DFSReader></DFSReader>
-          <DFSWriter>dfs://" + dfsoutput + ".gen" + si.ToString() + tempfnpost + @"</DFSWriter>
+          <DFSWriter>dfs://" + outname + ".gen" + si.ToString() + tempfnpost + outsuffix + @"</DFSWriter>
         </DFS_IO>");
                     }
                     sw.WriteLine((@"      </IOSettings>
       <Remote>
         <![CDATA[
-
+" + dline + @"
         public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
         {
+            const bool IS_RBIN_FILE = " + ((RecordLength > 0) ? "true" : "false") + @"; // Is rectangular binary output file?
             const bool IS_ASCII = " + ((GenerateType.ASCII == type) ? "true" : "false") + @";
             const bool IS_WORDS = " + ((GenerateType.WORDS == type) ? "true" : "false") + @";
             const long size = " + sizeoutput.ToString() + @";
             const long rowsize = " + rowsize.ToString() + @";
-            const long fullrecordsize = rowsize + " + Environment.NewLine.Length + @";            
+            long fullrecordsize = rowsize + " + Environment.NewLine.Length + @"; 
+            if(IS_RBIN_FILE)
+            {
+                fullrecordsize = Qizmt_OutputRecordLength;
+            }
             long numrows = size / fullrecordsize;
             if((size % fullrecordsize) != 0)
             {
@@ -143,9 +243,19 @@ namespace MySpace.DataMining.AELight
 
             List<byte> onerow = new List<byte>((rowsize > 16777216) ? 16777216 : (int)rowsize);
             long numrowsPART = numrows / DSpace_BlocksTotalCount;
-            if(0 == DSpace_BlockID)
+            if(IS_RBIN_FILE)
             {
-                numrowsPART += numrows % DSpace_BlocksTotalCount;
+                if(DSpace_BlockID < (numrows % DSpace_BlocksTotalCount))
+                {
+                    numrowsPART++;
+                }
+            }
+            else
+            {
+                if(0 == DSpace_BlockID)
+                {
+                    numrowsPART += numrows % DSpace_BlocksTotalCount;
+                }
             }
             for(long rn = 0; rn < numrowsPART; rn++)
             {
@@ -162,9 +272,7 @@ namespace MySpace.DataMining.AELight
                             onerow.Add((byte)' ');
                             remain--;
                         }
-                        " + (useCustomRandom ?
-                          "long wlen = rndLen.Next();" :
-                          "long wlen = rnd.Next(3, 9 + 1);") + @"
+                        long wlen = " + nextrandLen + @";
                         
                         if(wlen > remain - 1)
                         {
@@ -175,15 +283,11 @@ namespace MySpace.DataMining.AELight
                             if(fupper)
                             {
                                 fupper = false;
-                                " + (useCustomRandom ?
-                                  "b = (byte)rndUpper.Next();" :
-                                  "b = (byte)rnd.Next((int)'A', (int)'Z' + 1);") + @"                                
+                                b = (byte)" + nextrandUpper + @";
                             }
                             else
                             {
-                                " + (useCustomRandom ?
-                                  "b = (byte)rndLower.Next();" :
-                                  "b = (byte)rnd.Next((int)'a', (int)'z' + 1);") + @"                                
+                                b = (byte)" + nextrandLower + @";
                             }
                             onerow.Add(b);
                         }
@@ -202,24 +306,19 @@ namespace MySpace.DataMining.AELight
                     {
                         if(IS_ASCII)
                         {
-                            " + (useCustomRandom ?
-                              "b = (byte)rnd.Next();" :
-                              "b = (byte)rnd.Next((int)' ' + 1, (int)'~' + 1);") + @"                            
+                            b = (byte)" + nextrandAscii + @";
                         }
                         else // Binary.
                         {
                             for(;;)
                             {
-                                " + (useCustomRandom ?
-                                  @"b = rnd.NextByte();
-                                    if(b == 0)
-                                    {
-                                        b = 1;
-                                    }" :
-                                  "b = (byte)rnd.Next(1, 256);") + @"                                
-                                if(b == '\n' || b == '\r')
+                                b = (byte)" + nextrandBin + @";
+                                if(!IS_RBIN_FILE)
                                 {
-                                    continue;
+                                    if(b == 0 || b == '\n' || b == '\r')
+                                    {
+                                        continue;
+                                    }
                                 }
                                 break;
                             }
@@ -227,10 +326,29 @@ namespace MySpace.DataMining.AELight
                         onerow.Add(b);
                     }
                 }
-                dfsoutput.WriteLine(onerow);
+                if(IS_RBIN_FILE)
+                {
+                    while(onerow.Count < DSpace_OutputRecordLength)
+                    {
+                        if(IS_ASCII || IS_WORDS)
+                        {
+                            //onerow.Add((byte)' ');
+                            throw new NotImplementedException();
+                        }
+                        else
+                        {
+                            onerow.Add((byte)0);
+                        }
+                    }
+                    dfsoutput.WriteRecord(onerow);
+                }
+                else
+                {
+                    dfsoutput.WriteLine(onerow);
+                }
             }
         }
-
+" + drline + @"
         ]]>
       </Remote>
     </Job>
@@ -246,13 +364,21 @@ namespace MySpace.DataMining.AELight
                     // File jobsfn exists.
                     Console.WriteLine("Generating data...");
                     Exec("", LoadConfig(xpaths, jobsfn), new string[] { }, false, false);
-                    if (null != DfsFindAny(dc, dfsoutput))
+                    if (null != DfsFindAny(dc, outname))
                     {
                         SetFailure();
                         return;
                     }
-                    Shell("DSpace -dfs combine \"dfs://" + dfsoutput + ".gen*" + tempfnpost + "\" + \"" + dfsoutput + "\"");
-                    Console.WriteLine("Done; file '{0}' written into DFS with {1} rows", dfsoutput, GetFriendlyByteSize(rowsize));
+                    Shell("DSpace -dfs combine \"dfs://" + outname + ".gen*" + tempfnpost + "\" + \"" + outname + "\"");
+                    if (RecordLength > 0)
+                    {
+                        Console.WriteLine("Done; file '{0}' written into DFS with {1} of random data per {2} record",
+                            outname, GetFriendlyByteSize(rowsize), GetFriendlyByteSize(RecordLength));
+                    }
+                    else
+                    {
+                        Console.WriteLine("Done; file '{0}' written into DFS with {1} rows", outname, GetFriendlyByteSize(rowsize));
+                    }
                 }
             }
             finally
@@ -267,6 +393,102 @@ namespace MySpace.DataMining.AELight
             }
         }
 
+        public static void CheckSummt(string hashname, string dfsreader)
+        {
+            dfs dc = LoadDfsConfig();
+            if (null == DfsFindAny(dc, dfsreader))
+            {
+                Console.Error.WriteLine("Input file does not exist in DFS: {0}", dfsreader);
+                SetFailure();
+                return;
+            }
+
+            string tempfnpost = ".$" + Guid.NewGuid().ToString() + ".$" + System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+            string jobsfn = "gen" + hashname + "-jobs.xml" + tempfnpost;
+            try
+            {
+                using (System.IO.StreamWriter sw = System.IO.File.CreateText(jobsfn))
+                {
+                    sw.Write((@"<SourceCode>
+<Jobs>
+ <Job Name=`Generate " + hashname + @"` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>4</KeyLength>
+        <DFSInput>" + dfsreader + @"</DFSInput>
+        <DFSOutput></DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+           ulong lsum = 0;
+           public virtual void Map(ByteSlice line, MapOutput output)
+            { 
+                
+                 byte[] buf = line.ToBytes();
+              
+                 for(int i=0; i < buf.Length ; i++)
+                   {    
+                     lsum += buf[i];
+                   }   
+              if(StaticGlobals.Qizmt_Last)
+              {
+               recordset rValue = recordset.Prepare();
+               recordset rKey = recordset.Prepare();
+               rKey.PutInt(0);
+               rValue.PutULong(lsum);
+               output.Add(rKey,rValue); 
+               }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+             
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {  
+               ulong lsum = 0;
+               for(int i = 0; i < values.Length; i++)
+                  {
+                      recordset res = recordset.Prepare(values.Items[i]);
+                      ulong temp = res.GetULong();
+                      lsum += temp;
+                  }
+              
+              
+                StringBuilder sbresult = new StringBuilder(32);
+                sbresult.Append(`\n" + hashname + @"` + ` of `);
+                sbresult.Append(@`dfs://" + dfsreader + @"`);
+                sbresult.Append(`:  `);
+                sbresult.Append(lsum);
+                DSpace_Log(sbresult.ToString());
+               
+             }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+</Jobs>
+</SourceCode>
+").Replace("`", "\""));
+                }
+
+                Console.WriteLine("Generating {0}...", hashname);
+                Exec("", LoadConfig(jobsfn), new string[] { }, false, false);
+            }
+            finally
+            {
+                try
+                {
+                    System.IO.File.Delete(jobsfn);
+                }
+                catch
+                {
+                }
+            }
+
+       }
 
         public static void GenerateHash(string hashname, string dfsreader)
         {
@@ -330,6 +552,7 @@ namespace MySpace.DataMining.AELight
                     {
                         break;
                     }
+                
                     lsum += (byte)ib;
                 }
                 StringBuilder sbresult = new StringBuilder(32);
@@ -403,7 +626,13 @@ namespace MySpace.DataMining.AELight
             }
         }
 
+        public static void CheckSortedmt(string dfsreader)
+        {
 
+
+        }
+
+        
         public static void CheckSorted(string dfsreader)
         {
             dfs dc = LoadDfsConfig();

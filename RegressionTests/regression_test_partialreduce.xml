@@ -1,0 +1,345 @@
+<SourceCode>
+  <Jobs>
+    <Job Name="cleanup" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                Shell(@"Qizmt del regression_test_partialreduceInput*.txt");
+                Shell(@"Qizmt del regression_test_partialreduceOutput*.txt");
+            }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name="createdata" Custodian="" Email="" Description="">
+      <IOSettings>
+        <JobType>remote</JobType>        
+        <DFS_IO_Multi>
+          <DFSReader></DFSReader>
+          <DFSWriter>dfs://regression_test_partialreduceInput####.txt</DFSWriter>
+          <Mode>ALL CORES</Mode>
+        </DFS_IO_Multi>
+      </IOSettings>
+      <Remote>
+        <![CDATA[
+            public virtual void Remote(RemoteInputStream dfsinput, RemoteOutputStream dfsoutput)
+            {
+                int upper = 1000;
+                int lower = 10;
+                int numperline = 10;
+                
+                int tofillbuffer = (1024 * 401) / (4 + 4 + 4);      // number of key/value pairs to over fill a zmap buffer.                
+                
+                int linecount =  (tofillbuffer * StaticGlobals.Qizmt_BlocksTotalCount) / numperline;
+                
+                Random rnd = new Random();
+                
+                for(int li = 0; li < linecount; li++)
+                {
+                    string line = "";
+                    for(int ni = 0; ni < numperline; ni++)
+                    {
+                        if(ni > 0)
+                        {
+                            line += " ";
+                        }
+                        line += rnd.Next(lower, upper).ToString();
+                    }
+                    dfsoutput.WriteLine(line);
+                }
+            }
+        ]]>
+      </Remote>
+    </Job>
+    <Job Name="mr_pr" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_partialreduceInput*.txt</DFSInput>
+        <DFSOutput>dfs://regression_test_partialreduceOutput.txt;regression_test_partialreduceOutputLC.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings> 
+      <PartialReduce/>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                mstring sLine = mstring.Prepare(line);
+                
+                while(sLine.HasNextItem(' '))
+                {
+                    int x = sLine.NextItemToInt(' ');
+                    recordset rkey = recordset.Prepare();
+                    rkey.PutInt(x);
+                    
+                    recordset rvalue = recordset.Prepare();
+                    rvalue.PutInt(1);
+                    
+                    output.Add(rkey.ToByteSlice(), rvalue.ToByteSlice());                    
+                }
+                
+                if(StaticGlobals.Qizmt_Last)
+                {
+                    recordset rkey = recordset.Prepare();
+                    rkey.PutInt((int)StaticGlobals.MapIteration);
+                    
+                    recordset rvalue = recordset.Prepare();
+                    rvalue.PutInt(-1);  //to denote that this is a linecount.
+                    
+                    output.Add(rkey.ToByteSlice(), rvalue.ToByteSlice());
+                }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {                
+                recordset rkey = recordset.Prepare(key);
+                int x = rkey.GetInt();     
+                
+                //word count
+                {
+                    int total = 0;
+                    for(int i = 0; i < values.Length; i++)
+                    {
+                        recordset rval = recordset.Prepare(values[i].Value);
+                        int num = rval.GetInt();
+                        if(num != -1)
+                        {
+                            total += num;
+                        }                    
+                    }
+                    
+                    if(total > 0)
+                    {
+                        if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+                        {
+                            recordset outkey = recordset.Prepare();
+                            outkey.PutInt(x);
+                            recordset outvalue = recordset.Prepare();
+                            outvalue.PutInt(total);
+                            output.Add(outkey.ToByteSlice(), outvalue.ToByteSlice());
+                        }
+                        else
+                        {                    
+                            mstring line = mstring.Prepare();
+                            line = line.AppendM(x).AppendM(':').AppendM(total);
+                            output.Add(line);
+                        }                
+                    } 
+                }
+                
+                //line count
+                {
+                    for(int i = 0; i < values.Length; i++)
+                    {
+                        recordset rval = recordset.Prepare(values[i].Value);
+                        int num = rval.GetInt();
+                        if(num == -1)
+                        {
+                            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+                            {
+                                recordset outkey = recordset.Prepare();
+                                outkey.PutInt(x);
+                                recordset outvalue = recordset.Prepare();
+                                outvalue.PutInt(-1);
+                                output.Add(outkey.ToByteSlice(), outvalue.ToByteSlice());
+                            }
+                            else
+                            {
+                                mstring line = mstring.Prepare();
+                                line = line.AppendM(x).AppendM(':').AppendM(-1);
+                                output.GetOutputByIndex(1).Add(line);
+                            }
+                        }                    
+                    }
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+     <Job Name="mr" Custodian="" Email="">
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://regression_test_partialreduceInput*.txt</DFSInput>
+        <DFSOutput>regression_test_partialreduceOutput2.txt;regression_test_partialreduceOutputLC2.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings> 
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                mstring sLine = mstring.Prepare(line);
+                
+                while(sLine.HasNextItem(' '))
+                {
+                    int x = sLine.NextItemToInt(' ');
+                    recordset rkey = recordset.Prepare();
+                    rkey.PutInt(x);
+                    
+                    recordset rvalue = recordset.Prepare();
+                    rvalue.PutInt(1);
+                    
+                    output.Add(rkey.ToByteSlice(), rvalue.ToByteSlice());                    
+                }
+                
+                if(StaticGlobals.Qizmt_Last)
+                {
+                    recordset rkey = recordset.Prepare();
+                    rkey.PutInt((int)StaticGlobals.MapIteration);
+                    
+                    recordset rvalue = recordset.Prepare();
+                    rvalue.PutInt(-1);  //to denote that this is a linecount.
+                    
+                    output.Add(rkey.ToByteSlice(), rvalue.ToByteSlice());
+                }
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                recordset rkey = recordset.Prepare(key);
+                int x = rkey.GetInt();     
+                
+                //word count
+                {
+                    int total = 0;
+                    for(int i = 0; i < values.Length; i++)
+                    {
+                        recordset rval = recordset.Prepare(values[i].Value);
+                        int num = rval.GetInt();
+                        if(num != -1)
+                        {
+                            total += num;
+                        }                    
+                    }
+                    
+                    if(total > 0)
+                    {
+                        if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+                        {
+                            recordset outkey = recordset.Prepare();
+                            outkey.PutInt(x);
+                            recordset outvalue = recordset.Prepare();
+                            outvalue.PutInt(total);
+                            output.Add(outkey.ToByteSlice(), outvalue.ToByteSlice());
+                        }
+                        else
+                        {                    
+                            mstring line = mstring.Prepare();
+                            line = line.AppendM(x).AppendM(':').AppendM(total);
+                            output.Add(line);
+                        }                
+                    } 
+                }
+                
+                //line count
+                {
+                    for(int i = 0; i < values.Length; i++)
+                    {
+                        recordset rval = recordset.Prepare(values[i].Value);
+                        int num = rval.GetInt();
+                        if(num == -1)
+                        {
+                            if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+                            {
+                                recordset outkey = recordset.Prepare();
+                                outkey.PutInt(x);
+                                recordset outvalue = recordset.Prepare();
+                                outvalue.PutInt(-1);
+                                output.Add(outkey.ToByteSlice(), outvalue.ToByteSlice());
+                            }
+                            else
+                            {
+                                mstring line = mstring.Prepare();
+                                line = line.AppendM(x).AppendM(':').AppendM(-1);
+                                output.GetOutputByIndex(1).Add(line);
+                            }
+                        }                    
+                    }
+                }
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    <Job Name="checkresults" Custodian="" Email="">
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                bool ok = false;
+                {
+                    string f1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    string f2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    Shell(@"qizmt get regression_test_partialreduceOutput.txt " + f1);
+                    Shell(@"qizmt get regression_test_partialreduceOutput2.txt " + f2);
+                    ok = CompareFiles(f1, f2);                    
+                    System.IO.File.Delete(f1);
+                    System.IO.File.Delete(f2);
+                }
+                if(ok)
+                {
+                    string f1 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    string f2 = IOUtils.GetTempDirectory() + @"\" + Guid.NewGuid().ToString();
+                    Shell(@"qizmt get regression_test_partialreduceOutputLC.txt " + f1);
+                    Shell(@"qizmt get regression_test_partialreduceOutputLC2.txt " + f2);
+                    ok = CompareFiles(f1, f2);                    
+                    System.IO.File.Delete(f1);
+                    System.IO.File.Delete(f2);
+                }
+                
+                Shell(@"Qizmt del regression_test_partialreduceInput*.txt");
+                Shell(@"Qizmt del regression_test_partialreduceOutput*.txt");
+                
+                if(ok)
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_partialreduce.xml 1");
+                }
+                else
+                {
+                    Shell(@"Qizmt exec regression_test_writePASSFAIL.xml regression_test_partialreduce.xml 0");
+                }                      
+            }
+            
+            bool CompareFiles(string f1, string f2)
+            {
+                List<string> l1 = new List<string>(System.IO.File.ReadAllLines(f1));
+                List<string> l2 = new List<string>(System.IO.File.ReadAllLines(f2));
+                
+                if(l1.Count != l2.Count)
+                {
+                    return false;
+                }
+                
+                l1.Sort();
+                l2.Sort();
+                
+                for(int i = 0; i < l1.Count; i++)
+                {
+                    if(l1[i] != l2[i])
+                    {
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
+        ]]>
+      </Local>
+    </Job>    
+  </Jobs>
+</SourceCode>

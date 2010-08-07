@@ -2289,6 +2289,11 @@ namespace QueryAnalyzer_Protocol
                                         {
                                             RDBMS_DBCORE.Qa.QOLimit = QOLimit;
                                         }
+
+                                        if (optindex < buf.Length)
+                                        {
+                                            RDBMS_DBCORE.Qa.FaultTolerantExecution = (buf[optindex] == 1);
+                                        }
                                     }
                                 }
                                 AllProtocolHosts = XContent.ReceiveXString(netstm, buf).Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);

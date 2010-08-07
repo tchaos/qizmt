@@ -762,6 +762,9 @@ namespace RDBMS_DBCORE
         // 0 is off.
         public const int DEFAULT_QOLimit = 0x400 * 0x400 * 64;
 
+        [ThreadStatic]
+        public static bool FaultTolerantExecution;
+
         static protected internal long _QOGetFileSizes(params string[] InputFiles)
         {
             long insize = 0;

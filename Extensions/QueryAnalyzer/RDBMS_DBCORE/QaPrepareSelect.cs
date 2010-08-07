@@ -929,6 +929,10 @@ namespace RDBMS_DBCORE
                                 mrc.OverrideInput = GByDfsInput;
                                 mrc.OverrideOutput = GByDfsOutput + "@" + OutputsRowSize;
                                 mrc.OverrideKeyLength = KeyLength;
+                                if (RDBMS_DBCORE.Qa.FaultTolerantExecution)
+                                {
+                                    mrc.OverrideFaultTolerantExecutionMode = "enabled";
+                                }
                                 mrc.Call("\"" + TableName + "\" \"" + DfsOutputName + "\" \"" + QlArgsNewSelectWhat + "\" " + TopCount.ToString() + " \"" + QlArgsOps + "\" \"" + Qa.QlArgsEscape(RowInfo) + "\" \"" + DisplayInfo + "\" \"" + Qa.QlArgsEscape(OutputRowInfo) + "\" " + GByArgsOptions).Trim();
                             }
                             DfsInput = GByDfsOutput + "@" + OutputsRowSize;
@@ -945,6 +949,10 @@ namespace RDBMS_DBCORE
                                 if (!OrderBy || Update)
                                 {
                                     mrc.OverrideOutputMethod = "grouped";
+                                    if (RDBMS_DBCORE.Qa.FaultTolerantExecution)
+                                    {
+                                        mrc.OverrideFaultTolerantExecutionMode = "enabled";
+                                    }
                                 }
                                 mrc.OverrideInput = DfsInput;
                                 mrc.OverrideOutput = DfsOutputName + "@" + OutputsRowSize;

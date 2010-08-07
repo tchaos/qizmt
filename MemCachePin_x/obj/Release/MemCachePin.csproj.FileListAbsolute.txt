@@ -1,0 +1,5 @@
+C:\SimpleSolutions\DataMining\Open\MemCachePin_x\bin\Release\MemCachePin.exe
+C:\SimpleSolutions\DataMining\Open\MemCachePin_x\bin\Release\MemCachePin.pdb
+C:\SimpleSolutions\DataMining\Open\MemCachePin_x\obj\Release\ResolveAssemblyReference.cache
+C:\SimpleSolutions\DataMining\Open\MemCachePin_x\obj\Release\MemCachePin.exe
+C:\SimpleSolutions\DataMining\Open\MemCachePin_x\obj\Release\MemCachePin.pdb

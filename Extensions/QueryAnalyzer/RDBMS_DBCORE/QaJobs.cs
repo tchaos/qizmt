@@ -855,6 +855,7 @@ namespace RDBMS_DBCORE
             public string OverrideInput = null;
             public string OverrideOutput = null;
             public string OverrideOutputMethod = null;
+            public string OverrideFaultTolerantExecutionMode = null;
 
             public MapReduceCall(string name)
                 : base(name)
@@ -891,6 +892,10 @@ namespace RDBMS_DBCORE
                 if (null != OverrideOutputMethod)
                 {
                     sbxpath.Append("\"//Job[@Name='" + this.Name + "']/IOSettings/OutputMethod=" + OverrideOutputMethod + "\" ");
+                }
+                if (null != OverrideFaultTolerantExecutionMode)
+                {
+                    sbxpath.Append("\"//Job[@Name='" + this.Name + "']/FaultTolerantExecution/Mode=" + OverrideFaultTolerantExecutionMode + "\" ");
                 }
                 return Shell("Qizmt exec " + sbxpath + "\"" + this.JobFile + "\" " + args);
             }

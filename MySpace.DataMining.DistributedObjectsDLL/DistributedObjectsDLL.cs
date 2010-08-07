@@ -397,6 +397,25 @@ namespace MySpace.DataMining.DistributedObjects5
             }
         }
 
+        public void JustCloseNoLock()
+        {
+            if (null != dslaves)
+            {
+                foreach (SlaveInfo slave in dslaves)
+                {
+                    try
+                    {                        
+                        slave.nstm.WriteByte((byte)'\\');
+                        slave.nstm.Close(1000);
+                        slave.nstm.Dispose();                        
+                    }
+                    catch (Exception e)
+                    {
+                    }
+                }
+                dslaves = null;
+            }
+        }
 
         public abstract char GetDistObjectTypeChar();
 
@@ -711,6 +730,8 @@ namespace MySpace.DataMining.DistributedObjects5
             BannedSlavePorts[55903] = true;
             BannedSlavePorts[55904] = true;
             BannedSlavePorts[55905] = true;
+            BannedSlavePorts[55906] = true;
+            BannedSlavePorts[55907] = true;
             BannedSlavePorts[58326] = true;
             BannedSlavePorts[58343] = true;
             BannedSlavePorts[58789] = true;

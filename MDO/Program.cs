@@ -62,6 +62,8 @@ namespace MySpace.DataMining.AELight
 
         static void Main(string[] args)
         {
+            Surrogate.LogonMachines();
+
 #if DEBUG
             _jobdebug = System.IO.File.Exists("jobdebug.txt");
             if (_jobdebug)
@@ -619,12 +621,19 @@ namespace MySpace.DataMining.AELight
                                 Console.WriteLine(@"User=\\" + System.Environment.UserDomainName + @"\" + System.Environment.UserName);
 #endif
                                 bool isForce = false;
+                                bool isMemCacheRelease = false;
                                 string subact = "";
                                 for (int ai = 1; ai < args.Length; ai++)
                                 {
                                     if (args[ai].ToLower() == "-f")
                                     {
                                         isForce = true;
+                                    }
+                                    else if (0 == string.Compare(args[ai], "MemCacheRollback", true)
+                                        || 0 == string.Compare(args[ai], "MemCacheRelease", true)
+                                        )
+                                    {
+                                        isMemCacheRelease = true;
                                     }
                                     else
                                     {
@@ -648,11 +657,25 @@ namespace MySpace.DataMining.AELight
                                     switch (subact)
                                     {
                                         case "xproxy":
-                                            RunProxy("DSpace.exe " + act + " -f");
+                                            {
+                                                string pact = act;
+                                                if (isMemCacheRelease)
+                                                {
+                                                    pact = pact + " MemCacheRelease";
+                                                }
+                                                RunProxy("DSpace.exe " + pact + " -f");
+                                            }
                                             return;
 
                                         case "proxy":
-                                            RunStreamStdIO("localhost", "DSpace.exe " + act + " -f", true);
+                                            {
+                                                string pact = act;
+                                                if (isMemCacheRelease)
+                                                {
+                                                    pact = pact + " MemCacheRelease";
+                                                }
+                                                RunStreamStdIO("localhost", "DSpace.exe " + pact + " -f", true);
+                                            }
                                             return;
 
                                         case "logon2":
@@ -666,6 +689,10 @@ namespace MySpace.DataMining.AELight
                                             break; // Keep going...
 
                                         case "-f":
+                                            break;
+
+                                        case "MemCacheRollback":
+                                        case "MemCacheRelease":
                                             break;
 
                                         default:
@@ -838,6 +865,12 @@ namespace MySpace.DataMining.AELight
                                                         Console.Write('.');
                                                     }
                                                 }
+                                            }
+
+                                            if (isMemCacheRelease)
+                                            {
+                                                System.Threading.Thread.Sleep(250);
+                                                Exec.Shell(@"sc \\" + host + " stop MemCachePin", true); // Suppress error.
                                             }
                                         }
                                     ), hosts, threadcount);
@@ -1162,6 +1195,12 @@ namespace MySpace.DataMining.AELight
                                                 Console.ForegroundColor = oldc;
                                             }
 
+                                            if (isMemCacheRelease)
+                                            {
+                                                System.Threading.Thread.Sleep(250);
+                                                Exec.Shell(@"sc \\" + host + " start MemCachePin", true); // Suppress error.
+                                            }
+
                                             //Console.WriteLine("{0}: done", host);
 
                                             //Console.WriteLine("--------");
@@ -1235,6 +1274,128 @@ namespace MySpace.DataMining.AELight
                             case "metapath":
                                 Console.WriteLine(Surrogate.NetworkPathForHost(Surrogate.MasterHost) + @"\" + dfs.DFSXMLNAME);
                                 return;
+
+                            case "metahost":
+                                Console.WriteLine(Surrogate.MasterHost);
+                                return;
+
+#if DEBUG
+                            case "#d":
+                                Console.WriteLine(Exec.Shell("sc stop DistributedObjects"));
+                                Console.WriteLine(Exec.Shell("sc stop MemCachePin"));
+                                return;
+
+                            case "#u":
+                                Console.WriteLine(Exec.Shell("sc start DistributedObjects"));
+                                Console.WriteLine(Exec.Shell("sc start MemCachePin"));
+                                return;
+#endif
+
+                            case "stopallmemcachepin":
+                                {
+                                    string[] hosts;
+                                    if (args.Length > 1)
+                                    {
+                                        string shosts = args[1];
+                                        if (shosts.StartsWith("@"))
+                                        {
+                                            hosts = Surrogate.GetHostsFromFile(shosts.Substring(1));
+                                        }
+                                        else
+                                        {
+                                            hosts = shosts.Split(';', ',');
+                                        }
+                                    }
+                                    else
+                                    {
+                                        dfs dc = dfs.ReadDfsConfig_unlocked(Surrogate.NetworkPathForHost(Surrogate.MasterHost) + @"\" + dfs.DFSXMLNAME);
+                                        hosts = dc.Slaves.SlaveList.Split(';');
+                                        // Always include self host if current cluster.
+                                        if (null == IPAddressUtil.FindCurrentHost(hosts))
+                                        {
+                                            List<string> xhosts = new List<string>(1 + hosts.Length);
+                                            xhosts.Add(System.Net.Dns.GetHostName());
+                                            xhosts.AddRange(hosts);
+                                            hosts = xhosts.ToArray();
+                                        }
+                                    }
+                                    int threadcount = hosts.Length;
+                                    if (threadcount > 15)
+                                    {
+                                        threadcount = 15;
+                                    }
+
+                                    MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                        new Action<string>(
+                                        delegate(string host)
+                                        {
+                                            try
+                                            {
+                                                Console.WriteLine("Stopping MemCachePin service on {0}...", host);
+                                                Console.WriteLine(Exec.Shell("sc \\\\" + host + " stop MemCachePin").Trim());
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                Console.WriteLine("Problem stopping MemCachePin service on {0}: {1}", host, e.Message);
+                                            }
+                                        }
+                                        ), hosts, threadcount);
+                                    Console.WriteLine("Done");
+                                }
+                                break;
+
+                            case "startallmemcachepin":
+                                {
+                                    string[] hosts;
+                                    if (args.Length > 1)
+                                    {
+                                        string shosts = args[1];
+                                        if (shosts.StartsWith("@"))
+                                        {
+                                            hosts = Surrogate.GetHostsFromFile(shosts.Substring(1));
+                                        }
+                                        else
+                                        {
+                                            hosts = shosts.Split(';', ',');
+                                        }
+                                    }
+                                    else
+                                    {
+                                        dfs dc = dfs.ReadDfsConfig_unlocked(Surrogate.NetworkPathForHost(Surrogate.MasterHost) + @"\" + dfs.DFSXMLNAME);
+                                        hosts = dc.Slaves.SlaveList.Split(';');
+                                        // Always include self host if current cluster.
+                                        if (null == IPAddressUtil.FindCurrentHost(hosts))
+                                        {
+                                            List<string> xhosts = new List<string>(1 + hosts.Length);
+                                            xhosts.Add(System.Net.Dns.GetHostName());
+                                            xhosts.AddRange(hosts);
+                                            hosts = xhosts.ToArray();
+                                        }
+                                    }
+                                    int threadcount = hosts.Length;
+                                    if (threadcount > 15)
+                                    {
+                                        threadcount = 15;
+                                    }
+
+                                    MySpace.DataMining.Threading.ThreadTools<string>.Parallel(
+                                        new Action<string>(
+                                        delegate(string host)
+                                        {
+                                            try
+                                            {
+                                                Console.WriteLine("Starting MemCachePin service on {0}...", host);
+                                                Console.WriteLine(Exec.Shell("sc \\\\" + host + " start MemCachePin").Trim());
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                Console.WriteLine("Problem starting MemCachePin service on {0}: {1}", host, e.Message);
+                                            }
+                                        }
+                                        ), hosts, threadcount);
+                                    Console.WriteLine("Done");
+                                }
+                                break;
 
                             case "stopall":
                             case "servicestopall":
@@ -1508,6 +1669,7 @@ namespace MySpace.DataMining.AELight
                                 return;
 
                             case "restoresurrogate":
+                            case "replacesurrogate":
                             case "\u0040format":
                             case "format":
                             format_cmd:
@@ -1522,6 +1684,13 @@ namespace MySpace.DataMining.AELight
                                     }
                                     System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(AELight_Dir + @"\AELight.exe", sargs);
                                     psi.UseShellExecute = false;
+                                    try
+                                    {
+                                        psi.EnvironmentVariables["MDODir"] = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+                                    }
+                                    catch
+                                    {
+                                    }
                                     System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
                                     proc.WaitForExit();
                                     Environment.Exit(proc.ExitCode);

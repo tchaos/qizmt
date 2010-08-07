@@ -60,6 +60,10 @@ namespace MySpace.DataMining.AELight
                 {
                     rem.AddOpenCVExtension();
                 }
+                if (cfgj.MemCache != null)
+                {
+                    rem.AddMemCacheExtension();
+                }
                 if (cfgj.Unsafe != null)
                 {
                     rem.AddUnsafe();

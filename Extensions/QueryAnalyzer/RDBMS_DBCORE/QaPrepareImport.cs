@@ -70,8 +70,14 @@ namespace RDBMS_DBCORE
                     throw new Exception("Record length mismatch of import file '" + ImportDfsFile + "', expected " + ExpectedImportRowLength.ToString() + " byte records");
                 }
 
+                string overrideFTE = "";
+                if (RDBMS_DBCORE.Qa.FaultTolerantExecution)
+                {
+                    overrideFTE = " \"//Job[@Name='RDBMS_Import']/FaultTolerantExecution/Mode=enabled\" ";
+                }
+
                 //\"//Job[@Name='RDBMS_Import']/IOSettings/KeyLength=" + ImportDfsFileRecordLength.ToString() + "\"
-                DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_Import']/IOSettings/DFSInput=" + ImportDfsFile + "@" + ExpectedImportRowLength.ToString() + "\" \"//Job[@Name='RDBMS_Import']/IOSettings/DFSOutput=" + OutputDfsFile + "@" + OutputRowLength.ToString() + "\" RDBMS_Import.DBCORE \"" + TableName + "\" \"" + ImportDfsFile + "\" \"" + OutputDfsFile + "\" \"" + DfsTableFile + "\" \"" + RowInfo + "\" \"" + TypeInfo + "\"").Trim());
+                DSpace_Log(Shell("dspace exec \"//Job[@Name='RDBMS_Import']/IOSettings/DFSInput=" + ImportDfsFile + "@" + ExpectedImportRowLength.ToString() + "\" \"//Job[@Name='RDBMS_Import']/IOSettings/DFSOutput=" + OutputDfsFile + "@" + OutputRowLength.ToString() + "\" " + overrideFTE + " RDBMS_Import.DBCORE \"" + TableName + "\" \"" + ImportDfsFile + "\" \"" + OutputDfsFile + "\" \"" + DfsTableFile + "\" \"" + RowInfo + "\" \"" + TypeInfo + "\"").Trim());
             }
 
         }

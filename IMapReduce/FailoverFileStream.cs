@@ -1,4 +1,26 @@
-﻿using System;
+﻿/**************************************************************************************
+ *  MySpace’s Mapreduce Framework is a mapreduce framework for distributed computing  *
+ *  and developing distributed computing applications on large clusters of servers.   *
+ *                                                                                    *
+ *  Copyright (C) 2008  MySpace Inc. <http://qizmt.myspace.com/>                      *
+ *                                                                                    *
+ *  This program is free software: you can redistribute it and/or modify              *
+ *  it under the terms of the GNU General Public License as published by              *
+ *  the Free Software Foundation, either version 3 of the License, or                 *
+ *  (at your option) any later version.                                               *
+ *                                                                                    *
+ *  This program is distributed in the hope that it will be useful,                   *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of                    *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                     *
+ *  GNU General Public License for more details.                                      *
+ *                                                                                    *
+ *  You should have received a copy of the GNU General Public License                 *
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
+***************************************************************************************/
+
+//#define FAILOVER_DEBUG
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -398,6 +420,13 @@ namespace MySpace.DataMining.DistributedObjects
             catch (Exception e)
             {
                 LastFailoverException = e;
+#if FAILOVER_DEBUG
+                {
+                    int xx = _fullname.IndexOf(@"\", 2);
+                    string xxhost = _fullname.Substring(2, xx - 2);
+                    System.IO.File.WriteAllText(@"\\" + Surrogate.MasterHost + @"\c$\temp\failoverfilestream_" + xxhost + "_" + Guid.NewGuid().ToString() + ".txt", "file:" + _fullname + ";error=" + e.ToString());
+                }                
+#endif
             }
             return false;
         }
@@ -519,6 +548,10 @@ namespace MySpace.DataMining.DistributedObjects
 
         bool IsDiskFailure(string host)
         {
+            if (diskcheck == null)
+            {
+                return false;
+            }
             return diskcheck.IsDiskFailure(host, null, out dfreason);
         }
 

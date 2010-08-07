@@ -37,6 +37,15 @@ namespace mrdebug
 
             public DebugProcess()
             {
+                this.din = Console.In;
+                this.dout = Console.Out;
+
+                CmdSyncWait = new System.Threading.AutoResetEvent(false);
+
+                imodules = new List<ICorDebugModule>();
+                iappdomains = new List<ICorDebugAppDomain>();
+                iassemblies = new List<ICorDebugAssembly>();
+                ibreakpoints = new List<ICorDebugFunctionBreakpoint>();
             }
 
 
@@ -127,19 +136,6 @@ namespace mrdebug
                     throw new ArgumentException("Critical error:  Run: idbgproc is null");
                 }
 
-                //this.idbg = idbg;
-                //this.idbgproc = idbgproc;
-
-                this.din = Console.In;
-                this.dout = Console.Out;
-
-                CmdSyncWait = new System.Threading.AutoResetEvent(false);
-
-                imodules = new List<ICorDebugModule>();
-                iappdomains = new List<ICorDebugAppDomain>();
-                iassemblies = new List<ICorDebugAssembly>();
-                ibreakpoints = new List<ICorDebugFunctionBreakpoint>();
-
 #if DEBUG
                 if (IsXDebug)
                 {
@@ -225,6 +221,13 @@ namespace mrdebug
                             }
                             cmd = origcmd.ToLower();
                         }
+
+#if DEBUG
+                        if (IsXDebug)
+                        {
+                            Console.WriteLine("  * received command named '{0}' with args '{1}'", origcmd, args);
+                        }
+#endif
 
                         if (ProcessExit)
                         {
@@ -2617,11 +2620,30 @@ namespace mrdebug
             {
                 try
                 {
-#if DEBUG
-                    System.Threading.Thread.Sleep(200);
-#endif
-
                     _EnterCallback();
+
+                    if (pAppDomain == null)
+                    {
+                        throw new NullReferenceException("CreateAppDomain pAppDomain is null");
+                    }
+
+                    if (dbgproc == null)
+                    {
+                        //System.Threading.Thread.Sleep(1000 * 1);
+                        //if (dbgproc == null)
+                        {
+                            throw new NullReferenceException("CreateAppDomain dbgproc is null");
+                        }
+                    }
+
+                    if (dbgproc.iappdomains == null)
+                    {
+                        //System.Threading.Thread.Sleep(1000 * 1);
+                        //if (dbgproc.iappdomains == null)
+                        {
+                            throw new NullReferenceException("CreateAppDomain dbgproc.iappdomains is null");
+                        }
+                    }
 
                     lock (dbgproc)
                     {
