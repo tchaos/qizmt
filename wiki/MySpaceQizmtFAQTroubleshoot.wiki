@@ -150,3 +150,7 @@ public virtual void Map(ByteSlice line, MapOutput output)
       output.add(… some error in data
     }
 }}}
+
+==Why am I getting "access denied" errors accessing resources from a job even though permission has been granted?==
+----
+If permissions have been modified on the account that Qizmt was installed under, a Qizmt killall command will need to be issued to update the access token.
