@@ -2224,9 +2224,10 @@ namespace MySpace.DataMining.DistributedObjects
                                         }
                                     }
 
+                                    if (!System.IO.File.Exists(chunkname))
                                     {
                                         using (System.IO.FileStream fs = new System.IO.FileStream(chunkname,
-                                            System.IO.FileMode.Create, System.IO.FileAccess.Write))
+                                            System.IO.FileMode.CreateNew, System.IO.FileAccess.Write))
                                         {
                                             fs.Write(HEADER, 0, HEADER.Length);
                                             if (chunklen > 0)

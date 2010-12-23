@@ -278,124 +278,53 @@ namespace MySpace.DataMining.AELight
                                 }
                                 break; // Normal handling.
 
-                            case "edit":
-                            case "editor":
-                                Environment.CurrentDirectory = AELight_Dir;
-
-                                int iarg = 1;
-                                string ExecOpts = "";
-                                List<string> xpaths = null;
+                            case "configedit":
+                            case "editconfig":
+                            case "configeditor":
                                 {
-                                    while (iarg < args.Length)
+                                    Environment.CurrentDirectory = AELight_Dir;
+                                    _FixSciLexDLL();
+                                    int iarg = 1;
+                                    if (args.Length <= iarg)
                                     {
-                                        switch (args[iarg][0])
-                                        {
-                                            case '-':
-                                                ExecOpts += " " + args[iarg].Substring(1);
-                                                iarg++; // Important.
-                                                continue;
-
-                                            case '/':
-                                                if (null == xpaths)
-                                                {
-                                                    xpaths = new List<string>();
-                                                }
-                                                xpaths.Add(args[iarg]);
-                                                iarg++; // Important.
-                                                continue;
-                                        }
-                                        break;
-                                    }
-                                }
-
-                                _FixSciLexDLL();
-                                if (args.Length <= iarg)
-                                {
-                                    Console.Error.WriteLine("Invalid arguments for " + args[0]);
-                                    //ShowUsage();
-                                    // Show blank usage...
-                                    args = new string[0];
-                                    break;
-                                }
-                                else if (0 == string.Compare("*errors*", args[iarg]) || 0 == string.Compare("*error*", args[iarg]))
-                                {
-                                    if (DebugSwitch)
-                                    {
-                                        Console.Error.WriteLine("Cannot debug {0}", args[iarg]);
+                                        Console.Error.WriteLine("Invalid arguments for " + args[0]);
                                         return;
                                     }
-                                    string errorscsfp = Surrogate.NetworkPathForHost(Surrogate.MasterHost) + @"\error.cs";
-                                    if (System.IO.File.Exists(errorscsfp))
-                                    {
-                                        JobsEdit.RunJobsEditor(errorscsfp, "C# Errors", true);
-                                    }
-                                    else
-                                    {
-                                        Console.Error.WriteLine("No C# errors found");
-                                    }
-                                }
-                                else
-                                {
-                                    string ActualFile, PrettyFile;
+
+                                    string PrettyFile = args[iarg];
 
                                     {
                                         dfs dc = Surrogate.ReadMasterDfsConfig();
 
-#if DEBUG
-                                        //System.Threading.Thread.Sleep(1000 * 8);
-#endif
-
-                                        if (null != dc.DefaultDebugType)
+                                        dfs.DfsFile dfcf = dc.Find(PrettyFile, DfsFileTypes.NORMAL);
+                                        if (null == dfcf)
                                         {
-                                            hashadd["DefaultDebugType"] = dc.DefaultDebugType;
-                                        }
-
-                                        try
-                                        {
-                                            string backupdir = dc.GetMetaBackupLocation();
-                                            if (!string.IsNullOrEmpty(backupdir))
+                                            if (PrettyFile.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
                                             {
-                                                hashadd.Add("backupdir", backupdir);
-                                            }
-                                        }
-                                        catch (Exception eb)
-                                        {
-                                            LogOutputToFile(eb.ToString());
-                                            Console.Error.WriteLine(eb.Message);
-                                        }
-
-                                        dfs.DfsFile dfjob = dc.Find(args[iarg], DfsFileTypes.JOB);
-                                        if (null == dfjob)
-                                        {
-                                            /*if (!QuietMode)
-                                            {
-                                                Console.WriteLine("New jobs file");
-                                            }*/
-                                            string fn = args[iarg];
-
-                                            if (fn.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
-                                            {
-                                                fn = fn.Substring(6);
+                                                PrettyFile = PrettyFile.Substring(6);
                                             }
 
                                             string reason = "";
-                                            if (dfs.IsBadFilename(fn, out reason))
+                                            if (dfs.IsBadFilename(PrettyFile, out reason))
                                             {
-                                                Console.Error.WriteLine("Invalid job file name: " + reason);
+                                                Console.Error.WriteLine("Invalid config file name: " + reason);
                                                 return;
                                             }
 
-                                            ActualFile = null; // !
-                                            PrettyFile = "dfs://" + fn;
+                                            //ActualFile = null;
+                                            PrettyFile = "dfs://" + PrettyFile;
                                         }
                                         else
                                         {
-                                            if (dfjob.Nodes.Count < 1)
+
+                                            //ActualFile = Surrogate.NetworkPathForHost(dfcf.Nodes[0].Host.Split(';')[0]) + @"\" + dfcf.Nodes[0].Name;
+                                            PrettyFile = "dfs://" + dfcf.Name;
+
+                                            if (!ConfigEditor.ConfigEdit.CheckConfigFileSize(PrettyFile, dfcf.Size))
                                             {
-                                                throw new Exception("Error: -exec jobs file not in correct jobs DFS format");
+                                                return;
                                             }
-                                            ActualFile = Surrogate.NetworkPathForHost(dfjob.Nodes[0].Host.Split(';')[0]) + @"\" + dfjob.Nodes[0].Name;
-                                            PrettyFile = "dfs://" + dfjob.Name;
+
                                         }
                                     }
 
@@ -412,33 +341,173 @@ namespace MySpace.DataMining.AELight
                                         {
                                             realuser = realuser.Substring(0, ix);
                                         }
-                                        JobsEdit.RealUserName = realuser;
+                                        ConfigEditor.ConfigEdit.RealUserName = realuser;
                                     }
 
-                                    if (DebugSwitch)
-                                    {
-                                        if (string.IsNullOrEmpty(ActualFile))
-                                        {
-                                            Console.Error.WriteLine("Cannot debug, jobs file does not exist: {0}", PrettyFile);
-                                            return;
-                                        }
-                                        hashadd["DebugSwitch"] = "y";
-                                        if (DebugStepSwitch)
-                                        {
-                                            hashadd["DebugStepSwitch"] = "y";
-                                        }
-                                    }
-
-                                    hashadd["ExecArgs"] = SubArray(args, iarg + 1);
-
-                                    if (null != xpaths)
-                                    {
-                                        hashadd["SourceCodeXPathSets"] = xpaths;
-                                    }
-
-                                    JobsEdit.RunJobsEditor(ActualFile, PrettyFile, hashadd);
+                                    ConfigEditor.ConfigEdit.RunConfigEditor(PrettyFile);
                                 }
                                 return;
+
+                            case "edit":
+                            case "editor":
+                                {
+                                    Environment.CurrentDirectory = AELight_Dir;
+
+                                    int iarg = 1;
+                                    string ExecOpts = "";
+                                    List<string> xpaths = null;
+                                    {
+                                        while (iarg < args.Length)
+                                        {
+                                            switch (args[iarg][0])
+                                            {
+                                                case '-':
+                                                    ExecOpts += " " + args[iarg].Substring(1);
+                                                    iarg++; // Important.
+                                                    continue;
+
+                                                case '/':
+                                                    if (null == xpaths)
+                                                    {
+                                                        xpaths = new List<string>();
+                                                    }
+                                                    xpaths.Add(args[iarg]);
+                                                    iarg++; // Important.
+                                                    continue;
+                                            }
+                                            break;
+                                        }
+                                    }
+
+                                    _FixSciLexDLL();
+                                    if (args.Length <= iarg)
+                                    {
+                                        Console.Error.WriteLine("Invalid arguments for " + args[0]);
+                                        return;
+                                    }
+                                    else if (0 == string.Compare("*errors*", args[iarg]) || 0 == string.Compare("*error*", args[iarg]))
+                                    {
+                                        if (DebugSwitch)
+                                        {
+                                            Console.Error.WriteLine("Cannot debug {0}", args[iarg]);
+                                            return;
+                                        }
+                                        string errorscsfp = Surrogate.NetworkPathForHost(Surrogate.MasterHost) + @"\error.cs";
+                                        if (System.IO.File.Exists(errorscsfp))
+                                        {
+                                            JobsEdit.RunJobsEditor(errorscsfp, "C# Errors", true);
+                                        }
+                                        else
+                                        {
+                                            Console.Error.WriteLine("No C# errors found");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        string ActualFile, PrettyFile;
+
+                                        {
+                                            dfs dc = Surrogate.ReadMasterDfsConfig();
+
+#if DEBUG
+                                            //System.Threading.Thread.Sleep(1000 * 8);
+#endif
+
+                                            if (null != dc.DefaultDebugType)
+                                            {
+                                                hashadd["DefaultDebugType"] = dc.DefaultDebugType;
+                                            }
+
+                                            try
+                                            {
+                                                string backupdir = dc.GetMetaBackupLocation();
+                                                if (!string.IsNullOrEmpty(backupdir))
+                                                {
+                                                    hashadd.Add("backupdir", backupdir);
+                                                }
+                                            }
+                                            catch (Exception eb)
+                                            {
+                                                LogOutputToFile(eb.ToString());
+                                                Console.Error.WriteLine(eb.Message);
+                                            }
+
+                                            dfs.DfsFile dfjob = dc.Find(args[iarg], DfsFileTypes.JOB);
+                                            if (null == dfjob)
+                                            {
+                                                /*if (!QuietMode)
+                                                {
+                                                    Console.WriteLine("New jobs file");
+                                                }*/
+                                                string fn = args[iarg];
+
+                                                if (fn.StartsWith("dfs://", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    fn = fn.Substring(6);
+                                                }
+
+                                                string reason = "";
+                                                if (dfs.IsBadFilename(fn, out reason))
+                                                {
+                                                    Console.Error.WriteLine("Invalid job file name: " + reason);
+                                                    return;
+                                                }
+
+                                                ActualFile = null; // !
+                                                PrettyFile = "dfs://" + fn;
+                                            }
+                                            else
+                                            {
+                                                if (dfjob.Nodes.Count < 1)
+                                                {
+                                                    throw new Exception("Error: -exec jobs file not in correct jobs DFS format");
+                                                }
+                                                ActualFile = Surrogate.NetworkPathForHost(dfjob.Nodes[0].Host.Split(';')[0]) + @"\" + dfjob.Nodes[0].Name;
+                                                PrettyFile = "dfs://" + dfjob.Name;
+                                            }
+                                        }
+
+                                        {
+                                            System.Threading.Thread editthread = new System.Threading.Thread(new System.Threading.ParameterizedThreadStart(editthreadproc));
+                                            editthread.IsBackground = true;
+                                            editthread.Start(sargs);
+                                        }
+
+                                        {
+                                            string realuser = mdousername();
+                                            int ix = realuser.IndexOfAny(new char[] { '@', '(' });
+                                            if (-1 != ix)
+                                            {
+                                                realuser = realuser.Substring(0, ix);
+                                            }
+                                            JobsEdit.RealUserName = realuser;
+                                        }
+
+                                        if (DebugSwitch)
+                                        {
+                                            if (string.IsNullOrEmpty(ActualFile))
+                                            {
+                                                Console.Error.WriteLine("Cannot debug, jobs file does not exist: {0}", PrettyFile);
+                                                return;
+                                            }
+                                            hashadd["DebugSwitch"] = "y";
+                                            if (DebugStepSwitch)
+                                            {
+                                                hashadd["DebugStepSwitch"] = "y";
+                                            }
+                                        }
+
+                                        hashadd["ExecArgs"] = SubArray(args, iarg + 1);
+
+                                        if (null != xpaths)
+                                        {
+                                            hashadd["SourceCodeXPathSets"] = xpaths;
+                                        }
+
+                                        JobsEdit.RunJobsEditor(ActualFile, PrettyFile, hashadd);
+                                    }
+                                    return;
+                                }
 
                             case "execview":
                                 if (args.Length < 2)
@@ -1289,6 +1358,23 @@ namespace MySpace.DataMining.AELight
                                 Console.WriteLine(Exec.Shell("sc start DistributedObjects"));
                                 Console.WriteLine(Exec.Shell("sc start MemCachePin"));
                                 return;
+
+                            case "#install":
+                                {
+                                    string dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                                    Console.WriteLine(Exec.Shell("installutil \"" + dir + "\\MySpace.DataMining.DistributedObjects.exe\"", false));
+                                }
+                                return;
+
+                            case "#uninstall":
+                                {
+                                    Exec.Shell("sc stop DistributedObjects", true); // suppresserrors=true
+                                    Exec.Shell("sc stop MemCachePin", true); // suppresserrors=true
+                                    System.Threading.Thread.Sleep(1000 * 5);
+                                    string dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                                    Console.WriteLine(Exec.Shell("installutil /u \"" + dir + "\\MySpace.DataMining.DistributedObjects.exe\"", false));
+                                }
+                                return;
 #endif
 
                             case "stopallmemcachepin":
@@ -1900,7 +1986,7 @@ namespace MySpace.DataMining.AELight
                                     lock (idir)
                                     {
                                         Console.Error.WriteLine("Invalid file name, skipping: {0}. {1}", fn, reason);
-                                    }                                    
+                                    }
                                     return;
                                 }
                                 string newactualfilehost = Surrogate.MasterHost;
@@ -2026,12 +2112,12 @@ namespace MySpace.DataMining.AELight
         }
 
         static void ProcessUser(string[] args)
-        {          
+        {
             string thisuser = Environment.UserName;
             string thishost = System.Net.Dns.GetHostName();
             _mdousername = thisuser + "@" + thishost;
 
-            string[] ahosts, ausers, acmds;            
+            string[] ahosts, ausers, acmds;
             Surrogate.GetAInfo(out ahosts, out ausers, out acmds);
 
             /*bool accountOn = false;
@@ -2076,7 +2162,7 @@ namespace MySpace.DataMining.AELight
                         break;
                     }
                 }
-              
+
                 /*if (accountOn && !isauser)
                 {
                     isauser = Surrogate.InAGroup(thisuser, dc);
@@ -2191,7 +2277,7 @@ namespace MySpace.DataMining.AELight
                     if (async)
                     {
                         opts += "-ASYNC ";
-                    }                    
+                    }
                     XContent.SendXContent(nstm, opts + @"\\" + Environment.UserDomainName + @"\" + mdousername() + ": " + fullargs);
                     if ((int)'+' != nstm.ReadByte())
                     {
@@ -2210,7 +2296,7 @@ namespace MySpace.DataMining.AELight
                         nstm.Close();
                     }
                     return 44;
-                }  
+                }
             }
         }
 
@@ -2221,7 +2307,7 @@ namespace MySpace.DataMining.AELight
 
         static void RunProxy(string sargs)
         {
-            System.Net.Sockets.Socket lsock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, 
+            System.Net.Sockets.Socket lsock = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
                 System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
             System.Net.IPEndPoint ep = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 55901);
 

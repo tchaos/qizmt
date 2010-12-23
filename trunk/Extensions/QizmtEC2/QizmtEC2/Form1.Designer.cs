@@ -39,6 +39,7 @@
             this.JavaHomeBox = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
             this.Ec2MachinesTab = new System.Windows.Forms.TabPage();
+            this.InstanceTypeBox = new System.Windows.Forms.ComboBox();
             this.SecurityGroupsBox = new System.Windows.Forms.TextBox();
             this.label10 = new System.Windows.Forms.Label();
             this.AvailabilityZoneCombo = new System.Windows.Forms.ComboBox();
@@ -47,7 +48,6 @@
             this.label8 = new System.Windows.Forms.Label();
             this.KeyPairBox = new System.Windows.Forms.ComboBox();
             this.label7 = new System.Windows.Forms.Label();
-            this.InstanceTypeBox = new System.Windows.Forms.TextBox();
             this.label6 = new System.Windows.Forms.Label();
             this.AmiCombo = new System.Windows.Forms.ComboBox();
             this.label5 = new System.Windows.Forms.Label();
@@ -114,7 +114,7 @@
             this.Ec2PrivateKeyBox.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.FileSystem;
             this.Ec2PrivateKeyBox.Location = new System.Drawing.Point(20, 176);
             this.Ec2PrivateKeyBox.Name = "Ec2PrivateKeyBox";
-            this.Ec2PrivateKeyBox.Size = new System.Drawing.Size(475, 20);
+            this.Ec2PrivateKeyBox.Size = new System.Drawing.Size(466, 20);
             this.Ec2PrivateKeyBox.TabIndex = 7;
             this.Ec2PrivateKeyBox.Text = "%UserProfile%\\ec2-keys\\pk-*.pem";
             // 
@@ -133,7 +133,7 @@
             this.Ec2CertBox.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.FileSystem;
             this.Ec2CertBox.Location = new System.Drawing.Point(20, 128);
             this.Ec2CertBox.Name = "Ec2CertBox";
-            this.Ec2CertBox.Size = new System.Drawing.Size(475, 20);
+            this.Ec2CertBox.Size = new System.Drawing.Size(466, 20);
             this.Ec2CertBox.TabIndex = 5;
             this.Ec2CertBox.Text = "%UserProfile%\\ec2-keys\\cert-*.pem";
             // 
@@ -152,7 +152,7 @@
             this.Ec2HomeBox.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.FileSystemDirectories;
             this.Ec2HomeBox.Location = new System.Drawing.Point(20, 79);
             this.Ec2HomeBox.Name = "Ec2HomeBox";
-            this.Ec2HomeBox.Size = new System.Drawing.Size(475, 20);
+            this.Ec2HomeBox.Size = new System.Drawing.Size(466, 20);
             this.Ec2HomeBox.TabIndex = 3;
             this.Ec2HomeBox.Text = "C:\\ec2-api-tools";
             // 
@@ -171,7 +171,7 @@
             this.JavaHomeBox.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.FileSystemDirectories;
             this.JavaHomeBox.Location = new System.Drawing.Point(20, 29);
             this.JavaHomeBox.Name = "JavaHomeBox";
-            this.JavaHomeBox.Size = new System.Drawing.Size(475, 20);
+            this.JavaHomeBox.Size = new System.Drawing.Size(466, 20);
             this.JavaHomeBox.TabIndex = 1;
             this.JavaHomeBox.Text = "C:\\Program Files\\Java\\jre6";
             // 
@@ -186,6 +186,7 @@
             // 
             // Ec2MachinesTab
             // 
+            this.Ec2MachinesTab.Controls.Add(this.InstanceTypeBox);
             this.Ec2MachinesTab.Controls.Add(this.SecurityGroupsBox);
             this.Ec2MachinesTab.Controls.Add(this.label10);
             this.Ec2MachinesTab.Controls.Add(this.AvailabilityZoneCombo);
@@ -194,7 +195,6 @@
             this.Ec2MachinesTab.Controls.Add(this.label8);
             this.Ec2MachinesTab.Controls.Add(this.KeyPairBox);
             this.Ec2MachinesTab.Controls.Add(this.label7);
-            this.Ec2MachinesTab.Controls.Add(this.InstanceTypeBox);
             this.Ec2MachinesTab.Controls.Add(this.label6);
             this.Ec2MachinesTab.Controls.Add(this.AmiCombo);
             this.Ec2MachinesTab.Controls.Add(this.label5);
@@ -204,6 +204,24 @@
             this.Ec2MachinesTab.TabIndex = 2;
             this.Ec2MachinesTab.Text = "EC2 Machines";
             this.Ec2MachinesTab.UseVisualStyleBackColor = true;
+            // 
+            // InstanceTypeBox
+            // 
+            this.InstanceTypeBox.FormattingEnabled = true;
+            this.InstanceTypeBox.Items.AddRange(new object[] {
+            "t1.micro - x86/x86_64 - Micro/Micro",
+            "m1.small - x86 - Standard/Small",
+            "m1.large - x86_64 - Standard/Large",
+            "m1.xlarge - x86_64 - Standard/Extra-Large",
+            "m2.xlarge - x86_64 - High-Memory/Extra-Large",
+            "m2.2xlarge - x86_64 - High-Memory/Double-Extra-Large",
+            "m2.4xlarge - x86_64 - High-Memory/Quadruple-Extra-Large",
+            "c1.medium - x86 - High-CPU/Medium",
+            "c1.xlarge - x86_64 - High-CPU/Extra-Large"});
+            this.InstanceTypeBox.Location = new System.Drawing.Point(165, 36);
+            this.InstanceTypeBox.Name = "InstanceTypeBox";
+            this.InstanceTypeBox.Size = new System.Drawing.Size(322, 21);
+            this.InstanceTypeBox.TabIndex = 3;
             // 
             // SecurityGroupsBox
             // 
@@ -281,14 +299,6 @@
             this.label7.TabIndex = 4;
             this.label7.Text = "KeyPair Name:";
             // 
-            // InstanceTypeBox
-            // 
-            this.InstanceTypeBox.Location = new System.Drawing.Point(165, 37);
-            this.InstanceTypeBox.Name = "InstanceTypeBox";
-            this.InstanceTypeBox.Size = new System.Drawing.Size(322, 20);
-            this.InstanceTypeBox.TabIndex = 3;
-            this.InstanceTypeBox.Text = "m1.small";
-            // 
             // label6
             // 
             this.label6.AutoSize = true;
@@ -302,7 +312,9 @@
             // 
             this.AmiCombo.FormattingEnabled = true;
             this.AmiCombo.Items.AddRange(new object[] {
-            "ami-b8c42cd1 - MySpace Qizmt - Windows-Server2008-i386-Base-v103"});
+            "ami-b8c42cd1 - MySpace Qizmt x86 EBS - Windows-Server2008-i386-Base-v103",
+            "ami-76bb4a1f - MySpace Qizmt x86_64 instance-store - Server2003r2-x86_64-Win-v1.0" +
+                "7"});
             this.AmiCombo.Location = new System.Drawing.Point(98, 10);
             this.AmiCombo.Name = "AmiCombo";
             this.AmiCombo.Size = new System.Drawing.Size(389, 21);
@@ -516,8 +528,8 @@
             this.MaximizeBox = false;
             this.Name = "Form1";
             this.Text = "Qizmt on EC2";
-            this.Load += new System.EventHandler(this.Form1_Load);
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
+            this.Load += new System.EventHandler(this.Form1_Load);
             this.tc.ResumeLayout(false);
             this.SetupTab.ResumeLayout(false);
             this.SetupTab.PerformLayout();
@@ -552,7 +564,6 @@
         private System.Windows.Forms.ComboBox AmiCombo;
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Label label6;
-        private System.Windows.Forms.TextBox InstanceTypeBox;
         private System.Windows.Forms.ComboBox KeyPairBox;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.TextBox KeyPairPrivateKeyFileBox;
@@ -575,6 +586,7 @@
         private System.Windows.Forms.Button LaunchRdpButton;
         private System.Windows.Forms.CheckBox launchRdpCheck;
         private System.Windows.Forms.Button StartClusterButton;
+        private System.Windows.Forms.ComboBox InstanceTypeBox;
     }
 }
 
