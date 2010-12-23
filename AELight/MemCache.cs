@@ -739,6 +739,7 @@ namespace MySpace.DataMining.AELight
                 }
             }
 
+            Dictionary<string, bool> newchunknames = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
             using (LockDfsMutex())
             {
                 dc = LoadDfsConfig();
@@ -755,6 +756,10 @@ namespace MySpace.DataMining.AELight
                         break;
                     }
                 }
+                foreach (dfs.DfsFile.FileNode fn in df2.Nodes)
+                {
+                    newchunknames[fn.Name] = true;
+                }
                 df2.MemCache = df.MemCache;
                 df2.Size = dfsfilesize;
                 df2.Name = df.Name;
@@ -764,9 +769,22 @@ namespace MySpace.DataMining.AELight
 
             {
                 // Just kill the old chunks, not the MemCache stuff.
-                List<dfs.DfsFile> delfiles = new List<dfs.DfsFile>(1);
-                delfiles.Add(df);
-                _KillDataFileChunks_unlocked_mt(delfiles, false);
+                List<string> delfnodes = new List<string>();
+                {
+                    //Collect file node paths.
+                    for (int dn = 0; dn < df.Nodes.Count; dn++)
+                    {
+                        if (newchunknames.ContainsKey(df.Nodes[dn].Name))
+                        {
+                            continue;
+                        }
+                        foreach (string chost in df.Nodes[dn].Host.Split(';'))
+                        {
+                            delfnodes.Add(NetworkPathForHost(chost) + @"\" + df.Nodes[dn].Name);
+                        }
+                    }
+                }
+                _KillDataFileChunksInternal_unlocked_mt(delfnodes);
             }
 
         }

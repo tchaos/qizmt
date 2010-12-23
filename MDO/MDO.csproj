@@ -78,6 +78,10 @@
       <Project>{E8C7AF83-2E61-4A6A-BB39-F07897661C15}</Project>
       <Name>Admin</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ConfigEditor\ConfigEditor.csproj">
+      <Project>{336DEF50-9929-4D4E-9F17-E045171FC050}</Project>
+      <Name>ConfigEditor</Name>
+    </ProjectReference>
     <ProjectReference Include="..\JobsEditor\JobsEditor.csproj">
       <Project>{AD3B5A84-2A12-435F-B5AF-F07F2F1D3D3B}</Project>
       <Name>JobsEditor</Name>

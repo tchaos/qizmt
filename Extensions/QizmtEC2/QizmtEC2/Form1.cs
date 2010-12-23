@@ -1,4 +1,24 @@
-﻿using System;
+﻿/**************************************************************************************
+ *  MySpace’s Mapreduce Framework is a mapreduce framework for distributed computing  *
+ *  and developing distributed computing applications on large clusters of servers.   *
+ *                                                                                    *
+ *  Copyright (C) 2008  MySpace Inc. <http://qizmt.myspace.com/>                      *
+ *                                                                                    *
+ *  This program is free software: you can redistribute it and/or modify              *
+ *  it under the terms of the GNU General Public License as published by              *
+ *  the Free Software Foundation, either version 3 of the License, or                 *
+ *  (at your option) any later version.                                               *
+ *                                                                                    *
+ *  This program is distributed in the hope that it will be useful,                   *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of                    *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                     *
+ *  GNU General Public License for more details.                                      *
+ *                                                                                    *
+ *  You should have received a copy of the GNU General Public License                 *
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
+***************************************************************************************/
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -14,7 +34,119 @@ namespace QizmtEC2
         public Form1()
         {
             InitializeComponent();
+
+            addbrowsetextboxes(this);
         }
+
+
+        Button _curbrowsebtn;
+        TextBox _curbrowsebtntextbox;
+
+        void _browsebtnFileSystem_gotfocus(Object sender, EventArgs ea)
+        {
+            if (null != _curbrowsebtn)
+            {
+                _curbrowsebtn.Dispose();
+                _curbrowsebtn = null;
+            }
+            TextBox tb = (TextBox)sender;
+            _curbrowsebtntextbox = tb;
+            _curbrowsebtn = new Button();
+            _curbrowsebtn.Text = "...";
+            _curbrowsebtn.TabIndex = tb.TabIndex + 1;
+            _curbrowsebtn.Bounds = new Rectangle(tb.Right + 2, tb.Top, 24, tb.Height);
+            _curbrowsebtn.Parent = tb.Parent;
+            _curbrowsebtn.Click += new EventHandler(_browsebtnFileSystem_browse);
+        }
+
+        void _browsebtnFileSystem_browse(Object sender, EventArgs ea)
+        {
+            OpenFileDialog fd = new OpenFileDialog();
+            {
+                Label label = _curbrowsebtntextbox.Parent.GetNextControl(_curbrowsebtntextbox, false) as Label;
+                if (null != label)
+                {
+                    fd.Title = label.Text;
+                }
+            }
+            fd.FileName = _curbrowsebtntextbox.Text;
+            if (DialogResult.OK == fd.ShowDialog(this))
+            {
+                _curbrowsebtntextbox.Text = fd.FileName;
+            }
+        }
+
+        void _browsebtnFileSystemDirectories_gotfocus(Object sender, EventArgs ea)
+        {
+            if (null != _curbrowsebtn)
+            {
+                _curbrowsebtn.Dispose();
+                _curbrowsebtn = null;
+            }
+            TextBox tb = (TextBox)sender;
+            _curbrowsebtntextbox = tb;
+            _curbrowsebtn = new Button();
+            _curbrowsebtn.Text = "...";
+            _curbrowsebtn.TabIndex = tb.TabIndex + 1;
+            _curbrowsebtn.Bounds = new Rectangle(tb.Right + 2, tb.Top, 24, tb.Height);
+            _curbrowsebtn.Parent = tb.Parent;
+            _curbrowsebtn.Click += new EventHandler(_browsebtnFileSystemDirectories_browse);
+        }
+
+        void _browsebtnFileSystemDirectories_browse(Object sender, EventArgs ea)
+        {
+            FolderBrowserDialog fd = new FolderBrowserDialog();
+            {
+                Label label = _curbrowsebtntextbox.Parent.GetNextControl(_curbrowsebtntextbox, false) as Label;
+                if (null != label)
+                {
+                    fd.Description = label.Text;
+                }
+            }
+            fd.ShowNewFolderButton = true;
+            fd.SelectedPath = _curbrowsebtntextbox.Text;
+            if (DialogResult.OK == fd.ShowDialog(this))
+            {
+                _curbrowsebtntextbox.Text = fd.SelectedPath;
+            }
+        }
+
+        void addbrowsetextboxes(Control cparent)
+        {
+            foreach (Control ctrl in cparent.Controls)
+            {
+                if (ctrl.HasChildren)
+                {
+                    addbrowsetextboxes(ctrl);
+                }
+                else
+                {
+                    TextBox tb = ctrl as TextBox;
+                    if (null != tb)
+                    {
+                        if (tb.AutoCompleteMode != AutoCompleteMode.None)
+                        {
+                            switch (tb.AutoCompleteSource)
+                            {
+                                case AutoCompleteSource.FileSystem:
+                                    {
+                                        tb.GotFocus += new EventHandler(_browsebtnFileSystem_gotfocus);
+                                    }
+                                    break;
+                                case AutoCompleteSource.FileSystemDirectories:
+                                    {
+                                        tb.GotFocus += new EventHandler(_browsebtnFileSystemDirectories_gotfocus);
+                                    }
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
 
         private void PrevButton_Click(object sender, EventArgs e)
         {
@@ -53,14 +185,15 @@ namespace QizmtEC2
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            if (this.AmiCombo.Items.Count > 0)
+            /*if (this.AmiCombo.Items.Count > 0)
             {
                 this.AmiCombo.SelectedIndex = 0;
-            }
-            if (this.AvailabilityZoneCombo.Items.Count > 0)
+            }*/
+
+            /*if (this.AvailabilityZoneCombo.Items.Count > 0)
             {
                 this.AvailabilityZoneCombo.SelectedIndex = 0;
-            }
+            }*/
 
             {
                 string sv = Environment.GetEnvironmentVariable("JAVA_HOME");
@@ -561,49 +694,59 @@ namespace QizmtEC2
                         Application.DoEvents();
                     }
 
-                    int numhostsfound = 0;
-                    for (int itries = 0; itries < 90; itries++)
                     {
-                        for (int i = 0; i < 15; i++)
+                        int numhostsfound = 0;
+                        for (int outeritries = 0; ; )
                         {
-                            System.Threading.Thread.Sleep(200);
-                            Application.DoEvents();
-                        }
-                        string[] output = CallEc2Command(info, "ec2-describe-instances.cmd")
-                            .Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (string ln in output)
-                        {
-                            string[] parts = ln.Split('\t');
-                            if (parts.Length > 17 && "INSTANCE" == parts[0])
+                            for (int itries = 0; itries < 90; itries++)
                             {
-                                string instanceID = string.Intern(parts[1]);
-                                Ec2Instance einst = GetInstanceByID(instanceID);
-                                if (null != einst && null == einst.ipaddrInternal)
+                                for (int i = 0; i < 15; i++)
                                 {
-                                    string instanceIPaddr = parts[16];
-                                    string instanceIPaddrInternal = parts[17];
-                                    if (instanceIPaddrInternal.Length > 0)
+                                    System.Threading.Thread.Sleep(200);
+                                    Application.DoEvents();
+                                }
+                                string[] output = CallEc2Command(info, "ec2-describe-instances.cmd")
+                                    .Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                                foreach (string ln in output)
+                                {
+                                    string[] parts = ln.Split('\t');
+                                    if (parts.Length > 17 && "INSTANCE" == parts[0])
                                     {
-                                        einst.ipaddr = instanceIPaddr;
-                                        einst.ipaddrInternal = instanceIPaddrInternal;
-                                        if (!string.IsNullOrEmpty(masterpasswd))
+                                        string instanceID = string.Intern(parts[1]);
+                                        Ec2Instance einst = GetInstanceByID(instanceID);
+                                        if (null != einst && null == einst.ipaddrInternal)
                                         {
-                                            einst.passwd = masterpasswd;
+                                            string instanceIPaddr = parts[16];
+                                            string instanceIPaddrInternal = parts[17];
+                                            if (instanceIPaddrInternal.Length > 0)
+                                            {
+                                                einst.ipaddr = instanceIPaddr;
+                                                einst.ipaddrInternal = instanceIPaddrInternal;
+                                                if (!string.IsNullOrEmpty(masterpasswd))
+                                                {
+                                                    einst.passwd = masterpasswd;
+                                                }
+                                                numhostsfound++;
+                                            }
                                         }
-                                        numhostsfound++;
                                     }
                                 }
+                                Application.DoEvents();
+                                if (numhostsfound == instances.Count)
+                                {
+                                    break;
+                                }
                             }
-                        }
-                        Application.DoEvents();
-                        if (numhostsfound == instances.Count)
-                        {
+                            if (numhostsfound != instances.Count)
+                            {
+                                if (++outeritries == 5)
+                                {
+                                    throw new Exception("Machine instances lost; only found " + numhostsfound + " of " + instances.Count);
+                                }
+                                continue;
+                            }
                             break;
                         }
-                    }
-                    if (numhostsfound != instances.Count)
-                    {
-                        throw new Exception("Machine instances lost; only found " + numhostsfound + " of " + instances.Count);
                     }
 
                     if (string.IsNullOrEmpty(masterpasswd))
@@ -681,50 +824,60 @@ namespace QizmtEC2
                         Application.DoEvents();
                     }
 
-                    bool foundminstance = false;
-                    for (int itries = 0; itries < 90; itries++)
                     {
-                        for (int i = 0; i < 15; i++)
+                        bool foundminstance = false;
+                        for (int outeritries = 0; ; )
                         {
-                            System.Threading.Thread.Sleep(200);
-                            Application.DoEvents();
-                        }
-                        string[] output = CallEc2Command(info, "ec2-describe-instances.cmd")
-                            .Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (string ln in output)
-                        {
-                            string[] parts = ln.Split('\t');
-                            if (parts.Length > 17 && "INSTANCE" == parts[0])
+                            for (int itries = 0; itries < 90; itries++)
                             {
-                                string instanceID = string.Intern(parts[1]);
-                                if (machineinstance == instanceID)
+                                for (int i = 0; i < 15; i++)
                                 {
-                                    Ec2Instance einst = GetInstanceByID(instanceID);
-                                    if (null == einst || null != einst.ipaddrInternal)
+                                    System.Threading.Thread.Sleep(200);
+                                    Application.DoEvents();
+                                }
+                                string[] output = CallEc2Command(info, "ec2-describe-instances.cmd")
+                                    .Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                                foreach (string ln in output)
+                                {
+                                    string[] parts = ln.Split('\t');
+                                    if (parts.Length > 17 && "INSTANCE" == parts[0])
                                     {
-                                        throw new Exception("Problem with instance " + instanceID
-                                            + " - ec2-describe-instances.cmd output not consistent");
-                                    }
-                                    string instanceIPaddr = parts[16];
-                                    string instanceIPaddrInternal = parts[17];
-                                    if (instanceIPaddrInternal.Length > 0)
-                                    {
-                                        einst.ipaddr = instanceIPaddr;
-                                        einst.ipaddrInternal = instanceIPaddrInternal;
-                                        foundminstance = true;
+                                        string instanceID = string.Intern(parts[1]);
+                                        if (machineinstance == instanceID)
+                                        {
+                                            Ec2Instance einst = GetInstanceByID(instanceID);
+                                            if (null == einst || null != einst.ipaddrInternal)
+                                            {
+                                                throw new Exception("Problem with instance " + instanceID
+                                                    + " - ec2-describe-instances.cmd output not consistent");
+                                            }
+                                            string instanceIPaddr = parts[16];
+                                            string instanceIPaddrInternal = parts[17];
+                                            if (instanceIPaddrInternal.Length > 0)
+                                            {
+                                                einst.ipaddr = instanceIPaddr;
+                                                einst.ipaddrInternal = instanceIPaddrInternal;
+                                                foundminstance = true;
+                                            }
+                                        }
                                     }
                                 }
+                                Application.DoEvents();
+                                if (foundminstance)
+                                {
+                                    break;
+                                }
                             }
-                        }
-                        Application.DoEvents();
-                        if (foundminstance)
-                        {
+                            if (!foundminstance)
+                            {
+                                if (++outeritries == 5)
+                                {
+                                    throw new Exception("Machine instances lost; only found " + (info.numberofmachines - 1) + " of " + info.numberofmachines);
+                                }
+                                continue;
+                            }
                             break;
                         }
-                    }
-                    if (!foundminstance)
-                    {
-                        throw new Exception("Machine instances lost; only found " + (info.numberofmachines - 1) + " of " + info.numberofmachines);
                     }
 
                     OutputBox.AppendText(Environment.NewLine + "Machines:");
@@ -745,7 +898,7 @@ namespace QizmtEC2
                     {
                         // Give a bit of time for the surrogate to setup.
                         OutputBox.AppendText(".");
-                        const int iwaitsecs = 60;
+                        int iwaitsecs = 60 + instances.Count;
                         for (int iwait = 0; iwait < iwaitsecs * 5; iwait++)
                         {
                             System.Threading.Thread.Sleep(200);
@@ -962,13 +1115,9 @@ namespace QizmtEC2
             }
             else
             {
-                index = output.IndexOf(": Meta-data is now available");
-                if (-1 != index)
+                if (-1 != output.IndexOf(": Message: Windows is Ready to use"))
                 {
-                    if (-1 != output.IndexOf(": Message: Windows is Ready to use", index))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
             return false;
@@ -1192,6 +1341,20 @@ namespace QizmtEC2
             info.keypairprivatekeyfile = keypairprivatekeyfile;
 
             string instancetype = InstanceTypeBox.Text.Trim();
+            {
+                int isp = instancetype.IndexOf(' ');
+                if (-1 != isp)
+                {
+                    instancetype = instancetype.Substring(0, isp);
+                }
+            }
+            if (0 == instancetype.Length)
+            {
+                BadControlValue(InstanceTypeBox);
+                MessageBox.Show(this, "Must specify an instance type",
+                    this.Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return info;
+            }
             info.instancetype = instancetype;
 
             string availabilityzone = AvailabilityZoneCombo.Text.Trim();

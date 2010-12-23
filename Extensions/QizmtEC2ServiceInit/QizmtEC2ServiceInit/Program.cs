@@ -1,4 +1,24 @@
-﻿using System;
+﻿/**************************************************************************************
+ *  MySpace’s Mapreduce Framework is a mapreduce framework for distributed computing  *
+ *  and developing distributed computing applications on large clusters of servers.   *
+ *                                                                                    *
+ *  Copyright (C) 2008  MySpace Inc. <http://qizmt.myspace.com/>                      *
+ *                                                                                    *
+ *  This program is free software: you can redistribute it and/or modify              *
+ *  it under the terms of the GNU General Public License as published by              *
+ *  the Free Software Foundation, either version 3 of the License, or                 *
+ *  (at your option) any later version.                                               *
+ *                                                                                    *
+ *  This program is distributed in the hope that it will be useful,                   *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of                    *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                     *
+ *  GNU General Public License for more details.                                      *
+ *                                                                                    *
+ *  You should have received a copy of the GNU General Public License                 *
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.             *
+***************************************************************************************/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,6 +29,10 @@ namespace QizmtEC2ServiceInit
 {
     class Program
     {
+
+        static string Ec2ConfigDir;
+        static string Ec2ConfigLogsDir;
+
         static void Main(string[] args)
         {
             try
@@ -16,17 +40,33 @@ namespace QizmtEC2ServiceInit
 
                 XLog.statuslog("Started");
 
+                Ec2ConfigDir = @"C:\Program Files\Amazon\Ec2ConfigService";
+                if (!System.IO.Directory.Exists(Ec2ConfigDir))
+                {
+                    Ec2ConfigDir = @"C:\Program Files (x86)\Amazon\Ec2ConfigSetup";
+                    if (!System.IO.Directory.Exists(Ec2ConfigDir))
+                    {
+                        throw new System.IO.IOException(@"Unable to locate directory for Amazon\Ec2ConfigSetup");
+                    }
+                }
+
+                Ec2ConfigLogsDir = Ec2ConfigDir + @"\Logs";
+                if (!System.IO.Directory.Exists(Ec2ConfigLogsDir))
+                {
+                    Ec2ConfigLogsDir = Ec2ConfigDir;
+                }
+
                 try
                 {
-                    // C:\Program Files\Amazon\Ec2ConfigService\Logs\Ec2ConfigLog.txt
+                    // C:\<ProgramFiles>\Amazon\Ec2ConfigService\Logs\Ec2ConfigLog.txt
                     // contains "Ec2RebootInstance:Windows is Ready to use"
                     // Allow thread abort and interrupt exceptions here.
                     XLog.statuslog("Waiting on EC2 instance to fully to initialize");
                     for (; ; )
                     {
                         string content = System.IO.File.ReadAllText(
-                            @"C:\Program Files\Amazon\Ec2ConfigService\Logs\Ec2ConfigLog.txt");
-                        if (-1 != content.IndexOf("Ec2RebootInstance:Windows is Ready to use"))
+                            Ec2ConfigLogsDir + @"\Ec2ConfigLog.txt");
+                        if (-1 != content.IndexOf("Windows is Ready to use"))
                         {
                             break;
                         }
@@ -128,6 +168,31 @@ namespace QizmtEC2ServiceInit
                 }
 #endif
 
+                try
+                {
+                    // Note: if there's no D drive, stay on C.
+                    if (System.IO.Directory.Exists(LocalQizmtDir))
+                    {
+                        string NewLocalQizmtParentDir = @"D:\";
+                        string NewLocalQizmtDir = @"D:\Qizmt";
+                        if (!System.IO.Directory.Exists(NewLocalQizmtDir)
+                            && System.IO.Directory.Exists(NewLocalQizmtParentDir))
+                        {
+                            //XLog.statuslog("Copy Qizmt to " + NewLocalQizmtDir);
+                            CopyDirectory(LocalQizmtDir, NewLocalQizmtDir);
+                            if (!System.IO.Directory.Exists(LocalQizmtDir))
+                            {
+                                throw new System.IO.IOException("Not able to copy Qizmt from " + LocalQizmtDir + " to " + NewLocalQizmtDir);
+                            }
+                            LocalQizmtDir = NewLocalQizmtDir;
+                            XLog.statuslog("Copied Qizmt to " + NewLocalQizmtDir);
+                        }
+                    }
+                }
+                catch
+                {
+                }
+
                 {
 
                     XLog.statuslog("Setting Qizmt DistributedObjects permissions");
@@ -139,7 +204,7 @@ namespace QizmtEC2ServiceInit
 
                     {
                         System.Threading.Thread.Sleep(1000 * 2);
-                        CallSC(@"sc config DistributedObjects obj= .\administrator password= " + mypassword);
+                        CallSC(@"sc config DistributedObjects binPath= """ + LocalQizmtDir + @"\MySpace.DataMining.DistributedObjects.exe"" obj= .\administrator password= """ + mypassword + @"""");
                     }
 
                     {
@@ -177,6 +242,27 @@ namespace QizmtEC2ServiceInit
 
             XLog.statuslog("Done");
 
+        }
+
+
+        private static void CopyDirectory(string sourcePath, string destPath)
+        {
+            if (!System.IO.Directory.Exists(destPath))
+            {
+                System.IO.Directory.CreateDirectory(destPath);
+            }
+
+            foreach (string file in System.IO.Directory.GetFiles(sourcePath))
+            {
+                string dest = System.IO.Path.Combine(destPath, System.IO.Path.GetFileName(file));
+                System.IO.File.Copy(file, dest);
+            }
+
+            foreach (string folder in System.IO.Directory.GetDirectories(sourcePath))
+            {
+                string dest = System.IO.Path.Combine(destPath, System.IO.Path.GetFileName(folder));
+                CopyDirectory(folder, dest);
+            }
         }
 
 
@@ -307,7 +393,30 @@ namespace QizmtEC2ServiceInit
                 System.IO.Directory.CreateDirectory(thisnetpath);
             }
             string thislogonfile = thisnetpath + @"\logon.dat";
-            System.IO.File.WriteAllText(thislogonfile, logondatContent);
+            for (int itries = 0; ; )
+            {
+                try
+                {
+                    System.IO.File.WriteAllText(thislogonfile, logondatContent);
+                }
+                catch
+                {
+                    if (++itries > 3)
+                    {
+                        throw;
+                    }
+                    System.Threading.Thread.Sleep(1000 * itries);
+                    try
+                    {
+                        System.IO.File.Delete(thislogonfile);
+                    }
+                    catch
+                    {
+                    }
+                    continue;
+                }
+                break;
+            }
             XLog.statuslog("Logging on all machines in cluster");
             if (!LogonMachines(thislogonfile))
             {
@@ -329,7 +438,6 @@ namespace QizmtEC2ServiceInit
                     try
                     {
                         fmhost = GetHostnameInternal(rhost);
-                        appendhostsfiles += rhost + "    " + fmhost + Environment.NewLine;
                     }
                     catch
                     {
@@ -341,7 +449,31 @@ namespace QizmtEC2ServiceInit
                         System.IO.Directory.CreateDirectory(rnetpath);
                     }
                     string rlogonfile = rnetpath + @"\logon.dat";
-                    System.IO.File.WriteAllText(rlogonfile, logondatContent);
+
+                    for (int itries = 0; ; )
+                    {
+                        try
+                        {
+                            System.IO.File.WriteAllText(rlogonfile, logondatContent);
+                        }
+                        catch
+                        {
+                            if (++itries > 3)
+                            {
+                                throw;
+                            }
+                            System.Threading.Thread.Sleep(1000 * itries);
+                            try
+                            {
+                                System.IO.File.Delete(rlogonfile);
+                            }
+                            catch
+                            {
+                            }
+                            continue;
+                        }
+                        break;
+                    }
 
                     System.IO.File.AppendAllText(ToNetworkPath(hostsfilepath, fmhost), appendhostsfiles);
                 }
@@ -359,6 +491,22 @@ namespace QizmtEC2ServiceInit
 
         public static bool LogonMachines(string logonfile)
         {
+            {
+                string cmdname = "net";
+                string cmdargs = "CONFIG SERVER /Autodisconnect:-1";
+                System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(cmdname, cmdargs);
+                psi.UseShellExecute = false;
+                psi.CreateNoWindow = true;
+                psi.RedirectStandardError = true;
+                System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
+                //proc.WaitForExit();
+                string erroutput = proc.StandardError.ReadToEnd().Trim();
+                proc.Dispose();
+                if (erroutput.Length > 0)
+                {
+                    throw new Exception("Process.Start(\"" + cmdname + "\", \"" + cmdargs + "\") error: " + erroutput);
+                }
+            }
             // File in the format:
             // <WindowsUser>
             // <machine>=<password>
@@ -414,10 +562,9 @@ namespace QizmtEC2ServiceInit
                         catch
                         {
                         }
-                        //AccessNetworkShare(sharepath, user, passwd);
                         {
                             string cmdname = "net";
-                            string cmdargs = "use * \"" + sharepath + "\" \"/USER:" + user + "\" \"" + passwd + "\"";
+                            string cmdargs = "use * \"" + sharepath + "\" \"/USER:" + machine + @"\" + user + "\" \"" + passwd + "\"";
                             System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(cmdname, cmdargs);
                             psi.UseShellExecute = false;
                             psi.CreateNoWindow = true;
@@ -451,10 +598,12 @@ namespace QizmtEC2ServiceInit
         }
 
 
+        // NOTE: Hardcoded path!
+        internal static string LocalQizmtDir = @"C:\Qizmt"; // May be moved to D drive at startup.
+
         public static string NetworkPathForHost(string host)
         {
-            // NOTE: Hardcoded path!
-            return ToNetworkPath(@"C:\Qizmt", host);
+            return ToNetworkPath(LocalQizmtDir, host);
         }
 
 

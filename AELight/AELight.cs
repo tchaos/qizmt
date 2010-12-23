@@ -45,6 +45,7 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    retrylogmd5 <logfile>   writes all output to the logfile");
             Console.WriteLine("Actions:");
             Console.WriteLine("    edit <jobs.xml>         edit the specified jobs source code XML file");
+            Console.WriteLine("    configedit <x.config>   edit the specified configuration text file");
             //Console.WriteLine("    exec <jobs.xml>         run the specified jobs source code XML file");
             Console.WriteLine(@"    exec [""</xpath>=<value>""] <jobs.xml>  run the jobs source code XML file");
             Console.WriteLine("    addmachine <host>       add a machine to the cluster");
@@ -54,6 +55,7 @@ namespace MySpace.DataMining.AELight
             Console.WriteLine("    ps                      distributed processes, schedule and queue info");
             Console.WriteLine("    who                     show who is logged on");
             Console.WriteLine("    history [<count>] [-j]  show command history");
+            Console.WriteLine("    hdhistory [<num-days>]  show hard disk history (installation disk)");
             Console.WriteLine("    killall                 kill all jobs, clean any orphaned intermediate data");
             Console.WriteLine("    killall xproxy          killall using install credentials");
             Console.WriteLine("    killall MemCacheRollback [xproxy]    killall & force rollback all MemCaches");
@@ -2578,6 +2580,61 @@ namespace MySpace.DataMining.AELight
                     System.IO.File.Delete("filerepairlog.txt");
                     Console.Write('.');
                     Console.WriteLine();
+                    break;
+
+                case "hdhistory":
+                    {
+                        int days = 1;
+                        string host = "localhost";
+                        if (args.Length > 1)
+                        {
+                            days = int.Parse(args[1]);
+                            if (args.Length > 2)
+                            {
+                                host = args[2];
+                            }
+                        }
+                        try
+                        {
+                            DateTime cutoff = DateTime.Now.AddDays(-days);
+                            string netpath = Surrogate.NetworkPathForHost(host);
+                            using (System.IO.StreamReader sr = new System.IO.StreamReader(netpath + @"\harddrive_history.txt"))
+                            {
+                                for (; ; )
+                                {
+                                    string ln = sr.ReadLine();
+                                    if (null == ln)
+                                    {
+                                        break;
+                                    }
+                                    string[] parts = ln.Split('|');
+                                    if (parts.Length > 0)
+                                    {
+                                        string part = parts[0].Trim();
+                                        string partfind = "Sample Taken: ";
+                                        if (part.StartsWith(partfind))
+                                        {
+                                            try
+                                            {
+                                                string sdt = part.Substring(partfind.Length);
+                                                DateTime dt = DateTime.Parse(sdt);
+                                                if (dt > cutoff)
+                                                {
+                                                    Console.WriteLine(ln);
+                                                }
+                                            }
+                                            catch
+                                            {
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (System.IO.FileNotFoundException)
+                        {
+                        }
+                    }
                     break;
 
                 case "dfscheck":
@@ -7290,6 +7347,14 @@ namespace MySpace.DataMining.AELight
                         string newactualfilename = args[2];
                         string newprettyfilename = args[3];
                         string filetype = args[4];
+                        bool autoskip4bytes = false;
+                        try
+                        {
+                            autoskip4bytes = (args.Length > 5) && "-h4" == args[5];
+                        }
+                        catch
+                        {
+                        }
 
                         /*if (0 != string.Compare(DfsFileTypes.JOB, filetype))
                         {
@@ -7310,6 +7375,14 @@ namespace MySpace.DataMining.AELight
                                 //if (finfo.Exists)
                                 {
                                     flen = finfo.Length;
+                                    if (autoskip4bytes)
+                                    {
+                                        flen -= 4;
+                                        if (flen < 0)
+                                        {
+                                            flen = 0;
+                                        }
+                                    }
                                     dfs.DfsFile.FileNode fnode = new dfs.DfsFile.FileNode();
                                     fnode.Host = newactualfilehost;
                                     fnode.Position = 0;
@@ -7974,7 +8047,7 @@ namespace MySpace.DataMining.AELight
                         {
                             Console.WriteLine();
                             Console.WriteLine("Calling '{0} metabackup -backup-now' on new surrogate...", appname);
-                            System.Threading.Thread.Sleep(1000 * 20); // Give another sec to startup.
+                            System.Threading.Thread.Sleep(1000 * 60); // Give another sec to startup.
                             Console.WriteLine(Shell(appname + " @=" + newhost + " metabackup -backup-now").Trim());
                         }
 

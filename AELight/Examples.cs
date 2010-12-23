@@ -4069,6 +4069,228 @@ Exec usage:
             Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
             #endregion
 
+            #region LargeWordCount
+            alljobfiles.Add(@"Qizmt-LargeWordCount.xml");
+            AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);
+            AELight.DfsPutJobsFileContent(alljobfiles[alljobfiles.Count - 1],
+                @"<SourceCode>
+  <Jobs>
+    
+    <!-- Check arguments: -->
+    <Job Name=`checkargs` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                // Ensure expected arguments.
+                if(Qizmt_ExecArgs.Length <= 0)
+                {
+                    throw new Exception(`   ***   Expected argument: <expand-size>   `);
+                }
+                CommandUtils.ParseLongByteSize(Qizmt_ExecArgs[0]); // Test it.
+            }
+        ]]>
+      </Local>
+    </Job>
+    
+    <!-- Generate initial words: -->
+    <Job Name=`genwords` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                try
+                {
+                    Qizmt_Log(Shell(`Qizmt wordgen Qizmt-LargeWordCount-1MB.txt 1MB rand=frand`, false));
+                }
+                catch
+                {
+                }
+            }
+        ]]>
+      </Local>
+    </Job>
+    
+    <!-- Expand words: -->
+    <Job Name=`expandwords_Preprocessing` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+            public virtual void Local()
+            {
+                try
+                {
+                    Shell(`Qizmt del Qizmt-LargeWordCount-AllWords.txt`, true);
+                }
+                catch
+                {
+                }
+            }
+        ]]>
+      </Local>
+    </Job>
+    <!--
+        Output size should be roughly the size requested.
+        However, if [0B] is shown to output, it may be much less.
+    -->
+    <Job Name=`expandwords` Custodian=`` Email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>int</KeyLength>
+        <DFSInput>dfs://Qizmt-LargeWordCount-1MB.txt</DFSInput>
+        <DFSOutput>dfs://Qizmt-LargeWordCount-AllWords.txt</DFSOutput>
+        <OutputMethod>grouped</OutputMethod>
+      </IOSettings>
+      <MapReduce>
+        <Map>
+          <![CDATA[
+            List<byte> keybytes = new List<byte>(); // Reused buffer for key.
+            bool first = true; // Keep track of first map iteration.
+            public virtual void Map(ByteSlice line, MapOutput output)
+            {
+                if(first)
+                {
+                    // Initialize random on first map iteration.
+                    first = false;
+                    FRandom.Seed(unchecked(Qizmt_ProcessID * 5 + 2231));
+                }
+                keybytes.Clear(); // Clear to prepare for key.
+                Entry.ToBytesAppend(FRandom.Next(), keybytes); // Random number key.
+                output.Add(ByteSlice.Prepare(keybytes), line); // Map all input as value.
+            }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[
+            List<byte[]> rows = new List<byte[]>(); // Keep track of all values from input file.
+            long totalBytesThisProcess = 0;
+            public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+            {
+                while(values.MoveNext())
+                {
+                    rows.Add(values.Current.ToBytes()); // Keep a copy of all values from input file.
+                    totalBytesThisProcess += values.Current.Length; // Keep track of total size.
+                }
+                
+                // Use all values on last reduce iteration to expand the data.
+                if(StaticGlobals.Qizmt_Last)
+                {
+                    FRandom.Seed(unchecked((Qizmt_ProcessID * 5 + 828) * DateTime.Now.Minute)); // Initialize random.
+                    long expandsize = CommandUtils.ParseLongByteSize(Qizmt_ExecArgs[0]); // Expand size provided by user argument.
+                    long thisexpand = expandsize / Qizmt_ProcessCount; // Expand size for this process (total divided by process count).
+                    int avgreclen = checked((int)(totalBytesThisProcess / rows.Count)); // Average record length.
+                    long thisoutputrecords = thisexpand / avgreclen; // Roughly the number of records this process should output.
+                    for(long thisoutputsofar = 0; thisoutputsofar < thisoutputrecords; thisoutputsofar++)
+                    {
+                        // Randomly select values to output.
+                        int upper = rows.Count;
+                        int i = FRandom.Next(0, upper);
+                        output.WriteLine(ByteSlice.Prepare(rows[i]));
+                    }
+                }
+                
+                
+            }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    
+    <!-- Word count: -->
+    <Job Name=`Cleanup` Custodian=`` email=``>
+      <IOSettings>
+        <JobType>local</JobType>
+      </IOSettings>
+      <Local>
+        <![CDATA[
+        public virtual void Local()
+        {
+            Shell(@`Qizmt del Qizmt-LargeWordCount-WordCounts.txt`, true); // Clean previous run.            
+        }
+        ]]>
+      </Local>
+    </Job>
+    <Job Name=`WordCountByPartialReduce` Custodian=`` email=``>
+      <IOSettings>
+        <JobType>mapreduce</JobType>
+        <KeyLength>16</KeyLength>
+        <DFSInput>dfs://Qizmt-LargeWordCount-AllWords.txt</DFSInput>
+        <DFSOutput>dfs://Qizmt-LargeWordCount-WordCounts.txt</DFSOutput>
+      </IOSettings>
+      <PartialReduce/>        
+      <MapReduce>
+        <Map>
+          <![CDATA[
+          public virtual void Map(ByteSlice line, MapOutput output)
+          {
+              mstring sLine = mstring.Prepare(line); // Input line as mstring.
+              mstringarray parts = sLine.SplitM(' '); // Split input by space.
+              
+             for(int i = 0; i < parts.Length; i++) // For each word...
+             {
+                    mstring word = parts[i]; // Current word.
+                    
+                    if(word.Length > 0 && word.Length <= 16) // If appropriate word length.
+                    {                        
+                        // Lowercase word as key; and 1 as value to sum.
+                        recordset rs = recordset.Prepare();
+                        rs.PutInt(1);
+                        output.Add(word.ToLowerM(), rs); 
+                    }                                 
+             }
+          }
+        ]]>
+        </Map>
+        <Reduce>
+          <![CDATA[         
+          public override void Reduce(ByteSlice key, ByteSliceList values, ReduceOutput output)
+          {
+              int totalCount = 0;
+              
+              if(StaticGlobals.ExecutionContext == ExecutionContextType.PARTIALREDUCE)
+              {
+                  // Partial reduce to combine counts.
+                  totalCount = values.Length;
+                 
+                  recordset rs = recordset.Prepare();
+                  rs.PutInt(totalCount); // Update value with intermediate count.
+                  output.Add(key, rs.ToByteSlice());
+              }
+              else
+              {
+			      // Add values together from partial reduce.
+                  for(int i = 0; i < values.Length; i++)
+                  {
+                      recordset rs = recordset.Prepare(values[i].Value);
+                      int count = rs.GetInt();
+                      totalCount += count;
+                  }
+                  
+                  // Final output with count of occurrences of this word.
+                  mstring outline = mstring.Prepare(UnpadKey(key));
+                  outline = outline.AppendM(',').AppendM(totalCount);
+                  output.Add(outline);
+              }
+          }
+        ]]>
+        </Reduce>
+      </MapReduce>
+    </Job>
+    
+  </Jobs>
+</SourceCode>
+".Replace('`', '"'));
+            Console.WriteLine("    Qizmt exec {0}", alljobfiles[alljobfiles.Count - 1]);
+            #endregion
+
             #region Qizmt-AddUsingReferences
             alljobfiles.Add(@"Qizmt-AddUsingReferences.xml");
             AELight.DfsDelete(alljobfiles[alljobfiles.Count - 1], false);

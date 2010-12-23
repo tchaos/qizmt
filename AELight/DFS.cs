@@ -3793,28 +3793,8 @@ switch(workerindex)
             }
         }
 
-        static void _KillDataFileChunks_unlocked_mt(List<dfs.DfsFile> delfiles, bool verbose)
+        static void _KillDataFileChunksInternal_unlocked_mt(List<string> fnodes)
         {
-            if (delfiles.Count == 0)
-            {
-                return;
-            }
-
-            List<string> fnodes = new List<string>();
-            for (int di = 0; di < delfiles.Count; di++)
-            {
-                dfs.DfsFile dfsf = delfiles[di];
-
-                //Collect file node paths.
-                for (int dn = 0; dn < dfsf.Nodes.Count; dn++)
-                {
-                    foreach (string chost in dfsf.Nodes[dn].Host.Split(';'))
-                    {
-                        fnodes.Add(NetworkPathForHost(chost) + @"\" + dfsf.Nodes[dn].Name);
-                    }
-                }
-            }
-
             int dist = 15;
             int maxThread = 15;
 
@@ -3847,6 +3827,31 @@ switch(workerindex)
                 }
                 ), fnodes, nThreads);
             }
+        }
+
+        static void _KillDataFileChunks_unlocked_mt(List<dfs.DfsFile> delfiles, bool verbose)
+        {
+            if (delfiles.Count == 0)
+            {
+                return;
+            }
+
+            List<string> fnodes = new List<string>();
+            for (int di = 0; di < delfiles.Count; di++)
+            {
+                dfs.DfsFile dfsf = delfiles[di];
+
+                //Collect file node paths.
+                for (int dn = 0; dn < dfsf.Nodes.Count; dn++)
+                {
+                    foreach (string chost in dfsf.Nodes[dn].Host.Split(';'))
+                    {
+                        fnodes.Add(NetworkPathForHost(chost) + @"\" + dfsf.Nodes[dn].Name);
+                    }
+                }
+            }
+
+            _KillDataFileChunksInternal_unlocked_mt(fnodes);
 
             if (verbose)
             {

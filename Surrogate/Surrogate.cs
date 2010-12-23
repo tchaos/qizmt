@@ -20,6 +20,8 @@
 
 //#define VARIABLE_NETWORK_PATHS
 
+//#define LOGON_MACHINES
+
 
 using System;
 using System.Collections.Generic;
@@ -2654,6 +2656,7 @@ namespace MySpace.DataMining.AELight
             // <machine>=<password>
             try
             {
+                bool disabledautodisconnect = false;
                 using (System.IO.StreamReader sr = new System.IO.StreamReader(logonfile))
                 {
                     string user = sr.ReadLine();
@@ -2704,10 +2707,23 @@ namespace MySpace.DataMining.AELight
                         catch
                         {
                         }
-                        //AccessNetworkShare(sharepath, user, passwd);
+                        if (!disabledautodisconnect)
+                        {
+                            disabledautodisconnect = true;
+                            string cmdname = "net";
+                            string cmdargs = "CONFIG SERVER /Autodisconnect:-1";
+                            System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(cmdname, cmdargs);
+                            psi.UseShellExecute = false;
+                            psi.CreateNoWindow = true;
+                            psi.RedirectStandardOutput = true;
+                            System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
+                            //proc.WaitForExit();
+                            proc.StandardOutput.ReadToEnd();
+                            proc.Dispose();
+                        }
                         {
                             string cmdname = "net";
-                            string cmdargs = "use * \"" + sharepath + "\" \"/USER:" + user + "\" \"" + passwd + "\"";
+                            string cmdargs = "use * \"" + sharepath + "\" \"/USER:" + machine + @"\" + user + "\" \"" + passwd + "\"";
                             System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(cmdname, cmdargs);
                             psi.UseShellExecute = false;
                             psi.CreateNoWindow = true;
