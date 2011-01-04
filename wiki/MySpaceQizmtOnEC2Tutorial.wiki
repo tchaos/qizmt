@@ -108,11 +108,11 @@ The actual time that it takes to complete this tutorial varies and there are no 
   Followed by a map reduce job to perform word counts.
  # *`Qizmt perfmon diskio`* can be called in another Command Prompt window to display the Disk I/O performance of the machines in the cluster while the job is running.
   Note that this can take several minutes to complete due to the job using resources.
-  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_025_QizmtPerf.png
+  <img src="http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_025_QizmtPerf.png" alt="Performance" width="90%" height="90%" />
  # *`Qizmt perfmon cputime`* can be used to get the CPU usage of the machines in the cluster.
  # Type *`Qizmt perfmon availablememory`* to get the available memory of the machines in the cluster.
  # Type *`Qizmt head Qizmt-LargeWordCount-WordCounts.txt 30`* to view the first 30 lines of the word count output file when the job is successfully done.
-  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_026_QizmtHead.png
+  <img src="http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_026_QizmtHead.png" alt="Qizmt head" width="90%" height="90%" />
  # Type *`qizmt get Qizmt-LargeWordCount-WordCounts.txt \\<host>\d$\<dir>\wordcounts.txt`* to get a copy of the resulting word counts out of MR.DFS
  # When you are done using the cluster,
   * click on <font color="brown">Terminate Cluster</font>,
@@ -242,8 +242,6 @@ such as:  `ec2-create-image -n "MySpaceQizmt1" i-90f3effb`
 succeeded with:  `IMAGE   ami-b8c42cd1`
 
 View at:  https://console.aws.amazon.com/ec2/home#c=EC2&s=Images
-
-
 
 
 
