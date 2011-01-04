@@ -23,4 +23,9 @@ MySpace Qizmt is a mapreduce framework for executing and developing distributed 
 
 == Contributor Documentation ==
 
-[MySpaceQizmtOpenSourceContribution MySpace Qizmt Open Source Contribution ]
+[MySpaceQizmtOpenSourceContribution MySpace Qizmt Open Source Contribution]
+
+== Qizmt on EC2 Documentation ==
+
+[MySpaceQizmtOnEC2Tutorial Qizmt on EC2 Tutorial]
+
