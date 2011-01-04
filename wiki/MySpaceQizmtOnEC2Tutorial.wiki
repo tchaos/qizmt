@@ -126,9 +126,122 @@ The actual time that it takes to complete this tutorial varies and there are no 
 
 
 
+<table width="100%"><tr><td width="100%" align="center">
+==Appendix==
+===AMI setup notes for Qizmt on EC2===
+</td></tr></table>
+
+This is for preparing to create an AMI (Amazon EC2 OS image) with Qizmt and QizmtEC2Service preinstalled.
+
+====EC2 base images:====
+*_Instance Store*_
+
+`ami-dd20c3b4 x86_64 windows "ec2-public-windows-images/Server2003r2-x86_64-Win-v1.07.manifest.xml"`
+
+`ami-df20c3b6 i386 windows "ec2-public-windows-images/Server2003r2-i386-Win-v1.07.manifest.xml"`
 
 
+====Steps to prepare Windows instance on EC2 for Qizmt:====
 
+-	Log into EC2 instance via Remote Desktop using auto-generated password from EC2 (through elasticfox, etc).
+(In Remote Desktop’s options, enable ‘Local devices and resources’ for Drives to allow copying files into EC2)
+
+-	Set Network Location: Home (Not on 2003)
+
+-	Change network and sharing settings in Network and Sharing Center: (Not on 2003)
+  # Turn On "File sharing"
+  # Turn Off "Password protected sharing"
+
+-	Disable Windows Firewall. (Only if already enabled)
+
+-	Apply Qizmt registry changes.
+
+-	Set console defaults.
+Put "Command Prompt" shortcut on desktop.
+
+-	Folder settings: (explorer: alt, tools, folder options, view)
+  # don't hide file extensions
+  # show hidden files
+
+-	Install Qizmt at C:\Qizmt with `.\Administrator` account.
+If it is already installed, ensure it is pointing to `C:\Qizmt`:
+`sc config "DistributedObjects" binPath= "C:\Qizmt\MySpace.DataMining.DistributedObjects.exe"`
+Note: Qizmt must have been built with `#define LOGON_MACHINES` in Surrogate.cs
+
+-	Update system environment variables to include `D:\Qizmt` before `C:\Qizmt`.
+Note: `D:\Qizmt` won’t necessarily exist yet.
+
+-	Copy 2 exe's to `C:\QizmtEC2Service`
+  # `QizmtEC2Service.exe`
+  # `QizmtEC2ServiceInit.exe`
+
+-	Run:  `sc create "QizmtEC2Service" binPath= "C:\QizmtEC2Service\QizmtEC2Service.exe" start= auto`
+
+-	then start it:  `net start "QizmtEC2Service"`
+
+-	Delete `C:\QizmtEC2Service\QizmtEC2Service-status.txt` (after looking at it).
+Check for `C:\QizmtEC2Service\QizmtEC2Service-errors.txt`
+(Ignore and delete if error 404)
+
+-	Restore hosts file at `%SystemRoot%\system32\drivers\etc\hosts`
+with `C:\QizmtEC2Service\hosts.old` (restore default, if found)
+(can potentially skip restoring hosts file; shouldn't hurt anything)
+(note: if running service or init twice, hosts.old won't be the default)
+
+-	`C:\Program Files\Amazon\Ec2ConfigService\Settings\config.xml` -
+or `C:\Program Files (x86)\Amazon\Ec2ConfigSetup\config.xml` -
+Plugin Ec2SetPassword: `<State>Enabled</State>`
+
+-	`C:\Program Files\Amazon\Ec2ConfigService\Logs\Ec2ConfigLog.txt` -
+or `C:\Program Files (x86)\Amazon\Ec2ConfigSetup\Ec2ConfigLog.txt`
+replace contents with "`Preparing for Qizmt
+`" (newline)
+
+-	Delete `\Qizmt\logon.dat` (if exists)
+`del c:\logon.dat`
+`del d:\logon.dat`
+
+-	Stop `DistributedObjects` service and set to Manual start.
+
+-	Delete in `C:\Qizmt`:
+  # `del harddrive_history.txt *.xlib *.ylib zfoil* *.tmp service-stoplog.txt`
+  # `del slave.dat`
+  # `del dfs.xml execlog.txt errors.txt jid.dat`
+
+-	Delete any temp files (e.g. qizmt msi)
+Empty recycle bin.
+
+
+====Create AMI:====
+
+*_S3:_*
+
+http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/index.html?creating-an-ami-s3.html
+
+`ec2-bundle-instance <instance_id> -b <bucket_name> -p <bundle_name> -o <access_key_id> -w <secret_access_key>`
+
+such as: `ec2-bundle-instance i-2afaa947 -b qizmt2 -p "MySpaceQizmt2_x86_64" -o AKIADQKE4SARGYLE -w eW91dHViZS5jb20vd2F0Y2g/dj1SU3NKMTlzeTNKSQ==`
+(-o and -p are in account credentials)
+
+`ec2-describe-bundle-tasks`
+
+`ec2-register <your-s3-bucket>/image.manifest.xml -n image_name`
+
+such as: `ec2-register "qizmt2/MySpaceQizmt2_x86_64.manifest.xml" -n "MySpaceQizmt2_x86_64"`
+
+succeeded with:  `IMAGE   ami-baea1cd3`
+
+*_EBS:_*
+
+http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/index.html?creating-an-ami-ebs.html
+
+`ec2-create-image -n <your_image_name>  <instance_id>`
+
+such as:  `ec2-create-image -n "MySpaceQizmt1" i-90f3effb`
+
+succeeded with:  `IMAGE   ami-b8c42cd1`
+
+View at:  https://console.aws.amazon.com/ec2/home#c=EC2&s=Images
 
 
 
