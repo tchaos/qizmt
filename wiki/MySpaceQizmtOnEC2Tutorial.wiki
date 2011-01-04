@@ -1,0 +1,56 @@
+#labels Qizmt,EC2,Tutorial
+#MySpace Qizmt on EC2 Tutorial (Amazon EC2)
+
+<wiki:toc max_depth="1" />
+
+= Qizmt on EC2 Tutorial =
+
+==_Overview_==
+
+In this tutorial we will attempt to use the Qizmt-on-EC2 wizard (GPLv3) to automate the rental of EC2 instances linked to an EC2 account, generate a set of random words and execute a Qizmt Mapreduce job which will count the number of occurrences of each word. This tutorial also covers cluster diagnostics and using Qizmt Mapreduce IDE/Debugger on EC2.
+
+http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_001_QizmtCloudImage.png
+
+The actual time that it takes to complete this tutorial varies and there are no guarantees that any software described in this tutorial will work properly or function as expected.
+
+==_Results from Qizmt on EC2 word-count test 12/21/2010_==
+
+|| Execution Time || 8hrs 11min ||        || Per virtual core || 2.5 EC2 Compute Units ||
+|| Instance setup || ~1hrs ||             || MR.DFS size || ~7.14TB (TiB) ||
+|| Gen inputs time || ~1hrs 14min ||      || Disk IO per instance || ~160Mb/s (observed) ||
+|| Input doc size || ~1TB (TiB) ||        || Total disk IO || ~3.1Gb/s (observed) ||
+|| Output doc size || ~2MB ||             || || ||
+|| || ||                                  || || ||
+|| Replication level used || 1 ||         || MR Algorithm || Grouped ||
+|| Instances rented || 20 ||              || Reduce || Partial Reduce (reduce applied both before and after exchange phase) ||
+|| Instance type rented || High-CPU XL || || Logic || Map all words as keys with value as 1, in partial reduce produce intermediate word counts, in reduce add up total count for each word. ||
+|| Total virtual cores || 160 ||          || || ||
+
+==_Preparing your EC2 account on Amazon Web Services_==
+
+ # Read and make sure that you understand this entire tutorial prior to performing any of its described actions. Also, because this tutorial describes how to automate the rental of EC2 instances, you should review the code for Qizmt-on-EC2 (GPLv3) wizard via SVN at http://code.google.com/p/qizmt/
+ # Before resuming this tutorial, make sure that you fully understand all current EC2 rental costs, concepts and terminology and that you have fully reviewed that Qizmt-on-EC2 wizard code that you will be using to automate the rental of EC2 instances. Also be sure that you have read and agree to the GPLv3 license under which all code on <http://code.google.com/p/qizmt/> is released.
+ # Sign up for a free Amazon Web Services Account <http://aws.amazon.com/>.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_002_AWSSignup.png
+  You can use your existing Amazon account login information, or create a new account.
+ # Sign up for EC2 through the Amazon Elastic Compute Cloud (EC2) section under the Products tab
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_003_EC2Section.png  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_004_EC2SignUp.png
+ # Go to the Security Credentials under the Account tab to start getting your X.509 certificate.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_005_AWSCredsLink.png
+ # Go to the Access Credentials and then X.509 Certificates tab
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_006_AWSCredsView.png
+ # Create a new certificate.
+ # Download the certificate to your computer. The file has pattern *`cert-*.pem`*
+ # Download the private key to your computer. The file has pattern *`pk-*.pem`*  If you are attempting to use an existing certificate, you must already have this private key file and it cannot be downloaded again (in this case, create and use a new certificate).
+ # Enter the AWS Management Console to start to create and download an EC2 KeyPair. A link can be found at the top of the page.  Note that this is not the same key as from the previous steps.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_007_AWSMgmtConsole.png
+ # Click the Key Pairs link under NETWORKING & SECURITY in the left Navigation menu under the EC2 tab.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_008_EC2KeyPairs.png
+ # If you do not have a key pair, create one with a name such as _mykeypair1_.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_009_EC2KeyPairCreate.png
+ # Download the private key file to your computer. The file will be named *_mykeypair1.pem_* (for a key pair named _mykeypair1_).
+
+
+
+
+
