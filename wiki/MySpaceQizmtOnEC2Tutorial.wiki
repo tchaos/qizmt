@@ -1,11 +1,9 @@
 #labels Qizmt,EC2,Tutorial
-#MySpace Qizmt on EC2 Tutorial (Amazon EC2)
-
-<wiki:toc max_depth="1" />
+<wiki:toc max_depth="2" />
 
 = Qizmt on EC2 Tutorial =
 
-==_Overview_==
+  ==_Overview_==
 
 In this tutorial we will attempt to use the Qizmt-on-EC2 wizard (GPLv3) to automate the rental of EC2 instances linked to an EC2 account, generate a set of random words and execute a Qizmt Mapreduce job which will count the number of occurrences of each word. This tutorial also covers cluster diagnostics and using Qizmt Mapreduce IDE/Debugger on EC2.
 
@@ -13,7 +11,7 @@ http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_001_QizmtCloudImage.png
 
 The actual time that it takes to complete this tutorial varies and there are no guarantees that any software described in this tutorial will work properly or function as expected.
 
-==_Results from Qizmt on EC2 word-count test 12/21/2010_==
+  ==_Results from Qizmt on EC2 word-count test 12/21/2010_==
 
 || Execution Time || 8hrs 11min ||        || Per virtual core || 2.5 EC2 Compute Units ||
 || Instance setup || ~1hrs ||             || MR.DFS size || ~7.14TB (TiB) ||
@@ -26,7 +24,7 @@ The actual time that it takes to complete this tutorial varies and there are no 
 || Instance type rented || High-CPU XL || || Logic || Map all words as keys with value as 1, in partial reduce produce intermediate word counts, in reduce add up total count for each word. ||
 || Total virtual cores || 160 ||          || || ||
 
-==_Preparing your EC2 account on Amazon Web Services_==
+  ==_Preparing your EC2 account on Amazon Web Services_==
 
  # Read and make sure that you understand this entire tutorial prior to performing any of its described actions. Also, because this tutorial describes how to automate the rental of EC2 instances, you should review the code for Qizmt-on-EC2 (GPLv3) wizard via SVN at http://code.google.com/p/qizmt/
  # Before resuming this tutorial, make sure that you fully understand all current EC2 rental costs, concepts and terminology and that you have fully reviewed that Qizmt-on-EC2 wizard code that you will be using to automate the rental of EC2 instances. Also be sure that you have read and agree to the GPLv3 license under which all code on <http://code.google.com/p/qizmt/> is released.
@@ -49,6 +47,40 @@ The actual time that it takes to complete this tutorial varies and there are no 
  # If you do not have a key pair, create one with a name such as _mykeypair1_.
   http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_009_EC2KeyPairCreate.png
  # Download the private key file to your computer. The file will be named *_mykeypair1.pem_* (for a key pair named _mykeypair1_).
+  ==_Get  EC2 Command-line Tools_==
+ # Ensure that Java is installed on your computer.
+ # Download ec2-api-tools.zip file from http://aws.amazon.com/developertools/351?_encoding=UTF8&jiveRedirect=1 to your computer if you do not have it already.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_010_EC2APIToolsDL.png
+ # Un-zip to your computer.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_011_EC2APIToolsUnzip.png
+  ==_Qizmt on EC2 Wizard_==
+ # Download Qizmt EC2 setup wizard from http://code.google.com/p/qizmt/downloads/list
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_012_QizmtOnEC2DL.png
+  The code for this wizard is available on http://code.google.com/p/qizmt/ 
+  Notes on the AMI setup is in the appendix of this document.
+ # Run the “Qizmt on EC2” wizard and fill out the Setup tab:
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_013_QizmtOnEC2Setup.png
+ # Java home folder is where Java is installed.
+ # EC2 command-line tools home folder is the directory extracted from the tools zip file.
+ # EC2 X.509 certificate file was created during EC2 sign-up and matches pattern *`cert-*.pem`*
+ # EC2 private key file was created during EC2 sign-up and matches pattern *`pk-*.pem`*
+ # Click Next to go to the EC2 Machines tab:
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_014_QizmtOnEC2Machines.png
+ # Select the ami-76bb4a1f - MySpace Qizmt x86_64 instance-store - Server2003r2-x86_64-Win-v1.07 AMI ID. AMI ID is the Amazon image ID with the operating system. A custom built one for MySpace Qizmt must be used for this tutorial. 
+ # Select the c1.xlarge - x86_64 - High-CPU/Extra-Large Instance type. For this wizard you can select any instance of the 64 bit instance types. For info on the listing types and rental costs see http://aws.amazon.com/ec2/instance-types/ and http://aws.amazon.com/ec2/pricing/ 
+ # Select the KeyPair created in EC2 in prior steps of this tutorial. KeyPair name is the name of the key pair. The example used in this tutorial is test3. The drop down button can be used to fetch your available KeyPair names from your EC2 account. http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_015_ComboLoading.png
+ # Set KeyPair private key file to the private key file downloaded in prior steps of this tutorial. KeyPair private key file is the file downloaded after creating the key pair and matches file name *_test3.pem_* (for a key pair named _test3_).
+ # Leave the Availability Zone option blank. Availability Zone is where the machines are located. This can be left at the default or can be changed to another availability zone. Note that availability zones may have different pricing; see http://aws.amazon.com/ec2/ for information.
+ # Leave Security Groups specifying “default” Security Groups can list the security groups you wish to use, such as to restrict access. Note that this should be done carefully and can prevent Qizmt from operating.
+ # Click Next to go to the Qizmt Cluster tab.
+ # Enter the number of machines to rent for this Qizmt cluster. This is the number of EC2 instances that will be powered on to create this cluster. Note that each machine counts as an EC2 instance and has additional pricing; see the http://aws.amazon.com/ec2/  for information.
+ # Set an administrator password and retype it.
+  <font color="red">*Reminder: By clicking on “Start Qizmt Cluster” you will be attempting to automate the rental of multiple EC2 instances. The code for this wizard is available on http://code.google.com/p/qizmt/ and it is your responsibility to review and re-build the code for the Qizmt-on-EC2 wizard as there is never a guarantee that it or any other code on http://code.google.com/p/qizmt/ or the Qizmt EC2 AIMs will function properly.*</font>
+ # Click the Start Qizmt Cluster button and wait for your cluster to be rented. Click OK to confirm. This can take about over 40 minutes for EC2 to allocate the Qizmt instances. While waiting you should log into EC2 and confirm that your instances are launching.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_016_QizmtOnEC2Cluster.png
+ # When the Qizmt cluster is ready, the Qizmt-on-EC2 wizard will automatically launch a remote desktop session. Log in using user name Administrator and the password you entered. Leave the Qizmt-on-EC2 wizard open while you are still using the cluster.
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_017_QizmtOnEC2StartCluster.png
+  http://qizmt.googlecode.com/svn/wiki/images/QizmtOnEC2_018_RDConnecting.png
 
 
 
