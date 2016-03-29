@@ -1,0 +1,32 @@
+<a href='Hidden comment: Image:'></a><img src='http://qizmt.googlecode.com/svn/wiki/images/Qizmt_logo_small.png' alt='Qizmt logo (small)' />
+
+Back to <a href='Hidden comment: Link:'></a>[Wiki Main](Main.md)
+
+  * Binary API
+    * [ByteSlice Methods](MySpaceQizmtReferenceByteSliceMethods.md)
+    * [ByteSlice Static Methods](MySpaceQizmtReferenceByteSliceStaticMethods.md)
+    * [Entry Static Methods](MySpaceQizmtReferenceEntryStaticMethods.md)
+    * [MapOutput Methods](MySpaceQizmtReferenceMapOutputMethods.md)
+    * [ReduceOutput Methods](MySpaceQizmtReferenceReduceOutputMethods.md)
+    * [ByteSliceList Properties](MySpaceQizmtReferenceByteSliceListProperties.md)
+    * [ByteSliceList Methods](MySpaceQizmtReferenceByteSliceListMethods.md)
+    * [ReduceEntry Properties](MySpaceQizmtReferenceReduceEntryProperties.md)
+    * [ReduceEntry Methods](MySpaceQizmtReferenceReduceEntryMethods.md)
+  * Mapreducer-aware Memory Management
+    * [mstring Static Methods](MySpaceQizmtReferenceMStringStaticMethods.md)
+    * [mstring Methods](MySpaceQizmtReferenceMStringMethods.md)
+    * [mstringarray Static Methods](MySpaceQizmtReferenceMStringArrayStaticMethods.md)
+    * [mstringarray Properties](MySpaceQizmtReferenceMStringArrayProperties.md)
+    * [recordset Static Methods](MySpaceQizmtReferenceRecordsetStaticMethods.md)
+    * [recordset Methods](MySpaceQizmtReferenceRecordsetMethods.md)
+  * [Static Globals](MySpaceQizmtReferenceStaticGlobals.md)
+  * [Qizmt\_\* Constants](MySpaceQizmtReferenceQizmtConstants.md)
+  * [Qizmt\_\* Methods](MySpaceQizmtReferenceQizmtMethods.md)
+  * [System.Linq Support](MySpaceQizmtReferenceSystemLinqSupport.md)
+  * [Unsafe Code](MySpaceQizmtReferenceUnsafeCode.md)
+  * [Sort Order of Keys](MySpaceQizmtReferenceSortOrderOfKeys.md)
+  * [Character Encoding](MySpaceQizmtReferenceCharacterEncoding.md)
+  * [Multiple Input/Output Files in a Remote Job](MySpaceQizmtReferenceRemoteJobMultipleInputOutputFiles.md)
+  * [Multiple Input/Output Files in a Mapreduce Job](MySpaceQizmtReferenceMapreduceJobMultipleInputOutputFiles.md)
+  * [IntermediateDataAddressing and KeyRepeatedEnabled](MySpaceQizmtReferenceIntermediateDataAddressing.md)
+  * [Heterogeneous Rectangular Binary Files](MySpaceQizmtReferenceHeterogeneousRectangularBinaryFile.md)
